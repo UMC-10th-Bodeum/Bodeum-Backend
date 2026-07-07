@@ -1,0 +1,70 @@
+language: ko-KR
+
+reviews:
+  path_instructions:
+    - path: "**/controller/**"
+      instructions: >
+        Controller는 요청 검증, 인증 사용자 추출, Service 호출, 응답 반환만 담당해야 합니다.
+        Controller에서 Repository를 직접 호출하지 않는지 확인하세요.
+        Controller에 비즈니스 로직이 포함되어 있지 않은지 확인하세요.
+        URL은 소문자, 복수형 명사, kebab-case를 사용하는지 확인하세요.
+        요청 DTO에 @Valid가 적용되어 있는지 확인하세요.
+        인증 사용자 정보는 @AuthenticationPrincipal로 받는지 확인하세요.
+
+    - path: "**/service/**"
+      instructions: >
+        조회 메서드에 @Transactional(readOnly = true)가 적용되어 있는지 확인하세요.
+        생성, 수정, 삭제 메서드에 @Transactional이 적용되어 있는지 확인하세요.
+        권한 검증이 Service에서 수행되는지 확인하세요.
+        Service에서 ResponseEntity를 반환하지 않는지 확인하세요.
+
+    - path: "**/repository/**"
+      instructions: >
+        Repository는 DB 조회와 저장만 담당하는지 확인하세요.
+
+    - path: "**/entity/**"
+      instructions: >
+        Entity가 API 응답으로 직접 반환되지 않는지 확인하세요.
+        Entity에 @Setter를 사용하지 않는지 확인하세요.
+        모든 @ManyToOne에 fetch = FetchType.LAZY가 명시되어 있는지 확인하세요.
+        테이블과 컬럼은 snake_case, Java Entity 필드는 camelCase를 사용하는지 확인하세요.
+        PK는 id, FK는 {table}_id 형식을 사용하는지 확인하세요.
+
+    - path: "**/dto/**"
+      instructions: >
+        요청 DTO는 ReqDTO, 응답 DTO는 ResDTO 접미사를 사용하는지 확인하세요.
+        Request DTO와 Response DTO가 분리되어 있는지 확인하세요.
+        DTO가 가능한 record로 작성되어 있는지 확인하세요.
+        입력값 검증이 ReqDTO에 작성되어 있는지 확인하세요.
+
+    - path: "**/exception/**"
+      instructions: >
+        RuntimeException을 직접 던지지 않고 ErrorCode, BusinessException을 사용하는지 확인하세요.
+        사용자 메시지가 Service에 하드코딩되어 있지 않은지 확인하세요.
+
+    - path: "src/main/resources/db/migration/**"
+      instructions: >
+        공용 DB 변경이 Flyway migration으로만 수행되는지 확인하세요.
+        이미 적용 완료된 migration 파일을 수정하지 않고 새 파일을 추가했는지 확인하세요.
+
+    - path: "**/*.java"
+      instructions: >
+        Naver Java Coding Convention을 기본 스타일로 따르는지 확인하세요.
+        들여쓰기는 4칸 스페이스를 사용하는지 확인하세요.
+        한 줄 최대 길이가 120자를 넘지 않는지 확인하세요.
+        wildcard import를 사용하지 않는지 확인하세요.
+        조건문과 반복문에 항상 중괄호를 사용하는지 확인하세요.
+        매직 넘버와 문자열이 상수 또는 Enum으로 분리되어 있는지 확인하세요.
+        네이밍 컨벤션(Entity는 명사형 PascalCase, Controller/Service/Repository는 "도메인+역할" 형식,
+        Exception은 "도메인+상황+Exception" 형식)을 따르는지 확인하세요.
+        메서드 네이밍 규칙(필수 단건 조회는 getXById, Optional 단건 조회는 findByX,
+        조건 검색은 searchX, 생성/수정/삭제는 createX/updateX/deleteX,
+        Boolean은 isX/hasX/canX 형식)을 따르는지 확인하세요.
+
+  commit_status: true
+  request_changes_workflow: false
+
+  tone_instructions: >
+    PR 체크리스트(Controller 로직 분리, Entity 직접 반환 금지, DTO 분리, Enum 상태값 관리,
+    ErrorCode/BusinessException 예외 처리, Flyway migration, ERD-Entity-migration 일치 여부)를
+    기준으로 리뷰하세요.
