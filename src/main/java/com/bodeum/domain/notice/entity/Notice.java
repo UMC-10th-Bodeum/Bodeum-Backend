@@ -1,12 +1,17 @@
 package com.bodeum.domain.notice.entity;
 
 import com.bodeum.global.common.entity.BaseCreatedUpdatedDeletedEntity;
-import jakarta.persistence.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
+import java.time.Instant;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import java.time.Instant;
 
 @Entity
 @Getter
@@ -55,6 +60,7 @@ public class Notice extends BaseCreatedUpdatedDeletedEntity {
         this.endAt = endAt;
     }
 
+    // TODO: startAt > endAt 유효성 검증 추가 예정 (Service 레이어 또는 여기서 처리)
     public static Notice create(Long userId, String title, String content,
                                 Instant startAt, Instant endAt) {
         return Notice.builder()
