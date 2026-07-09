@@ -1,6 +1,38 @@
 language: ko-KR
 
+tone_instructions: >
+  피드백은 명확하고 구체적으로 작성하고, 문제의 원인과 개선 방법을 함께 제시하세요.
+  비판보다는 개선 중심으로 제안하세요.
+
 reviews:
+  profile: chill
+
+  commit_status: true
+  request_changes_workflow: false
+
+  high_level_summary: true
+  changed_files_summary: true
+  collapse_walkthrough: true
+  sequence_diagrams: true
+
+  assess_linked_issues: true
+  related_issues: false
+  related_prs: true
+
+  suggested_labels: false
+  auto_apply_labels: false
+
+  suggested_reviewers: false
+  auto_assign_reviewers: false
+
+  poem: true
+
+  auto_review:
+    enabled: true
+    auto_incremental_review: true
+    base_branches:
+      - develop
+
   path_instructions:
     - path: "**/controller/**"
       instructions: >
@@ -28,7 +60,8 @@ reviews:
         Entity에 @Setter를 사용하지 않는지 확인하세요.
         모든 @ManyToOne에 fetch = FetchType.LAZY가 명시되어 있는지 확인하세요.
         테이블과 컬럼은 snake_case, Java Entity 필드는 camelCase를 사용하는지 확인하세요.
-        PK는 id, FK는 {table}_id 형식을 사용하는지 확인하세요.
+        PK는 `id` 또는 `{table}_id` 중 프로젝트에서 채택한 규칙을 일관되게 사용하는지 확인하세요.
+        FK는 `{referenced_table}_id` 형식을 사용하는지 확인하세요.
 
     - path: "**/dto/**"
       instructions: >
@@ -61,10 +94,16 @@ reviews:
         조건 검색은 searchX, 생성/수정/삭제는 createX/updateX/deleteX,
         Boolean은 isX/hasX/canX 형식)을 따르는지 확인하세요.
 
-  commit_status: true
-  request_changes_workflow: false
-
   tone_instructions: >
     PR 체크리스트(Controller 로직 분리, Entity 직접 반환 금지, DTO 분리, Enum 상태값 관리,
     ErrorCode/BusinessException 예외 처리, Flyway migration, ERD-Entity-migration 일치 여부)를
     기준으로 리뷰하세요.
+
+chat:
+  auto_reply: true
+
+knowledge_base:
+  web_search:
+    enabled: true
+  code_guidelines:
+    enabled: true
