@@ -7,7 +7,7 @@ import java.time.LocalDateTime;
 public record UserAgreementResDTO(
         boolean serviceTermsAgreed,
         boolean privacyPolicyAgreed,
-        boolean marketingAgreed,
+        boolean aiChatAgreed,
         LocalDateTime agreedAt,
         AuthNextStep nextStep
 ) {
@@ -16,7 +16,7 @@ public record UserAgreementResDTO(
         return new UserAgreementResDTO(
                 userAccount.isServiceTermsAgreed(),
                 userAccount.isPrivacyPolicyAgreed(),
-                userAccount.isMarketingAgreed(),
+                userAccount.isAiChatAgreed(),
                 userAccount.getAgreementAgreedAt(),
                 AuthNextStep.ONBOARDING
         );

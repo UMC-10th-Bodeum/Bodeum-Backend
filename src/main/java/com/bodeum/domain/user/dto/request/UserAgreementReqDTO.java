@@ -10,7 +10,7 @@ public record UserAgreementReqDTO(
         @NotNull(message = "개인정보처리방침 동의 여부는 필수입니다.")
         Boolean privacyPolicyAgreed,
 
-        Boolean marketingAgreed
+        Boolean aiChatAgreed
 ) {
 
     @AssertTrue(message = "필수 약관에 모두 동의해야 합니다.")
@@ -18,7 +18,7 @@ public record UserAgreementReqDTO(
         return Boolean.TRUE.equals(serviceTermsAgreed) && Boolean.TRUE.equals(privacyPolicyAgreed);
     }
 
-    public boolean isMarketingAgreedValue() {
-        return Boolean.TRUE.equals(marketingAgreed);
+    public boolean isAiChatAgreedValue() {
+        return Boolean.TRUE.equals(aiChatAgreed);
     }
 }

@@ -8,7 +8,8 @@ import java.util.Set;
 public enum TermType {
 
     SERVICE("service", Set.of("terms", "service-terms"), "이용약관"),
-    PRIVACY("privacy", Set.of("privacy-policy"), "개인정보처리방침");
+    PRIVACY("privacy", Set.of("privacy-policy"), "개인정보처리방침"),
+    AI_CHAT("ai-chat", Set.of("ai", "ai-chat-terms", "chatbot"), "AI 챗봇 이용 동의 방침");
 
     private final String path;
     private final Set<String> aliases;

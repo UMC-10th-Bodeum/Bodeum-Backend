@@ -20,6 +20,15 @@ public class TermsService {
             );
         }
 
+        if (type == TermType.AI_CHAT) {
+            return TermsResDTO.of(
+                    type,
+                    "1.0",
+                    LocalDate.of(2026, 7, 4),
+                    "AI 챗봇 이용에 동의하시면 입력하신 대화 내용이 답변 생성을 위해 처리됩니다. 선택 항목이며, 동의하지 않아도 서비스를 이용하실 수 있습니다."
+            );
+        }
+
         return TermsResDTO.of(
                 type,
                 "1.0",
