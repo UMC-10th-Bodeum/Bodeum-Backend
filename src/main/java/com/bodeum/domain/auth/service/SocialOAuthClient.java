@@ -127,15 +127,14 @@ public class SocialOAuthClient {
                 });
     }
 
-    @SuppressWarnings("unchecked")
     private SocialUserProfile parseKakaoProfile(Map<String, Object> userInfo) {
         if (userInfo == null || userInfo.get("id") == null) {
             throw new ProjectException(GeneralErrorCode.UNAUTHORIZED);
         }
 
-        Map<String, Object> kakaoAccount = (Map<String, Object>) userInfo.getOrDefault("kakao_account", Map.of());
-        Map<String, Object> profile = (Map<String, Object>) kakaoAccount.getOrDefault("profile", Map.of());
-        Map<String, Object> properties = (Map<String, Object>) userInfo.getOrDefault("properties", Map.of());
+        Map<String, Object> kakaoAccount = mapValue(userInfo.get("kakao_account"));
+        Map<String, Object> profile = mapValue(kakaoAccount.get("profile"));
+        Map<String, Object> properties = mapValue(userInfo.get("properties"));
 
         String providerUserId = String.valueOf(userInfo.get("id"));
         String email = stringValue(kakaoAccount.get("email"));
@@ -148,13 +147,16 @@ public class SocialOAuthClient {
         return new SocialUserProfile(providerUserId, email, nickname);
     }
 
-    @SuppressWarnings("unchecked")
     private SocialUserProfile parseNaverProfile(Map<String, Object> userInfo) {
-        if (userInfo == null || !(userInfo.get("response") instanceof Map<?, ?>)) {
+        if (userInfo == null) {
             throw new ProjectException(GeneralErrorCode.UNAUTHORIZED);
         }
 
-        Map<String, Object> response = (Map<String, Object>) userInfo.get("response");
+        Map<String, Object> response = mapValue(userInfo.get("response"));
+        if (response.isEmpty()) {
+            throw new ProjectException(GeneralErrorCode.UNAUTHORIZED);
+        }
+
         String providerUserId = stringValue(response.get("id"));
         if (!StringUtils.hasText(providerUserId)) {
             throw new ProjectException(GeneralErrorCode.UNAUTHORIZED);
@@ -187,6 +189,21 @@ public class SocialOAuthClient {
         }
 
         return oAuthProperties.getBaseUrl() + "/api/auth/callback/" + provider.getPath();
+    }
+
+    private Map<String, Object> mapValue(Object value) {
+        if (!(value instanceof Map<?, ?> map)) {
+            return Map.of();
+        }
+
+        Map<String, Object> converted = new java.util.LinkedHashMap<>();
+        map.forEach((key, mapValue) -> {
+            if (key instanceof String stringKey) {
+                converted.put(stringKey, mapValue);
+            }
+        });
+
+        return converted;
     }
 
     private String resolveTokenUri(SocialProvider provider, OAuthProperties.ProviderRegistration registration) {

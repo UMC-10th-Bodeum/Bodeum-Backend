@@ -89,7 +89,7 @@ public class AuthService {
 
         // 실제 소셜 연동이 구성된 경우에만 state를 검증한다. (모의 로그인은 리다이렉트 없이 콜백만 호출)
         if (registration != null && registration.isConfigured() && !oAuthStateStore.consume(provider, state)) {
-            log.warn("[AUTH] state 검증 실패 provider={} state={}", provider, state);
+            log.warn("[AUTH] state 검증 실패 provider={} statePresent={}", provider, StringUtils.hasText(state));
             throw new ProjectException(GeneralErrorCode.UNAUTHORIZED);
         }
     }
