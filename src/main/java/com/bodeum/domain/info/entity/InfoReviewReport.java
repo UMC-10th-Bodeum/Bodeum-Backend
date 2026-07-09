@@ -51,7 +51,7 @@ public class InfoReviewReport extends BaseCreatedEntity {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private ReportStatus status = ReportStatus.PENDING;
+    private ReportStatus status;
 
     @Builder
     public InfoReviewReport(Long userId, InfoReview infoReview, ReportReasonType reasonType, String content) {
