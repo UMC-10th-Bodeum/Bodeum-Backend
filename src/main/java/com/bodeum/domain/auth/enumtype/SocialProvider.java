@@ -12,7 +12,8 @@ public enum SocialProvider {
             "https://kauth.kakao.com/oauth/authorize",
             "https://kauth.kakao.com/oauth/token",
             "https://kapi.kakao.com/v2/user/me",
-            // 동의항목 미설정(정보 미수집) 상태이므로 scope를 요청하지 않는다. id는 scope 없이도 내려온다.
+            // 동의항목 미설정 상태이므로 scope를 요청하지 않는다.
+            // id는 scope 없이도 내려온다.
             null,
             false
     ),

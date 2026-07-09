@@ -6,19 +6,20 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.bodeum.domain.auth.enumtype.SocialProvider;
 import com.bodeum.domain.auth.repository.OAuthStateRepository;
 import com.bodeum.domain.auth.repository.RefreshTokenSessionRepository;
-import com.bodeum.domain.user.model.UserAccount;
+import com.bodeum.domain.user.entity.UserAccount;
 import com.bodeum.domain.user.repository.UserAccountRepository;
 import com.bodeum.domain.user.service.UserAccountStore;
 import com.bodeum.global.apiPayload.exception.ProjectException;
 import com.bodeum.global.auth.AuthUserPrincipal;
-import java.util.List;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.IntStream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -73,7 +74,7 @@ class AuthTokenServiceTest {
         CountDownLatch startLatch = new CountDownLatch(1);
 
         try {
-            List<Future<UserAccountStore.UserCreationResult>> futures = java.util.stream.IntStream.range(0, attemptCount)
+            List<Future<UserAccountStore.UserCreationResult>> futures = IntStream.range(0, attemptCount)
                     .mapToObj(index -> executorService.submit(() -> {
                         startLatch.await();
                         return userAccountStore.getOrCreateSocialUser(
@@ -99,7 +100,9 @@ class AuthTokenServiceTest {
 
             assertThat(userAccountRepository.count()).isEqualTo(1);
             assertThat(results).filteredOn(UserAccountStore.UserCreationResult::created).hasSize(1);
-            assertThat(results).extracting(result -> result.userAccount().getId()).containsOnly(results.getFirst().userAccount().getId());
+            assertThat(results)
+                    .extracting(result -> result.userAccount().getId())
+                    .containsOnly(results.getFirst().userAccount().getId());
         } finally {
             executorService.shutdownNow();
         }

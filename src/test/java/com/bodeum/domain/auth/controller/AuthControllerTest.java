@@ -54,7 +54,7 @@ class AuthControllerTest {
 
     @Test
     void mockCallbackIssuesTokenThatAuthenticatesProtectedEndpoint() throws Exception {
-        MvcResult loginResult = mockMvc.perform(get("/api/auth/callback/kakao")
+        MvcResult loginResult = mockMvc.perform(get("/api/v1/auth/callback/kakao")
                         .param("code", "mock-code"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.result.accessToken").isNotEmpty())
@@ -64,7 +64,7 @@ class AuthControllerTest {
         JsonNode loginBody = readBody(loginResult);
         String accessToken = loginBody.at("/result/accessToken").asText();
 
-        mockMvc.perform(get("/api/users/me/summary")
+        mockMvc.perform(get("/api/v1/users/me/summary")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.result.userId").isNumber())
@@ -73,14 +73,14 @@ class AuthControllerTest {
 
     @Test
     void refreshRotatesRefreshTokenAndRejectsOldToken() throws Exception {
-        JsonNode loginBody = readBody(mockMvc.perform(get("/api/auth/callback/kakao")
+        JsonNode loginBody = readBody(mockMvc.perform(get("/api/v1/auth/callback/kakao")
                         .param("code", "refresh-code"))
                 .andExpect(status().isOk())
                 .andReturn());
         String refreshToken = loginBody.at("/result/refreshToken").asText();
 
         String refreshBody = objectMapper.writeValueAsString(Map.of("refreshToken", refreshToken));
-        MvcResult refreshResult = mockMvc.perform(post("/api/auth/refresh")
+        MvcResult refreshResult = mockMvc.perform(post("/api/v1/auth/refresh")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(refreshBody))
                 .andExpect(status().isOk())
@@ -89,7 +89,7 @@ class AuthControllerTest {
         JsonNode refreshedBody = readBody(refreshResult);
         assertThat(refreshedBody.at("/result/refreshToken").asText()).isNotEqualTo(refreshToken);
 
-        mockMvc.perform(post("/api/auth/refresh")
+        mockMvc.perform(post("/api/v1/auth/refresh")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(refreshBody))
                 .andExpect(status().isUnauthorized());
@@ -97,7 +97,7 @@ class AuthControllerTest {
 
     @Test
     void loginRedirectForConfiguredProviderIncludesState() throws Exception {
-        MvcResult result = mockMvc.perform(get("/api/auth/login/naver"))
+        MvcResult result = mockMvc.perform(get("/api/v1/auth/login/naver"))
                 .andExpect(status().isFound())
                 .andReturn();
 
@@ -110,26 +110,34 @@ class AuthControllerTest {
 
     @Test
     void configuredProviderCallbackWithoutStateIsUnauthorized() throws Exception {
-        mockMvc.perform(get("/api/auth/callback/naver")
+        mockMvc.perform(get("/api/v1/auth/callback/naver")
                         .param("code", "provider-code"))
                 .andExpect(status().isUnauthorized());
     }
 
     @Test
     void invalidProviderIsBadRequest() throws Exception {
-        mockMvc.perform(get("/api/auth/callback/google")
+        mockMvc.perform(get("/api/v1/auth/callback/google")
                         .param("code", "provider-code"))
                 .andExpect(status().isBadRequest());
     }
 
     @Test
     void malformedRefreshBodyIsBadRequest() throws Exception {
-        mockMvc.perform(post("/api/auth/refresh")
+        mockMvc.perform(post("/api/v1/auth/refresh")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("잘못된 요청입니다."))
                 .andExpect(jsonPath("$.result").doesNotExist());
+    }
+
+    @Test
+    void logoutWithoutRefreshTokenIsBadRequest() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/logout")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isBadRequest());
     }
 
     private JsonNode readBody(MvcResult result) throws Exception {

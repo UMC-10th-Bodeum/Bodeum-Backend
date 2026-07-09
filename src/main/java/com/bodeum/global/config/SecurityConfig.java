@@ -29,12 +29,12 @@ public class SecurityConfig {
             "/swagger-ui/**",
             "/swagger-resources/**",
             "/v3/api-docs/**",
-            "/api/auth/login/**",
-            "/api/auth/callback/**",
-            "/api/auth/refresh",
+            "/api/v1/auth/login/**",
+            "/api/v1/auth/callback/**",
+            "/api/v1/auth/refresh",
             // access token이 만료된 상태에서도 refresh token 폐기가 가능해야 한다.
-            "/api/auth/logout",
-            "/api/terms/**"
+            "/api/v1/auth/logout",
+            "/api/v1/terms/**"
     };
 
     @Bean

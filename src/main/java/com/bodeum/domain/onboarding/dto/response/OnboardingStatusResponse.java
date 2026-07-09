@@ -1,9 +1,9 @@
 package com.bodeum.domain.onboarding.dto.response;
 
 import com.bodeum.domain.auth.enumtype.AuthNextStep;
-import com.bodeum.domain.user.model.UserAccount;
+import com.bodeum.domain.user.entity.UserAccount;
 
-public record OnboardingStatusResDTO(
+public record OnboardingStatusResponse(
         boolean childProfileRegistered,
         boolean interestRegionRegistered,
         boolean guardianProfileRegistered,
@@ -11,9 +11,9 @@ public record OnboardingStatusResDTO(
         AuthNextStep nextStep
 ) {
 
-    public static OnboardingStatusResDTO from(UserAccount userAccount) {
+    public static OnboardingStatusResponse from(UserAccount userAccount) {
         boolean onboardingCompleted = userAccount.isOnboardingCompleted();
-        return new OnboardingStatusResDTO(
+        return new OnboardingStatusResponse(
                 userAccount.isChildProfileRegistered(),
                 userAccount.isInterestRegionRegistered(),
                 userAccount.isGuardianProfileRegistered(),

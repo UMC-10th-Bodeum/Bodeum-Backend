@@ -1,7 +1,7 @@
 package com.bodeum.domain.user.service;
 
 import com.bodeum.domain.auth.enumtype.SocialProvider;
-import com.bodeum.domain.user.model.UserAccount;
+import com.bodeum.domain.user.entity.UserAccount;
 import com.bodeum.domain.user.repository.UserAccountRepository;
 import com.bodeum.global.apiPayload.code.GeneralErrorCode;
 import com.bodeum.global.apiPayload.exception.ProjectException;
@@ -30,7 +30,10 @@ public class UserAccountStore {
             String email,
             String nickname
     ) {
-        Optional<UserAccount> existingUser = userAccountRepository.findByProviderAndProviderUserId(provider, providerUserId);
+        Optional<UserAccount> existingUser = userAccountRepository.findByProviderAndProviderUserId(
+                provider,
+                providerUserId
+        );
         if (existingUser.isPresent()) {
             return new UserCreationResult(requireActive(existingUser.get()), false);
         }

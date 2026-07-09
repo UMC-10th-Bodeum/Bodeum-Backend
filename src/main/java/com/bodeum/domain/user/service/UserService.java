@@ -1,11 +1,11 @@
 package com.bodeum.domain.user.service;
 
-import com.bodeum.domain.user.dto.request.UserAgreementReqDTO;
-import com.bodeum.domain.user.dto.request.UserProfileUpdateReqDTO;
-import com.bodeum.domain.user.dto.response.UserAgreementResDTO;
-import com.bodeum.domain.user.dto.response.UserProfileResDTO;
-import com.bodeum.domain.user.dto.response.UserSummaryResDTO;
-import com.bodeum.domain.user.model.UserAccount;
+import com.bodeum.domain.user.dto.request.CreateUserAgreementRequest;
+import com.bodeum.domain.user.dto.request.UpdateUserProfileRequest;
+import com.bodeum.domain.user.dto.response.UserAgreementResponse;
+import com.bodeum.domain.user.dto.response.UserProfileResponse;
+import com.bodeum.domain.user.dto.response.UserSummaryResponse;
+import com.bodeum.domain.user.entity.UserAccount;
 import com.bodeum.global.apiPayload.code.GeneralErrorCode;
 import com.bodeum.global.apiPayload.exception.ProjectException;
 import com.bodeum.global.auth.AuthUserPrincipal;
@@ -21,25 +21,25 @@ public class UserService {
     private final UserAccountStore userAccountStore;
 
     @Transactional(readOnly = true)
-    public UserSummaryResDTO getSummary(Authentication authentication) {
-        return UserSummaryResDTO.from(getCurrentUser(authentication));
+    public UserSummaryResponse getSummary(Authentication authentication) {
+        return UserSummaryResponse.from(getCurrentUser(authentication));
     }
 
     @Transactional(readOnly = true)
-    public UserProfileResDTO getProfile(Authentication authentication) {
-        return UserProfileResDTO.from(getCurrentUser(authentication));
+    public UserProfileResponse getProfile(Authentication authentication) {
+        return UserProfileResponse.from(getCurrentUser(authentication));
     }
 
     @Transactional
-    public UserProfileResDTO updateProfile(Authentication authentication, UserProfileUpdateReqDTO request) {
+    public UserProfileResponse updateProfile(Authentication authentication, UpdateUserProfileRequest request) {
         UserAccount userAccount = getCurrentUser(authentication);
         userAccount.updateProfile(request.nickname(), request.childName(), request.guardianType());
 
-        return UserProfileResDTO.from(userAccount);
+        return UserProfileResponse.from(userAccount);
     }
 
     @Transactional
-    public UserAgreementResDTO agreeTerms(Authentication authentication, UserAgreementReqDTO request) {
+    public UserAgreementResponse agreeTerms(Authentication authentication, CreateUserAgreementRequest request) {
         UserAccount userAccount = getCurrentUser(authentication);
         userAccount.agreeTerms(
                 request.serviceTermsAgreed(),
@@ -47,7 +47,7 @@ public class UserService {
                 request.isAiChatAgreedValue()
         );
 
-        return UserAgreementResDTO.from(userAccount);
+        return UserAgreementResponse.from(userAccount);
     }
 
     @Transactional

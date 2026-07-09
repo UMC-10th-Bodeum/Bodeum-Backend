@@ -1,9 +1,9 @@
 package com.bodeum.domain.auth.controller;
 
-import com.bodeum.domain.auth.dto.request.AuthLogoutReqDTO;
-import com.bodeum.domain.auth.dto.request.AuthTokenRefreshReqDTO;
-import com.bodeum.domain.auth.dto.response.AuthLoginResDTO;
-import com.bodeum.domain.auth.dto.response.AuthTokenResDTO;
+import com.bodeum.domain.auth.dto.request.LogoutAuthRequest;
+import com.bodeum.domain.auth.dto.request.RefreshAuthTokenRequest;
+import com.bodeum.domain.auth.dto.response.AuthLoginResponse;
+import com.bodeum.domain.auth.dto.response.AuthTokenResponse;
 import com.bodeum.domain.auth.enumtype.SocialProvider;
 import com.bodeum.domain.auth.service.AuthService;
 import com.bodeum.global.apiPayload.ApiResponse;
@@ -22,7 +22,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/auth")
+@RequestMapping("/api/v1/auth")
 @RequiredArgsConstructor
 public class AuthController {
 
@@ -40,7 +40,7 @@ public class AuthController {
     }
 
     @GetMapping("/callback/{provider}")
-    public ApiResponse<AuthLoginResDTO> socialLoginCallback(
+    public ApiResponse<AuthLoginResponse> socialLoginCallback(
             @PathVariable String provider,
             @RequestParam String code,
             @RequestParam(required = false) String state
@@ -52,18 +52,17 @@ public class AuthController {
     }
 
     @PostMapping("/refresh")
-    public ApiResponse<AuthTokenResDTO> refreshToken(
-            @Valid @RequestBody AuthTokenRefreshReqDTO request
+    public ApiResponse<AuthTokenResponse> refreshToken(
+            @Valid @RequestBody RefreshAuthTokenRequest request
     ) {
         return ApiResponse.of(GeneralSuccessCode.OK, authService.refresh(request.refreshToken()));
     }
 
     @PostMapping("/logout")
     public ApiResponse<Void> logout(
-            @RequestBody(required = false) AuthLogoutReqDTO request
+            @Valid @RequestBody LogoutAuthRequest request
     ) {
-        String refreshToken = request == null ? null : request.refreshToken();
-        authService.logout(refreshToken);
+        authService.logout(request.refreshToken());
 
         return ApiResponse.of(GeneralSuccessCode.OK, null);
     }

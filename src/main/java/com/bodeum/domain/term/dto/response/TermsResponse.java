@@ -3,7 +3,7 @@ package com.bodeum.domain.term.dto.response;
 import com.bodeum.domain.term.enumtype.TermType;
 import java.time.LocalDate;
 
-public record TermsResDTO(
+public record TermsResponse(
         String type,
         String title,
         String version,
@@ -12,14 +12,20 @@ public record TermsResDTO(
         boolean required
 ) {
 
-    public static TermsResDTO of(TermType type, String version, LocalDate effectiveDate, String content) {
-        return new TermsResDTO(
+    public static TermsResponse of(
+            TermType type,
+            String version,
+            LocalDate effectiveDate,
+            String content,
+            boolean isRequired
+    ) {
+        return new TermsResponse(
                 type.getPath(),
                 type.getTitle(),
                 version,
                 effectiveDate,
                 content,
-                true
+                isRequired
         );
     }
 }

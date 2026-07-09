@@ -1,6 +1,6 @@
 package com.bodeum.domain.auth.repository;
 
-import com.bodeum.domain.auth.model.RefreshTokenSession;
+import com.bodeum.domain.auth.entity.RefreshTokenSession;
 import jakarta.persistence.LockModeType;
 import java.time.Instant;
 import java.util.Optional;

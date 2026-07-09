@@ -1,9 +1,9 @@
 package com.bodeum.domain.user.dto.response;
 
-import com.bodeum.domain.user.model.UserAccount;
+import com.bodeum.domain.user.entity.UserAccount;
 import java.util.List;
 
-public record UserProfileResDTO(
+public record UserProfileResponse(
         Long userId,
         String nickname,
         String email,
@@ -21,8 +21,8 @@ public record UserProfileResDTO(
         String communityRoleType
 ) {
 
-    public static UserProfileResDTO from(UserAccount userAccount) {
-        return new UserProfileResDTO(
+    public static UserProfileResponse from(UserAccount userAccount) {
+        return new UserProfileResponse(
                 userAccount.getId(),
                 userAccount.getNickname(),
                 userAccount.getEmail(),

@@ -3,7 +3,7 @@ package com.bodeum.domain.user.dto.request;
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.NotNull;
 
-public record UserAgreementReqDTO(
+public record CreateUserAgreementRequest(
         @NotNull(message = "서비스 이용약관 동의 여부는 필수입니다.")
         Boolean serviceTermsAgreed,
 

@@ -1,9 +1,9 @@
 package com.bodeum.domain.user.dto.response;
 
 import com.bodeum.domain.auth.enumtype.SocialProvider;
-import com.bodeum.domain.user.model.UserAccount;
+import com.bodeum.domain.user.entity.UserAccount;
 
-public record UserSummaryResDTO(
+public record UserSummaryResponse(
         Long userId,
         String nickname,
         String email,
@@ -12,8 +12,8 @@ public record UserSummaryResDTO(
         boolean onboardingCompleted
 ) {
 
-    public static UserSummaryResDTO from(UserAccount userAccount) {
-        return new UserSummaryResDTO(
+    public static UserSummaryResponse from(UserAccount userAccount) {
+        return new UserSummaryResponse(
                 userAccount.getId(),
                 userAccount.getNickname(),
                 userAccount.getEmail(),

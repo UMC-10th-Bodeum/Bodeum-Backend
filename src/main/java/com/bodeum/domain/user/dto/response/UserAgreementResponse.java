@@ -1,10 +1,10 @@
 package com.bodeum.domain.user.dto.response;
 
 import com.bodeum.domain.auth.enumtype.AuthNextStep;
-import com.bodeum.domain.user.model.UserAccount;
+import com.bodeum.domain.user.entity.UserAccount;
 import java.time.LocalDateTime;
 
-public record UserAgreementResDTO(
+public record UserAgreementResponse(
         boolean serviceTermsAgreed,
         boolean privacyPolicyAgreed,
         boolean aiChatAgreed,
@@ -12,8 +12,8 @@ public record UserAgreementResDTO(
         AuthNextStep nextStep
 ) {
 
-    public static UserAgreementResDTO from(UserAccount userAccount) {
-        return new UserAgreementResDTO(
+    public static UserAgreementResponse from(UserAccount userAccount) {
+        return new UserAgreementResponse(
                 userAccount.isServiceTermsAgreed(),
                 userAccount.isPrivacyPolicyAgreed(),
                 userAccount.isAiChatAgreed(),

@@ -2,10 +2,10 @@ package com.bodeum.domain.auth.dto.response;
 
 import com.bodeum.domain.auth.enumtype.AuthNextStep;
 import com.bodeum.domain.auth.service.AuthTokenService;
-import com.bodeum.domain.user.model.UserAccount;
+import com.bodeum.domain.user.entity.UserAccount;
 import java.time.Instant;
 
-public record AuthLoginResDTO(
+public record AuthLoginResponse(
         Long userId,
         String provider,
         String nickname,
@@ -20,17 +20,17 @@ public record AuthLoginResDTO(
         AuthNextStep nextStep
 ) {
 
-    public static AuthLoginResDTO of(
+    public static AuthLoginResponse of(
             UserAccount userAccount,
             AuthTokenService.AuthTokenPair tokenPair,
             boolean isNewUser,
             AuthNextStep nextStep
     ) {
-        return new AuthLoginResDTO(
+        return new AuthLoginResponse(
                 userAccount.getId(),
                 userAccount.getProvider().getPath(),
                 userAccount.getNickname(),
-                "Bearer",
+                AuthTokenService.TOKEN_TYPE,
                 tokenPair.accessToken(),
                 tokenPair.refreshToken(),
                 tokenPair.accessTokenExpiresAt(),

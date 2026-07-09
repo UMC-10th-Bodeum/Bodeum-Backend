@@ -188,7 +188,7 @@ public class SocialOAuthClient {
             return registration.getRedirectUri();
         }
 
-        return oAuthProperties.getBaseUrl() + "/api/auth/callback/" + provider.getPath();
+        return oAuthProperties.getBaseUrl() + "/api/v1/auth/callback/" + provider.getPath();
     }
 
     private Map<String, Object> mapValue(Object value) {

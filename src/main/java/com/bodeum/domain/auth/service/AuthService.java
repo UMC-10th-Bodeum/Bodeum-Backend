@@ -1,10 +1,10 @@
 package com.bodeum.domain.auth.service;
 
-import com.bodeum.domain.auth.dto.response.AuthLoginResDTO;
-import com.bodeum.domain.auth.dto.response.AuthTokenResDTO;
+import com.bodeum.domain.auth.dto.response.AuthLoginResponse;
+import com.bodeum.domain.auth.dto.response.AuthTokenResponse;
 import com.bodeum.domain.auth.enumtype.AuthNextStep;
 import com.bodeum.domain.auth.enumtype.SocialProvider;
-import com.bodeum.domain.user.model.UserAccount;
+import com.bodeum.domain.user.entity.UserAccount;
 import com.bodeum.domain.user.service.UserAccountStore;
 import com.bodeum.global.apiPayload.code.GeneralErrorCode;
 import com.bodeum.global.apiPayload.exception.ProjectException;
@@ -50,7 +50,7 @@ public class AuthService {
         return builder.encode().build().toUri();
     }
 
-    public AuthLoginResDTO loginWithCallback(SocialProvider provider, String code, String state) {
+    public AuthLoginResponse loginWithCallback(SocialProvider provider, String code, String state) {
         if (!StringUtils.hasText(code)) {
             throw new ProjectException(GeneralErrorCode.BAD_REQUEST);
         }
@@ -68,7 +68,7 @@ public class AuthService {
         UserAccount userAccount = userCreationResult.userAccount();
         AuthTokenService.AuthTokenPair tokenPair = authTokenService.issueTokens(userAccount.getId());
 
-        return AuthLoginResDTO.of(
+        return AuthLoginResponse.of(
                 userAccount,
                 tokenPair,
                 userCreationResult.created(),
@@ -76,8 +76,8 @@ public class AuthService {
         );
     }
 
-    public AuthTokenResDTO refresh(String refreshToken) {
-        return AuthTokenResDTO.from(authTokenService.refresh(refreshToken));
+    public AuthTokenResponse refresh(String refreshToken) {
+        return AuthTokenResponse.from(authTokenService.refresh(refreshToken));
     }
 
     public void logout(String refreshToken) {
@@ -87,7 +87,8 @@ public class AuthService {
     private void validateState(SocialProvider provider, String state) {
         OAuthProperties.ProviderRegistration registration = oAuthProperties.getRegistration(provider);
 
-        // 실제 소셜 연동이 구성된 경우에만 state를 검증한다. (모의 로그인은 리다이렉트 없이 콜백만 호출)
+        // 실제 소셜 연동이 구성된 경우에만 state를 검증한다.
+        // 모의 로그인은 리다이렉트 없이 콜백만 호출한다.
         if (registration != null && registration.isConfigured() && !oAuthStateStore.consume(provider, state)) {
             log.warn("[AUTH] state 검증 실패 provider={} statePresent={}", provider, StringUtils.hasText(state));
             throw new ProjectException(GeneralErrorCode.UNAUTHORIZED);
@@ -99,7 +100,7 @@ public class AuthService {
             return registration.getRedirectUri();
         }
 
-        return oAuthProperties.getBaseUrl() + "/api/auth/callback/" + provider.getPath();
+        return oAuthProperties.getBaseUrl() + "/api/v1/auth/callback/" + provider.getPath();
     }
 
     private AuthNextStep resolveNextStep(UserAccount userAccount) {

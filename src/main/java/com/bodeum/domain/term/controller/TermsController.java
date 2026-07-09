@@ -1,6 +1,6 @@
 package com.bodeum.domain.term.controller;
 
-import com.bodeum.domain.term.dto.response.TermsResDTO;
+import com.bodeum.domain.term.dto.response.TermsResponse;
 import com.bodeum.domain.term.enumtype.TermType;
 import com.bodeum.domain.term.service.TermsService;
 import com.bodeum.global.apiPayload.ApiResponse;
@@ -12,14 +12,14 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/terms")
+@RequestMapping("/api/v1/terms")
 @RequiredArgsConstructor
 public class TermsController {
 
     private final TermsService termsService;
 
     @GetMapping("/{type}")
-    public ApiResponse<TermsResDTO> getTerms(
+    public ApiResponse<TermsResponse> getTerms(
             @PathVariable String type
     ) {
         return ApiResponse.of(GeneralSuccessCode.OK, termsService.getTerms(TermType.from(type)));

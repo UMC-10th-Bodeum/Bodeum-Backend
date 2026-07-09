@@ -1,4 +1,4 @@
-package com.bodeum.domain.auth.model;
+package com.bodeum.domain.auth.entity;
 
 import com.bodeum.domain.auth.enumtype.SocialProvider;
 import jakarta.persistence.Column;

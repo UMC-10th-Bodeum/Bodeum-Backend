@@ -1,11 +1,12 @@
 package com.bodeum.domain.onboarding.service;
 
-import com.bodeum.domain.onboarding.dto.request.ChildProfileCreateReqDTO;
-import com.bodeum.domain.onboarding.dto.request.GuardianProfileCreateReqDTO;
-import com.bodeum.domain.onboarding.dto.request.InterestRegionCreateReqDTO;
-import com.bodeum.domain.onboarding.dto.response.OnboardingStatusResDTO;
-import com.bodeum.domain.onboarding.dto.response.OnboardingStepResDTO;
-import com.bodeum.domain.user.model.UserAccount;
+import com.bodeum.domain.onboarding.dto.request.CreateChildProfileRequest;
+import com.bodeum.domain.onboarding.dto.request.CreateGuardianProfileRequest;
+import com.bodeum.domain.onboarding.dto.request.CreateInterestRegionRequest;
+import com.bodeum.domain.onboarding.dto.response.OnboardingStatusResponse;
+import com.bodeum.domain.onboarding.dto.response.OnboardingStepResponse;
+import com.bodeum.domain.onboarding.enumtype.OnboardingStep;
+import com.bodeum.domain.user.entity.UserAccount;
 import com.bodeum.domain.user.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
@@ -19,9 +20,9 @@ public class OnboardingService {
     private final UserService userService;
 
     @Transactional
-    public OnboardingStepResDTO registerChildProfile(
+    public OnboardingStepResponse registerChildProfile(
             Authentication authentication,
-            ChildProfileCreateReqDTO request
+            CreateChildProfileRequest request
     ) {
         UserAccount userAccount = userService.getCurrentUser(authentication);
         userAccount.updateChildProfile(
@@ -32,24 +33,24 @@ public class OnboardingService {
                 request.characteristicKeyword()
         );
 
-        return OnboardingStepResDTO.of("CHILD_PROFILE", userAccount.isOnboardingCompleted());
+        return OnboardingStepResponse.of(OnboardingStep.CHILD_PROFILE, userAccount.isOnboardingCompleted());
     }
 
     @Transactional
-    public OnboardingStepResDTO registerInterestRegion(
+    public OnboardingStepResponse registerInterestRegion(
             Authentication authentication,
-            InterestRegionCreateReqDTO request
+            CreateInterestRegionRequest request
     ) {
         UserAccount userAccount = userService.getCurrentUser(authentication);
         userAccount.updateInterestRegion(request.interests(), request.sido(), request.sigungu());
 
-        return OnboardingStepResDTO.of("INTEREST_REGION", userAccount.isOnboardingCompleted());
+        return OnboardingStepResponse.of(OnboardingStep.INTEREST_REGION, userAccount.isOnboardingCompleted());
     }
 
     @Transactional
-    public OnboardingStepResDTO registerGuardianProfile(
+    public OnboardingStepResponse registerGuardianProfile(
             Authentication authentication,
-            GuardianProfileCreateReqDTO request
+            CreateGuardianProfileRequest request
     ) {
         UserAccount userAccount = userService.getCurrentUser(authentication);
         userAccount.updateGuardianProfile(
@@ -58,11 +59,11 @@ public class OnboardingService {
                 request.communityRoleType()
         );
 
-        return OnboardingStepResDTO.of("GUARDIAN_PROFILE", userAccount.isOnboardingCompleted());
+        return OnboardingStepResponse.of(OnboardingStep.GUARDIAN_PROFILE, userAccount.isOnboardingCompleted());
     }
 
     @Transactional(readOnly = true)
-    public OnboardingStatusResDTO getStatus(Authentication authentication) {
-        return OnboardingStatusResDTO.from(userService.getCurrentUser(authentication));
+    public OnboardingStatusResponse getStatus(Authentication authentication) {
+        return OnboardingStatusResponse.from(userService.getCurrentUser(authentication));
     }
 }

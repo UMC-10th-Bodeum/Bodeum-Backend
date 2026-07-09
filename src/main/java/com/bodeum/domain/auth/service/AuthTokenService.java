@@ -1,8 +1,8 @@
 package com.bodeum.domain.auth.service;
 
-import com.bodeum.domain.auth.model.RefreshTokenSession;
+import com.bodeum.domain.auth.entity.RefreshTokenSession;
 import com.bodeum.domain.auth.repository.RefreshTokenSessionRepository;
-import com.bodeum.domain.user.model.UserAccount;
+import com.bodeum.domain.user.entity.UserAccount;
 import com.bodeum.domain.user.service.UserAccountStore;
 import com.bodeum.global.apiPayload.code.GeneralErrorCode;
 import com.bodeum.global.apiPayload.exception.ProjectException;
@@ -26,6 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class AuthTokenService {
 
+    public static final String TOKEN_TYPE = "Bearer";
     private static final int TOKEN_BYTE_LENGTH = 32;
 
     private final UserAccountStore userAccountStore;
@@ -46,7 +47,11 @@ public class AuthTokenService {
         Instant accessTokenExpiresAt = now.plus(authTokenProperties.getAccessTokenTtl());
         Instant refreshTokenExpiresAt = now.plus(authTokenProperties.getRefreshTokenTtl());
 
-        String accessToken = jwtTokenProvider.createAccessToken(userAccount.getAuthSubject(), now, accessTokenExpiresAt);
+        String accessToken = jwtTokenProvider.createAccessToken(
+                userAccount.getAuthSubject(),
+                now,
+                accessTokenExpiresAt
+        );
         String refreshToken = generateRefreshToken();
         refreshTokenSessionRepository.save(RefreshTokenSession.create(
                 hashToken(refreshToken),

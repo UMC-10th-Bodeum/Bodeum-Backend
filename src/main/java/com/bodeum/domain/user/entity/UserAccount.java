@@ -1,4 +1,4 @@
-package com.bodeum.domain.user.model;
+package com.bodeum.domain.user.entity;
 
 import com.bodeum.domain.auth.enumtype.SocialProvider;
 import jakarta.persistence.CollectionTable;
@@ -24,7 +24,10 @@ import java.util.UUID;
 @Table(
         name = "user_accounts",
         uniqueConstraints = {
-                @UniqueConstraint(name = "uk_user_accounts_provider_user", columnNames = {"provider", "provider_user_id"}),
+                @UniqueConstraint(
+                        name = "uk_user_accounts_provider_user",
+                        columnNames = {"provider", "provider_user_id"}
+                ),
                 @UniqueConstraint(name = "uk_user_accounts_auth_subject", columnNames = "auth_subject")
         }
 )
@@ -74,7 +77,7 @@ public class UserAccount {
     @Column(name = "child_birth_month")
     private Integer childBirthMonth;
 
-    @ElementCollection(fetch = FetchType.EAGER)
+    @ElementCollection(fetch = FetchType.LAZY)
     @CollectionTable(name = "user_care_areas", joinColumns = @JoinColumn(name = "user_id"))
     @Column(name = "care_area", nullable = false, length = 100)
     private List<String> careAreas = new ArrayList<>();
@@ -82,7 +85,7 @@ public class UserAccount {
     @Column(name = "characteristic_keyword", length = 100)
     private String characteristicKeyword;
 
-    @ElementCollection(fetch = FetchType.EAGER)
+    @ElementCollection(fetch = FetchType.LAZY)
     @CollectionTable(name = "user_interests", joinColumns = @JoinColumn(name = "user_id"))
     @Column(name = "interest", nullable = false, length = 100)
     private List<String> interests = new ArrayList<>();
