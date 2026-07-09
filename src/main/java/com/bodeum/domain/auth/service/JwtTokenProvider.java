@@ -19,16 +19,17 @@ public class JwtTokenProvider {
     private final SecretKey secretKey;
 
     public JwtTokenProvider(AuthTokenProperties authTokenProperties) {
-        // 시크릿 미설정 시 임시 키로 대체한다. 재시작하면 기존 access token은 전부 무효화된다.
-        this.secretKey = StringUtils.hasText(authTokenProperties.getJwtSecret())
-                ? Keys.hmacShaKeyFor(authTokenProperties.getJwtSecret().getBytes(StandardCharsets.UTF_8))
-                : Jwts.SIG.HS256.key().build();
+        if (!StringUtils.hasText(authTokenProperties.getJwtSecret())) {
+            throw new IllegalStateException("bodeum.auth.jwt-secret must be set and must be at least 32 bytes.");
+        }
+
+        this.secretKey = Keys.hmacShaKeyFor(authTokenProperties.getJwtSecret().getBytes(StandardCharsets.UTF_8));
     }
 
-    public String createAccessToken(Long userId, Instant issuedAt, Instant expiresAt) {
+    public String createAccessToken(String authSubject, Instant issuedAt, Instant expiresAt) {
         return Jwts.builder()
                 .id(UUID.randomUUID().toString())
-                .subject(String.valueOf(userId))
+                .subject(authSubject)
                 .issuedAt(Date.from(issuedAt))
                 .expiration(Date.from(expiresAt))
                 .signWith(secretKey)
@@ -36,9 +37,9 @@ public class JwtTokenProvider {
     }
 
     /**
-     * 서명·만료를 검증하고 subject의 userId를 반환한다. 유효하지 않으면 empty.
+     * 서명·만료를 검증하고 subject의 인증 식별자를 반환한다. 유효하지 않으면 empty.
      */
-    public Optional<Long> parseUserId(String accessToken) {
+    public Optional<String> parseAuthSubject(String accessToken) {
         try {
             Claims claims = Jwts.parser()
                     .verifyWith(secretKey)
@@ -46,7 +47,8 @@ public class JwtTokenProvider {
                     .parseSignedClaims(accessToken)
                     .getPayload();
 
-            return Optional.of(Long.parseLong(claims.getSubject()));
+            return Optional.ofNullable(claims.getSubject())
+                    .filter(StringUtils::hasText);
         } catch (JwtException | IllegalArgumentException e) {
             return Optional.empty();
         }

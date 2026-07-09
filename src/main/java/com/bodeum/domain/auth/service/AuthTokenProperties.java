@@ -14,7 +14,7 @@ public class AuthTokenProperties {
 
     /**
      * HS256 서명 키. 32바이트(256비트) 이상이어야 한다.
-     * 비어 있으면 기동 시 임시 키를 생성한다. (재시작하면 기존 access token 전부 무효화)
+     * 비어 있으면 애플리케이션 기동을 중단한다.
      */
     private String jwtSecret;
 

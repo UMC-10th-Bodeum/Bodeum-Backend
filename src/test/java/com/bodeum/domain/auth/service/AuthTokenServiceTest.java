@@ -4,23 +4,53 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.bodeum.domain.auth.enumtype.SocialProvider;
+import com.bodeum.domain.auth.repository.OAuthStateRepository;
+import com.bodeum.domain.auth.repository.RefreshTokenSessionRepository;
 import com.bodeum.domain.user.model.UserAccount;
+import com.bodeum.domain.user.repository.UserAccountRepository;
 import com.bodeum.domain.user.service.UserAccountStore;
 import com.bodeum.global.apiPayload.exception.ProjectException;
 import com.bodeum.global.auth.AuthUserPrincipal;
+import java.util.List;
 import java.time.Instant;
 import java.util.Optional;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
 
+@SpringBootTest(properties = "bodeum.auth.jwt-secret=test-jwt-secret-32-bytes-minimum-value")
 class AuthTokenServiceTest {
 
-    private final UserAccountStore userAccountStore = new UserAccountStore();
-    private final AuthTokenProperties authTokenProperties = new AuthTokenProperties();
-    private final AuthTokenService authTokenService = new AuthTokenService(
-            userAccountStore,
-            new JwtTokenProvider(authTokenProperties),
-            authTokenProperties
-    );
+    @Autowired
+    private UserAccountStore userAccountStore;
+
+    @Autowired
+    private AuthTokenService authTokenService;
+
+    @Autowired
+    private JwtTokenProvider jwtTokenProvider;
+
+    @Autowired
+    private UserAccountRepository userAccountRepository;
+
+    @Autowired
+    private RefreshTokenSessionRepository refreshTokenSessionRepository;
+
+    @Autowired
+    private OAuthStateRepository oAuthStateRepository;
+
+    @BeforeEach
+    void setUp() {
+        refreshTokenSessionRepository.deleteAll();
+        oAuthStateRepository.deleteAll();
+        userAccountRepository.deleteAll();
+    }
 
     @Test
     void issueTokensAndAuthenticate() {
@@ -37,17 +67,70 @@ class AuthTokenServiceTest {
     }
 
     @Test
+    void concurrentFirstLoginCreatesOnlyOneUser() throws Exception {
+        int attemptCount = 8;
+        ExecutorService executorService = Executors.newFixedThreadPool(attemptCount);
+        CountDownLatch startLatch = new CountDownLatch(1);
+
+        try {
+            List<Future<UserAccountStore.UserCreationResult>> futures = java.util.stream.IntStream.range(0, attemptCount)
+                    .mapToObj(index -> executorService.submit(() -> {
+                        startLatch.await();
+                        return userAccountStore.getOrCreateSocialUser(
+                                SocialProvider.KAKAO,
+                                "same-provider-user",
+                                "parent@example.com",
+                                "민준맘"
+                        );
+                    }))
+                    .toList();
+
+            startLatch.countDown();
+
+            List<UserAccountStore.UserCreationResult> results = futures.stream()
+                    .map(future -> {
+                        try {
+                            return future.get(5, TimeUnit.SECONDS);
+                        } catch (Exception e) {
+                            throw new AssertionError(e);
+                        }
+                    })
+                    .toList();
+
+            assertThat(userAccountRepository.count()).isEqualTo(1);
+            assertThat(results).filteredOn(UserAccountStore.UserCreationResult::created).hasSize(1);
+            assertThat(results).extracting(result -> result.userAccount().getId()).containsOnly(results.getFirst().userAccount().getId());
+        } finally {
+            executorService.shutdownNow();
+        }
+    }
+
+    @Test
     void authenticateFailsWithForgedToken() {
         assertThat(authTokenService.authenticate("forged-access-token")).isEmpty();
 
-        JwtTokenProvider otherKeyProvider = new JwtTokenProvider(new AuthTokenProperties());
+        AuthTokenProperties otherProperties = new AuthTokenProperties();
+        otherProperties.setJwtSecret("other-jwt-secret-32-bytes-minimum");
+        JwtTokenProvider otherKeyProvider = new JwtTokenProvider(otherProperties);
+        UserAccount userAccount = createUser();
         String tokenSignedWithOtherKey = otherKeyProvider.createAccessToken(
-                createUser().getId(),
+                userAccount.getAuthSubject(),
                 Instant.now(),
                 Instant.now().plusSeconds(600)
         );
 
         assertThat(authTokenService.authenticate(tokenSignedWithOtherKey)).isEmpty();
+    }
+
+    @Test
+    void authenticateFailsWhenJwtSubjectIsMissing() {
+        String tokenWithoutSubject = jwtTokenProvider.createAccessToken(
+                null,
+                Instant.now(),
+                Instant.now().plusSeconds(600)
+        );
+
+        assertThat(authTokenService.authenticate(tokenWithoutSubject)).isEmpty();
     }
 
     @Test
@@ -74,6 +157,20 @@ class AuthTokenServiceTest {
     }
 
     @Test
+    void refreshTokenIsStoredAsHash() {
+        UserAccount userAccount = createUser();
+
+        AuthTokenService.AuthTokenPair tokenPair = authTokenService.issueTokens(userAccount.getId());
+
+        assertThat(refreshTokenSessionRepository.findAll())
+                .singleElement()
+                .satisfies(session -> {
+                    assertThat(session.getTokenHash()).hasSize(64);
+                    assertThat(session.getTokenHash()).isNotEqualTo(tokenPair.refreshToken());
+                });
+    }
+
+    @Test
     void refreshFailsWithInvalidRefreshToken() {
         assertThatThrownBy(() -> authTokenService.refresh("invalid-refresh-token"))
                 .isInstanceOf(ProjectException.class);
@@ -85,6 +182,7 @@ class AuthTokenServiceTest {
         AuthTokenService.AuthTokenPair tokenPair = authTokenService.issueTokens(userAccount.getId());
 
         userAccount.withdraw();
+        userAccountRepository.saveAndFlush(userAccount);
 
         assertThatThrownBy(() -> authTokenService.refresh(tokenPair.refreshToken()))
                 .isInstanceOf(ProjectException.class);
@@ -96,6 +194,7 @@ class AuthTokenServiceTest {
         AuthTokenService.AuthTokenPair tokenPair = authTokenService.issueTokens(userAccount.getId());
 
         userAccount.withdraw();
+        userAccountRepository.saveAndFlush(userAccount);
 
         assertThat(authTokenService.authenticate(tokenPair.accessToken())).isEmpty();
     }
