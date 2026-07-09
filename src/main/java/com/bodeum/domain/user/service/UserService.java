@@ -44,7 +44,7 @@ public class UserService {
         userAccount.agreeTerms(
                 request.serviceTermsAgreed(),
                 request.privacyPolicyAgreed(),
-                request.isMarketingAgreedValue()
+                request.isAiChatAgreedValue()
         );
 
         return UserAgreementResDTO.from(userAccount);

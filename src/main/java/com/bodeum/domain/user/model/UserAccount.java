@@ -1,64 +1,151 @@
 package com.bodeum.domain.user.model;
 
 import com.bodeum.domain.auth.enumtype.SocialProvider;
+import jakarta.persistence.CollectionTable;
+import jakarta.persistence.Column;
+import jakarta.persistence.ElementCollection;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
+@Entity
+@Table(
+        name = "user_accounts",
+        uniqueConstraints = {
+                @UniqueConstraint(name = "uk_user_accounts_provider_user", columnNames = {"provider", "provider_user_id"}),
+                @UniqueConstraint(name = "uk_user_accounts_auth_subject", columnNames = "auth_subject")
+        }
+)
 public class UserAccount {
 
-    private final Long id;
-    private final SocialProvider provider;
-    private final String providerUserId;
-    private final LocalDateTime createdAt;
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private SocialProvider provider;
+
+    @Column(name = "provider_user_id", nullable = false, length = 128)
+    private String providerUserId;
+
+    @Column(name = "auth_subject", nullable = false, length = 36)
+    private String authSubject;
+
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private LocalDateTime createdAt;
+
+    @Column(length = 255)
     private String email;
+
+    @Column(length = 100)
     private String nickname;
+
+    @Column(name = "service_terms_agreed", nullable = false)
     private boolean serviceTermsAgreed;
+
+    @Column(name = "privacy_policy_agreed", nullable = false)
     private boolean privacyPolicyAgreed;
-    private boolean marketingAgreed;
+
+    @Column(name = "ai_chat_agreed", nullable = false)
+    private boolean aiChatAgreed;
+
+    @Column(name = "agreement_agreed_at")
     private LocalDateTime agreementAgreedAt;
+
+    @Column(name = "child_name", length = 20)
     private String childName;
+
+    @Column(name = "child_birth_year")
     private Integer childBirthYear;
+
+    @Column(name = "child_birth_month")
     private Integer childBirthMonth;
-    private List<String> careAreas = List.of();
+
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "user_care_areas", joinColumns = @JoinColumn(name = "user_id"))
+    @Column(name = "care_area", nullable = false, length = 100)
+    private List<String> careAreas = new ArrayList<>();
+
+    @Column(name = "characteristic_keyword", length = 100)
     private String characteristicKeyword;
-    private List<String> interests = List.of();
+
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "user_interests", joinColumns = @JoinColumn(name = "user_id"))
+    @Column(name = "interest", nullable = false, length = 100)
+    private List<String> interests = new ArrayList<>();
+
+    @Column(length = 50)
     private String sido;
+
+    @Column(length = 50)
     private String sigungu;
+
+    @Column(name = "guardian_nickname", length = 20)
     private String guardianNickname;
+
+    @Column(name = "guardian_type", length = 50)
     private String guardianType;
+
+    @Column(name = "community_role_type", length = 50)
     private String communityRoleType;
+
+    @Column(nullable = false)
     private boolean withdrawn;
 
+    protected UserAccount() {
+    }
+
     private UserAccount(
-            Long id,
             SocialProvider provider,
             String providerUserId,
             String email,
             String nickname
     ) {
-        this.id = id;
         this.provider = provider;
         this.providerUserId = providerUserId;
+        this.authSubject = UUID.randomUUID().toString();
         this.email = email;
         this.nickname = nickname;
         this.createdAt = LocalDateTime.now();
     }
 
     public static UserAccount createSocialUser(
-            Long id,
             SocialProvider provider,
             String providerUserId,
             String email,
             String nickname
     ) {
-        return new UserAccount(id, provider, providerUserId, email, nickname);
+        return new UserAccount(provider, providerUserId, email, nickname);
     }
 
-    public void agreeTerms(boolean serviceTermsAgreed, boolean privacyPolicyAgreed, boolean marketingAgreed) {
+    @PrePersist
+    void prePersist() {
+        if (authSubject == null) {
+            authSubject = UUID.randomUUID().toString();
+        }
+
+        if (createdAt == null) {
+            createdAt = LocalDateTime.now();
+        }
+    }
+
+    public void agreeTerms(boolean serviceTermsAgreed, boolean privacyPolicyAgreed, boolean aiChatAgreed) {
         this.serviceTermsAgreed = serviceTermsAgreed;
         this.privacyPolicyAgreed = privacyPolicyAgreed;
-        this.marketingAgreed = marketingAgreed;
+        this.aiChatAgreed = aiChatAgreed;
         this.agreementAgreedAt = LocalDateTime.now();
     }
 
@@ -72,12 +159,12 @@ public class UserAccount {
         this.childName = childName;
         this.childBirthYear = childBirthYear;
         this.childBirthMonth = childBirthMonth;
-        this.careAreas = List.copyOf(careAreas);
+        this.careAreas = new ArrayList<>(careAreas);
         this.characteristicKeyword = characteristicKeyword;
     }
 
     public void updateInterestRegion(List<String> interests, String sido, String sigungu) {
-        this.interests = List.copyOf(interests);
+        this.interests = new ArrayList<>(interests);
         this.sido = sido;
         this.sigungu = sigungu;
     }
@@ -140,6 +227,10 @@ public class UserAccount {
         return providerUserId;
     }
 
+    public String getAuthSubject() {
+        return authSubject;
+    }
+
     public LocalDateTime getCreatedAt() {
         return createdAt;
     }
@@ -160,8 +251,8 @@ public class UserAccount {
         return privacyPolicyAgreed;
     }
 
-    public boolean isMarketingAgreed() {
-        return marketingAgreed;
+    public boolean isAiChatAgreed() {
+        return aiChatAgreed;
     }
 
     public LocalDateTime getAgreementAgreedAt() {
@@ -181,7 +272,7 @@ public class UserAccount {
     }
 
     public List<String> getCareAreas() {
-        return careAreas;
+        return List.copyOf(careAreas);
     }
 
     public String getCharacteristicKeyword() {
@@ -189,7 +280,7 @@ public class UserAccount {
     }
 
     public List<String> getInterests() {
-        return interests;
+        return List.copyOf(interests);
     }
 
     public String getSido() {
