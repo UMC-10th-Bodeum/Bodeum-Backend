@@ -1,14 +1,7 @@
 package com.bodeum.domain.search.entity;
 
 import com.bodeum.global.common.entity.BaseCreatedEntity;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
@@ -20,21 +13,29 @@ import lombok.NoArgsConstructor;
 @Table(name = "search_log")
 public class SearchLog extends BaseCreatedEntity {
 
+    public static final int KEYWORD_MAX_LENGTH = 100;
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long searchLogId;
+    @Column(name = "search_log_id")
+    private Long id;
 
-    // user_id는 NULL 허용 (비로그인 사용자도 검색 로그 기록)
+//    TODO: User 엔티티 구현 후 user_id FK 적용 예정 (비로그인 사용자 검색 로그 허용을 위해 nullable = true 유지)
+//    @ManyToOne(fetch = FetchType.LAZY)
+//    @JoinColumn(name = "user_id", nullable = true)
+//    private User user;
+
+    @Column(name = "user_id")
     private Long userId;
 
-    @Column(nullable = false, length = 100)
+    @Column(name = "keyword", nullable = false, length = KEYWORD_MAX_LENGTH)
     private String keyword;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(name = "search_type", nullable = false)
     private SearchType searchType;
 
-    @Column(nullable = false)
+    @Column(name = "result_count", nullable = false)
     private Long resultCount;
 
     @Builder
