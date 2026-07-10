@@ -32,7 +32,7 @@ public class InfoScrap extends BaseCreatedEntity {
 //    private User user;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "info_id", nullable = false)
+    @JoinColumn(name = "info_item_id", nullable = false)
     private InfoItem infoItem;
 
     @Builder

@@ -18,7 +18,7 @@ public class InfoOperatingHour {
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "info_id", nullable = false)
+    @JoinColumn(name = "info_item_id", nullable = false)
     private InfoItem infoItem;
 
     @Enumerated(EnumType.STRING)

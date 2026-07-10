@@ -18,7 +18,7 @@ public class InfoItem extends BaseCreatedUpdatedEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "info_id")
+    @Column(name = "info_item_id")
     private Long id;
 
     // API가 내려주는 고유 ID가 없을 경우, 응답값 조합으로 생성

@@ -29,7 +29,7 @@ public class InfoReview extends BaseCreatedUpdatedDeletedEntity {
     private Long userId;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "info_id", nullable = false)
+    @JoinColumn(name = "info_item_id", nullable = false)
     private InfoItem infoItem;
 
     @Column(nullable = false, precision = 2, scale = 1)

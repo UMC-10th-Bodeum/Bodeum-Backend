@@ -21,7 +21,7 @@ public class InfoItemTag extends BaseCreatedEntity {
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "info_id", nullable = false)
+    @JoinColumn(name = "info_item_id", nullable = false)
     private InfoItem infoItem;
 
     @ManyToOne(fetch = FetchType.LAZY)
