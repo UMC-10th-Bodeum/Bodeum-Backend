@@ -13,7 +13,7 @@ import lombok.NoArgsConstructor;
 @Table(
         name = "info_scrap",
         uniqueConstraints = {
-                @UniqueConstraint(columnNames = {"user_id", "info_id"})
+                @UniqueConstraint(columnNames = {"user_id", "info_item_id"})
         }
 )
 public class InfoScrap extends BaseCreatedEntity {

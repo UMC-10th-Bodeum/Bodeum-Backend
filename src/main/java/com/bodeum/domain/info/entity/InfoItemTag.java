@@ -10,7 +10,7 @@ import lombok.*;
 @Table(
         name = "info_item_tag",
         uniqueConstraints = {
-                @UniqueConstraint(columnNames = {"info_id", "info_tag_id"})
+                @UniqueConstraint(columnNames = {"info_item_id", "info_tag_id"})
         }
 )
 public class InfoItemTag extends BaseCreatedEntity {
