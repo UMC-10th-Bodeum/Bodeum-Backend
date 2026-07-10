@@ -11,7 +11,15 @@ import java.time.LocalDateTime;
 
 @Getter
 @Entity
-@Table(name = "news")
+@Table(
+        name = "news",
+        uniqueConstraints = {
+                @UniqueConstraint(
+                        name = "uk_news_source_external_item",
+                        columnNames = {"news_source_id", "external_item_id"}
+                )
+        }
+)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class News extends BaseCreatedUpdatedDeletedEntity {
 
@@ -23,6 +31,13 @@ public class News extends BaseCreatedUpdatedDeletedEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "content_category_id", nullable = false)
     private NewsCategory newsCategory;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "news_source_id")
+    private NewsSource newsSource;
+
+    @Column(name = "external_item_id", length = 100)
+    private String externalItemId;
 
     @Column(name = "region_id")
     private Long regionId;
