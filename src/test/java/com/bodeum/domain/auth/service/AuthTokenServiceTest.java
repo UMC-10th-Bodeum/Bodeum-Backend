@@ -8,7 +8,7 @@ import com.bodeum.domain.auth.repository.OAuthStateRepository;
 import com.bodeum.domain.auth.repository.RefreshTokenSessionRepository;
 import com.bodeum.domain.user.entity.UserAccount;
 import com.bodeum.domain.user.repository.UserAccountRepository;
-import com.bodeum.domain.user.service.UserAccountStore;
+import com.bodeum.domain.user.service.UserService;
 import com.bodeum.global.apiPayload.exception.ProjectException;
 import com.bodeum.global.auth.AuthUserPrincipal;
 import java.time.Instant;
@@ -29,7 +29,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 class AuthTokenServiceTest {
 
     @Autowired
-    private UserAccountStore userAccountStore;
+    private UserService userService;
 
     @Autowired
     private AuthTokenService authTokenService;
@@ -74,10 +74,10 @@ class AuthTokenServiceTest {
         CountDownLatch startLatch = new CountDownLatch(1);
 
         try {
-            List<Future<UserAccountStore.UserCreationResult>> futures = IntStream.range(0, attemptCount)
+            List<Future<UserService.UserCreationResult>> futures = IntStream.range(0, attemptCount)
                     .mapToObj(index -> executorService.submit(() -> {
                         startLatch.await();
-                        return userAccountStore.getOrCreateSocialUser(
+                        return userService.getOrCreateSocialUser(
                                 SocialProvider.KAKAO,
                                 "same-provider-user",
                                 "parent@example.com",
@@ -88,7 +88,7 @@ class AuthTokenServiceTest {
 
             startLatch.countDown();
 
-            List<UserAccountStore.UserCreationResult> results = futures.stream()
+            List<UserService.UserCreationResult> results = futures.stream()
                     .map(future -> {
                         try {
                             return future.get(5, TimeUnit.SECONDS);
@@ -99,10 +99,10 @@ class AuthTokenServiceTest {
                     .toList();
 
             assertThat(userAccountRepository.count()).isEqualTo(1);
-            assertThat(results).filteredOn(UserAccountStore.UserCreationResult::created).hasSize(1);
+            assertThat(results).filteredOn(UserService.UserCreationResult::created).hasSize(1);
             assertThat(results)
-                    .extracting(result -> result.userAccount().getId())
-                    .containsOnly(results.getFirst().userAccount().getId());
+                    .extracting(UserService.UserCreationResult::userId)
+                    .containsOnly(results.getFirst().userId());
         } finally {
             executorService.shutdownNow();
         }
@@ -214,8 +214,9 @@ class AuthTokenServiceTest {
     }
 
     private UserAccount createUser() {
-        return userAccountStore
+        Long userId = userService
                 .getOrCreateSocialUser(SocialProvider.KAKAO, "kakao-user-1", "parent@example.com", "민준맘")
-                .userAccount();
+                .userId();
+        return userService.getUserById(userId);
     }
 }

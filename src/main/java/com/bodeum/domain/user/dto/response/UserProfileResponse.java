@@ -1,5 +1,9 @@
 package com.bodeum.domain.user.dto.response;
 
+import com.bodeum.domain.onboarding.enumtype.CareArea;
+import com.bodeum.domain.onboarding.enumtype.CommunityRoleType;
+import com.bodeum.domain.onboarding.enumtype.GuardianType;
+import com.bodeum.domain.onboarding.enumtype.InterestCategory;
 import com.bodeum.domain.user.entity.UserAccount;
 import java.util.List;
 
@@ -11,14 +15,14 @@ public record UserProfileResponse(
         String childName,
         Integer childBirthYear,
         Integer childBirthMonth,
-        List<String> careAreas,
+        List<CareArea> careAreas,
         String characteristicKeyword,
-        List<String> interests,
-        String sido,
-        String sigungu,
+        List<InterestCategory> interests,
+        String regionLevel1,
+        String regionLevel2,
         String guardianNickname,
-        String guardianType,
-        String communityRoleType
+        GuardianType guardianType,
+        CommunityRoleType communityRoleType
 ) {
 
     public static UserProfileResponse from(UserAccount userAccount) {
@@ -33,8 +37,8 @@ public record UserProfileResponse(
                 userAccount.getCareAreas(),
                 userAccount.getCharacteristicKeyword(),
                 userAccount.getInterests(),
-                userAccount.getSido(),
-                userAccount.getSigungu(),
+                userAccount.getRegionLevel1(),
+                userAccount.getRegionLevel2(),
                 userAccount.getGuardianNickname(),
                 userAccount.getGuardianType(),
                 userAccount.getCommunityRoleType()

@@ -18,7 +18,7 @@ public record UserAgreementResponse(
                 userAccount.isPrivacyPolicyAgreed(),
                 userAccount.isAiChatAgreed(),
                 userAccount.getAgreementAgreedAt(),
-                AuthNextStep.ONBOARDING
+                userAccount.isOnboardingResolved() ? AuthNextStep.HOME : AuthNextStep.ONBOARDING
         );
     }
 }

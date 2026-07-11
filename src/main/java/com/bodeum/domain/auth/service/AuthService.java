@@ -4,14 +4,15 @@ import com.bodeum.domain.auth.dto.response.AuthLoginResponse;
 import com.bodeum.domain.auth.dto.response.AuthTokenResponse;
 import com.bodeum.domain.auth.enumtype.AuthNextStep;
 import com.bodeum.domain.auth.enumtype.SocialProvider;
+import com.bodeum.domain.auth.exception.AuthErrorCode;
 import com.bodeum.domain.user.entity.UserAccount;
-import com.bodeum.domain.user.service.UserAccountStore;
-import com.bodeum.global.apiPayload.code.GeneralErrorCode;
+import com.bodeum.domain.user.service.UserService;
 import com.bodeum.global.apiPayload.exception.ProjectException;
 import java.net.URI;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 import org.springframework.web.util.UriComponentsBuilder;
 
@@ -21,7 +22,7 @@ import org.springframework.web.util.UriComponentsBuilder;
 public class AuthService {
 
     private final OAuthProperties oAuthProperties;
-    private final UserAccountStore userAccountStore;
+    private final UserService userService;
     private final AuthTokenService authTokenService;
     private final SocialOAuthClient socialOAuthClient;
     private final OAuthStateStore oAuthStateStore;
@@ -29,10 +30,10 @@ public class AuthService {
     public URI createLoginRedirectUri(SocialProvider provider) {
         OAuthProperties.ProviderRegistration registration = oAuthProperties.getRegistration(provider);
         if (registration == null || !registration.isConfigured()) {
-            throw new ProjectException(GeneralErrorCode.BAD_REQUEST);
+            throw new ProjectException(AuthErrorCode.PROVIDER_NOT_CONFIGURED);
         }
 
-        String redirectUri = resolveRedirectUri(provider, registration);
+        String redirectUri = oAuthProperties.resolveRedirectUri(provider);
         String scope = StringUtils.hasText(registration.getScope())
                 ? registration.getScope()
                 : provider.getDefaultScope();
@@ -50,22 +51,25 @@ public class AuthService {
         return builder.encode().build().toUri();
     }
 
+    @Transactional
     public AuthLoginResponse loginWithCallback(SocialProvider provider, String code, String state) {
         if (!StringUtils.hasText(code)) {
-            throw new ProjectException(GeneralErrorCode.BAD_REQUEST);
+            throw new ProjectException(AuthErrorCode.MISSING_AUTH_CODE);
         }
 
         validateState(provider, state);
 
         SocialUserProfile socialUserProfile = socialOAuthClient.getUserProfile(provider, code, state);
-        UserAccountStore.UserCreationResult userCreationResult = userAccountStore.getOrCreateSocialUser(
+        UserService.UserCreationResult userCreationResult = userService.getOrCreateSocialUser(
                 provider,
                 socialUserProfile.providerUserId(),
                 socialUserProfile.email(),
                 socialUserProfile.nickname()
         );
 
-        UserAccount userAccount = userCreationResult.userAccount();
+        // getOrCreateSocialUser는 트랜잭션 밖에서 식별자만 반환한다.
+        // 응답 생성 시 LAZY 필드를 읽어야 하므로 이 트랜잭션 안에서 managed 상태로 다시 조회한다.
+        UserAccount userAccount = userService.getUserById(userCreationResult.userId());
         AuthTokenService.AuthTokenPair tokenPair = authTokenService.issueTokens(userAccount.getId());
 
         return AuthLoginResponse.of(
@@ -91,16 +95,8 @@ public class AuthService {
         // 모의 로그인은 리다이렉트 없이 콜백만 호출한다.
         if (registration != null && registration.isConfigured() && !oAuthStateStore.consume(provider, state)) {
             log.warn("[AUTH] state 검증 실패 provider={} statePresent={}", provider, StringUtils.hasText(state));
-            throw new ProjectException(GeneralErrorCode.UNAUTHORIZED);
+            throw new ProjectException(AuthErrorCode.INVALID_OAUTH_STATE);
         }
-    }
-
-    private String resolveRedirectUri(SocialProvider provider, OAuthProperties.ProviderRegistration registration) {
-        if (StringUtils.hasText(registration.getRedirectUri())) {
-            return registration.getRedirectUri();
-        }
-
-        return oAuthProperties.getBaseUrl() + "/api/v1/auth/callback/" + provider.getPath();
     }
 
     private AuthNextStep resolveNextStep(UserAccount userAccount) {
@@ -108,7 +104,7 @@ public class AuthService {
             return AuthNextStep.TERMS;
         }
 
-        if (!userAccount.isOnboardingCompleted()) {
+        if (!userAccount.isOnboardingResolved()) {
             return AuthNextStep.ONBOARDING;
         }
 

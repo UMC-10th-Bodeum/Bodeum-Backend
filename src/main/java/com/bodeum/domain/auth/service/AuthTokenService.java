@@ -1,10 +1,10 @@
 package com.bodeum.domain.auth.service;
 
 import com.bodeum.domain.auth.entity.RefreshTokenSession;
+import com.bodeum.domain.auth.exception.AuthErrorCode;
 import com.bodeum.domain.auth.repository.RefreshTokenSessionRepository;
 import com.bodeum.domain.user.entity.UserAccount;
-import com.bodeum.domain.user.service.UserAccountStore;
-import com.bodeum.global.apiPayload.code.GeneralErrorCode;
+import com.bodeum.domain.user.service.UserService;
 import com.bodeum.global.apiPayload.exception.ProjectException;
 import com.bodeum.global.auth.AuthUserPrincipal;
 import java.nio.charset.StandardCharsets;
@@ -29,7 +29,7 @@ public class AuthTokenService {
     public static final String TOKEN_TYPE = "Bearer";
     private static final int TOKEN_BYTE_LENGTH = 32;
 
-    private final UserAccountStore userAccountStore;
+    private final UserService userService;
     private final JwtTokenProvider jwtTokenProvider;
     private final AuthTokenProperties authTokenProperties;
     private final RefreshTokenSessionRepository refreshTokenSessionRepository;
@@ -40,8 +40,8 @@ public class AuthTokenService {
     public AuthTokenPair issueTokens(Long userId) {
         purgeExpiredSessions();
 
-        UserAccount userAccount = userAccountStore.findActiveUser(userId)
-                .orElseThrow(() -> new ProjectException(GeneralErrorCode.UNAUTHORIZED));
+        UserAccount userAccount = userService.findActiveUser(userId)
+                .orElseThrow(() -> new ProjectException(AuthErrorCode.INACTIVE_USER));
 
         Instant now = Instant.now();
         Instant accessTokenExpiresAt = now.plus(authTokenProperties.getAccessTokenTtl());
@@ -65,7 +65,7 @@ public class AuthTokenService {
     @Transactional(readOnly = true)
     public Optional<AuthUserPrincipal> authenticate(String accessToken) {
         return jwtTokenProvider.parseAuthSubject(accessToken)
-                .flatMap(userAccountStore::findActiveUserByAuthSubject)
+                .flatMap(userService::findActiveUserByAuthSubject)
                 .map(this::toPrincipal);
     }
 
@@ -80,13 +80,13 @@ public class AuthTokenService {
             if (session != null) {
                 refreshTokenSessionRepository.delete(session);
             }
-            throw new ProjectException(GeneralErrorCode.UNAUTHORIZED);
+            throw new ProjectException(AuthErrorCode.INVALID_REFRESH_TOKEN);
         }
 
         refreshTokenSessionRepository.delete(session);
 
-        UserAccount userAccount = userAccountStore.findActiveUser(session.getUserId())
-                .orElseThrow(() -> new ProjectException(GeneralErrorCode.UNAUTHORIZED));
+        UserAccount userAccount = userService.findActiveUser(session.getUserId())
+                .orElseThrow(() -> new ProjectException(AuthErrorCode.INACTIVE_USER));
 
         return issueTokens(userAccount.getId());
     }
@@ -120,7 +120,7 @@ public class AuthTokenService {
 
     private String hashToken(String token) {
         if (token == null || token.isBlank()) {
-            throw new ProjectException(GeneralErrorCode.UNAUTHORIZED);
+            throw new ProjectException(AuthErrorCode.INVALID_REFRESH_TOKEN);
         }
 
         try {

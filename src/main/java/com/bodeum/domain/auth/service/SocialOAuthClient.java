@@ -1,7 +1,7 @@
 package com.bodeum.domain.auth.service;
 
 import com.bodeum.domain.auth.enumtype.SocialProvider;
-import com.bodeum.global.apiPayload.code.GeneralErrorCode;
+import com.bodeum.domain.auth.exception.AuthErrorCode;
 import com.bodeum.global.apiPayload.exception.ProjectException;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
@@ -31,11 +31,11 @@ public class SocialOAuthClient {
     public SocialUserProfile getUserProfile(SocialProvider provider, String code, String state) {
         OAuthProperties.ProviderRegistration registration = oAuthProperties.getRegistration(provider);
         if (registration == null || !registration.isConfigured()) {
-            if (oAuthProperties.isMockEnabled()) {
+            if (oAuthProperties.isMockLoginAllowed()) {
                 return createDevelopmentProfile(provider, code);
             }
 
-            throw new ProjectException(GeneralErrorCode.BAD_REQUEST);
+            throw new ProjectException(AuthErrorCode.PROVIDER_NOT_CONFIGURED);
         }
 
         validateTokenExchangeConfiguration(provider, registration);
@@ -55,22 +55,8 @@ public class SocialOAuthClient {
             String code,
             String state
     ) {
-        try {
-            String providerAccessToken = requestProviderAccessToken(provider, registration, code, state);
-            return requestUserInfo(provider, registration, providerAccessToken);
-        } catch (RestClientException e) {
-            log.warn("[AUTH] {} 토큰 교환/사용자 조회 실패: {}", provider, e.getMessage(), e);
-            throw new ProjectException(GeneralErrorCode.UNAUTHORIZED);
-        }
-    }
-
-    private void validateTokenExchangeConfiguration(
-            SocialProvider provider,
-            OAuthProperties.ProviderRegistration registration
-    ) {
-        if (provider.isClientSecretRequired() && !StringUtils.hasText(registration.getClientSecret())) {
-            throw new ProjectException(GeneralErrorCode.BAD_REQUEST);
-        }
+        String providerAccessToken = requestProviderAccessToken(provider, registration, code, state);
+        return requestUserInfo(provider, registration, providerAccessToken);
     }
 
     private String requestProviderAccessToken(
@@ -79,10 +65,33 @@ public class SocialOAuthClient {
             String code,
             String state
     ) {
+        try {
+            return requestProviderAccessTokenFromProvider(provider, registration, code, state);
+        } catch (RestClientException e) {
+            log.warn("[AUTH] {} 토큰 교환 실패: {}", provider, e.getMessage(), e);
+            throw new ProjectException(AuthErrorCode.SOCIAL_TOKEN_EXCHANGE_FAILED);
+        }
+    }
+
+    private void validateTokenExchangeConfiguration(
+            SocialProvider provider,
+            OAuthProperties.ProviderRegistration registration
+    ) {
+        if (provider.isClientSecretRequired() && !StringUtils.hasText(registration.getClientSecret())) {
+            throw new ProjectException(AuthErrorCode.PROVIDER_NOT_CONFIGURED);
+        }
+    }
+
+    private String requestProviderAccessTokenFromProvider(
+            SocialProvider provider,
+            OAuthProperties.ProviderRegistration registration,
+            String code,
+            String state
+    ) {
         MultiValueMap<String, String> requestBody = new LinkedMultiValueMap<>();
         requestBody.add("grant_type", "authorization_code");
         requestBody.add("client_id", registration.getClientId());
-        requestBody.add("redirect_uri", resolveRedirectUri(provider, registration));
+        requestBody.add("redirect_uri", oAuthProperties.resolveRedirectUri(provider));
         requestBody.add("code", code);
 
         if (StringUtils.hasText(state)) {
@@ -107,7 +116,7 @@ public class SocialOAuthClient {
             // 응답 본문에는 토큰이 포함될 수 있어 error 코드만 남긴다.
             Object error = tokenResponse == null ? null : tokenResponse.get("error");
             log.warn("[AUTH] {} 토큰 응답에 access_token 없음. error={}", provider, error);
-            throw new ProjectException(GeneralErrorCode.UNAUTHORIZED);
+            throw new ProjectException(AuthErrorCode.SOCIAL_TOKEN_EXCHANGE_FAILED);
         }
 
         return token;
@@ -118,18 +127,23 @@ public class SocialOAuthClient {
             OAuthProperties.ProviderRegistration registration,
             String providerAccessToken
     ) {
-        return restClientBuilder.build()
-                .get()
-                .uri(resolveUserInfoUri(provider, registration))
-                .header(HttpHeaders.AUTHORIZATION, BEARER_PREFIX + providerAccessToken)
-                .retrieve()
-                .body(new ParameterizedTypeReference<>() {
-                });
+        try {
+            return restClientBuilder.build()
+                    .get()
+                    .uri(resolveUserInfoUri(provider, registration))
+                    .header(HttpHeaders.AUTHORIZATION, BEARER_PREFIX + providerAccessToken)
+                    .retrieve()
+                    .body(new ParameterizedTypeReference<>() {
+                    });
+        } catch (RestClientException e) {
+            log.warn("[AUTH] {} 사용자 정보 조회 실패: {}", provider, e.getMessage(), e);
+            throw new ProjectException(AuthErrorCode.SOCIAL_PROFILE_FETCH_FAILED);
+        }
     }
 
     private SocialUserProfile parseKakaoProfile(Map<String, Object> userInfo) {
         if (userInfo == null || userInfo.get("id") == null) {
-            throw new ProjectException(GeneralErrorCode.UNAUTHORIZED);
+            throw new ProjectException(AuthErrorCode.SOCIAL_PROFILE_FETCH_FAILED);
         }
 
         Map<String, Object> kakaoAccount = mapValue(userInfo.get("kakao_account"));
@@ -149,17 +163,17 @@ public class SocialOAuthClient {
 
     private SocialUserProfile parseNaverProfile(Map<String, Object> userInfo) {
         if (userInfo == null) {
-            throw new ProjectException(GeneralErrorCode.UNAUTHORIZED);
+            throw new ProjectException(AuthErrorCode.SOCIAL_PROFILE_FETCH_FAILED);
         }
 
         Map<String, Object> response = mapValue(userInfo.get("response"));
         if (response.isEmpty()) {
-            throw new ProjectException(GeneralErrorCode.UNAUTHORIZED);
+            throw new ProjectException(AuthErrorCode.SOCIAL_PROFILE_FETCH_FAILED);
         }
 
         String providerUserId = stringValue(response.get("id"));
         if (!StringUtils.hasText(providerUserId)) {
-            throw new ProjectException(GeneralErrorCode.UNAUTHORIZED);
+            throw new ProjectException(AuthErrorCode.SOCIAL_PROFILE_FETCH_FAILED);
         }
 
         return new SocialUserProfile(
@@ -178,17 +192,6 @@ public class SocialOAuthClient {
                 provider.getPath() + "_" + stableId.substring(0, 8) + "@bodeum.local",
                 provider.getDisplayName() + " 사용자"
         );
-    }
-
-    private String resolveRedirectUri(
-            SocialProvider provider,
-            OAuthProperties.ProviderRegistration registration
-    ) {
-        if (StringUtils.hasText(registration.getRedirectUri())) {
-            return registration.getRedirectUri();
-        }
-
-        return oAuthProperties.getBaseUrl() + "/api/v1/auth/callback/" + provider.getPath();
     }
 
     private Map<String, Object> mapValue(Object value) {

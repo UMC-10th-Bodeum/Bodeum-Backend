@@ -68,7 +68,7 @@ class AuthControllerTest {
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.result.userId").isNumber())
-                .andExpect(jsonPath("$.result.provider").value("KAKAO"));
+                .andExpect(jsonPath("$.result.provider").value("kakao"));
     }
 
     @Test
@@ -116,6 +116,46 @@ class AuthControllerTest {
     }
 
     @Test
+    void callbackWithoutCodeReturnsMissingAuthCodeError() throws Exception {
+        mockMvc.perform(get("/api/v1/auth/callback/kakao"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("AUTH400_3"));
+    }
+
+    @Test
+    void withdrawnUserCallbackReturnsInactiveUserError() throws Exception {
+        mockMvc.perform(get("/api/v1/auth/callback/kakao")
+                        .param("code", "withdrawn-user-code"))
+                .andExpect(status().isOk());
+
+        var userAccount = userAccountRepository.findAll().getFirst();
+        userAccount.withdraw();
+        userAccountRepository.saveAndFlush(userAccount);
+
+        mockMvc.perform(get("/api/v1/auth/callback/kakao")
+                        .param("code", "withdrawn-user-code"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("AUTH401_5"));
+    }
+
+    @Test
+    void swaggerDocumentsOnlyClientInputFields() throws Exception {
+        JsonNode openApi = readBody(mockMvc.perform(get("/v3/api-docs"))
+                .andExpect(status().isOk())
+                .andReturn());
+
+        JsonNode codeParameter = findCallbackParameter(openApi, "code");
+        assertThat(codeParameter).isNotNull();
+        assertThat(codeParameter.path("required").asBoolean()).isTrue();
+        assertThat(openApi.at("/components/schemas/CreateChildProfileRequest/properties/birthYearValid").isMissingNode())
+                .isTrue();
+        assertThat(openApi.at("/components/schemas/CreateUserAgreementRequest/properties/requiredAgreementCompleted").isMissingNode())
+                .isTrue();
+        assertThat(openApi.at("/components/schemas/CreateUserAgreementRequest/properties/aiChatAgreedValue").isMissingNode())
+                .isTrue();
+    }
+
+    @Test
     void invalidProviderIsBadRequest() throws Exception {
         mockMvc.perform(get("/api/v1/auth/callback/google")
                         .param("code", "provider-code"))
@@ -142,5 +182,15 @@ class AuthControllerTest {
 
     private JsonNode readBody(MvcResult result) throws Exception {
         return objectMapper.readTree(result.getResponse().getContentAsString());
+    }
+
+    private JsonNode findCallbackParameter(JsonNode openApi, String name) {
+        for (JsonNode parameter : openApi.at("/paths/~1api~1v1~1auth~1callback~1{provider}/get/parameters")) {
+            if (name.equals(parameter.path("name").asText())) {
+                return parameter;
+            }
+        }
+
+        return null;
     }
 }

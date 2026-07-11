@@ -10,6 +10,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
@@ -54,6 +55,16 @@ public class GeneralExceptionAdvice {
         BaseErrorCode errorCode = GeneralErrorCode.BAD_REQUEST;
         return ResponseEntity.status(errorCode.getStatus())
                 .body(ApiResponse.onFailure(errorCode, null));
+    }
+
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<ApiResponse<String>> handleMissingRequestParameterException(
+            MissingServletRequestParameterException e
+    ) {
+        BaseErrorCode errorCode = GeneralErrorCode.BAD_REQUEST;
+        String message = e.getParameterName() + " 파라미터가 필요합니다.";
+        return ResponseEntity.status(errorCode.getStatus())
+                .body(ApiResponse.onFailure(errorCode, message));
     }
 
     // 그 외의 정의되지 않은 모든 예외 처리

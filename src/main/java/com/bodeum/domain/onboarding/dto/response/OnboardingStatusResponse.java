@@ -12,13 +12,12 @@ public record OnboardingStatusResponse(
 ) {
 
     public static OnboardingStatusResponse from(UserAccount userAccount) {
-        boolean onboardingCompleted = userAccount.isOnboardingCompleted();
         return new OnboardingStatusResponse(
                 userAccount.isChildProfileRegistered(),
                 userAccount.isInterestRegionRegistered(),
                 userAccount.isGuardianProfileRegistered(),
-                onboardingCompleted,
-                onboardingCompleted ? AuthNextStep.HOME : AuthNextStep.ONBOARDING
+                userAccount.isOnboardingCompleted(),
+                userAccount.isOnboardingResolved() ? AuthNextStep.HOME : AuthNextStep.ONBOARDING
         );
     }
 }

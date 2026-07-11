@@ -1,6 +1,6 @@
 package com.bodeum.domain.auth.enumtype;
 
-import com.bodeum.global.apiPayload.code.GeneralErrorCode;
+import com.bodeum.domain.auth.exception.AuthErrorCode;
 import com.bodeum.global.apiPayload.exception.ProjectException;
 import java.util.Arrays;
 
@@ -85,6 +85,6 @@ public enum SocialProvider {
         return Arrays.stream(values())
                 .filter(provider -> provider.path.equalsIgnoreCase(value))
                 .findFirst()
-                .orElseThrow(() -> new ProjectException(GeneralErrorCode.BAD_REQUEST));
+                .orElseThrow(() -> new ProjectException(AuthErrorCode.UNSUPPORTED_PROVIDER));
     }
 }

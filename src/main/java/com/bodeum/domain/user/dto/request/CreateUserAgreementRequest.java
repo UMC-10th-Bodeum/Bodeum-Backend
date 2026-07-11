@@ -1,5 +1,7 @@
 package com.bodeum.domain.user.dto.request;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.NotNull;
 
@@ -13,11 +15,15 @@ public record CreateUserAgreementRequest(
         Boolean aiChatAgreed
 ) {
 
+    @JsonIgnore
+    @Schema(hidden = true)
     @AssertTrue(message = "필수 약관에 모두 동의해야 합니다.")
     public boolean isRequiredAgreementCompleted() {
         return Boolean.TRUE.equals(serviceTermsAgreed) && Boolean.TRUE.equals(privacyPolicyAgreed);
     }
 
+    @JsonIgnore
+    @Schema(hidden = true)
     public boolean isAiChatAgreedValue() {
         return Boolean.TRUE.equals(aiChatAgreed);
     }

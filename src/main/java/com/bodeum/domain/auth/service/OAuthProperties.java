@@ -1,10 +1,15 @@
 package com.bodeum.domain.auth.service;
 
 import com.bodeum.domain.auth.enumtype.SocialProvider;
+import jakarta.annotation.PostConstruct;
+import java.util.Arrays;
 import lombok.Getter;
 import lombok.Setter;
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 
 @Getter
 @Setter
@@ -23,11 +28,51 @@ public class OAuthProperties {
     private ProviderRegistration kakao = new ProviderRegistration();
     private ProviderRegistration naver = new ProviderRegistration();
 
+    private final Environment environment;
+
+    public OAuthProperties() {
+        this.environment = null;
+    }
+
+    @Autowired
+    public OAuthProperties(Environment environment) {
+        this.environment = environment;
+    }
+
+    @PostConstruct
+    void validateMockConfiguration() {
+        if (mockEnabled && isProductionProfileActive()) {
+            throw new IllegalStateException("OAuth mock login must be disabled in production profiles.");
+        }
+    }
+
     public ProviderRegistration getRegistration(SocialProvider provider) {
         return switch (provider) {
             case KAKAO -> kakao;
             case NAVER -> naver;
         };
+    }
+
+    public boolean isMockLoginAllowed() {
+        return mockEnabled && !isProductionProfileActive();
+    }
+
+    public String resolveRedirectUri(SocialProvider provider) {
+        ProviderRegistration registration = getRegistration(provider);
+        if (registration != null && StringUtils.hasText(registration.getRedirectUri())) {
+            return registration.getRedirectUri();
+        }
+
+        return baseUrl + "/api/v1/auth/callback/" + provider.getPath();
+    }
+
+    private boolean isProductionProfileActive() {
+        if (environment == null) {
+            return false;
+        }
+
+        return Arrays.stream(environment.getActiveProfiles())
+                .anyMatch(profile -> profile.equalsIgnoreCase("prod") || profile.equalsIgnoreCase("production"));
     }
 
     @Getter

@@ -1,5 +1,8 @@
 package com.bodeum.domain.onboarding.dto.request;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import io.swagger.v3.oas.annotations.media.ArraySchema;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -23,13 +26,17 @@ public record CreateChildProfileRequest(
         Integer birthMonth,
 
         @NotEmpty(message = "집중 케어 영역을 하나 이상 선택해주세요.")
-        @Size(max = 3, message = "집중 케어 영역은 최대 3개까지 선택 가능합니다.")
+        @ArraySchema(schema = @Schema(allowableValues = {
+                "AUTISM_SPECTRUM", "INTELLECTUAL", "BRAIN_LESION", "ADHD", "DEVELOPMENTAL", "LANGUAGE", "OTHER"
+        }))
         List<String> careAreas,
 
         @Size(max = 100, message = "특징 키워드는 최대 100자까지 입력 가능합니다.")
         String characteristicKeyword
 ) {
 
+    @JsonIgnore
+    @Schema(hidden = true)
     @AssertTrue(message = "출생 연도를 확인해주세요.")
     public boolean isBirthYearValid() {
         return birthYear == null || birthYear <= Year.now().getValue();

@@ -5,9 +5,14 @@ import com.bodeum.domain.onboarding.dto.request.CreateGuardianProfileRequest;
 import com.bodeum.domain.onboarding.dto.request.CreateInterestRegionRequest;
 import com.bodeum.domain.onboarding.dto.response.OnboardingStatusResponse;
 import com.bodeum.domain.onboarding.dto.response.OnboardingStepResponse;
+import com.bodeum.domain.onboarding.enumtype.CareArea;
+import com.bodeum.domain.onboarding.enumtype.CommunityRoleType;
+import com.bodeum.domain.onboarding.enumtype.GuardianType;
+import com.bodeum.domain.onboarding.enumtype.InterestCategory;
 import com.bodeum.domain.onboarding.enumtype.OnboardingStep;
 import com.bodeum.domain.user.entity.UserAccount;
 import com.bodeum.domain.user.service.UserService;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
@@ -25,11 +30,14 @@ public class OnboardingService {
             CreateChildProfileRequest request
     ) {
         UserAccount userAccount = userService.getCurrentUser(authentication);
+        List<CareArea> careAreas = request.careAreas().stream()
+                .map(CareArea::from)
+                .toList();
         userAccount.updateChildProfile(
                 request.childName(),
                 request.birthYear(),
                 request.birthMonth(),
-                request.careAreas(),
+                careAreas,
                 request.characteristicKeyword()
         );
 
@@ -42,7 +50,10 @@ public class OnboardingService {
             CreateInterestRegionRequest request
     ) {
         UserAccount userAccount = userService.getCurrentUser(authentication);
-        userAccount.updateInterestRegion(request.interests(), request.sido(), request.sigungu());
+        List<InterestCategory> interests = request.interests().stream()
+                .map(InterestCategory::from)
+                .toList();
+        userAccount.updateInterestRegion(interests, request.regionLevel1(), request.regionLevel2());
 
         return OnboardingStepResponse.of(OnboardingStep.INTEREST_REGION, userAccount.isOnboardingCompleted());
     }
@@ -55,11 +66,19 @@ public class OnboardingService {
         UserAccount userAccount = userService.getCurrentUser(authentication);
         userAccount.updateGuardianProfile(
                 request.guardianNickname(),
-                request.guardianType(),
-                request.communityRoleType()
+                GuardianType.fromNullable(request.guardianType()),
+                CommunityRoleType.fromNullable(request.communityRoleType())
         );
 
         return OnboardingStepResponse.of(OnboardingStep.GUARDIAN_PROFILE, userAccount.isOnboardingCompleted());
+    }
+
+    @Transactional
+    public OnboardingStatusResponse skipOnboarding(Authentication authentication) {
+        UserAccount userAccount = userService.getCurrentUser(authentication);
+        userAccount.skipOnboarding();
+
+        return OnboardingStatusResponse.from(userAccount);
     }
 
     @Transactional(readOnly = true)
