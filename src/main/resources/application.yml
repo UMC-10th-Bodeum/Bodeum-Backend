@@ -1,0 +1,41 @@
+spring:
+  config:
+    import: optional:file:.env[.properties]
+
+  application:
+    name: Bodeum
+
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: ${DB_URL}
+    username: ${DB_USER}
+    password: ${DB_PW}
+
+  jpa:
+    database: mysql
+    database-platform: org.hibernate.dialect.MySQLDialect
+    show-sql: false
+    hibernate:
+      ddl-auto: update
+
+bodeum:
+  auth:
+    jwt-secret: ${JWT_SECRET:}
+    access-token-ttl: ${AUTH_ACCESS_TOKEN_TTL:1h}
+    refresh-token-ttl: ${AUTH_REFRESH_TOKEN_TTL:14d}
+  oauth:
+    base-url: ${BODEUM_BASE_URL:http://localhost:8080}
+    mock-enabled: ${OAUTH_MOCK_ENABLED:false}
+    kakao:
+      client-id: ${KAKAO_CLIENT_ID:}
+      client-secret: ${KAKAO_CLIENT_SECRET:}
+      redirect-uri: ${KAKAO_REDIRECT_URI:}
+      scope: ${KAKAO_SCOPE:}
+      token-uri: ${KAKAO_TOKEN_URI:}
+      user-info-uri: ${KAKAO_USER_INFO_URI:}
+    naver:
+      client-id: ${NAVER_CLIENT_ID:}
+      client-secret: ${NAVER_CLIENT_SECRET:}
+      redirect-uri: ${NAVER_REDIRECT_URI:}
+      token-uri: ${NAVER_TOKEN_URI:}
+      user-info-uri: ${NAVER_USER_INFO_URI:}

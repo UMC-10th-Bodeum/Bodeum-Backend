@@ -38,7 +38,6 @@ out/
 
 ### Application Configuration ###
 application.properties
-application.yml
 application-*.properties
 application-*.yml
 .env
