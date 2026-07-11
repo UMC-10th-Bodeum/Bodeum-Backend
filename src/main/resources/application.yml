@@ -18,6 +18,11 @@ spring:
     hibernate:
       ddl-auto: update
 
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 5MB
+
 bodeum:
   auth:
     jwt-secret: ${JWT_SECRET:}
@@ -39,3 +44,10 @@ bodeum:
       redirect-uri: ${NAVER_REDIRECT_URI:}
       token-uri: ${NAVER_TOKEN_URI:}
       user-info-uri: ${NAVER_USER_INFO_URI:}
+  aws:
+    s3:
+      bucket: ${AWS_S3_BUCKET:}
+      region: ${AWS_S3_REGION:ap-northeast-2}
+      access-key: ${AWS_ACCESS_KEY:}
+      secret-key: ${AWS_SECRET_KEY:}
+      public-base-url: ${AWS_S3_PUBLIC_BASE_URL:}
