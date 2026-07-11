@@ -13,8 +13,8 @@ import java.time.Year;
 import java.util.List;
 
 public record CreateChildProfileRequest(
-        @Size(max = 20, message = "자녀 이름은 최대 20자까지 입력 가능합니다.")
-        String childName,
+        @Size(max = 20, message = "자녀 닉네임은 최대 20자까지 입력 가능합니다.")
+        String childNickname,
 
         @NotNull(message = "자녀 출생 연도는 필수입니다.")
         @Min(value = 2000, message = "출생 연도를 확인해주세요.")

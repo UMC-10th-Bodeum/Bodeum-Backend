@@ -34,7 +34,7 @@ public class OnboardingService {
                 .map(CareArea::from)
                 .toList();
         userAccount.updateChildProfile(
-                request.childName(),
+                request.childNickname(),
                 request.birthYear(),
                 request.birthMonth(),
                 careAreas,

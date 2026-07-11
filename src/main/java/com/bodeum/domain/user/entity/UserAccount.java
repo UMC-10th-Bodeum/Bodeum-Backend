@@ -5,6 +5,7 @@ import com.bodeum.domain.onboarding.enumtype.CareArea;
 import com.bodeum.domain.onboarding.enumtype.CommunityRoleType;
 import com.bodeum.domain.onboarding.enumtype.GuardianType;
 import com.bodeum.domain.onboarding.enumtype.InterestCategory;
+import com.bodeum.domain.user.enumtype.GuardianLevel;
 import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
 import jakarta.persistence.ElementCollection;
@@ -19,6 +20,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -60,6 +62,9 @@ public class UserAccount {
     @Column(length = 100)
     private String nickname;
 
+    @Column(name = "profile_image_url", length = 512)
+    private String profileImageUrl;
+
     @Column(name = "service_terms_agreed", nullable = false)
     private boolean serviceTermsAgreed;
 
@@ -72,8 +77,8 @@ public class UserAccount {
     @Column(name = "agreement_agreed_at")
     private LocalDateTime agreementAgreedAt;
 
-    @Column(name = "child_name", length = 20)
-    private String childName;
+    @Column(name = "child_nickname", length = 20)
+    private String childNickname;
 
     @Column(name = "child_birth_year")
     private Integer childBirthYear;
@@ -115,6 +120,9 @@ public class UserAccount {
 
     @Column(name = "onboarding_skipped", nullable = false)
     private boolean onboardingSkipped;
+
+    @Column(nullable = false)
+    private int point;
 
     @Column(nullable = false)
     private boolean withdrawn;
@@ -164,13 +172,13 @@ public class UserAccount {
     }
 
     public void updateChildProfile(
-            String childName,
+            String childNickname,
             Integer childBirthYear,
             Integer childBirthMonth,
             List<CareArea> careAreas,
             String characteristicKeyword
     ) {
-        this.childName = childName;
+        this.childNickname = childNickname;
         this.childBirthYear = childBirthYear;
         this.childBirthMonth = childBirthMonth;
         this.careAreas = new ArrayList<>(careAreas);
@@ -202,9 +210,13 @@ public class UserAccount {
         this.onboardingSkipped = true;
     }
 
+    public void updateProfileImage(String profileImageUrl) {
+        this.profileImageUrl = profileImageUrl;
+    }
+
     public void updateProfile(
             String nickname,
-            String childName,
+            String childNickname,
             Integer childBirthYear,
             Integer childBirthMonth,
             List<CareArea> careAreas,
@@ -220,8 +232,8 @@ public class UserAccount {
             this.guardianNickname = nickname;
         }
 
-        if (childName != null && !childName.isBlank()) {
-            this.childName = childName;
+        if (childNickname != null && !childNickname.isBlank()) {
+            this.childNickname = childNickname;
         }
 
         if (childBirthYear != null) {
@@ -326,6 +338,10 @@ public class UserAccount {
         return nickname;
     }
 
+    public String getProfileImageUrl() {
+        return profileImageUrl;
+    }
+
     public boolean isServiceTermsAgreed() {
         return serviceTermsAgreed;
     }
@@ -343,7 +359,7 @@ public class UserAccount {
     }
 
     public String getChildName() {
-        return childName;
+        return childNickname;
     }
 
     public Integer getChildBirthYear() {
@@ -352,6 +368,24 @@ public class UserAccount {
 
     public Integer getChildBirthMonth() {
         return childBirthMonth;
+    }
+
+    /**
+     * 자녀 출생 연월 기준 만 나이. 생월이 아직 지나지 않았으면 한 살을 뺀다.
+     * 출생 연도가 없으면 나이를 계산할 수 없으므로 null을 반환한다.
+     */
+    public Integer getChildAge() {
+        if (childBirthYear == null) {
+            return null;
+        }
+
+        LocalDate now = LocalDate.now();
+        int age = now.getYear() - childBirthYear;
+        if (childBirthMonth != null && now.getMonthValue() < childBirthMonth) {
+            age--;
+        }
+
+        return age;
     }
 
     public List<CareArea> getCareAreas() {
@@ -388,6 +422,14 @@ public class UserAccount {
 
     public boolean isOnboardingSkipped() {
         return onboardingSkipped;
+    }
+
+    public int getPoint() {
+        return point;
+    }
+
+    public GuardianLevel getGuardianLevel() {
+        return GuardianLevel.from(point);
     }
 
     public boolean isWithdrawn() {

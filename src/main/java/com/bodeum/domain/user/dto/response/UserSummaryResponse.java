@@ -7,6 +7,10 @@ public record UserSummaryResponse(
         String nickname,
         String email,
         String provider,
+        String profileImageUrl,
+        int point,
+        int level,
+        String badgeName,
         boolean agreementCompleted,
         boolean onboardingCompleted
 ) {
@@ -17,6 +21,10 @@ public record UserSummaryResponse(
                 userAccount.getNickname(),
                 userAccount.getEmail(),
                 userAccount.getProvider().getPath(),
+                userAccount.getProfileImageUrl(),
+                userAccount.getPoint(),
+                userAccount.getGuardianLevel().getLevelNumber(),
+                userAccount.getGuardianLevel().getBadgeName(),
                 userAccount.isAgreementCompleted(),
                 userAccount.isOnboardingCompleted()
         );

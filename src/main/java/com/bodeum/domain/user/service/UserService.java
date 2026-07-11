@@ -9,6 +9,7 @@ import com.bodeum.domain.onboarding.enumtype.InterestCategory;
 import com.bodeum.domain.user.dto.request.CreateUserAgreementRequest;
 import com.bodeum.domain.user.dto.request.UpdateUserProfileRequest;
 import com.bodeum.domain.user.dto.response.UserAgreementResponse;
+import com.bodeum.domain.user.dto.response.UserHeaderResponse;
 import com.bodeum.domain.user.dto.response.UserProfileResponse;
 import com.bodeum.domain.user.dto.response.UserSummaryResponse;
 import com.bodeum.domain.user.entity.UserAccount;
@@ -16,6 +17,7 @@ import com.bodeum.domain.user.repository.UserAccountRepository;
 import com.bodeum.global.apiPayload.code.GeneralErrorCode;
 import com.bodeum.global.apiPayload.exception.ProjectException;
 import com.bodeum.global.auth.AuthUserPrincipal;
+import com.bodeum.global.infrastructure.storage.S3ImageStorage;
 import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
@@ -24,12 +26,16 @@ import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 @Service
 @RequiredArgsConstructor
 public class UserService {
 
+    private static final String PROFILE_IMAGE_DIRECTORY = "profile-images";
+
     private final UserAccountRepository userAccountRepository;
+    private final S3ImageStorage s3ImageStorage;
 
     @Transactional(readOnly = true)
     public UserSummaryResponse getSummary(Authentication authentication) {
@@ -41,12 +47,27 @@ public class UserService {
         return UserProfileResponse.from(getCurrentUser(authentication));
     }
 
+    /**
+     * 헤더/사이드바 공통 조회. 인증이 없거나 토큰이 만료된 경우에도 예외 없이
+     * 비로그인 응답으로 fallback 한다.
+     */
+    @Transactional(readOnly = true)
+    public UserHeaderResponse getHeaderInfo(Authentication authentication) {
+        if (authentication == null || !(authentication.getPrincipal() instanceof AuthUserPrincipal principal)) {
+            return UserHeaderResponse.loggedOut();
+        }
+
+        return findActiveUser(principal.userId())
+                .map(UserHeaderResponse::from)
+                .orElseGet(UserHeaderResponse::loggedOut);
+    }
+
     @Transactional
     public UserProfileResponse updateProfile(Authentication authentication, UpdateUserProfileRequest request) {
         UserAccount userAccount = getCurrentUser(authentication);
         userAccount.updateProfile(
                 request.nickname(),
-                request.childName(),
+                request.childNickname(),
                 request.childBirthYear(),
                 request.childBirthMonth(),
                 toCareAreas(request.careAreas()),
@@ -57,6 +78,15 @@ public class UserService {
                 GuardianType.fromNullable(request.guardianType()),
                 CommunityRoleType.fromNullable(request.communityRoleType())
         );
+
+        return UserProfileResponse.from(userAccount);
+    }
+
+    @Transactional
+    public UserProfileResponse uploadProfileImage(Authentication authentication, MultipartFile image) {
+        UserAccount userAccount = getCurrentUser(authentication);
+        String imageUrl = s3ImageStorage.upload(image, PROFILE_IMAGE_DIRECTORY);
+        userAccount.updateProfileImage(imageUrl);
 
         return UserProfileResponse.from(userAccount);
     }

@@ -5,15 +5,18 @@ import com.bodeum.domain.onboarding.service.OnboardingService;
 import com.bodeum.domain.user.dto.request.CreateUserAgreementRequest;
 import com.bodeum.domain.user.dto.request.UpdateUserProfileRequest;
 import com.bodeum.domain.user.dto.response.UserAgreementResponse;
+import com.bodeum.domain.user.dto.response.UserHeaderResponse;
 import com.bodeum.domain.user.dto.response.UserProfileResponse;
 import com.bodeum.domain.user.dto.response.UserSummaryResponse;
 import com.bodeum.domain.user.service.UserService;
 import com.bodeum.global.apiPayload.ApiResponse;
 import com.bodeum.global.apiPayload.code.GeneralSuccessCode;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.MediaType;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -21,7 +24,9 @@ import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 @Tag(name = "User", description = "사용자 프로필 및 약관 동의 관리 API")
 @RestController
@@ -38,6 +43,17 @@ public class UserController {
         return ApiResponse.of(GeneralSuccessCode.OK, userService.getSummary(authentication));
     }
 
+    @Operation(
+            summary = "헤더/사이드바용 내 정보 조회",
+            description = "헤더·사이드바 공통 조회. 로그인 시 닉네임/레벨/뱃지/자녀 정보/지역을, "
+                    + "비로그인이거나 토큰이 만료된 경우에는 인증 없이 200으로 isLoggedIn=false를 반환한다."
+    )
+    @SecurityRequirements
+    @GetMapping("/me/brief")
+    public ApiResponse<UserHeaderResponse> getBrief(Authentication authentication) {
+        return ApiResponse.of(GeneralSuccessCode.OK, userService.getHeaderInfo(authentication));
+    }
+
     @Operation(summary = "내 프로필 조회", description = "현재 로그인한 사용자의 상세 프로필을 조회한다.")
     @GetMapping("/me")
     public ApiResponse<UserProfileResponse> getProfile(Authentication authentication) {
@@ -51,6 +67,18 @@ public class UserController {
             @Valid @RequestBody UpdateUserProfileRequest request
     ) {
         return ApiResponse.of(GeneralSuccessCode.OK, userService.updateProfile(authentication, request));
+    }
+
+    @Operation(
+            summary = "프로필 이미지 업로드",
+            description = "이미지 파일(multipart/form-data, 필드명 image)을 업로드해 프로필 사진으로 저장하고 수정된 프로필을 반환한다."
+    )
+    @PostMapping(value = "/me/profile-image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ApiResponse<UserProfileResponse> uploadProfileImage(
+            Authentication authentication,
+            @RequestParam("image") MultipartFile image
+    ) {
+        return ApiResponse.of(GeneralSuccessCode.OK, userService.uploadProfileImage(authentication, image));
     }
 
     @Operation(summary = "온보딩 진행 상태 조회", description = "온보딩 단계별 완료 여부와 다음 이동 화면을 조회한다.")

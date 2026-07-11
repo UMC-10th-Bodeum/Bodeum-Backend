@@ -14,8 +14,8 @@ public record UpdateUserProfileRequest(
         @Size(max = 20, message = "닉네임은 최대 20자까지 입력 가능합니다.")
         String nickname,
 
-        @Size(max = 20, message = "자녀 이름은 최대 20자까지 입력 가능합니다.")
-        String childName,
+        @Size(max = 20, message = "자녀 닉네임은 최대 20자까지 입력 가능합니다.")
+        String childNickname,
 
         @Min(value = 2000, message = "출생 연도를 확인해주세요.")
         Integer childBirthYear,
