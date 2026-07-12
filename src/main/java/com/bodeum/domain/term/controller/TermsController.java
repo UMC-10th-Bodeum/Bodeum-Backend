@@ -24,7 +24,7 @@ public class TermsController {
 
     private final TermsService termsService;
 
-    @Operation(summary = "약관 내용 조회", description = "약관 유형별(서비스 이용약관/개인정보 처리방침 등) 내용을 조회한다.")
+    @Operation(summary = "약관 내용 조회", description = "약관 유형별(서비스 이용약관/개인정보 처리방침/AI 챗봇 이용 동의 등) 내용을 조회한다.")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "조회 성공"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(

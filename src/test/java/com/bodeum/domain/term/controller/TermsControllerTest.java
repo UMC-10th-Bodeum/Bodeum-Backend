@@ -31,8 +31,18 @@ class TermsControllerTest {
     }
 
     @Test
-    void unsupportedTermsTypeReturnsTermsErrorCode() throws Exception {
+    void getAiChatTermsReturnsNotionResponseShape() throws Exception {
         mockMvc.perform(get("/api/v1/terms/ai-chat"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.type").value("ai-chat"))
+                .andExpect(jsonPath("$.result.title").value("AI 챗봇 이용 동의"))
+                .andExpect(jsonPath("$.result.content").isNotEmpty())
+                .andExpect(jsonPath("$.result.updatedAt").isNotEmpty());
+    }
+
+    @Test
+    void unsupportedTermsTypeReturnsTermsErrorCode() throws Exception {
+        mockMvc.perform(get("/api/v1/terms/marketing"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("TERMS400_1"));
     }

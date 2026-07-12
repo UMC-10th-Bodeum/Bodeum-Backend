@@ -7,7 +7,8 @@ import java.util.Arrays;
 public enum TermType {
 
     SERVICE("service", "서비스 이용약관"),
-    PRIVACY("privacy", "개인정보처리방침");
+    PRIVACY("privacy", "개인정보처리방침"),
+    AI_CHAT("ai-chat", "AI 챗봇 이용 동의");
 
     private final String path;
     private final String title;
