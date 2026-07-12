@@ -56,8 +56,18 @@ bodeum:
 spring:
   config:
     activate:
-      on-profile: local | dev | test
+      on-profile: local | test
 
   jpa:
     hibernate:
       ddl-auto: update
+
+---
+spring:
+  config:
+    activate:
+      on-profile: dev
+
+  jpa:
+    hibernate:
+      ddl-auto: validate

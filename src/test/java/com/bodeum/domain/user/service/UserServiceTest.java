@@ -35,6 +35,9 @@ class UserServiceTest {
     @Mock
     private S3ImageStorage s3ImageStorage;
 
+    @Mock
+    private UserProfileImageUpdater userProfileImageUpdater;
+
     @InjectMocks
     private UserService userService;
 

@@ -4,11 +4,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.verify;
 
 import com.bodeum.global.apiPayload.exception.ProjectException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockMultipartFile;
@@ -55,6 +57,16 @@ class S3ImageStorageTest {
     }
 
     @Test
+    void rejectsMissingContentType() {
+        MockMultipartFile image = new MockMultipartFile("image", "a.png", null, new byte[]{1, 2, 3});
+
+        assertThatThrownBy(() -> s3ImageStorage.upload(image, "profile-images"))
+                .isInstanceOf(ProjectException.class)
+                .extracting(exception -> ((ProjectException) exception).getErrorCode())
+                .isEqualTo(StorageErrorCode.INVALID_IMAGE_TYPE);
+    }
+
+    @Test
     void uploadsAndReturnsStandardS3Url() {
         MockMultipartFile image = new MockMultipartFile("image", "a.png", "image/png", new byte[]{1, 2, 3});
 
@@ -62,6 +74,7 @@ class S3ImageStorageTest {
 
         assertThat(url).startsWith("https://bodeum-bucket.s3.ap-northeast-2.amazonaws.com/profile-images/");
         assertThat(url).endsWith(".png");
+        assertPutObjectRequest("profile-images/", ".png", "image/png");
     }
 
     @Test
@@ -74,6 +87,7 @@ class S3ImageStorageTest {
         // 뒤 슬래시가 중복되지 않고 CDN 도메인 기준으로 붙는다.
         assertThat(url).startsWith("https://cdn.bodeum.com/profile-images/");
         assertThat(url).endsWith(".webp");
+        assertPutObjectRequest("profile-images/", ".webp", "image/webp");
     }
 
     @Test
@@ -86,5 +100,17 @@ class S3ImageStorageTest {
                 .isInstanceOf(ProjectException.class)
                 .extracting(exception -> ((ProjectException) exception).getErrorCode())
                 .isEqualTo(StorageErrorCode.IMAGE_UPLOAD_FAILED);
+    }
+
+    private void assertPutObjectRequest(String keyPrefix, String keySuffix, String contentType) {
+        ArgumentCaptor<PutObjectRequest> requestCaptor = ArgumentCaptor.forClass(PutObjectRequest.class);
+
+        verify(s3Client).putObject(requestCaptor.capture(), any(RequestBody.class));
+
+        PutObjectRequest request = requestCaptor.getValue();
+        assertThat(request.bucket()).isEqualTo("bodeum-bucket");
+        assertThat(request.key()).startsWith(keyPrefix);
+        assertThat(request.key()).endsWith(keySuffix);
+        assertThat(request.contentType()).isEqualTo(contentType);
     }
 }

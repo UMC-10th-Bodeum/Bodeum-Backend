@@ -3,14 +3,13 @@ package com.bodeum.global.infrastructure.storage;
 import com.bodeum.global.apiPayload.exception.ProjectException;
 import java.io.IOException;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
-import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.core.exception.SdkException;
+import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
@@ -57,7 +56,12 @@ public class S3ImageStorage {
             throw new ProjectException(StorageErrorCode.EMPTY_IMAGE_FILE);
         }
 
-        String extension = ALLOWED_CONTENT_TYPES.get(file.getContentType());
+        String contentType = file.getContentType();
+        if (!StringUtils.hasText(contentType)) {
+            throw new ProjectException(StorageErrorCode.INVALID_IMAGE_TYPE);
+        }
+
+        String extension = ALLOWED_CONTENT_TYPES.get(contentType);
         if (extension == null) {
             throw new ProjectException(StorageErrorCode.INVALID_IMAGE_TYPE);
         }

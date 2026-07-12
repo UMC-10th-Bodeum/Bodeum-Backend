@@ -35,6 +35,7 @@ public class UserService {
     private final UserAccountRepository userAccountRepository;
     private final RefreshTokenSessionRepository refreshTokenSessionRepository;
     private final S3ImageStorage s3ImageStorage;
+    private final UserProfileImageUpdater userProfileImageUpdater;
 
     @Transactional(readOnly = true)
     public UserProfileResponse getProfile(Long userId) {
@@ -75,13 +76,11 @@ public class UserService {
         return UserProfileUpdateResponse.ofSuccess();
     }
 
-    @Transactional
     public UserProfileResponse uploadProfileImage(Long userId, MultipartFile image) {
-        UserAccount userAccount = getCurrentUser(userId);
+        getCurrentUser(userId);
         String imageUrl = s3ImageStorage.upload(image, PROFILE_IMAGE_DIRECTORY);
-        userAccount.updateProfileImage(imageUrl);
 
-        return UserProfileResponse.from(userAccount);
+        return userProfileImageUpdater.updateProfileImage(userId, imageUrl);
     }
 
     @Transactional

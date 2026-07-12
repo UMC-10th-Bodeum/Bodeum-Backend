@@ -283,7 +283,20 @@ class AuthControllerTest {
     }
 
     private boolean hasParameter(JsonNode openApi, String parametersPath, String name) {
-        for (JsonNode parameter : openApi.at(parametersPath)) {
+        JsonNode parameters = openApi.at(parametersPath);
+        if (parameters.isMissingNode()) {
+            String operationPath = parametersPath.substring(0, parametersPath.lastIndexOf("/parameters"));
+            assertThat(openApi.at(operationPath).isMissingNode())
+                    .as("OpenAPI operation path must exist: %s", operationPath)
+                    .isFalse();
+            return false;
+        }
+
+        assertThat(parameters.isArray())
+                .as("OpenAPI parameters must be an array: %s", parametersPath)
+                .isTrue();
+
+        for (JsonNode parameter : parameters) {
             if (name.equals(parameter.path("name").asText())) {
                 return true;
             }
