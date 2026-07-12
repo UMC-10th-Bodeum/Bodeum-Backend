@@ -3,7 +3,6 @@ package com.bodeum.domain.user.dto.response;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.bodeum.domain.auth.enumtype.SocialProvider;
-import com.bodeum.domain.onboarding.enumtype.CareArea;
 import com.bodeum.domain.user.entity.UserAccount;
 import java.time.LocalDate;
 import java.util.List;
@@ -19,7 +18,7 @@ class UserHeaderResponseTest {
         assertThat(response.nickname()).isNull();
         assertThat(response.level()).isNull();
         assertThat(response.badgeName()).isNull();
-        assertThat(response.childDisabilityTypes()).isNull();
+        assertThat(response.childDisabilityTypeIds()).isNull();
         assertThat(response.childAge()).isNull();
         assertThat(response.region()).isNull();
     }
@@ -61,12 +60,12 @@ class UserHeaderResponseTest {
         int birthYear = LocalDate.now().getYear() - 5;
         UserAccount userAccount = newUserAccount();
         // 1월생은 어느 시점에 조회해도 당해 생월이 지났거나 당월이므로 만 나이 = 연도 차이
-        userAccount.updateChildProfile("민준이", birthYear, 1, List.of(CareArea.AUTISM_SPECTRUM), null);
+        userAccount.updateChildProfile("민준이", String.format("%04d-01", birthYear), List.of(1), null);
 
         UserHeaderResponse response = UserHeaderResponse.from(userAccount);
 
         assertThat(response.childAge()).isEqualTo(5);
-        assertThat(response.childDisabilityTypes()).containsExactly(CareArea.AUTISM_SPECTRUM);
+        assertThat(response.childDisabilityTypeIds()).containsExactly(1);
     }
 
     @Test
@@ -74,7 +73,7 @@ class UserHeaderResponseTest {
         LocalDate now = LocalDate.now();
         int birthYear = now.getYear() - 3;
         UserAccount userAccount = newUserAccount();
-        userAccount.updateChildProfile("민준이", birthYear, 12, List.of(CareArea.ADHD), null);
+        userAccount.updateChildProfile("민준이", String.format("%04d-12", birthYear), List.of(4), null);
 
         // 12월생: 아직 12월 전이면 생일 전이므로 한 살 적게 계산된다.
         int expected = now.getMonthValue() < 12 ? 2 : 3;

@@ -16,7 +16,7 @@ spring:
     database-platform: org.hibernate.dialect.MySQLDialect
     show-sql: false
     hibernate:
-      ddl-auto: update
+      ddl-auto: validate
 
   servlet:
     multipart:
@@ -51,3 +51,13 @@ bodeum:
       access-key: ${AWS_ACCESS_KEY:}
       secret-key: ${AWS_SECRET_KEY:}
       public-base-url: ${AWS_S3_PUBLIC_BASE_URL:}
+
+---
+spring:
+  config:
+    activate:
+      on-profile: local | dev | test
+
+  jpa:
+    hibernate:
+      ddl-auto: update

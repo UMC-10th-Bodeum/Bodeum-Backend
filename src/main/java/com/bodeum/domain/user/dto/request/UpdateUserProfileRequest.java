@@ -6,55 +6,74 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
-import java.time.Year;
+import java.time.YearMonth;
+import java.time.format.DateTimeParseException;
 import java.util.List;
 
 public record UpdateUserProfileRequest(
+        @Schema(example = "민준맘")
         @Size(max = 20, message = "닉네임은 최대 20자까지 입력 가능합니다.")
         String nickname,
 
+        @Schema(example = "민준")
         @Size(max = 20, message = "자녀 닉네임은 최대 20자까지 입력 가능합니다.")
         String childNickname,
 
-        @Min(value = 2000, message = "출생 연도를 확인해주세요.")
-        Integer childBirthYear,
+        @Schema(example = "2020-03")
+        @Pattern(regexp = "\\d{4}-\\d{2}", message = "생년월은 YYYY-MM 형식으로 입력해주세요.")
+        String childBirth,
 
-        @Min(value = 1, message = "출생 월은 1월부터 입력 가능합니다.")
-        @Max(value = 12, message = "출생 월은 12월까지 입력 가능합니다.")
-        Integer childBirthMonth,
+        @ArraySchema(
+                arraySchema = @Schema(example = "[1, 3]"),
+                schema = @Schema(type = "integer", allowableValues = {"1", "2", "3", "4", "5", "6", "7"})
+        )
+        List<@Min(value = 1, message = "지원하지 않는 케어 영역입니다.")
+                @Max(value = 7, message = "지원하지 않는 케어 영역입니다.") Integer> disabilityTypeIds,
 
-        @ArraySchema(schema = @Schema(allowableValues = {
-                "AUTISM_SPECTRUM", "INTELLECTUAL", "BRAIN_LESION", "ADHD", "DEVELOPMENTAL", "LANGUAGE", "OTHER"
-        }))
-        List<String> careAreas,
-
+        @Schema(example = "말이 느림")
         @Size(max = 100, message = "특징 키워드는 최대 100자까지 입력 가능합니다.")
-        String characteristicKeyword,
+        String keywordText,
 
-        @Size(max = 2, message = "관심사는 최대 2개까지 선택 가능합니다.")
-        @ArraySchema(schema = @Schema(allowableValues = {
-                "WELFARE_SUBSIDY", "HOSPITAL_HEALTH", "PARENTING_COMMUNICATION", "GROWTH_EDUCATION"
-        }))
-        List<String> interests,
+        @Size(max = 3, message = "관심사는 최대 3개까지 선택 가능합니다.")
+        @ArraySchema(
+                arraySchema = @Schema(example = "[1, 2]"),
+                schema = @Schema(type = "integer", allowableValues = {"1", "2", "3", "4"})
+        )
+        List<@Min(value = 1, message = "지원하지 않는 관심사입니다.")
+                @Max(value = 4, message = "지원하지 않는 관심사입니다.") Integer> interestCategoryIds,
 
+        @Schema(example = "서울특별시")
         @Size(max = 50, message = "시/도는 최대 50자까지 입력 가능합니다.")
         String regionLevel1,
 
+        @Schema(example = "강남구")
         @Size(max = 50, message = "시/군/구는 최대 50자까지 입력 가능합니다.")
         String regionLevel2,
 
         @Schema(allowableValues = {"PARENT", "GRANDPARENT", "SIBLING", "OTHER"})
+        @Pattern(regexp = "PARENT|GRANDPARENT|SIBLING|OTHER", message = "보호자 유형을 확인해주세요.")
         String guardianType,
 
         @Schema(allowableValues = {"INFO_SEEKER", "EXPERIENCE_SHARER", "WISDOM_HELPER"})
+        @Pattern(regexp = "INFO_SEEKER|EXPERIENCE_SHARER|WISDOM_HELPER", message = "커뮤니티 성향을 확인해주세요.")
         String communityRoleType
 ) {
 
     @JsonIgnore
     @Schema(hidden = true)
-    @AssertTrue(message = "출생 연도를 확인해주세요.")
-    public boolean isBirthYearValid() {
-        return childBirthYear == null || childBirthYear <= Year.now().getValue();
+    @AssertTrue(message = "생년월은 YYYY-MM 형식으로 입력해주세요.")
+    public boolean isBirthValid() {
+        if (childBirth == null) {
+            return true;
+        }
+
+        try {
+            YearMonth birthYearMonth = YearMonth.parse(childBirth);
+            return birthYearMonth.getYear() >= 2000 && !birthYearMonth.isAfter(YearMonth.now());
+        } catch (DateTimeParseException e) {
+            return false;
+        }
     }
 }

@@ -1,23 +1,19 @@
 package com.bodeum.domain.term.enumtype;
 
-import com.bodeum.global.apiPayload.code.GeneralErrorCode;
+import com.bodeum.domain.term.exception.TermsErrorCode;
 import com.bodeum.global.apiPayload.exception.ProjectException;
 import java.util.Arrays;
-import java.util.Set;
 
 public enum TermType {
 
-    SERVICE("service", Set.of("terms", "service-terms"), "이용약관"),
-    PRIVACY("privacy", Set.of("privacy-policy"), "개인정보처리방침"),
-    AI_CHAT("ai-chat", Set.of("ai", "ai-chat-terms", "chatbot"), "AI 챗봇 이용 동의 방침");
+    SERVICE("service", "서비스 이용약관"),
+    PRIVACY("privacy", "개인정보처리방침");
 
     private final String path;
-    private final Set<String> aliases;
     private final String title;
 
-    TermType(String path, Set<String> aliases, String title) {
+    TermType(String path, String title) {
         this.path = path;
-        this.aliases = aliases;
         this.title = title;
     }
 
@@ -31,8 +27,8 @@ public enum TermType {
 
     public static TermType from(String value) {
         return Arrays.stream(values())
-                .filter(type -> type.path.equalsIgnoreCase(value) || type.aliases.contains(value.toLowerCase()))
+                .filter(type -> type.path.equalsIgnoreCase(value))
                 .findFirst()
-                .orElseThrow(() -> new ProjectException(GeneralErrorCode.BAD_REQUEST));
+                .orElseThrow(() -> new ProjectException(TermsErrorCode.UNSUPPORTED_TYPE));
     }
 }

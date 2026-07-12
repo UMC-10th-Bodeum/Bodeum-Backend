@@ -1,7 +1,7 @@
 package com.bodeum.global.auth;
 
+import com.bodeum.domain.auth.exception.AuthErrorCode;
 import com.bodeum.global.apiPayload.ApiResponse;
-import com.bodeum.global.apiPayload.code.GeneralErrorCode;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
@@ -29,7 +29,7 @@ public class ApiAuthenticationEntryPoint implements AuthenticationEntryPoint {
             HttpServletResponse response,
             AuthenticationException authException
     ) throws IOException {
-        GeneralErrorCode errorCode = GeneralErrorCode.UNAUTHORIZED;
+        AuthErrorCode errorCode = AuthErrorCode.INVALID_ACCESS_TOKEN;
 
         response.setStatus(errorCode.getStatus().value());
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);

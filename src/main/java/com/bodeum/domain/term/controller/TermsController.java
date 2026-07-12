@@ -29,7 +29,11 @@ public class TermsController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "조회 성공"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "400",
-                    description = "COMMON400_1: 지원하지 않는 약관 유형"
+                    description = "TERMS400_1: 지원하지 않는 약관 유형"
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "500",
+                    description = "TERMS500_1: 약관 콘텐츠 로드 실패"
             )
     })
     @SecurityRequirements

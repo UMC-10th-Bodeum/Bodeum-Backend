@@ -1,10 +1,9 @@
 package com.bodeum.domain.user.dto.response;
 
-import com.bodeum.domain.onboarding.enumtype.CareArea;
 import com.bodeum.domain.onboarding.enumtype.CommunityRoleType;
 import com.bodeum.domain.onboarding.enumtype.GuardianType;
-import com.bodeum.domain.onboarding.enumtype.InterestCategory;
 import com.bodeum.domain.user.entity.UserAccount;
+import java.time.LocalDateTime;
 import java.util.List;
 
 public record UserProfileResponse(
@@ -17,12 +16,10 @@ public record UserProfileResponse(
         int level,
         String badgeName,
         String levelDescription,
-        String childNickname,
-        Integer childBirthYear,
-        Integer childBirthMonth,
-        List<CareArea> careAreas,
-        String characteristicKeyword,
-        List<InterestCategory> interests,
+        LocalDateTime joinedAt,
+        ChildProfile childProfile,
+        String keywordText,
+        List<Integer> interestCategoryIds,
         String regionLevel1,
         String regionLevel2,
         String guardianNickname,
@@ -41,17 +38,30 @@ public record UserProfileResponse(
                 userAccount.getGuardianLevel().getLevelNumber(),
                 userAccount.getGuardianLevel().getBadgeName(),
                 userAccount.getGuardianLevel().getDescription(),
-                userAccount.getChildName(),
-                userAccount.getChildBirthYear(),
-                userAccount.getChildBirthMonth(),
-                userAccount.getCareAreas(),
-                userAccount.getCharacteristicKeyword(),
-                userAccount.getInterests(),
+                userAccount.getCreatedAt(),
+                ChildProfile.from(userAccount),
+                userAccount.getKeywordText(),
+                userAccount.getInterestCategoryIds(),
                 userAccount.getRegionLevel1(),
                 userAccount.getRegionLevel2(),
                 userAccount.getGuardianNickname(),
                 userAccount.getGuardianType(),
                 userAccount.getCommunityRoleType()
         );
+    }
+
+    public record ChildProfile(
+            String nickname,
+            String birth,
+            List<Integer> disabilityTypeIds
+    ) {
+
+        private static ChildProfile from(UserAccount userAccount) {
+            return new ChildProfile(
+                    userAccount.getChildName(),
+                    userAccount.getChildBirth(),
+                    userAccount.getDisabilityTypeIds()
+            );
+        }
     }
 }

@@ -39,7 +39,11 @@ public class AuthController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "302", description = "소셜 인증 페이지로 리다이렉트"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "400",
-                    description = "AUTH400_1: 지원하지 않는 제공자 / AUTH400_2: 소셜 로그인 설정 미완료"
+                    description = "AUTH400_1: 지원하지 않는 제공자"
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "500",
+                    description = "AUTH500_1: 소셜 로그인 설정 미완료"
             )
     })
     @SecurityRequirements
@@ -60,12 +64,15 @@ public class AuthController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "로그인 성공"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "400",
-                    description = "AUTH400_1: 지원하지 않는 제공자 / AUTH400_2: 소셜 로그인 설정 미완료 / AUTH400_3: 인가 코드 누락"
+                    description = "AUTH400_1: 지원하지 않는 제공자 / AUTH400_2: 유효하지 않은 인가 코드 / AUTH400_4: 소셜 토큰 교환 실패"
             ),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "401",
-                    description = "AUTH401_1: 유효하지 않은 state / AUTH401_2: 소셜 토큰 발급 실패 / "
-                            + "AUTH401_3: 소셜 사용자 정보 조회 실패 / AUTH401_5: 비활성 사용자"
+                    description = "AUTH401_2: 소셜 인증 실패 / AUTH401_5: 비활성 사용자 / AUTH401_6: 유효하지 않은 state"
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "500",
+                    description = "AUTH500_1: 소셜 로그인 설정 미완료"
             )
     })
     @SecurityRequirements
@@ -88,7 +95,7 @@ public class AuthController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "토큰 재발급 성공"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "401",
-                    description = "AUTH401_4: 유효하지 않은 리프레시 토큰 / AUTH401_5: 비활성 사용자"
+                    description = "AUTH401_3: 유효하지 않은 refreshToken / AUTH401_5: 비활성 사용자"
             )
     })
     @SecurityRequirements

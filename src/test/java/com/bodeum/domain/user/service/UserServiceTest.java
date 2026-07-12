@@ -1,20 +1,27 @@
 package com.bodeum.domain.user.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.then;
 
 import com.bodeum.domain.auth.enumtype.SocialProvider;
+import com.bodeum.domain.auth.exception.AuthErrorCode;
+import com.bodeum.domain.auth.repository.RefreshTokenSessionRepository;
+import com.bodeum.domain.user.dto.request.WithdrawUserRequest;
 import com.bodeum.domain.user.dto.response.UserHeaderResponse;
+import com.bodeum.domain.user.dto.response.UserWithdrawResponse;
 import com.bodeum.domain.user.entity.UserAccount;
 import com.bodeum.domain.user.repository.UserAccountRepository;
-import com.bodeum.global.auth.AuthUserPrincipal;
+import com.bodeum.global.apiPayload.exception.ProjectException;
+import com.bodeum.global.infrastructure.storage.S3ImageStorage;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.security.core.Authentication;
+import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
 class UserServiceTest {
@@ -23,24 +30,18 @@ class UserServiceTest {
     private UserAccountRepository userAccountRepository;
 
     @Mock
-    private Authentication authentication;
+    private RefreshTokenSessionRepository refreshTokenSessionRepository;
+
+    @Mock
+    private S3ImageStorage s3ImageStorage;
 
     @InjectMocks
     private UserService userService;
 
     @Test
-    void headerInfoReturnsLoggedOutWhenAuthenticationIsNull() {
+    void headerInfoReturnsLoggedOutWhenUserIdIsNull() {
         // 헤더/사이드바 조회는 비로그인(인증 없음)이어도 예외 없이 비로그인 응답을 반환한다.
         UserHeaderResponse response = userService.getHeaderInfo(null);
-
-        assertThat(response.isLoggedIn()).isFalse();
-    }
-
-    @Test
-    void headerInfoReturnsLoggedOutWhenPrincipalIsNotAuthUser() {
-        given(authentication.getPrincipal()).willReturn("anonymousUser");
-
-        UserHeaderResponse response = userService.getHeaderInfo(authentication);
 
         assertThat(response.isLoggedIn()).isFalse();
     }
@@ -49,11 +50,9 @@ class UserServiceTest {
     void headerInfoReturnsUserInfoWhenLoggedIn() {
         UserAccount userAccount = UserAccount.createSocialUser(
                 SocialProvider.KAKAO, "kakao-1", "parent@example.com", "민준맘");
-        given(authentication.getPrincipal())
-                .willReturn(new AuthUserPrincipal(1L, SocialProvider.KAKAO, "민준맘", "parent@example.com"));
         given(userAccountRepository.findById(1L)).willReturn(Optional.of(userAccount));
 
-        UserHeaderResponse response = userService.getHeaderInfo(authentication);
+        UserHeaderResponse response = userService.getHeaderInfo(1L);
 
         assertThat(response.isLoggedIn()).isTrue();
         assertThat(response.nickname()).isEqualTo("민준맘");
@@ -65,13 +64,43 @@ class UserServiceTest {
     void headerInfoFallsBackToLoggedOutWhenUserWithdrawn() {
         UserAccount userAccount = UserAccount.createSocialUser(
                 SocialProvider.KAKAO, "kakao-1", "parent@example.com", "민준맘");
-        userAccount.withdraw();
-        given(authentication.getPrincipal())
-                .willReturn(new AuthUserPrincipal(1L, SocialProvider.KAKAO, "민준맘", "parent@example.com"));
+        userAccount.withdraw(null);
         given(userAccountRepository.findById(1L)).willReturn(Optional.of(userAccount));
 
-        UserHeaderResponse response = userService.getHeaderInfo(authentication);
+        UserHeaderResponse response = userService.getHeaderInfo(1L);
 
         assertThat(response.isLoggedIn()).isFalse();
+    }
+
+    @Test
+    void withdrawStoresReasonAndRevokesRefreshTokenSessions() {
+        UserAccount userAccount = UserAccount.createSocialUser(
+                SocialProvider.KAKAO, "kakao-1", "parent@example.com", "민준맘");
+        ReflectionTestUtils.setField(userAccount, "id", 1L);
+        given(userAccountRepository.findById(1L)).willReturn(Optional.of(userAccount));
+
+        UserWithdrawResponse response = userService.withdraw(
+                1L,
+                new WithdrawUserRequest("더 이상 서비스를 이용하지 않습니다.")
+        );
+
+        assertThat(response.success()).isTrue();
+        assertThat(userAccount.isWithdrawn()).isTrue();
+        assertThat(userAccount.getDeletedAt()).isNotNull();
+        assertThat(userAccount.getWithdrawalReason()).isEqualTo("더 이상 서비스를 이용하지 않습니다.");
+        then(refreshTokenSessionRepository).should().deleteByUserId(1L);
+    }
+
+    @Test
+    void withdrawRejectsAlreadyWithdrawnUser() {
+        UserAccount userAccount = UserAccount.createSocialUser(
+                SocialProvider.KAKAO, "kakao-1", "parent@example.com", "민준맘");
+        userAccount.withdraw(null);
+        given(userAccountRepository.findById(1L)).willReturn(Optional.of(userAccount));
+
+        assertThatThrownBy(() -> userService.withdraw(1L, null))
+                .isInstanceOf(ProjectException.class)
+                .extracting(exception -> ((ProjectException) exception).getErrorCode())
+                .isEqualTo(AuthErrorCode.ALREADY_WITHDRAWN);
     }
 }

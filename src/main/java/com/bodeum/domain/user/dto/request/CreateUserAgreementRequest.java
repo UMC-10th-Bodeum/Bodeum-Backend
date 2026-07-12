@@ -12,7 +12,7 @@ public record CreateUserAgreementRequest(
         @NotNull(message = "개인정보처리방침 동의 여부는 필수입니다.")
         Boolean privacyPolicyAgreed,
 
-        Boolean aiChatAgreed
+        Boolean aiTermsAgreed
 ) {
 
     @JsonIgnore
@@ -24,7 +24,7 @@ public record CreateUserAgreementRequest(
 
     @JsonIgnore
     @Schema(hidden = true)
-    public boolean isAiChatAgreedValue() {
-        return Boolean.TRUE.equals(aiChatAgreed);
+    public boolean isAiTermsAgreedValue() {
+        return Boolean.TRUE.equals(aiTermsAgreed);
     }
 }

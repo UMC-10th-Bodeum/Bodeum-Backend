@@ -1,6 +1,5 @@
 package com.bodeum.domain.user.dto.response;
 
-import com.bodeum.domain.onboarding.enumtype.CareArea;
 import com.bodeum.domain.user.entity.UserAccount;
 import java.util.List;
 
@@ -10,7 +9,7 @@ public record UserHeaderResponse(
         String profileImageUrl,
         Integer level,
         String badgeName,
-        List<CareArea> childDisabilityTypes,
+        List<Integer> childDisabilityTypeIds,
         Integer childAge,
         String region
 ) {
@@ -26,7 +25,7 @@ public record UserHeaderResponse(
                 userAccount.getProfileImageUrl(),
                 userAccount.getGuardianLevel().getLevelNumber(),
                 userAccount.getGuardianLevel().getBadgeName(),
-                userAccount.getCareAreas(),
+                userAccount.getDisabilityTypeIds(),
                 userAccount.getChildAge(),
                 buildRegion(userAccount.getRegionLevel1(), userAccount.getRegionLevel2())
         );

@@ -13,6 +13,8 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 
 @Slf4j
 @RestControllerAdvice
@@ -65,6 +67,25 @@ public class GeneralExceptionAdvice {
         String message = e.getParameterName() + " 파라미터가 필요합니다.";
         return ResponseEntity.status(errorCode.getStatus())
                 .body(ApiResponse.onFailure(errorCode, message));
+    }
+
+    @ExceptionHandler(MissingServletRequestPartException.class)
+    public ResponseEntity<ApiResponse<String>> handleMissingRequestPartException(
+            MissingServletRequestPartException e
+    ) {
+        BaseErrorCode errorCode = GeneralErrorCode.BAD_REQUEST;
+        String message = e.getRequestPartName() + " 파일이 필요합니다.";
+        return ResponseEntity.status(errorCode.getStatus())
+                .body(ApiResponse.onFailure(errorCode, message));
+    }
+
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<ApiResponse<Void>> handleMaxUploadSizeExceededException(
+            MaxUploadSizeExceededException e
+    ) {
+        BaseErrorCode errorCode = GeneralErrorCode.PAYLOAD_TOO_LARGE;
+        return ResponseEntity.status(errorCode.getStatus())
+                .body(ApiResponse.onFailure(errorCode, null));
     }
 
     // 그 외의 정의되지 않은 모든 예외 처리

@@ -10,13 +10,15 @@ import org.springframework.http.HttpStatus;
 public enum AuthErrorCode implements BaseErrorCode {
 
     UNSUPPORTED_PROVIDER(HttpStatus.BAD_REQUEST, "AUTH400_1", "지원하지 않는 소셜 로그인 제공자입니다."),
-    PROVIDER_NOT_CONFIGURED(HttpStatus.BAD_REQUEST, "AUTH400_2", "소셜 로그인 설정이 완료되지 않았습니다."),
-    MISSING_AUTH_CODE(HttpStatus.BAD_REQUEST, "AUTH400_3", "인가 코드가 존재하지 않습니다."),
-    INVALID_OAUTH_STATE(HttpStatus.UNAUTHORIZED, "AUTH401_1", "유효하지 않은 OAuth state 값입니다."),
-    SOCIAL_TOKEN_EXCHANGE_FAILED(HttpStatus.UNAUTHORIZED, "AUTH401_2", "소셜 액세스 토큰 발급에 실패했습니다."),
-    SOCIAL_PROFILE_FETCH_FAILED(HttpStatus.UNAUTHORIZED, "AUTH401_3", "소셜 사용자 정보 조회에 실패했습니다."),
-    INVALID_REFRESH_TOKEN(HttpStatus.UNAUTHORIZED, "AUTH401_4", "유효하지 않은 리프레시 토큰입니다."),
-    INACTIVE_USER(HttpStatus.UNAUTHORIZED, "AUTH401_5", "탈퇴했거나 비활성화된 사용자입니다.");
+    MISSING_AUTH_CODE(HttpStatus.BAD_REQUEST, "AUTH400_2", "유효하지 않은 인가 코드입니다."),
+    SOCIAL_TOKEN_EXCHANGE_FAILED(HttpStatus.BAD_REQUEST, "AUTH400_4", "소셜 토큰 교환에 실패했습니다."),
+    ALREADY_WITHDRAWN(HttpStatus.BAD_REQUEST, "AUTH400_3", "이미 탈퇴한 사용자입니다."),
+    INVALID_ACCESS_TOKEN(HttpStatus.UNAUTHORIZED, "AUTH401_1", "유효하지 않은 토큰입니다."),
+    SOCIAL_PROFILE_FETCH_FAILED(HttpStatus.UNAUTHORIZED, "AUTH401_2", "소셜 인증에 실패했습니다."),
+    INVALID_REFRESH_TOKEN(HttpStatus.UNAUTHORIZED, "AUTH401_3", "유효하지 않은 refreshToken입니다. 다시 로그인해주세요."),
+    INACTIVE_USER(HttpStatus.UNAUTHORIZED, "AUTH401_5", "탈퇴했거나 비활성화된 사용자입니다."),
+    INVALID_OAUTH_STATE(HttpStatus.UNAUTHORIZED, "AUTH401_6", "유효하지 않은 OAuth state 값입니다."),
+    PROVIDER_NOT_CONFIGURED(HttpStatus.INTERNAL_SERVER_ERROR, "AUTH500_1", "소셜 로그인 설정이 완료되지 않았습니다.");
 
     private final HttpStatus status;
     private final String code;

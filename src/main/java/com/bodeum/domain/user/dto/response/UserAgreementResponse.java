@@ -7,7 +7,7 @@ import java.time.LocalDateTime;
 public record UserAgreementResponse(
         boolean serviceTermsAgreed,
         boolean privacyPolicyAgreed,
-        boolean aiChatAgreed,
+        boolean aiTermsAgreed,
         LocalDateTime agreedAt,
         AuthNextStep nextStep
 ) {
@@ -16,7 +16,7 @@ public record UserAgreementResponse(
         return new UserAgreementResponse(
                 userAccount.isServiceTermsAgreed(),
                 userAccount.isPrivacyPolicyAgreed(),
-                userAccount.isAiChatAgreed(),
+                userAccount.isAiTermsAgreed(),
                 userAccount.getAgreementAgreedAt(),
                 userAccount.isOnboardingResolved() ? AuthNextStep.HOME : AuthNextStep.ONBOARDING
         );

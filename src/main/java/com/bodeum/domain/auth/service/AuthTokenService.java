@@ -65,7 +65,7 @@ public class AuthTokenService {
     @Transactional(readOnly = true)
     public Optional<AuthUserPrincipal> authenticate(String accessToken) {
         return jwtTokenProvider.parseAuthSubject(accessToken)
-                .flatMap(userService::findActiveUserByAuthSubject)
+                .flatMap(userService::findUserByAuthSubject)
                 .map(this::toPrincipal);
     }
 
@@ -85,10 +85,8 @@ public class AuthTokenService {
 
         refreshTokenSessionRepository.delete(session);
 
-        UserAccount userAccount = userService.findActiveUser(session.getUserId())
-                .orElseThrow(() -> new ProjectException(AuthErrorCode.INACTIVE_USER));
-
-        return issueTokens(userAccount.getId());
+        // issueTokens가 활성 사용자 검증(INACTIVE_USER)을 수행하므로 여기서 중복 조회하지 않는다.
+        return issueTokens(session.getUserId());
     }
 
     @Transactional

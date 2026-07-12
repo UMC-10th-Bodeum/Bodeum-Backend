@@ -1,11 +1,10 @@
 package com.bodeum.domain.user.entity;
 
 import com.bodeum.domain.auth.enumtype.SocialProvider;
-import com.bodeum.domain.onboarding.enumtype.CareArea;
 import com.bodeum.domain.onboarding.enumtype.CommunityRoleType;
 import com.bodeum.domain.onboarding.enumtype.GuardianType;
-import com.bodeum.domain.onboarding.enumtype.InterestCategory;
 import com.bodeum.domain.user.enumtype.GuardianLevel;
+import com.bodeum.domain.user.enumtype.UserStatus;
 import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
 import jakarta.persistence.ElementCollection;
@@ -22,6 +21,8 @@ import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.YearMonth;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -71,8 +72,8 @@ public class UserAccount {
     @Column(name = "privacy_policy_agreed", nullable = false)
     private boolean privacyPolicyAgreed;
 
-    @Column(name = "ai_chat_agreed", nullable = false)
-    private boolean aiChatAgreed;
+    @Column(name = "ai_terms_agreed", nullable = false)
+    private boolean aiTermsAgreed;
 
     @Column(name = "agreement_agreed_at")
     private LocalDateTime agreementAgreedAt;
@@ -80,26 +81,21 @@ public class UserAccount {
     @Column(name = "child_nickname", length = 20)
     private String childNickname;
 
-    @Column(name = "child_birth_year")
-    private Integer childBirthYear;
-
-    @Column(name = "child_birth_month")
-    private Integer childBirthMonth;
+    @Column(name = "child_birth", length = 7)
+    private String childBirth;
 
     @ElementCollection(fetch = FetchType.LAZY)
-    @CollectionTable(name = "user_care_areas", joinColumns = @JoinColumn(name = "user_id"))
-    @Enumerated(EnumType.STRING)
-    @Column(name = "care_area", nullable = false, length = 50)
-    private List<CareArea> careAreas = new ArrayList<>();
+    @CollectionTable(name = "user_disability_types", joinColumns = @JoinColumn(name = "user_id"))
+    @Column(name = "disability_type_id", nullable = false)
+    private List<Integer> disabilityTypeIds = new ArrayList<>();
 
-    @Column(name = "characteristic_keyword", length = 100)
-    private String characteristicKeyword;
+    @Column(name = "keyword_text", length = 100)
+    private String keywordText;
 
     @ElementCollection(fetch = FetchType.LAZY)
     @CollectionTable(name = "user_interests", joinColumns = @JoinColumn(name = "user_id"))
-    @Enumerated(EnumType.STRING)
-    @Column(name = "interest", nullable = false, length = 50)
-    private List<InterestCategory> interests = new ArrayList<>();
+    @Column(name = "interest_category_id", nullable = false)
+    private List<Integer> interestCategoryIds = new ArrayList<>();
 
     @Column(name = "region_level_1", length = 50)
     private String regionLevel1;
@@ -124,8 +120,15 @@ public class UserAccount {
     @Column(nullable = false)
     private int point;
 
-    @Column(nullable = false)
-    private boolean withdrawn;
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private UserStatus status;
+
+    @Column(name = "deleted_at")
+    private LocalDateTime deletedAt;
+
+    @Column(name = "withdrawal_reason", length = 255)
+    private String withdrawalReason;
 
     protected UserAccount() {
     }
@@ -142,6 +145,7 @@ public class UserAccount {
         this.email = email;
         this.nickname = nickname;
         this.createdAt = LocalDateTime.now();
+        this.status = UserStatus.ACTIVE;
     }
 
     public static UserAccount createSocialUser(
@@ -162,35 +166,37 @@ public class UserAccount {
         if (createdAt == null) {
             createdAt = LocalDateTime.now();
         }
+
+        if (status == null) {
+            status = UserStatus.ACTIVE;
+        }
     }
 
-    public void agreeTerms(boolean serviceTermsAgreed, boolean privacyPolicyAgreed, boolean aiChatAgreed) {
+    public void agreeTerms(boolean serviceTermsAgreed, boolean privacyPolicyAgreed, boolean aiTermsAgreed) {
         this.serviceTermsAgreed = serviceTermsAgreed;
         this.privacyPolicyAgreed = privacyPolicyAgreed;
-        this.aiChatAgreed = aiChatAgreed;
+        this.aiTermsAgreed = aiTermsAgreed;
         this.agreementAgreedAt = LocalDateTime.now();
     }
 
     public void updateChildProfile(
             String childNickname,
-            Integer childBirthYear,
-            Integer childBirthMonth,
-            List<CareArea> careAreas,
-            String characteristicKeyword
+            String childBirth,
+            List<Integer> disabilityTypeIds,
+            String keywordText
     ) {
         this.childNickname = childNickname;
-        this.childBirthYear = childBirthYear;
-        this.childBirthMonth = childBirthMonth;
-        this.careAreas = new ArrayList<>(careAreas);
-        this.characteristicKeyword = characteristicKeyword;
+        this.childBirth = childBirth;
+        this.disabilityTypeIds = new ArrayList<>(disabilityTypeIds);
+        this.keywordText = keywordText;
     }
 
     public void updateInterestRegion(
-            List<InterestCategory> interests,
+            List<Integer> interestCategoryIds,
             String regionLevel1,
             String regionLevel2
     ) {
-        this.interests = new ArrayList<>(interests);
+        this.interestCategoryIds = new ArrayList<>(interestCategoryIds);
         this.regionLevel1 = regionLevel1;
         this.regionLevel2 = regionLevel2;
     }
@@ -217,11 +223,10 @@ public class UserAccount {
     public void updateProfile(
             String nickname,
             String childNickname,
-            Integer childBirthYear,
-            Integer childBirthMonth,
-            List<CareArea> careAreas,
-            String characteristicKeyword,
-            List<InterestCategory> interests,
+            String childBirth,
+            List<Integer> disabilityTypeIds,
+            String keywordText,
+            List<Integer> interestCategoryIds,
             String regionLevel1,
             String regionLevel2,
             GuardianType guardianType,
@@ -236,24 +241,20 @@ public class UserAccount {
             this.childNickname = childNickname;
         }
 
-        if (childBirthYear != null) {
-            this.childBirthYear = childBirthYear;
+        if (childBirth != null) {
+            this.childBirth = childBirth;
         }
 
-        if (childBirthMonth != null) {
-            this.childBirthMonth = childBirthMonth;
+        if (disabilityTypeIds != null) {
+            this.disabilityTypeIds = new ArrayList<>(disabilityTypeIds);
         }
 
-        if (careAreas != null) {
-            this.careAreas = new ArrayList<>(careAreas);
+        if (keywordText != null) {
+            this.keywordText = blankToNull(keywordText);
         }
 
-        if (characteristicKeyword != null) {
-            this.characteristicKeyword = blankToNull(characteristicKeyword);
-        }
-
-        if (interests != null) {
-            this.interests = new ArrayList<>(interests);
+        if (interestCategoryIds != null) {
+            this.interestCategoryIds = new ArrayList<>(interestCategoryIds);
         }
 
         if (regionLevel1 != null) {
@@ -277,8 +278,10 @@ public class UserAccount {
         return value == null || value.isBlank() ? null : value;
     }
 
-    public void withdraw() {
-        this.withdrawn = true;
+    public void withdraw(String reason) {
+        this.status = UserStatus.DELETED;
+        this.deletedAt = LocalDateTime.now();
+        this.withdrawalReason = blankToNull(reason);
     }
 
     public boolean isAgreementCompleted() {
@@ -286,11 +289,11 @@ public class UserAccount {
     }
 
     public boolean isChildProfileRegistered() {
-        return childBirthYear != null && childBirthMonth != null && !careAreas.isEmpty();
+        return childBirth != null && !disabilityTypeIds.isEmpty();
     }
 
     public boolean isInterestRegionRegistered() {
-        return !interests.isEmpty() && regionLevel1 != null && regionLevel2 != null;
+        return !interestCategoryIds.isEmpty() && regionLevel1 != null && regionLevel2 != null;
     }
 
     public boolean isGuardianProfileRegistered() {
@@ -350,8 +353,8 @@ public class UserAccount {
         return privacyPolicyAgreed;
     }
 
-    public boolean isAiChatAgreed() {
-        return aiChatAgreed;
+    public boolean isAiTermsAgreed() {
+        return aiTermsAgreed;
     }
 
     public LocalDateTime getAgreementAgreedAt() {
@@ -362,42 +365,47 @@ public class UserAccount {
         return childNickname;
     }
 
-    public Integer getChildBirthYear() {
-        return childBirthYear;
-    }
-
-    public Integer getChildBirthMonth() {
-        return childBirthMonth;
+    public String getChildBirth() {
+        return childBirth;
     }
 
     /**
      * 자녀 출생 연월 기준 만 나이. 생월이 아직 지나지 않았으면 한 살을 뺀다.
-     * 출생 연도가 없으면 나이를 계산할 수 없으므로 null을 반환한다.
+     * 생년월이 없으면 나이를 계산할 수 없으므로 null을 반환한다.
      */
     public Integer getChildAge() {
-        if (childBirthYear == null) {
+        if (childBirth == null) {
+            return null;
+        }
+
+        YearMonth birth;
+        try {
+            birth = YearMonth.parse(childBirth);
+        } catch (DateTimeParseException e) {
+            // 저장 시 검증을 거치지만, 마이그레이션·수작업 수정 등으로 형식이 깨진 데이터가
+            // 조회 API를 500으로 터뜨리지 않도록 나이를 계산 불가로 처리한다.
             return null;
         }
 
         LocalDate now = LocalDate.now();
-        int age = now.getYear() - childBirthYear;
-        if (childBirthMonth != null && now.getMonthValue() < childBirthMonth) {
+        int age = now.getYear() - birth.getYear();
+        if (now.getMonthValue() < birth.getMonthValue()) {
             age--;
         }
 
         return age;
     }
 
-    public List<CareArea> getCareAreas() {
-        return List.copyOf(careAreas);
+    public List<Integer> getDisabilityTypeIds() {
+        return List.copyOf(disabilityTypeIds);
     }
 
-    public String getCharacteristicKeyword() {
-        return characteristicKeyword;
+    public String getKeywordText() {
+        return keywordText;
     }
 
-    public List<InterestCategory> getInterests() {
-        return List.copyOf(interests);
+    public List<Integer> getInterestCategoryIds() {
+        return List.copyOf(interestCategoryIds);
     }
 
     public String getRegionLevel1() {
@@ -433,6 +441,18 @@ public class UserAccount {
     }
 
     public boolean isWithdrawn() {
-        return withdrawn;
+        return status == UserStatus.DELETED;
+    }
+
+    public UserStatus getStatus() {
+        return status;
+    }
+
+    public LocalDateTime getDeletedAt() {
+        return deletedAt;
+    }
+
+    public String getWithdrawalReason() {
+        return withdrawalReason;
     }
 }

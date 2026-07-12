@@ -2,27 +2,25 @@ package com.bodeum.domain.user.service;
 
 import com.bodeum.domain.auth.enumtype.SocialProvider;
 import com.bodeum.domain.auth.exception.AuthErrorCode;
-import com.bodeum.domain.onboarding.enumtype.CareArea;
+import com.bodeum.domain.auth.repository.RefreshTokenSessionRepository;
 import com.bodeum.domain.onboarding.enumtype.CommunityRoleType;
 import com.bodeum.domain.onboarding.enumtype.GuardianType;
-import com.bodeum.domain.onboarding.enumtype.InterestCategory;
 import com.bodeum.domain.user.dto.request.CreateUserAgreementRequest;
 import com.bodeum.domain.user.dto.request.UpdateUserProfileRequest;
+import com.bodeum.domain.user.dto.request.WithdrawUserRequest;
 import com.bodeum.domain.user.dto.response.UserAgreementResponse;
 import com.bodeum.domain.user.dto.response.UserHeaderResponse;
 import com.bodeum.domain.user.dto.response.UserProfileResponse;
-import com.bodeum.domain.user.dto.response.UserSummaryResponse;
+import com.bodeum.domain.user.dto.response.UserProfileUpdateResponse;
+import com.bodeum.domain.user.dto.response.UserWithdrawResponse;
 import com.bodeum.domain.user.entity.UserAccount;
 import com.bodeum.domain.user.repository.UserAccountRepository;
 import com.bodeum.global.apiPayload.code.GeneralErrorCode;
 import com.bodeum.global.apiPayload.exception.ProjectException;
-import com.bodeum.global.auth.AuthUserPrincipal;
 import com.bodeum.global.infrastructure.storage.S3ImageStorage;
-import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,16 +33,12 @@ public class UserService {
     private static final String PROFILE_IMAGE_DIRECTORY = "profile-images";
 
     private final UserAccountRepository userAccountRepository;
+    private final RefreshTokenSessionRepository refreshTokenSessionRepository;
     private final S3ImageStorage s3ImageStorage;
 
     @Transactional(readOnly = true)
-    public UserSummaryResponse getSummary(Authentication authentication) {
-        return UserSummaryResponse.from(getCurrentUser(authentication));
-    }
-
-    @Transactional(readOnly = true)
-    public UserProfileResponse getProfile(Authentication authentication) {
-        return UserProfileResponse.from(getCurrentUser(authentication));
+    public UserProfileResponse getProfile(Long userId) {
+        return UserProfileResponse.from(getCurrentUser(userId));
     }
 
     /**
@@ -52,76 +46,76 @@ public class UserService {
      * 비로그인 응답으로 fallback 한다.
      */
     @Transactional(readOnly = true)
-    public UserHeaderResponse getHeaderInfo(Authentication authentication) {
-        if (authentication == null || !(authentication.getPrincipal() instanceof AuthUserPrincipal principal)) {
+    public UserHeaderResponse getHeaderInfo(Long userId) {
+        if (userId == null) {
             return UserHeaderResponse.loggedOut();
         }
 
-        return findActiveUser(principal.userId())
+        return findActiveUser(userId)
                 .map(UserHeaderResponse::from)
                 .orElseGet(UserHeaderResponse::loggedOut);
     }
 
     @Transactional
-    public UserProfileResponse updateProfile(Authentication authentication, UpdateUserProfileRequest request) {
-        UserAccount userAccount = getCurrentUser(authentication);
+    public UserProfileUpdateResponse updateProfile(Long userId, UpdateUserProfileRequest request) {
+        UserAccount userAccount = getCurrentUser(userId);
         userAccount.updateProfile(
                 request.nickname(),
                 request.childNickname(),
-                request.childBirthYear(),
-                request.childBirthMonth(),
-                toCareAreas(request.careAreas()),
-                request.characteristicKeyword(),
-                toInterests(request.interests()),
+                request.childBirth(),
+                request.disabilityTypeIds(),
+                request.keywordText(),
+                request.interestCategoryIds(),
                 request.regionLevel1(),
                 request.regionLevel2(),
                 GuardianType.fromNullable(request.guardianType()),
                 CommunityRoleType.fromNullable(request.communityRoleType())
         );
 
-        return UserProfileResponse.from(userAccount);
+        return UserProfileUpdateResponse.ofSuccess();
     }
 
     @Transactional
-    public UserProfileResponse uploadProfileImage(Authentication authentication, MultipartFile image) {
-        UserAccount userAccount = getCurrentUser(authentication);
+    public UserProfileResponse uploadProfileImage(Long userId, MultipartFile image) {
+        UserAccount userAccount = getCurrentUser(userId);
         String imageUrl = s3ImageStorage.upload(image, PROFILE_IMAGE_DIRECTORY);
         userAccount.updateProfileImage(imageUrl);
 
         return UserProfileResponse.from(userAccount);
     }
 
-    private List<CareArea> toCareAreas(List<String> careAreas) {
-        return careAreas == null ? null : careAreas.stream().map(CareArea::from).toList();
-    }
-
-    private List<InterestCategory> toInterests(List<String> interests) {
-        return interests == null ? null : interests.stream().map(InterestCategory::from).toList();
-    }
-
     @Transactional
-    public UserAgreementResponse agreeTerms(Authentication authentication, CreateUserAgreementRequest request) {
-        UserAccount userAccount = getCurrentUser(authentication);
+    public UserAgreementResponse agreeTerms(Long userId, CreateUserAgreementRequest request) {
+        UserAccount userAccount = getCurrentUser(userId);
         userAccount.agreeTerms(
                 request.serviceTermsAgreed(),
                 request.privacyPolicyAgreed(),
-                request.isAiChatAgreedValue()
+                request.isAiTermsAgreedValue()
         );
 
         return UserAgreementResponse.from(userAccount);
     }
 
     @Transactional
-    public void withdraw(Authentication authentication) {
-        getCurrentUser(authentication).withdraw();
+    public UserWithdrawResponse withdraw(Long userId, WithdrawUserRequest request) {
+        UserAccount userAccount = userAccountRepository.findById(userId)
+                .orElseThrow(() -> new ProjectException(GeneralErrorCode.UNAUTHORIZED));
+        if (userAccount.isWithdrawn()) {
+            throw new ProjectException(AuthErrorCode.ALREADY_WITHDRAWN);
+        }
+
+        userAccount.withdraw(request == null ? null : request.reason());
+        refreshTokenSessionRepository.deleteByUserId(userId);
+
+        return UserWithdrawResponse.ofSuccess();
     }
 
-    public UserAccount getCurrentUser(Authentication authentication) {
-        if (authentication == null || !(authentication.getPrincipal() instanceof AuthUserPrincipal principal)) {
+    public UserAccount getCurrentUser(Long userId) {
+        if (userId == null) {
             throw new ProjectException(GeneralErrorCode.UNAUTHORIZED);
         }
 
-        return getUserById(principal.userId());
+        return getUserById(userId);
     }
 
     /**
@@ -160,8 +154,9 @@ public class UserService {
 
     @Transactional(readOnly = true)
     public UserAccount getUserById(Long userId) {
-        return findActiveUser(userId)
+        UserAccount userAccount = userAccountRepository.findById(userId)
                 .orElseThrow(() -> new ProjectException(GeneralErrorCode.UNAUTHORIZED));
+        return requireActive(userAccount);
     }
 
     @Transactional(readOnly = true)
@@ -174,6 +169,11 @@ public class UserService {
     public Optional<UserAccount> findActiveUserByAuthSubject(String authSubject) {
         return userAccountRepository.findByAuthSubject(authSubject)
                 .filter(userAccount -> !userAccount.isWithdrawn());
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<UserAccount> findUserByAuthSubject(String authSubject) {
+        return userAccountRepository.findByAuthSubject(authSubject);
     }
 
     private UserAccount requireActive(UserAccount userAccount) {

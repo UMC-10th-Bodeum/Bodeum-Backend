@@ -3,6 +3,8 @@ package com.bodeum.domain.auth.service;
 import com.bodeum.domain.auth.enumtype.SocialProvider;
 import jakarta.annotation.PostConstruct;
 import java.util.Arrays;
+import java.util.Locale;
+import java.util.Set;
 import lombok.Getter;
 import lombok.Setter;
 import org.springframework.boot.context.properties.ConfigurationProperties;
@@ -17,11 +19,13 @@ import org.springframework.util.StringUtils;
 @ConfigurationProperties(prefix = "bodeum.oauth")
 public class OAuthProperties {
 
+    private static final Set<String> MOCK_ALLOWED_PROFILES = Set.of("local", "dev", "test");
+
     private String baseUrl = "http://localhost:8080";
 
     /**
      * true면 client-id가 설정되지 않은 provider에 한해 개발용 모의 로그인을 허용한다.
-     * 운영 환경에서는 반드시 false여야 한다.
+     * local/dev/test 프로필에서만 활성화할 수 있다.
      */
     private boolean mockEnabled = false;
 
@@ -42,7 +46,7 @@ public class OAuthProperties {
     @PostConstruct
     void validateMockConfiguration() {
         if (mockEnabled && isProductionProfileActive()) {
-            throw new IllegalStateException("OAuth mock login must be disabled in production profiles.");
+            throw new IllegalStateException("OAuth mock login is only allowed in local, dev, or test profiles.");
         }
     }
 
@@ -68,11 +72,12 @@ public class OAuthProperties {
 
     private boolean isProductionProfileActive() {
         if (environment == null) {
-            return false;
+            return true;
         }
 
         return Arrays.stream(environment.getActiveProfiles())
-                .anyMatch(profile -> profile.equalsIgnoreCase("prod") || profile.equalsIgnoreCase("production"));
+                .map(profile -> profile.toLowerCase(Locale.ROOT))
+                .noneMatch(MOCK_ALLOWED_PROFILES::contains);
     }
 
     @Getter

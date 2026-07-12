@@ -19,4 +19,6 @@ public interface RefreshTokenSessionRepository extends JpaRepository<RefreshToke
     @Modifying
     @Query("delete from RefreshTokenSession session where session.expiresAt <= :now")
     int deleteExpired(@Param("now") Instant now);
+
+    long deleteByUserId(Long userId);
 }

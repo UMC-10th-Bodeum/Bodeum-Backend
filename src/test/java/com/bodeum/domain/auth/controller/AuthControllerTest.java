@@ -2,6 +2,7 @@ package com.bodeum.domain.auth.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -64,7 +65,7 @@ class AuthControllerTest {
         JsonNode loginBody = readBody(loginResult);
         String accessToken = loginBody.at("/result/accessToken").asText();
 
-        mockMvc.perform(get("/api/v1/users/me/summary")
+        mockMvc.perform(get("/api/v1/users/me/profile")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.result.userId").isNumber())
@@ -119,7 +120,84 @@ class AuthControllerTest {
     void callbackWithoutCodeReturnsMissingAuthCodeError() throws Exception {
         mockMvc.perform(get("/api/v1/auth/callback/kakao"))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("AUTH400_3"));
+                .andExpect(jsonPath("$.code").value("AUTH400_2"));
+    }
+
+    @Test
+    void agreementCanBeRegisteredThroughPluralPath() throws Exception {
+        JsonNode loginBody = readBody(mockMvc.perform(get("/api/v1/auth/callback/kakao")
+                        .param("code", "agreement-code"))
+                .andExpect(status().isOk())
+                .andReturn());
+        String accessToken = loginBody.at("/result/accessToken").asText();
+
+        mockMvc.perform(post("/api/v1/users/me/agreements")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "serviceTermsAgreed": true,
+                                  "privacyPolicyAgreed": true,
+                                  "aiTermsAgreed": false
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.serviceTermsAgreed").value(true))
+                .andExpect(jsonPath("$.result.privacyPolicyAgreed").value(true));
+    }
+
+    @Test
+    void profileCanBeReadAndUpdatedThroughProfilePath() throws Exception {
+        JsonNode loginBody = readBody(mockMvc.perform(get("/api/v1/auth/callback/kakao")
+                        .param("code", "profile-path-code"))
+                .andExpect(status().isOk())
+                .andReturn());
+        String accessToken = loginBody.at("/result/accessToken").asText();
+
+        mockMvc.perform(get("/api/v1/users/me/profile")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.joinedAt").isNotEmpty())
+                .andExpect(jsonPath("$.result.childProfile").exists());
+
+        mockMvc.perform(patch("/api/v1/users/me/profile")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "nickname": "민준맘",
+                                  "childNickname": "민준",
+                                  "childBirth": "2020-03",
+                                  "disabilityTypeIds": [1, 3]
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.updated").value(true));
+    }
+
+    @Test
+    void briefReturnsLoggedOutWhenAnonymous() throws Exception {
+        mockMvc.perform(get("/api/v1/users/me/brief"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.isLoggedIn").value(false));
+    }
+
+    @Test
+    void protectedEndpointReturnsInactiveUserErrorForWithdrawnUserToken() throws Exception {
+        JsonNode loginBody = readBody(mockMvc.perform(get("/api/v1/auth/callback/kakao")
+                        .param("code", "withdrawn-token-code"))
+                .andExpect(status().isOk())
+                .andReturn());
+        String accessToken = loginBody.at("/result/accessToken").asText();
+
+        var userAccount = userAccountRepository.findAll().getFirst();
+        userAccount.withdraw(null);
+        userAccountRepository.saveAndFlush(userAccount);
+
+        mockMvc.perform(get("/api/v1/users/me/profile")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("AUTH401_5"));
     }
 
     @Test
@@ -129,7 +207,7 @@ class AuthControllerTest {
                 .andExpect(status().isOk());
 
         var userAccount = userAccountRepository.findAll().getFirst();
-        userAccount.withdraw();
+        userAccount.withdraw(null);
         userAccountRepository.saveAndFlush(userAccount);
 
         mockMvc.perform(get("/api/v1/auth/callback/kakao")
@@ -147,11 +225,21 @@ class AuthControllerTest {
         JsonNode codeParameter = findCallbackParameter(openApi, "code");
         assertThat(codeParameter).isNotNull();
         assertThat(codeParameter.path("required").asBoolean()).isTrue();
-        assertThat(openApi.at("/components/schemas/CreateChildProfileRequest/properties/birthYearValid").isMissingNode())
+        assertThat(openApi.at("/paths/~1api~1v1~1users~1me~1summary").isMissingNode())
+                .isTrue();
+        assertThat(hasParameter(openApi, "/paths/~1api~1v1~1users~1me~1profile/patch/parameters", "userId"))
+                .isFalse();
+        assertThat(hasParameter(openApi, "/paths/~1api~1v1~1onboarding~1child-profile/post/parameters", "userId"))
+                .isFalse();
+        assertThat(openApi.at("/components/schemas/UpdateUserProfileRequest/properties/childBirth/example").asText())
+                .isEqualTo("2020-03");
+        assertThat(openApi.at("/components/schemas/CreateChildProfileRequest/properties/birth/example").asText())
+                .isEqualTo("2020-03");
+        assertThat(openApi.at("/components/schemas/CreateChildProfileRequest/properties/birthValid").isMissingNode())
                 .isTrue();
         assertThat(openApi.at("/components/schemas/CreateUserAgreementRequest/properties/requiredAgreementCompleted").isMissingNode())
                 .isTrue();
-        assertThat(openApi.at("/components/schemas/CreateUserAgreementRequest/properties/aiChatAgreedValue").isMissingNode())
+        assertThat(openApi.at("/components/schemas/CreateUserAgreementRequest/properties/aiTermsAgreedValue").isMissingNode())
                 .isTrue();
     }
 
@@ -192,5 +280,15 @@ class AuthControllerTest {
         }
 
         return null;
+    }
+
+    private boolean hasParameter(JsonNode openApi, String parametersPath, String name) {
+        for (JsonNode parameter : openApi.at(parametersPath)) {
+            if (name.equals(parameter.path("name").asText())) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

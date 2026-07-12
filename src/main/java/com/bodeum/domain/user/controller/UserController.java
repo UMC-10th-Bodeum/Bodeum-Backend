@@ -4,20 +4,22 @@ import com.bodeum.domain.onboarding.dto.response.OnboardingStatusResponse;
 import com.bodeum.domain.onboarding.service.OnboardingService;
 import com.bodeum.domain.user.dto.request.CreateUserAgreementRequest;
 import com.bodeum.domain.user.dto.request.UpdateUserProfileRequest;
+import com.bodeum.domain.user.dto.request.WithdrawUserRequest;
 import com.bodeum.domain.user.dto.response.UserAgreementResponse;
 import com.bodeum.domain.user.dto.response.UserHeaderResponse;
 import com.bodeum.domain.user.dto.response.UserProfileResponse;
-import com.bodeum.domain.user.dto.response.UserSummaryResponse;
+import com.bodeum.domain.user.dto.response.UserProfileUpdateResponse;
+import com.bodeum.domain.user.dto.response.UserWithdrawResponse;
 import com.bodeum.domain.user.service.UserService;
 import com.bodeum.global.apiPayload.ApiResponse;
 import com.bodeum.global.apiPayload.code.GeneralSuccessCode;
+import com.bodeum.global.auth.LoginUser;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
-import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -37,12 +39,6 @@ public class UserController {
     private final UserService userService;
     private final OnboardingService onboardingService;
 
-    @Operation(summary = "내 요약 정보 조회", description = "현재 로그인한 사용자의 요약 정보를 조회한다.")
-    @GetMapping("/me/summary")
-    public ApiResponse<UserSummaryResponse> getSummary(Authentication authentication) {
-        return ApiResponse.of(GeneralSuccessCode.OK, userService.getSummary(authentication));
-    }
-
     @Operation(
             summary = "헤더/사이드바용 내 정보 조회",
             description = "헤더·사이드바 공통 조회. 로그인 시 닉네임/레벨/뱃지/자녀 정보/지역을, "
@@ -50,23 +46,23 @@ public class UserController {
     )
     @SecurityRequirements
     @GetMapping("/me/brief")
-    public ApiResponse<UserHeaderResponse> getBrief(Authentication authentication) {
-        return ApiResponse.of(GeneralSuccessCode.OK, userService.getHeaderInfo(authentication));
+    public ApiResponse<UserHeaderResponse> getBrief(@LoginUser Long userId) {
+        return ApiResponse.of(GeneralSuccessCode.OK, userService.getHeaderInfo(userId));
     }
 
     @Operation(summary = "내 프로필 조회", description = "현재 로그인한 사용자의 상세 프로필을 조회한다.")
-    @GetMapping("/me")
-    public ApiResponse<UserProfileResponse> getProfile(Authentication authentication) {
-        return ApiResponse.of(GeneralSuccessCode.OK, userService.getProfile(authentication));
+    @GetMapping("/me/profile")
+    public ApiResponse<UserProfileResponse> getProfile(@LoginUser Long userId) {
+        return ApiResponse.of(GeneralSuccessCode.OK, userService.getProfile(userId));
     }
 
     @Operation(summary = "내 프로필 수정", description = "닉네임, 자녀 정보(이름/생년월/케어 영역/특징 키워드), 관심사, 지역, 보호자 유형, 커뮤니티 성향 등 온보딩에서 입력한 프로필 정보를 수정한다.")
-    @PatchMapping("/me")
-    public ApiResponse<UserProfileResponse> updateProfile(
-            Authentication authentication,
+    @PatchMapping("/me/profile")
+    public ApiResponse<UserProfileUpdateResponse> updateProfile(
+            @LoginUser Long userId,
             @Valid @RequestBody UpdateUserProfileRequest request
     ) {
-        return ApiResponse.of(GeneralSuccessCode.OK, userService.updateProfile(authentication, request));
+        return ApiResponse.of(GeneralSuccessCode.OK, userService.updateProfile(userId, request));
     }
 
     @Operation(
@@ -75,32 +71,33 @@ public class UserController {
     )
     @PostMapping(value = "/me/profile-image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ApiResponse<UserProfileResponse> uploadProfileImage(
-            Authentication authentication,
+            @LoginUser Long userId,
             @RequestParam("image") MultipartFile image
     ) {
-        return ApiResponse.of(GeneralSuccessCode.OK, userService.uploadProfileImage(authentication, image));
+        return ApiResponse.of(GeneralSuccessCode.OK, userService.uploadProfileImage(userId, image));
     }
 
     @Operation(summary = "온보딩 진행 상태 조회", description = "온보딩 단계별 완료 여부와 다음 이동 화면을 조회한다.")
     @GetMapping("/me/onboarding-status")
-    public ApiResponse<OnboardingStatusResponse> getOnboardingStatus(Authentication authentication) {
-        return ApiResponse.of(GeneralSuccessCode.OK, onboardingService.getStatus(authentication));
+    public ApiResponse<OnboardingStatusResponse> getOnboardingStatus(@LoginUser Long userId) {
+        return ApiResponse.of(GeneralSuccessCode.OK, onboardingService.getStatus(userId));
     }
 
     @Operation(summary = "약관 동의 등록", description = "서비스 이용약관, 개인정보 처리방침, AI 챗봇 이용 동의 여부를 등록한다.")
     @PostMapping("/me/agreements")
     public ApiResponse<UserAgreementResponse> agreeTerms(
-            Authentication authentication,
+            @LoginUser Long userId,
             @Valid @RequestBody CreateUserAgreementRequest request
     ) {
-        return ApiResponse.of(GeneralSuccessCode.OK, userService.agreeTerms(authentication, request));
+        return ApiResponse.of(GeneralSuccessCode.OK, userService.agreeTerms(userId, request));
     }
 
     @Operation(summary = "회원 탈퇴", description = "현재 로그인한 사용자를 탈퇴 처리한다.")
     @DeleteMapping("/me")
-    public ApiResponse<Void> withdraw(Authentication authentication) {
-        userService.withdraw(authentication);
-
-        return ApiResponse.of(GeneralSuccessCode.OK, null);
+    public ApiResponse<UserWithdrawResponse> withdraw(
+            @LoginUser Long userId,
+            @Valid @RequestBody(required = false) WithdrawUserRequest request
+    ) {
+        return ApiResponse.of(GeneralSuccessCode.OK, userService.withdraw(userId, request));
     }
 }

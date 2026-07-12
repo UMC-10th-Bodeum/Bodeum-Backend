@@ -5,16 +5,12 @@ import com.bodeum.domain.onboarding.dto.request.CreateGuardianProfileRequest;
 import com.bodeum.domain.onboarding.dto.request.CreateInterestRegionRequest;
 import com.bodeum.domain.onboarding.dto.response.OnboardingStatusResponse;
 import com.bodeum.domain.onboarding.dto.response.OnboardingStepResponse;
-import com.bodeum.domain.onboarding.enumtype.CareArea;
 import com.bodeum.domain.onboarding.enumtype.CommunityRoleType;
 import com.bodeum.domain.onboarding.enumtype.GuardianType;
-import com.bodeum.domain.onboarding.enumtype.InterestCategory;
 import com.bodeum.domain.onboarding.enumtype.OnboardingStep;
 import com.bodeum.domain.user.entity.UserAccount;
 import com.bodeum.domain.user.service.UserService;
-import java.util.List;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,19 +22,15 @@ public class OnboardingService {
 
     @Transactional
     public OnboardingStepResponse registerChildProfile(
-            Authentication authentication,
+            Long userId,
             CreateChildProfileRequest request
     ) {
-        UserAccount userAccount = userService.getCurrentUser(authentication);
-        List<CareArea> careAreas = request.careAreas().stream()
-                .map(CareArea::from)
-                .toList();
+        UserAccount userAccount = userService.getCurrentUser(userId);
         userAccount.updateChildProfile(
                 request.childNickname(),
-                request.birthYear(),
-                request.birthMonth(),
-                careAreas,
-                request.characteristicKeyword()
+                request.birth(),
+                request.disabilityTypeIds(),
+                request.keywordText()
         );
 
         return OnboardingStepResponse.of(OnboardingStep.CHILD_PROFILE, userAccount.isOnboardingCompleted());
@@ -46,24 +38,21 @@ public class OnboardingService {
 
     @Transactional
     public OnboardingStepResponse registerInterestRegion(
-            Authentication authentication,
+            Long userId,
             CreateInterestRegionRequest request
     ) {
-        UserAccount userAccount = userService.getCurrentUser(authentication);
-        List<InterestCategory> interests = request.interests().stream()
-                .map(InterestCategory::from)
-                .toList();
-        userAccount.updateInterestRegion(interests, request.regionLevel1(), request.regionLevel2());
+        UserAccount userAccount = userService.getCurrentUser(userId);
+        userAccount.updateInterestRegion(request.interestCategoryIds(), request.regionLevel1(), request.regionLevel2());
 
         return OnboardingStepResponse.of(OnboardingStep.INTEREST_REGION, userAccount.isOnboardingCompleted());
     }
 
     @Transactional
     public OnboardingStepResponse registerGuardianProfile(
-            Authentication authentication,
+            Long userId,
             CreateGuardianProfileRequest request
     ) {
-        UserAccount userAccount = userService.getCurrentUser(authentication);
+        UserAccount userAccount = userService.getCurrentUser(userId);
         userAccount.updateGuardianProfile(
                 request.guardianNickname(),
                 GuardianType.fromNullable(request.guardianType()),
@@ -74,15 +63,15 @@ public class OnboardingService {
     }
 
     @Transactional
-    public OnboardingStatusResponse skipOnboarding(Authentication authentication) {
-        UserAccount userAccount = userService.getCurrentUser(authentication);
+    public OnboardingStatusResponse skipOnboarding(Long userId) {
+        UserAccount userAccount = userService.getCurrentUser(userId);
         userAccount.skipOnboarding();
 
         return OnboardingStatusResponse.from(userAccount);
     }
 
     @Transactional(readOnly = true)
-    public OnboardingStatusResponse getStatus(Authentication authentication) {
-        return OnboardingStatusResponse.from(userService.getCurrentUser(authentication));
+    public OnboardingStatusResponse getStatus(Long userId) {
+        return OnboardingStatusResponse.from(userService.getCurrentUser(userId));
     }
 }
