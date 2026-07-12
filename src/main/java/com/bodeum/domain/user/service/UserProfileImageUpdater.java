@@ -24,7 +24,7 @@ public class UserProfileImageUpdater {
 
         UserAccount userAccount = userAccountRepository.findById(userId)
                 .orElseThrow(() -> new ProjectException(GeneralErrorCode.UNAUTHORIZED));
-        if (userAccount.isWithdrawn()) {
+        if (!userAccount.isActive()) {
             throw new ProjectException(AuthErrorCode.INACTIVE_USER);
         }
 

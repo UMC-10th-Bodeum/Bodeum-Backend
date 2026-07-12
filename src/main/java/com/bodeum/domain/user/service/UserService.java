@@ -165,13 +165,13 @@ public class UserService {
     @Transactional(readOnly = true)
     public Optional<UserAccount> findActiveUser(Long userId) {
         return userAccountRepository.findById(userId)
-                .filter(userAccount -> !userAccount.isWithdrawn());
+                .filter(UserAccount::isActive);
     }
 
     @Transactional(readOnly = true)
     public Optional<UserAccount> findActiveUserByAuthSubject(String authSubject) {
         return userAccountRepository.findByAuthSubject(authSubject)
-                .filter(userAccount -> !userAccount.isWithdrawn());
+                .filter(UserAccount::isActive);
     }
 
     @Transactional(readOnly = true)
@@ -180,7 +180,7 @@ public class UserService {
     }
 
     private UserAccount requireActive(UserAccount userAccount) {
-        if (userAccount.isWithdrawn()) {
+        if (!userAccount.isActive()) {
             throw new ProjectException(AuthErrorCode.INACTIVE_USER);
         }
 

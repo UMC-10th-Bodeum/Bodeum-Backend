@@ -17,6 +17,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.PrePersist;
+import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import java.time.LocalDate;
@@ -56,6 +57,9 @@ public class UserAccount {
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
+
+    @Column(name = "updated_at", nullable = false)
+    private LocalDateTime updatedAt;
 
     @Column(length = 255)
     private String email;
@@ -145,6 +149,7 @@ public class UserAccount {
         this.email = email;
         this.nickname = nickname;
         this.createdAt = LocalDateTime.now();
+        this.updatedAt = this.createdAt;
         this.status = UserStatus.ACTIVE;
     }
 
@@ -167,9 +172,18 @@ public class UserAccount {
             createdAt = LocalDateTime.now();
         }
 
+        if (updatedAt == null) {
+            updatedAt = createdAt;
+        }
+
         if (status == null) {
             status = UserStatus.ACTIVE;
         }
+    }
+
+    @PreUpdate
+    void preUpdate() {
+        this.updatedAt = LocalDateTime.now();
     }
 
     public void agreeTerms(boolean serviceTermsAgreed, boolean privacyPolicyAgreed, boolean aiTermsAgreed) {
@@ -177,6 +191,7 @@ public class UserAccount {
         this.privacyPolicyAgreed = privacyPolicyAgreed;
         this.aiTermsAgreed = aiTermsAgreed;
         this.agreementAgreedAt = LocalDateTime.now();
+        touch();
     }
 
     public void updateChildProfile(
@@ -189,6 +204,7 @@ public class UserAccount {
         this.childBirth = childBirth;
         this.disabilityTypeIds = new ArrayList<>(disabilityTypeIds);
         this.keywordText = keywordText;
+        touch();
     }
 
     public void updateInterestRegion(
@@ -199,6 +215,7 @@ public class UserAccount {
         this.interestCategoryIds = new ArrayList<>(interestCategoryIds);
         this.regionLevel1 = regionLevel1;
         this.regionLevel2 = regionLevel2;
+        touch();
     }
 
     public void updateGuardianProfile(
@@ -210,14 +227,17 @@ public class UserAccount {
         this.guardianType = guardianType;
         this.communityRoleType = communityRoleType;
         this.nickname = guardianNickname;
+        touch();
     }
 
     public void skipOnboarding() {
         this.onboardingSkipped = true;
+        touch();
     }
 
     public void updateProfileImage(String profileImageUrl) {
         this.profileImageUrl = profileImageUrl;
+        touch();
     }
 
     public void updateProfile(
@@ -272,6 +292,8 @@ public class UserAccount {
         if (communityRoleType != null) {
             this.communityRoleType = communityRoleType;
         }
+
+        touch();
     }
 
     private String blankToNull(String value) {
@@ -282,6 +304,16 @@ public class UserAccount {
         this.status = UserStatus.DELETED;
         this.deletedAt = LocalDateTime.now();
         this.withdrawalReason = blankToNull(reason);
+        touch();
+    }
+
+    public void hideByAdmin() {
+        this.status = UserStatus.HIDDEN;
+        touch();
+    }
+
+    private void touch() {
+        this.updatedAt = LocalDateTime.now();
     }
 
     public boolean isAgreementCompleted() {
@@ -444,8 +476,20 @@ public class UserAccount {
         return status == UserStatus.DELETED;
     }
 
+    public boolean isHidden() {
+        return status == UserStatus.HIDDEN;
+    }
+
+    public boolean isActive() {
+        return status == UserStatus.ACTIVE;
+    }
+
     public UserStatus getStatus() {
         return status;
+    }
+
+    public LocalDateTime getUpdatedAt() {
+        return updatedAt;
     }
 
     public LocalDateTime getDeletedAt() {

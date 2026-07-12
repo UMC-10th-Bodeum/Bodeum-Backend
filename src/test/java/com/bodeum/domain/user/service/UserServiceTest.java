@@ -78,6 +78,19 @@ class UserServiceTest {
     }
 
     @Test
+    void headerInfoFallsBackToLoggedOutWhenUserHidden() {
+        UserAccount userAccount = UserAccount.createSocialUser(
+                SocialProvider.KAKAO, "kakao-1", "parent@example.com", "민준맘");
+        userAccount.hideByAdmin();
+        given(userAccountRepository.findById(1L)).willReturn(Optional.of(userAccount));
+
+        UserHeaderResponse response = userService.getHeaderInfo(1L);
+
+        assertThat(userAccount.isHidden()).isTrue();
+        assertThat(response.isLoggedIn()).isFalse();
+    }
+
+    @Test
     void withdrawStoresReasonAndRevokesRefreshTokenSessions() {
         UserAccount userAccount = UserAccount.createSocialUser(
                 SocialProvider.KAKAO, "kakao-1", "parent@example.com", "민준맘");

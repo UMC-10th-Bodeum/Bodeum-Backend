@@ -180,6 +180,7 @@ class AuthControllerTest {
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.result.joinedAt").isNotEmpty())
+                .andExpect(jsonPath("$.result.updatedAt").isNotEmpty())
                 .andExpect(jsonPath("$.result.childProfile").exists());
 
         mockMvc.perform(patch("/api/v1/users/me/profile")

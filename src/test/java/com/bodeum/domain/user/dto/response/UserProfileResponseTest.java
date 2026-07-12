@@ -22,6 +22,7 @@ class UserProfileResponseTest {
         UserProfileResponse response = UserProfileResponse.from(userAccount);
 
         assertThat(response.joinedAt()).isNotNull();
+        assertThat(response.updatedAt()).isNotNull();
         assertThat(response.childProfile().nickname()).isEqualTo("민준");
         assertThat(response.childProfile().birth()).isEqualTo("2020-03");
         assertThat(response.childProfile().disabilityTypeIds()).containsExactly(1, 3);
