@@ -147,6 +147,28 @@ class AuthControllerTest {
     }
 
     @Test
+    void agreementWithoutRequiredTermsReturnsError() throws Exception {
+        JsonNode loginBody = readBody(mockMvc.perform(get("/api/v1/auth/callback/kakao")
+                        .param("code", "agreement-required-code"))
+                .andExpect(status().isOk())
+                .andReturn());
+        String accessToken = loginBody.at("/result/accessToken").asText();
+
+        mockMvc.perform(post("/api/v1/users/me/agreements")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "serviceTermsAgreed": true,
+                                  "privacyPolicyAgreed": false,
+                                  "aiTermsAgreed": false
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("AUTH400_4"));
+    }
+
+    @Test
     void profileCanBeReadAndUpdatedThroughProfilePath() throws Exception {
         JsonNode loginBody = readBody(mockMvc.perform(get("/api/v1/auth/callback/kakao")
                         .param("code", "profile-path-code"))

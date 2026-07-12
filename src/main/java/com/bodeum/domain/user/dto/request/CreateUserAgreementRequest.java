@@ -2,7 +2,6 @@ package com.bodeum.domain.user.dto.request;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import io.swagger.v3.oas.annotations.media.Schema;
-import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.NotNull;
 
 public record CreateUserAgreementRequest(
@@ -17,8 +16,7 @@ public record CreateUserAgreementRequest(
 
     @JsonIgnore
     @Schema(hidden = true)
-    @AssertTrue(message = "필수 약관에 모두 동의해야 합니다.")
-    public boolean isRequiredAgreementCompleted() {
+    public boolean hasAgreedRequiredTerms() {
         return Boolean.TRUE.equals(serviceTermsAgreed) && Boolean.TRUE.equals(privacyPolicyAgreed);
     }
 

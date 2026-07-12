@@ -85,6 +85,10 @@ public class UserService {
 
     @Transactional
     public UserAgreementResponse agreeTerms(Long userId, CreateUserAgreementRequest request) {
+        if (!request.hasAgreedRequiredTerms()) {
+            throw new ProjectException(AuthErrorCode.REQUIRED_TERMS_NOT_AGREED);
+        }
+
         UserAccount userAccount = getCurrentUser(userId);
         userAccount.agreeTerms(
                 request.serviceTermsAgreed(),
