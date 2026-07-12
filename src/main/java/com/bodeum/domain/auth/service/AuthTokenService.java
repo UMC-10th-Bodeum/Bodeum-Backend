@@ -3,7 +3,7 @@ package com.bodeum.domain.auth.service;
 import com.bodeum.domain.auth.entity.RefreshTokenSession;
 import com.bodeum.domain.auth.exception.AuthErrorCode;
 import com.bodeum.domain.auth.repository.RefreshTokenSessionRepository;
-import com.bodeum.domain.user.entity.UserAccount;
+import com.bodeum.domain.user.entity.User;
 import com.bodeum.domain.user.service.UserService;
 import com.bodeum.global.apiPayload.exception.ProjectException;
 import com.bodeum.global.auth.AuthUserPrincipal;
@@ -40,7 +40,7 @@ public class AuthTokenService {
     public AuthTokenPair issueTokens(Long userId) {
         purgeExpiredSessions();
 
-        UserAccount userAccount = userService.findActiveUser(userId)
+        User user = userService.findActiveUser(userId)
                 .orElseThrow(() -> new ProjectException(AuthErrorCode.INACTIVE_USER));
 
         Instant now = Instant.now();
@@ -48,14 +48,14 @@ public class AuthTokenService {
         Instant refreshTokenExpiresAt = now.plus(authTokenProperties.getRefreshTokenTtl());
 
         String accessToken = jwtTokenProvider.createAccessToken(
-                userAccount.getAuthSubject(),
+                user.getAuthSubject(),
                 now,
                 accessTokenExpiresAt
         );
         String refreshToken = generateRefreshToken();
         refreshTokenSessionRepository.save(RefreshTokenSession.create(
                 hashToken(refreshToken),
-                userAccount.getId(),
+                user.getId(),
                 refreshTokenExpiresAt
         ));
 
@@ -97,12 +97,12 @@ public class AuthTokenService {
         }
     }
 
-    private AuthUserPrincipal toPrincipal(UserAccount userAccount) {
+    private AuthUserPrincipal toPrincipal(User user) {
         return new AuthUserPrincipal(
-                userAccount.getId(),
-                userAccount.getProvider(),
-                userAccount.getNickname(),
-                userAccount.getEmail()
+                user.getId(),
+                user.getProvider(),
+                user.getNickname(),
+                user.getEmail()
         );
     }
 

@@ -3,7 +3,7 @@ package com.bodeum.domain.user.dto.response;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.bodeum.domain.auth.enumtype.SocialProvider;
-import com.bodeum.domain.user.entity.UserAccount;
+import com.bodeum.domain.user.entity.User;
 import java.time.LocalDate;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -26,7 +26,7 @@ class UserHeaderResponseTest {
     @Test
     void newUserStartsAtLevelOneSprout() {
         // 신규 가입자는 포인트 0 → Level 1 새싹
-        UserHeaderResponse response = UserHeaderResponse.from(newUserAccount());
+        UserHeaderResponse response = UserHeaderResponse.from(newUser());
 
         assertThat(response.isLoggedIn()).isTrue();
         assertThat(response.nickname()).isEqualTo("민준맘");
@@ -36,33 +36,33 @@ class UserHeaderResponseTest {
 
     @Test
     void combinesRegionLevelsWithSpace() {
-        UserAccount userAccount = newUserAccount();
-        userAccount.updateInterestRegion(List.of(), "서울특별시", "강남구");
+        User user = newUser();
+        user.updateInterestRegion(List.of(), "서울특별시", "강남구");
 
-        assertThat(UserHeaderResponse.from(userAccount).region()).isEqualTo("서울특별시 강남구");
+        assertThat(UserHeaderResponse.from(user).region()).isEqualTo("서울특별시 강남구");
     }
 
     @Test
     void usesSingleRegionWhenOnlyOnePresent() {
-        UserAccount userAccount = newUserAccount();
-        userAccount.updateInterestRegion(List.of(), "서울특별시", null);
+        User user = newUser();
+        user.updateInterestRegion(List.of(), "서울특별시", null);
 
-        assertThat(UserHeaderResponse.from(userAccount).region()).isEqualTo("서울특별시");
+        assertThat(UserHeaderResponse.from(user).region()).isEqualTo("서울특별시");
     }
 
     @Test
     void regionIsNullWhenNotRegistered() {
-        assertThat(UserHeaderResponse.from(newUserAccount()).region()).isNull();
+        assertThat(UserHeaderResponse.from(newUser()).region()).isNull();
     }
 
     @Test
     void calculatesChildAgeWhenBirthMonthAlreadyPassed() {
         int birthYear = LocalDate.now().getYear() - 5;
-        UserAccount userAccount = newUserAccount();
+        User user = newUser();
         // 1월생은 어느 시점에 조회해도 당해 생월이 지났거나 당월이므로 만 나이 = 연도 차이
-        userAccount.updateChildProfile("민준이", String.format("%04d-01", birthYear), List.of(1), null);
+        user.updateChildProfile("민준이", String.format("%04d-01", birthYear), List.of(1), null);
 
-        UserHeaderResponse response = UserHeaderResponse.from(userAccount);
+        UserHeaderResponse response = UserHeaderResponse.from(user);
 
         assertThat(response.childAge()).isEqualTo(5);
         assertThat(response.childDisabilityTypeIds()).containsExactly(1);
@@ -72,21 +72,21 @@ class UserHeaderResponseTest {
     void subtractsOneYearWhenBirthMonthNotYetReached() {
         LocalDate now = LocalDate.now();
         int birthYear = now.getYear() - 3;
-        UserAccount userAccount = newUserAccount();
-        userAccount.updateChildProfile("민준이", String.format("%04d-12", birthYear), List.of(4), null);
+        User user = newUser();
+        user.updateChildProfile("민준이", String.format("%04d-12", birthYear), List.of(4), null);
 
         // 12월생: 아직 12월 전이면 생일 전이므로 한 살 적게 계산된다.
         int expected = now.getMonthValue() < 12 ? 2 : 3;
-        assertThat(UserHeaderResponse.from(userAccount).childAge()).isEqualTo(expected);
+        assertThat(UserHeaderResponse.from(user).childAge()).isEqualTo(expected);
     }
 
     @Test
     void childAgeIsNullWhenBirthYearMissing() {
-        assertThat(UserHeaderResponse.from(newUserAccount()).childAge()).isNull();
+        assertThat(UserHeaderResponse.from(newUser()).childAge()).isNull();
     }
 
-    private UserAccount newUserAccount() {
-        return UserAccount.createSocialUser(
+    private User newUser() {
+        return User.createSocialUser(
                 SocialProvider.KAKAO,
                 "kakao-user-1",
                 "parent@example.com",

@@ -1,7 +1,7 @@
 package com.bodeum.domain.onboarding.dto.response;
 
 import com.bodeum.domain.auth.enumtype.AuthNextStep;
-import com.bodeum.domain.user.entity.UserAccount;
+import com.bodeum.domain.user.entity.User;
 
 public record OnboardingStatusResponse(
         boolean childProfileRegistered,
@@ -11,13 +11,13 @@ public record OnboardingStatusResponse(
         AuthNextStep nextStep
 ) {
 
-    public static OnboardingStatusResponse from(UserAccount userAccount) {
+    public static OnboardingStatusResponse from(User user) {
         return new OnboardingStatusResponse(
-                userAccount.isChildProfileRegistered(),
-                userAccount.isInterestRegionRegistered(),
-                userAccount.isGuardianProfileRegistered(),
-                userAccount.isOnboardingCompleted(),
-                userAccount.isOnboardingResolved() ? AuthNextStep.HOME : AuthNextStep.ONBOARDING
+                user.isChildProfileRegistered(),
+                user.isInterestRegionRegistered(),
+                user.isGuardianProfileRegistered(),
+                user.isOnboardingCompleted(),
+                user.isOnboardingResolved() ? AuthNextStep.HOME : AuthNextStep.ONBOARDING
         );
     }
 }

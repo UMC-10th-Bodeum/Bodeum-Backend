@@ -1,6 +1,6 @@
 package com.bodeum.domain.user.dto.response;
 
-import com.bodeum.domain.user.entity.UserAccount;
+import com.bodeum.domain.user.entity.User;
 import java.util.List;
 
 public record UserHeaderResponse(
@@ -18,16 +18,16 @@ public record UserHeaderResponse(
         return new UserHeaderResponse(false, null, null, null, null, null, null, null);
     }
 
-    public static UserHeaderResponse from(UserAccount userAccount) {
+    public static UserHeaderResponse from(User user) {
         return new UserHeaderResponse(
                 true,
-                userAccount.getNickname(),
-                userAccount.getProfileImageUrl(),
-                userAccount.getGuardianLevel().getLevelNumber(),
-                userAccount.getGuardianLevel().getBadgeName(),
-                userAccount.getDisabilityTypeIds(),
-                userAccount.getChildAge(),
-                buildRegion(userAccount.getRegionLevel1(), userAccount.getRegionLevel2())
+                user.getNickname(),
+                user.getProfileImageUrl(),
+                user.getGuardianLevel().getLevelNumber(),
+                user.getGuardianLevel().getBadgeName(),
+                user.getDisabilityTypeIds(),
+                user.getChildAge(),
+                buildRegion(user.getRegionLevel1(), user.getRegionLevel2())
         );
     }
 

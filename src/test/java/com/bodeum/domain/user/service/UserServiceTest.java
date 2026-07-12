@@ -13,8 +13,8 @@ import com.bodeum.domain.user.dto.request.WithdrawUserRequest;
 import com.bodeum.domain.user.dto.response.UserAgreementResponse;
 import com.bodeum.domain.user.dto.response.UserHeaderResponse;
 import com.bodeum.domain.user.dto.response.UserWithdrawResponse;
-import com.bodeum.domain.user.entity.UserAccount;
-import com.bodeum.domain.user.repository.UserAccountRepository;
+import com.bodeum.domain.user.entity.User;
+import com.bodeum.domain.user.repository.UserRepository;
 import com.bodeum.global.apiPayload.exception.ProjectException;
 import com.bodeum.global.infrastructure.storage.S3ImageStorage;
 import java.util.Optional;
@@ -29,7 +29,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 class UserServiceTest {
 
     @Mock
-    private UserAccountRepository userAccountRepository;
+    private UserRepository userRepository;
 
     @Mock
     private RefreshTokenSessionRepository refreshTokenSessionRepository;
@@ -53,9 +53,9 @@ class UserServiceTest {
 
     @Test
     void headerInfoReturnsUserInfoWhenLoggedIn() {
-        UserAccount userAccount = UserAccount.createSocialUser(
+        User user = User.createSocialUser(
                 SocialProvider.KAKAO, "kakao-1", "parent@example.com", "민준맘");
-        given(userAccountRepository.findById(1L)).willReturn(Optional.of(userAccount));
+        given(userRepository.findById(1L)).willReturn(Optional.of(user));
 
         UserHeaderResponse response = userService.getHeaderInfo(1L);
 
@@ -67,10 +67,10 @@ class UserServiceTest {
 
     @Test
     void headerInfoFallsBackToLoggedOutWhenUserWithdrawn() {
-        UserAccount userAccount = UserAccount.createSocialUser(
+        User user = User.createSocialUser(
                 SocialProvider.KAKAO, "kakao-1", "parent@example.com", "민준맘");
-        userAccount.withdraw(null);
-        given(userAccountRepository.findById(1L)).willReturn(Optional.of(userAccount));
+        user.withdraw(null);
+        given(userRepository.findById(1L)).willReturn(Optional.of(user));
 
         UserHeaderResponse response = userService.getHeaderInfo(1L);
 
@@ -79,23 +79,23 @@ class UserServiceTest {
 
     @Test
     void headerInfoFallsBackToLoggedOutWhenUserHidden() {
-        UserAccount userAccount = UserAccount.createSocialUser(
+        User user = User.createSocialUser(
                 SocialProvider.KAKAO, "kakao-1", "parent@example.com", "민준맘");
-        userAccount.hideByAdmin();
-        given(userAccountRepository.findById(1L)).willReturn(Optional.of(userAccount));
+        user.hideByAdmin();
+        given(userRepository.findById(1L)).willReturn(Optional.of(user));
 
         UserHeaderResponse response = userService.getHeaderInfo(1L);
 
-        assertThat(userAccount.isHidden()).isTrue();
+        assertThat(user.isHidden()).isTrue();
         assertThat(response.isLoggedIn()).isFalse();
     }
 
     @Test
     void withdrawStoresReasonAndRevokesRefreshTokenSessions() {
-        UserAccount userAccount = UserAccount.createSocialUser(
+        User user = User.createSocialUser(
                 SocialProvider.KAKAO, "kakao-1", "parent@example.com", "민준맘");
-        ReflectionTestUtils.setField(userAccount, "id", 1L);
-        given(userAccountRepository.findById(1L)).willReturn(Optional.of(userAccount));
+        ReflectionTestUtils.setField(user, "id", 1L);
+        given(userRepository.findById(1L)).willReturn(Optional.of(user));
 
         UserWithdrawResponse response = userService.withdraw(
                 1L,
@@ -103,18 +103,18 @@ class UserServiceTest {
         );
 
         assertThat(response.success()).isTrue();
-        assertThat(userAccount.isWithdrawn()).isTrue();
-        assertThat(userAccount.getDeletedAt()).isNotNull();
-        assertThat(userAccount.getWithdrawalReason()).isEqualTo("더 이상 서비스를 이용하지 않습니다.");
+        assertThat(user.isWithdrawn()).isTrue();
+        assertThat(user.getDeletedAt()).isNotNull();
+        assertThat(user.getWithdrawalReason()).isEqualTo("더 이상 서비스를 이용하지 않습니다.");
         then(refreshTokenSessionRepository).should().deleteByUserId(1L);
     }
 
     @Test
     void agreeTermsCompletesWhenOnlyRequiredTermsAgreedAndAiOmitted() {
         // AI 챗봇 동의는 선택 항목이므로, 미전송(null)이어도 필수 약관만 동의하면 온보딩이 완료된다.
-        UserAccount userAccount = UserAccount.createSocialUser(
+        User user = User.createSocialUser(
                 SocialProvider.KAKAO, "kakao-1", "parent@example.com", "민준맘");
-        given(userAccountRepository.findById(1L)).willReturn(Optional.of(userAccount));
+        given(userRepository.findById(1L)).willReturn(Optional.of(user));
 
         UserAgreementResponse response = userService.agreeTerms(
                 1L,
@@ -124,15 +124,15 @@ class UserServiceTest {
         assertThat(response.serviceTermsAgreed()).isTrue();
         assertThat(response.privacyPolicyAgreed()).isTrue();
         assertThat(response.aiTermsAgreed()).isFalse();
-        assertThat(userAccount.isAgreementCompleted()).isTrue();
+        assertThat(user.isAgreementCompleted()).isTrue();
     }
 
     @Test
     void agreeTermsStoresAiConsentWhenAgreed() {
         // AI 챗봇 동의를 true로 보내면 그대로 저장된다.
-        UserAccount userAccount = UserAccount.createSocialUser(
+        User user = User.createSocialUser(
                 SocialProvider.KAKAO, "kakao-1", "parent@example.com", "민준맘");
-        given(userAccountRepository.findById(1L)).willReturn(Optional.of(userAccount));
+        given(userRepository.findById(1L)).willReturn(Optional.of(user));
 
         UserAgreementResponse response = userService.agreeTerms(
                 1L,
@@ -156,10 +156,10 @@ class UserServiceTest {
 
     @Test
     void withdrawRejectsAlreadyWithdrawnUser() {
-        UserAccount userAccount = UserAccount.createSocialUser(
+        User user = User.createSocialUser(
                 SocialProvider.KAKAO, "kakao-1", "parent@example.com", "민준맘");
-        userAccount.withdraw(null);
-        given(userAccountRepository.findById(1L)).willReturn(Optional.of(userAccount));
+        user.withdraw(null);
+        given(userRepository.findById(1L)).willReturn(Optional.of(user));
 
         assertThatThrownBy(() -> userService.withdraw(1L, null))
                 .isInstanceOf(ProjectException.class)

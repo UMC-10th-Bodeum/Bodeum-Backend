@@ -5,7 +5,7 @@ import com.bodeum.domain.auth.dto.response.AuthTokenResponse;
 import com.bodeum.domain.auth.enumtype.AuthNextStep;
 import com.bodeum.domain.auth.enumtype.SocialProvider;
 import com.bodeum.domain.auth.exception.AuthErrorCode;
-import com.bodeum.domain.user.entity.UserAccount;
+import com.bodeum.domain.user.entity.User;
 import com.bodeum.domain.user.service.UserService;
 import com.bodeum.global.apiPayload.exception.ProjectException;
 import java.net.URI;
@@ -69,14 +69,14 @@ public class AuthService {
 
         // getOrCreateSocialUser는 트랜잭션 밖에서 식별자만 반환한다.
         // 응답 생성 시 LAZY 필드를 읽어야 하므로 이 트랜잭션 안에서 managed 상태로 다시 조회한다.
-        UserAccount userAccount = userService.getUserById(userCreationResult.userId());
-        AuthTokenService.AuthTokenPair tokenPair = authTokenService.issueTokens(userAccount.getId());
+        User user = userService.getUserById(userCreationResult.userId());
+        AuthTokenService.AuthTokenPair tokenPair = authTokenService.issueTokens(user.getId());
 
         return AuthLoginResponse.of(
-                userAccount,
+                user,
                 tokenPair,
                 userCreationResult.created(),
-                resolveNextStep(userAccount)
+                resolveNextStep(user)
         );
     }
 
@@ -99,12 +99,12 @@ public class AuthService {
         }
     }
 
-    private AuthNextStep resolveNextStep(UserAccount userAccount) {
-        if (!userAccount.isAgreementCompleted()) {
+    private AuthNextStep resolveNextStep(User user) {
+        if (!user.isAgreementCompleted()) {
             return AuthNextStep.TERMS;
         }
 
-        if (!userAccount.isOnboardingResolved()) {
+        if (!user.isOnboardingResolved()) {
             return AuthNextStep.ONBOARDING;
         }
 

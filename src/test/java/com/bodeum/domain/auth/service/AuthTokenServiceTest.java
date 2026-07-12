@@ -6,8 +6,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.bodeum.domain.auth.enumtype.SocialProvider;
 import com.bodeum.domain.auth.repository.OAuthStateRepository;
 import com.bodeum.domain.auth.repository.RefreshTokenSessionRepository;
-import com.bodeum.domain.user.entity.UserAccount;
-import com.bodeum.domain.user.repository.UserAccountRepository;
+import com.bodeum.domain.user.entity.User;
+import com.bodeum.domain.user.repository.UserRepository;
 import com.bodeum.domain.user.service.UserService;
 import com.bodeum.global.apiPayload.exception.ProjectException;
 import com.bodeum.global.auth.AuthUserPrincipal;
@@ -38,7 +38,7 @@ class AuthTokenServiceTest {
     private JwtTokenProvider jwtTokenProvider;
 
     @Autowired
-    private UserAccountRepository userAccountRepository;
+    private UserRepository userRepository;
 
     @Autowired
     private RefreshTokenSessionRepository refreshTokenSessionRepository;
@@ -50,19 +50,19 @@ class AuthTokenServiceTest {
     void setUp() {
         refreshTokenSessionRepository.deleteAll();
         oAuthStateRepository.deleteAll();
-        userAccountRepository.deleteAll();
+        userRepository.deleteAll();
     }
 
     @Test
     void issueTokensAndAuthenticate() {
-        UserAccount userAccount = createUser();
+        User user = createUser();
 
-        AuthTokenService.AuthTokenPair tokenPair = authTokenService.issueTokens(userAccount.getId());
+        AuthTokenService.AuthTokenPair tokenPair = authTokenService.issueTokens(user.getId());
 
         Optional<AuthUserPrincipal> principal = authTokenService.authenticate(tokenPair.accessToken());
 
         assertThat(principal).isPresent();
-        assertThat(principal.get().userId()).isEqualTo(userAccount.getId());
+        assertThat(principal.get().userId()).isEqualTo(user.getId());
         assertThat(principal.get().provider()).isEqualTo(SocialProvider.KAKAO);
         assertThat(principal.get().nickname()).isEqualTo("민준맘");
     }
@@ -98,7 +98,7 @@ class AuthTokenServiceTest {
                     })
                     .toList();
 
-            assertThat(userAccountRepository.count()).isEqualTo(1);
+            assertThat(userRepository.count()).isEqualTo(1);
             assertThat(results).filteredOn(UserService.UserCreationResult::created).hasSize(1);
             assertThat(results)
                     .extracting(UserService.UserCreationResult::userId)
@@ -115,9 +115,9 @@ class AuthTokenServiceTest {
         AuthTokenProperties otherProperties = new AuthTokenProperties();
         otherProperties.setJwtSecret("other-jwt-secret-32-bytes-minimum");
         JwtTokenProvider otherKeyProvider = new JwtTokenProvider(otherProperties);
-        UserAccount userAccount = createUser();
+        User user = createUser();
         String tokenSignedWithOtherKey = otherKeyProvider.createAccessToken(
-                userAccount.getAuthSubject(),
+                user.getAuthSubject(),
                 Instant.now(),
                 Instant.now().plusSeconds(600)
         );
@@ -138,8 +138,8 @@ class AuthTokenServiceTest {
 
     @Test
     void refreshIssuesNewTokenPair() {
-        UserAccount userAccount = createUser();
-        AuthTokenService.AuthTokenPair tokenPair = authTokenService.issueTokens(userAccount.getId());
+        User user = createUser();
+        AuthTokenService.AuthTokenPair tokenPair = authTokenService.issueTokens(user.getId());
 
         AuthTokenService.AuthTokenPair refreshedTokenPair = authTokenService.refresh(tokenPair.refreshToken());
 
@@ -149,8 +149,8 @@ class AuthTokenServiceTest {
 
     @Test
     void refreshRotatesRefreshToken() {
-        UserAccount userAccount = createUser();
-        AuthTokenService.AuthTokenPair tokenPair = authTokenService.issueTokens(userAccount.getId());
+        User user = createUser();
+        AuthTokenService.AuthTokenPair tokenPair = authTokenService.issueTokens(user.getId());
 
         authTokenService.refresh(tokenPair.refreshToken());
 
@@ -161,9 +161,9 @@ class AuthTokenServiceTest {
 
     @Test
     void refreshTokenIsStoredAsHash() {
-        UserAccount userAccount = createUser();
+        User user = createUser();
 
-        AuthTokenService.AuthTokenPair tokenPair = authTokenService.issueTokens(userAccount.getId());
+        AuthTokenService.AuthTokenPair tokenPair = authTokenService.issueTokens(user.getId());
 
         assertThat(refreshTokenSessionRepository.findAll())
                 .singleElement()
@@ -181,11 +181,11 @@ class AuthTokenServiceTest {
 
     @Test
     void refreshFailsForWithdrawnUser() {
-        UserAccount userAccount = createUser();
-        AuthTokenService.AuthTokenPair tokenPair = authTokenService.issueTokens(userAccount.getId());
+        User user = createUser();
+        AuthTokenService.AuthTokenPair tokenPair = authTokenService.issueTokens(user.getId());
 
-        userAccount.withdraw(null);
-        userAccountRepository.saveAndFlush(userAccount);
+        user.withdraw(null);
+        userRepository.saveAndFlush(user);
 
         assertThatThrownBy(() -> authTokenService.refresh(tokenPair.refreshToken()))
                 .isInstanceOf(ProjectException.class);
@@ -193,19 +193,19 @@ class AuthTokenServiceTest {
 
     @Test
     void authenticateRestoresPrincipalForWithdrawnUser() {
-        UserAccount userAccount = createUser();
-        AuthTokenService.AuthTokenPair tokenPair = authTokenService.issueTokens(userAccount.getId());
+        User user = createUser();
+        AuthTokenService.AuthTokenPair tokenPair = authTokenService.issueTokens(user.getId());
 
-        userAccount.withdraw(null);
-        userAccountRepository.saveAndFlush(userAccount);
+        user.withdraw(null);
+        userRepository.saveAndFlush(user);
 
         assertThat(authTokenService.authenticate(tokenPair.accessToken())).isPresent();
     }
 
     @Test
     void revokeRemovesRefreshToken() {
-        UserAccount userAccount = createUser();
-        AuthTokenService.AuthTokenPair tokenPair = authTokenService.issueTokens(userAccount.getId());
+        User user = createUser();
+        AuthTokenService.AuthTokenPair tokenPair = authTokenService.issueTokens(user.getId());
 
         authTokenService.revoke(tokenPair.refreshToken());
 
@@ -213,7 +213,7 @@ class AuthTokenServiceTest {
                 .isInstanceOf(ProjectException.class);
     }
 
-    private UserAccount createUser() {
+    private User createUser() {
         Long userId = userService
                 .getOrCreateSocialUser(SocialProvider.KAKAO, "kakao-user-1", "parent@example.com", "민준맘")
                 .userId();

@@ -2,7 +2,7 @@ package com.bodeum.domain.user.dto.response;
 
 import com.bodeum.domain.onboarding.enumtype.CommunityRoleType;
 import com.bodeum.domain.onboarding.enumtype.GuardianType;
-import com.bodeum.domain.user.entity.UserAccount;
+import com.bodeum.domain.user.entity.User;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -28,27 +28,27 @@ public record UserProfileResponse(
         CommunityRoleType communityRoleType
 ) {
 
-    public static UserProfileResponse from(UserAccount userAccount) {
+    public static UserProfileResponse from(User user) {
         return new UserProfileResponse(
-                userAccount.getId(),
-                userAccount.getNickname(),
-                userAccount.getEmail(),
-                userAccount.getProvider().getPath(),
-                userAccount.getProfileImageUrl(),
-                userAccount.getPoint(),
-                userAccount.getGuardianLevel().getLevelNumber(),
-                userAccount.getGuardianLevel().getBadgeName(),
-                userAccount.getGuardianLevel().getDescription(),
-                userAccount.getCreatedAt(),
-                userAccount.getUpdatedAt(),
-                ChildProfile.from(userAccount),
-                userAccount.getKeywordText(),
-                userAccount.getInterestCategoryIds(),
-                userAccount.getRegionLevel1(),
-                userAccount.getRegionLevel2(),
-                userAccount.getGuardianNickname(),
-                userAccount.getGuardianType(),
-                userAccount.getCommunityRoleType()
+                user.getId(),
+                user.getNickname(),
+                user.getEmail(),
+                user.getProvider().getPath(),
+                user.getProfileImageUrl(),
+                user.getPoint(),
+                user.getGuardianLevel().getLevelNumber(),
+                user.getGuardianLevel().getBadgeName(),
+                user.getGuardianLevel().getDescription(),
+                user.getCreatedAt(),
+                user.getUpdatedAt(),
+                ChildProfile.from(user),
+                user.getKeywordText(),
+                user.getInterestCategoryIds(),
+                user.getRegionLevel1(),
+                user.getRegionLevel2(),
+                user.getGuardianNickname(),
+                user.getGuardianType(),
+                user.getCommunityRoleType()
         );
     }
 
@@ -58,11 +58,11 @@ public record UserProfileResponse(
             List<Integer> disabilityTypeIds
     ) {
 
-        private static ChildProfile from(UserAccount userAccount) {
+        private static ChildProfile from(User user) {
             return new ChildProfile(
-                    userAccount.getChildName(),
-                    userAccount.getChildBirth(),
-                    userAccount.getDisabilityTypeIds()
+                    user.getChildName(),
+                    user.getChildBirth(),
+                    user.getDisabilityTypeIds()
             );
         }
     }

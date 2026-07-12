@@ -9,7 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.bodeum.domain.auth.repository.OAuthStateRepository;
 import com.bodeum.domain.auth.repository.RefreshTokenSessionRepository;
-import com.bodeum.domain.user.repository.UserAccountRepository;
+import com.bodeum.domain.user.repository.UserRepository;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.Map;
@@ -38,7 +38,7 @@ class AuthControllerTest {
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Autowired
-    private UserAccountRepository userAccountRepository;
+    private UserRepository userRepository;
 
     @Autowired
     private RefreshTokenSessionRepository refreshTokenSessionRepository;
@@ -50,7 +50,7 @@ class AuthControllerTest {
     void setUp() {
         refreshTokenSessionRepository.deleteAll();
         oAuthStateRepository.deleteAll();
-        userAccountRepository.deleteAll();
+        userRepository.deleteAll();
     }
 
     @Test
@@ -213,9 +213,9 @@ class AuthControllerTest {
                 .andReturn());
         String accessToken = loginBody.at("/result/accessToken").asText();
 
-        var userAccount = userAccountRepository.findAll().getFirst();
-        userAccount.withdraw(null);
-        userAccountRepository.saveAndFlush(userAccount);
+        var user = userRepository.findAll().getFirst();
+        user.withdraw(null);
+        userRepository.saveAndFlush(user);
 
         mockMvc.perform(get("/api/v1/users/me/profile")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
@@ -229,9 +229,9 @@ class AuthControllerTest {
                         .param("code", "withdrawn-user-code"))
                 .andExpect(status().isOk());
 
-        var userAccount = userAccountRepository.findAll().getFirst();
-        userAccount.withdraw(null);
-        userAccountRepository.saveAndFlush(userAccount);
+        var user = userRepository.findAll().getFirst();
+        user.withdraw(null);
+        userRepository.saveAndFlush(user);
 
         mockMvc.perform(get("/api/v1/auth/callback/kakao")
                         .param("code", "withdrawn-user-code"))

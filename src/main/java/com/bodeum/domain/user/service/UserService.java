@@ -13,8 +13,8 @@ import com.bodeum.domain.user.dto.response.UserHeaderResponse;
 import com.bodeum.domain.user.dto.response.UserProfileResponse;
 import com.bodeum.domain.user.dto.response.UserProfileUpdateResponse;
 import com.bodeum.domain.user.dto.response.UserWithdrawResponse;
-import com.bodeum.domain.user.entity.UserAccount;
-import com.bodeum.domain.user.repository.UserAccountRepository;
+import com.bodeum.domain.user.entity.User;
+import com.bodeum.domain.user.repository.UserRepository;
 import com.bodeum.global.apiPayload.code.GeneralErrorCode;
 import com.bodeum.global.apiPayload.exception.ProjectException;
 import com.bodeum.global.infrastructure.storage.S3ImageStorage;
@@ -32,7 +32,7 @@ public class UserService {
 
     private static final String PROFILE_IMAGE_DIRECTORY = "profile-images";
 
-    private final UserAccountRepository userAccountRepository;
+    private final UserRepository userRepository;
     private final RefreshTokenSessionRepository refreshTokenSessionRepository;
     private final S3ImageStorage s3ImageStorage;
     private final UserProfileImageUpdater userProfileImageUpdater;
@@ -59,8 +59,8 @@ public class UserService {
 
     @Transactional
     public UserProfileUpdateResponse updateProfile(Long userId, UpdateUserProfileRequest request) {
-        UserAccount userAccount = getCurrentUser(userId);
-        userAccount.updateProfile(
+        User user = getCurrentUser(userId);
+        user.updateProfile(
                 request.nickname(),
                 request.childNickname(),
                 request.childBirth(),
@@ -89,31 +89,31 @@ public class UserService {
             throw new ProjectException(AuthErrorCode.REQUIRED_TERMS_NOT_AGREED);
         }
 
-        UserAccount userAccount = getCurrentUser(userId);
-        userAccount.agreeTerms(
+        User user = getCurrentUser(userId);
+        user.agreeTerms(
                 request.serviceTermsAgreed(),
                 request.privacyPolicyAgreed(),
                 request.isAiTermsAgreedValue()
         );
 
-        return UserAgreementResponse.from(userAccount);
+        return UserAgreementResponse.from(user);
     }
 
     @Transactional
     public UserWithdrawResponse withdraw(Long userId, WithdrawUserRequest request) {
-        UserAccount userAccount = userAccountRepository.findById(userId)
+        User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ProjectException(GeneralErrorCode.UNAUTHORIZED));
-        if (userAccount.isWithdrawn()) {
+        if (user.isWithdrawn()) {
             throw new ProjectException(AuthErrorCode.ALREADY_WITHDRAWN);
         }
 
-        userAccount.withdraw(request == null ? null : request.reason());
+        user.withdraw(request == null ? null : request.reason());
         refreshTokenSessionRepository.deleteByUserId(userId);
 
         return UserWithdrawResponse.ofSuccess();
     }
 
-    public UserAccount getCurrentUser(Long userId) {
+    public User getCurrentUser(Long userId) {
         if (userId == null) {
             throw new ProjectException(GeneralErrorCode.UNAUTHORIZED);
         }
@@ -137,7 +137,7 @@ public class UserService {
             String email,
             String nickname
     ) {
-        Optional<UserAccount> existingUser = userAccountRepository.findByProviderAndProviderUserId(
+        Optional<User> existingUser = userRepository.findByProviderAndProviderUserId(
                 provider,
                 providerUserId
         );
@@ -146,45 +146,45 @@ public class UserService {
         }
 
         try {
-            UserAccount userAccount = UserAccount.createSocialUser(provider, providerUserId, email, nickname);
-            return new UserCreationResult(userAccountRepository.saveAndFlush(userAccount).getId(), true);
+            User user = User.createSocialUser(provider, providerUserId, email, nickname);
+            return new UserCreationResult(userRepository.saveAndFlush(user).getId(), true);
         } catch (DataIntegrityViolationException e) {
-            return userAccountRepository.findByProviderAndProviderUserId(provider, providerUserId)
-                    .map(userAccount -> new UserCreationResult(requireActive(userAccount).getId(), false))
+            return userRepository.findByProviderAndProviderUserId(provider, providerUserId)
+                    .map(user -> new UserCreationResult(requireActive(user).getId(), false))
                     .orElseThrow(() -> e);
         }
     }
 
     @Transactional(readOnly = true)
-    public UserAccount getUserById(Long userId) {
-        UserAccount userAccount = userAccountRepository.findById(userId)
+    public User getUserById(Long userId) {
+        User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ProjectException(GeneralErrorCode.UNAUTHORIZED));
-        return requireActive(userAccount);
+        return requireActive(user);
     }
 
     @Transactional(readOnly = true)
-    public Optional<UserAccount> findActiveUser(Long userId) {
-        return userAccountRepository.findById(userId)
-                .filter(UserAccount::isActive);
+    public Optional<User> findActiveUser(Long userId) {
+        return userRepository.findById(userId)
+                .filter(User::isActive);
     }
 
     @Transactional(readOnly = true)
-    public Optional<UserAccount> findActiveUserByAuthSubject(String authSubject) {
-        return userAccountRepository.findByAuthSubject(authSubject)
-                .filter(UserAccount::isActive);
+    public Optional<User> findActiveUserByAuthSubject(String authSubject) {
+        return userRepository.findByAuthSubject(authSubject)
+                .filter(User::isActive);
     }
 
     @Transactional(readOnly = true)
-    public Optional<UserAccount> findUserByAuthSubject(String authSubject) {
-        return userAccountRepository.findByAuthSubject(authSubject);
+    public Optional<User> findUserByAuthSubject(String authSubject) {
+        return userRepository.findByAuthSubject(authSubject);
     }
 
-    private UserAccount requireActive(UserAccount userAccount) {
-        if (!userAccount.isActive()) {
+    private User requireActive(User user) {
+        if (!user.isActive()) {
             throw new ProjectException(AuthErrorCode.INACTIVE_USER);
         }
 
-        return userAccount;
+        return user;
     }
 
     public record UserCreationResult(

@@ -8,7 +8,7 @@ import com.bodeum.domain.onboarding.dto.response.OnboardingStepResponse;
 import com.bodeum.domain.onboarding.enumtype.CommunityRoleType;
 import com.bodeum.domain.onboarding.enumtype.GuardianType;
 import com.bodeum.domain.onboarding.enumtype.OnboardingStep;
-import com.bodeum.domain.user.entity.UserAccount;
+import com.bodeum.domain.user.entity.User;
 import com.bodeum.domain.user.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -25,15 +25,15 @@ public class OnboardingService {
             Long userId,
             CreateChildProfileRequest request
     ) {
-        UserAccount userAccount = userService.getCurrentUser(userId);
-        userAccount.updateChildProfile(
+        User user = userService.getCurrentUser(userId);
+        user.updateChildProfile(
                 request.childNickname(),
                 request.birth(),
                 request.disabilityTypeIds(),
                 request.keywordText()
         );
 
-        return OnboardingStepResponse.of(OnboardingStep.CHILD_PROFILE, userAccount.isOnboardingCompleted());
+        return OnboardingStepResponse.of(OnboardingStep.CHILD_PROFILE, user.isOnboardingCompleted());
     }
 
     @Transactional
@@ -41,10 +41,10 @@ public class OnboardingService {
             Long userId,
             CreateInterestRegionRequest request
     ) {
-        UserAccount userAccount = userService.getCurrentUser(userId);
-        userAccount.updateInterestRegion(request.interestCategoryIds(), request.regionLevel1(), request.regionLevel2());
+        User user = userService.getCurrentUser(userId);
+        user.updateInterestRegion(request.interestCategoryIds(), request.regionLevel1(), request.regionLevel2());
 
-        return OnboardingStepResponse.of(OnboardingStep.INTEREST_REGION, userAccount.isOnboardingCompleted());
+        return OnboardingStepResponse.of(OnboardingStep.INTEREST_REGION, user.isOnboardingCompleted());
     }
 
     @Transactional
@@ -52,22 +52,22 @@ public class OnboardingService {
             Long userId,
             CreateGuardianProfileRequest request
     ) {
-        UserAccount userAccount = userService.getCurrentUser(userId);
-        userAccount.updateGuardianProfile(
+        User user = userService.getCurrentUser(userId);
+        user.updateGuardianProfile(
                 request.guardianNickname(),
                 GuardianType.fromNullable(request.guardianType()),
                 CommunityRoleType.fromNullable(request.communityRoleType())
         );
 
-        return OnboardingStepResponse.of(OnboardingStep.GUARDIAN_PROFILE, userAccount.isOnboardingCompleted());
+        return OnboardingStepResponse.of(OnboardingStep.GUARDIAN_PROFILE, user.isOnboardingCompleted());
     }
 
     @Transactional
     public OnboardingStatusResponse skipOnboarding(Long userId) {
-        UserAccount userAccount = userService.getCurrentUser(userId);
-        userAccount.skipOnboarding();
+        User user = userService.getCurrentUser(userId);
+        user.skipOnboarding();
 
-        return OnboardingStatusResponse.from(userAccount);
+        return OnboardingStatusResponse.from(user);
     }
 
     @Transactional(readOnly = true)

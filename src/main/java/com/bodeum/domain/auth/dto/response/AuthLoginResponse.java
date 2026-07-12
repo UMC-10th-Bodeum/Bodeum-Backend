@@ -2,7 +2,7 @@ package com.bodeum.domain.auth.dto.response;
 
 import com.bodeum.domain.auth.enumtype.AuthNextStep;
 import com.bodeum.domain.auth.service.AuthTokenService;
-import com.bodeum.domain.user.entity.UserAccount;
+import com.bodeum.domain.user.entity.User;
 import java.time.Instant;
 
 public record AuthLoginResponse(
@@ -21,23 +21,23 @@ public record AuthLoginResponse(
 ) {
 
     public static AuthLoginResponse of(
-            UserAccount userAccount,
+            User user,
             AuthTokenService.AuthTokenPair tokenPair,
             boolean isNewUser,
             AuthNextStep nextStep
     ) {
         return new AuthLoginResponse(
-                userAccount.getId(),
-                userAccount.getProvider().getPath(),
-                userAccount.getNickname(),
+                user.getId(),
+                user.getProvider().getPath(),
+                user.getNickname(),
                 AuthTokenService.TOKEN_TYPE,
                 tokenPair.accessToken(),
                 tokenPair.refreshToken(),
                 tokenPair.accessTokenExpiresAt(),
                 tokenPair.refreshTokenExpiresAt(),
                 isNewUser,
-                userAccount.isAgreementCompleted(),
-                userAccount.isOnboardingCompleted(),
+                user.isAgreementCompleted(),
+                user.isOnboardingCompleted(),
                 nextStep
         );
     }

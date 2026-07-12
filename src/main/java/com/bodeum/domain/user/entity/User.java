@@ -30,16 +30,16 @@ import java.util.UUID;
 
 @Entity
 @Table(
-        name = "user_accounts",
+        name = "users",
         uniqueConstraints = {
                 @UniqueConstraint(
-                        name = "uk_user_accounts_provider_user",
+                        name = "uk_users_provider_user",
                         columnNames = {"provider", "provider_user_id"}
                 ),
-                @UniqueConstraint(name = "uk_user_accounts_auth_subject", columnNames = "auth_subject")
+                @UniqueConstraint(name = "uk_users_auth_subject", columnNames = "auth_subject")
         }
 )
-public class UserAccount {
+public class User {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -134,10 +134,10 @@ public class UserAccount {
     @Column(name = "withdrawal_reason", length = 255)
     private String withdrawalReason;
 
-    protected UserAccount() {
+    protected User() {
     }
 
-    private UserAccount(
+    private User(
             SocialProvider provider,
             String providerUserId,
             String email,
@@ -153,13 +153,13 @@ public class UserAccount {
         this.status = UserStatus.ACTIVE;
     }
 
-    public static UserAccount createSocialUser(
+    public static User createSocialUser(
             SocialProvider provider,
             String providerUserId,
             String email,
             String nickname
     ) {
-        return new UserAccount(provider, providerUserId, email, nickname);
+        return new User(provider, providerUserId, email, nickname);
     }
 
     @PrePersist

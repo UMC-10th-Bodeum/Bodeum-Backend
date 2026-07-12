@@ -1,7 +1,7 @@
 package com.bodeum.domain.user.dto.response;
 
 import com.bodeum.domain.auth.enumtype.AuthNextStep;
-import com.bodeum.domain.user.entity.UserAccount;
+import com.bodeum.domain.user.entity.User;
 import java.time.LocalDateTime;
 
 public record UserAgreementResponse(
@@ -12,13 +12,13 @@ public record UserAgreementResponse(
         AuthNextStep nextStep
 ) {
 
-    public static UserAgreementResponse from(UserAccount userAccount) {
+    public static UserAgreementResponse from(User user) {
         return new UserAgreementResponse(
-                userAccount.isServiceTermsAgreed(),
-                userAccount.isPrivacyPolicyAgreed(),
-                userAccount.isAiTermsAgreed(),
-                userAccount.getAgreementAgreedAt(),
-                userAccount.isOnboardingResolved() ? AuthNextStep.HOME : AuthNextStep.ONBOARDING
+                user.isServiceTermsAgreed(),
+                user.isPrivacyPolicyAgreed(),
+                user.isAiTermsAgreed(),
+                user.getAgreementAgreedAt(),
+                user.isOnboardingResolved() ? AuthNextStep.HOME : AuthNextStep.ONBOARDING
         );
     }
 }
