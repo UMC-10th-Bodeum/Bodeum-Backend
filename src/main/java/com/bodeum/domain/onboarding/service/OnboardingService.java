@@ -8,6 +8,8 @@ import com.bodeum.domain.onboarding.dto.response.OnboardingStepResponse;
 import com.bodeum.domain.onboarding.enumtype.CommunityRoleType;
 import com.bodeum.domain.onboarding.enumtype.GuardianType;
 import com.bodeum.domain.onboarding.enumtype.OnboardingStep;
+import com.bodeum.domain.region.entity.Region;
+import com.bodeum.domain.region.service.RegionService;
 import com.bodeum.domain.user.entity.User;
 import com.bodeum.domain.user.service.UserService;
 import lombok.RequiredArgsConstructor;
@@ -19,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class OnboardingService {
 
     private final UserService userService;
+    private final RegionService regionService;
 
     @Transactional
     public OnboardingStepResponse registerChildProfile(
@@ -42,7 +45,8 @@ public class OnboardingService {
             CreateInterestRegionRequest request
     ) {
         User user = userService.getCurrentUser(userId);
-        user.updateInterestRegion(request.interestCategoryIds(), request.regionLevel1(), request.regionLevel2());
+        Region region = regionService.getById(request.regionId());
+        user.updateInterestRegion(request.interestCategoryIds(), region);
 
         return OnboardingStepResponse.of(OnboardingStep.INTEREST_REGION, user.isOnboardingCompleted());
     }

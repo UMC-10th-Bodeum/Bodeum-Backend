@@ -2,6 +2,7 @@ package com.bodeum.domain.user.dto.response;
 
 import com.bodeum.domain.onboarding.enumtype.CommunityRoleType;
 import com.bodeum.domain.onboarding.enumtype.GuardianType;
+import com.bodeum.domain.region.entity.Region;
 import com.bodeum.domain.user.entity.User;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -21,6 +22,7 @@ public record UserProfileResponse(
         ChildProfile childProfile,
         String keywordText,
         List<Integer> interestCategoryIds,
+        Long regionId,
         String regionLevel1,
         String regionLevel2,
         String guardianNickname,
@@ -29,6 +31,7 @@ public record UserProfileResponse(
 ) {
 
     public static UserProfileResponse from(User user) {
+        Region region = user.getRegion();
         return new UserProfileResponse(
                 user.getId(),
                 user.getNickname(),
@@ -44,8 +47,9 @@ public record UserProfileResponse(
                 ChildProfile.from(user),
                 user.getKeywordText(),
                 user.getInterestCategoryIds(),
-                user.getRegionLevel1(),
-                user.getRegionLevel2(),
+                region == null ? null : region.getId(),
+                region == null ? null : region.getRegionLevel1(),
+                region == null ? null : region.getRegionLevel2(),
                 user.getGuardianNickname(),
                 user.getGuardianType(),
                 user.getCommunityRoleType()

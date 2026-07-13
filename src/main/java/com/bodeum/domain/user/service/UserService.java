@@ -5,6 +5,8 @@ import com.bodeum.domain.auth.exception.AuthErrorCode;
 import com.bodeum.domain.auth.repository.RefreshTokenSessionRepository;
 import com.bodeum.domain.onboarding.enumtype.CommunityRoleType;
 import com.bodeum.domain.onboarding.enumtype.GuardianType;
+import com.bodeum.domain.region.entity.Region;
+import com.bodeum.domain.region.service.RegionService;
 import com.bodeum.domain.user.dto.request.CreateUserAgreementRequest;
 import com.bodeum.domain.user.dto.request.UpdateUserProfileRequest;
 import com.bodeum.domain.user.dto.request.WithdrawUserRequest;
@@ -36,6 +38,7 @@ public class UserService {
     private final RefreshTokenSessionRepository refreshTokenSessionRepository;
     private final S3ImageStorage s3ImageStorage;
     private final UserProfileImageUpdater userProfileImageUpdater;
+    private final RegionService regionService;
 
     @Transactional(readOnly = true)
     public UserProfileResponse getProfile(Long userId) {
@@ -60,6 +63,7 @@ public class UserService {
     @Transactional
     public UserProfileUpdateResponse updateProfile(Long userId, UpdateUserProfileRequest request) {
         User user = getCurrentUser(userId);
+        Region region = request.regionId() == null ? null : regionService.getById(request.regionId());
         user.updateProfile(
                 request.nickname(),
                 request.childNickname(),
@@ -67,8 +71,7 @@ public class UserService {
                 request.disabilityTypeIds(),
                 request.keywordText(),
                 request.interestCategoryIds(),
-                request.regionLevel1(),
-                request.regionLevel2(),
+                region,
                 GuardianType.fromNullable(request.guardianType()),
                 CommunityRoleType.fromNullable(request.communityRoleType())
         );

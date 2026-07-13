@@ -4,8 +4,8 @@ import io.swagger.v3.oas.annotations.media.ArraySchema;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
-import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import java.util.List;
 
@@ -16,10 +16,8 @@ public record CreateInterestRegionRequest(
         List<@Min(value = 1, message = "지원하지 않는 관심사입니다.")
                 @Max(value = 4, message = "지원하지 않는 관심사입니다.") Integer> interestCategoryIds,
 
-        @NotBlank(message = "시/도는 필수입니다.")
-        String regionLevel1,
-
-        @NotBlank(message = "구/군은 필수입니다.")
-        String regionLevel2
+        @Schema(example = "1", description = "지역 ID (GET /api/v1/regions 로 조회한 regionId)")
+        @NotNull(message = "지역은 필수입니다.")
+        Long regionId
 ) {
 }

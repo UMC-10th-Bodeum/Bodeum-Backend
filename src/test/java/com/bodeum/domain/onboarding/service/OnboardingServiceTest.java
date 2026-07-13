@@ -15,6 +15,8 @@ import com.bodeum.domain.onboarding.enumtype.CommunityRoleType;
 import com.bodeum.domain.onboarding.enumtype.GuardianType;
 import com.bodeum.domain.onboarding.enumtype.OnboardingStep;
 import com.bodeum.domain.onboarding.exception.OnboardingErrorCode;
+import com.bodeum.domain.region.entity.Region;
+import com.bodeum.domain.region.service.RegionService;
 import com.bodeum.domain.user.entity.User;
 import com.bodeum.domain.user.service.UserService;
 import com.bodeum.global.apiPayload.exception.ProjectException;
@@ -30,6 +32,9 @@ class OnboardingServiceTest {
 
     @Mock
     private UserService userService;
+
+    @Mock
+    private RegionService regionService;
 
     @InjectMocks
     private OnboardingService onboardingService;
@@ -114,20 +119,20 @@ class OnboardingServiceTest {
     }
 
     @Test
-    void registerInterestRegionStoresInterestCategoryIds() {
+    void registerInterestRegionStoresInterestCategoryIdsAndRegion() {
         User user = newUser();
+        Region region = Region.create("서울특별시", "강남구");
         given(userService.getCurrentUser(1L)).willReturn(user);
+        given(regionService.getById(10L)).willReturn(region);
         CreateInterestRegionRequest request = new CreateInterestRegionRequest(
                 List.of(1, 2, 3),
-                "서울특별시",
-                "강남구"
+                10L
         );
 
         OnboardingStepResponse response = onboardingService.registerInterestRegion(1L, request);
 
         assertThat(user.getInterestCategoryIds()).containsExactly(1, 2, 3);
-        assertThat(user.getRegionLevel1()).isEqualTo("서울특별시");
-        assertThat(user.getRegionLevel2()).isEqualTo("강남구");
+        assertThat(user.getRegion()).isEqualTo(region);
         assertThat(response.step()).isEqualTo(2);
         assertThat(response.completedStep()).isEqualTo(OnboardingStep.INTEREST_REGION);
     }

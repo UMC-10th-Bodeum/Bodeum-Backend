@@ -27,20 +27,7 @@ public record UserHeaderResponse(
                 user.getGuardianLevel().getBadgeName(),
                 user.getDisabilityTypeIds(),
                 user.getChildAge(),
-                buildRegion(user.getRegionLevel1(), user.getRegionLevel2())
+                user.getRegion() == null ? null : user.getRegion().getFullName()
         );
-    }
-
-    private static String buildRegion(String regionLevel1, String regionLevel2) {
-        if (regionLevel1 == null && regionLevel2 == null) {
-            return null;
-        }
-        if (regionLevel1 == null) {
-            return regionLevel2;
-        }
-        if (regionLevel2 == null) {
-            return regionLevel1;
-        }
-        return regionLevel1 + " " + regionLevel2;
     }
 }

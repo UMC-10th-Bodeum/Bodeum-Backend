@@ -3,6 +3,7 @@ package com.bodeum.domain.user.dto.response;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.bodeum.domain.auth.enumtype.SocialProvider;
+import com.bodeum.domain.region.entity.Region;
 import com.bodeum.domain.user.entity.User;
 import java.time.LocalDate;
 import java.util.List;
@@ -35,19 +36,11 @@ class UserHeaderResponseTest {
     }
 
     @Test
-    void combinesRegionLevelsWithSpace() {
+    void exposesRegionFullName() {
         User user = newUser();
-        user.updateInterestRegion(List.of(), "서울특별시", "강남구");
+        user.updateInterestRegion(List.of(), Region.create("서울특별시", "강남구"));
 
         assertThat(UserHeaderResponse.from(user).region()).isEqualTo("서울특별시 강남구");
-    }
-
-    @Test
-    void usesSingleRegionWhenOnlyOnePresent() {
-        User user = newUser();
-        user.updateInterestRegion(List.of(), "서울특별시", null);
-
-        assertThat(UserHeaderResponse.from(user).region()).isEqualTo("서울특별시");
     }
 
     @Test

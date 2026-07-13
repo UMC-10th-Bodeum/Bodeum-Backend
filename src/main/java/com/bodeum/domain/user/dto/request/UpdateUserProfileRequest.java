@@ -44,13 +44,8 @@ public record UpdateUserProfileRequest(
         List<@Min(value = 1, message = "지원하지 않는 관심사입니다.")
                 @Max(value = 4, message = "지원하지 않는 관심사입니다.") Integer> interestCategoryIds,
 
-        @Schema(example = "서울특별시")
-        @Size(max = 50, message = "시/도는 최대 50자까지 입력 가능합니다.")
-        String regionLevel1,
-
-        @Schema(example = "강남구")
-        @Size(max = 50, message = "시/군/구는 최대 50자까지 입력 가능합니다.")
-        String regionLevel2,
+        @Schema(example = "1", description = "지역 ID (GET /api/v1/regions 로 조회한 regionId)")
+        Long regionId,
 
         @Schema(allowableValues = {"PARENT", "GRANDPARENT", "SIBLING", "OTHER"})
         @Pattern(regexp = "PARENT|GRANDPARENT|SIBLING|OTHER", message = "보호자 유형을 확인해주세요.")

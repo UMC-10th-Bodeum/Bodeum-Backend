@@ -3,6 +3,7 @@ package com.bodeum.domain.user.entity;
 import com.bodeum.domain.auth.enumtype.SocialProvider;
 import com.bodeum.domain.onboarding.enumtype.CommunityRoleType;
 import com.bodeum.domain.onboarding.enumtype.GuardianType;
+import com.bodeum.domain.region.entity.Region;
 import com.bodeum.domain.user.enumtype.GuardianLevel;
 import com.bodeum.domain.user.enumtype.UserStatus;
 import jakarta.persistence.CollectionTable;
@@ -16,6 +17,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
@@ -101,11 +103,9 @@ public class User {
     @Column(name = "interest_category_id", nullable = false)
     private List<Integer> interestCategoryIds = new ArrayList<>();
 
-    @Column(name = "region_level_1", length = 50)
-    private String regionLevel1;
-
-    @Column(name = "region_level_2", length = 50)
-    private String regionLevel2;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "region_id")
+    private Region region;
 
     @Column(name = "guardian_nickname", length = 20)
     private String guardianNickname;
@@ -209,12 +209,10 @@ public class User {
 
     public void updateInterestRegion(
             List<Integer> interestCategoryIds,
-            String regionLevel1,
-            String regionLevel2
+            Region region
     ) {
         this.interestCategoryIds = new ArrayList<>(interestCategoryIds);
-        this.regionLevel1 = regionLevel1;
-        this.regionLevel2 = regionLevel2;
+        this.region = region;
         touch();
     }
 
@@ -247,8 +245,7 @@ public class User {
             List<Integer> disabilityTypeIds,
             String keywordText,
             List<Integer> interestCategoryIds,
-            String regionLevel1,
-            String regionLevel2,
+            Region region,
             GuardianType guardianType,
             CommunityRoleType communityRoleType
     ) {
@@ -277,12 +274,8 @@ public class User {
             this.interestCategoryIds = new ArrayList<>(interestCategoryIds);
         }
 
-        if (regionLevel1 != null) {
-            this.regionLevel1 = blankToNull(regionLevel1);
-        }
-
-        if (regionLevel2 != null) {
-            this.regionLevel2 = blankToNull(regionLevel2);
+        if (region != null) {
+            this.region = region;
         }
 
         if (guardianType != null) {
@@ -325,7 +318,7 @@ public class User {
     }
 
     public boolean isInterestRegionRegistered() {
-        return !interestCategoryIds.isEmpty() && regionLevel1 != null && regionLevel2 != null;
+        return !interestCategoryIds.isEmpty() && region != null;
     }
 
     public boolean isGuardianProfileRegistered() {
@@ -440,12 +433,8 @@ public class User {
         return List.copyOf(interestCategoryIds);
     }
 
-    public String getRegionLevel1() {
-        return regionLevel1;
-    }
-
-    public String getRegionLevel2() {
-        return regionLevel2;
+    public Region getRegion() {
+        return region;
     }
 
     public String getGuardianNickname() {
