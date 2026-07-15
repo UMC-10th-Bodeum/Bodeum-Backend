@@ -1,11 +1,11 @@
 package com.bodeum.domain.user.dto.request;
 
+import com.bodeum.domain.user.enumtype.DisabilityType;
+import com.bodeum.domain.user.enumtype.InterestCategory;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import io.swagger.v3.oas.annotations.media.ArraySchema;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.AssertTrue;
-import jakarta.validation.constraints.Max;
-import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import java.time.YearMonth;
@@ -26,11 +26,21 @@ public record UpdateUserProfileRequest(
         String childBirth,
 
         @ArraySchema(
-                arraySchema = @Schema(example = "[1, 3]"),
-                schema = @Schema(type = "integer", allowableValues = {"1", "2", "3", "4", "5", "6", "7"})
+                arraySchema = @Schema(example = "[\"AUTISM\", \"DEVELOPMENTAL_DELAY\"]"),
+                schema = @Schema(
+                        type = "string",
+                        allowableValues = {
+                                "AUTISM",
+                                "INTELLECTUAL_DISABILITY",
+                                "CEREBRAL_PALSY",
+                                "ADHD",
+                                "DEVELOPMENTAL_DELAY",
+                                "LANGUAGE_DISORDER",
+                                "ETC"
+                        }
+                )
         )
-        List<@Min(value = 1, message = "지원하지 않는 케어 영역입니다.")
-                @Max(value = 7, message = "지원하지 않는 케어 영역입니다.") Integer> disabilityTypeIds,
+        List<DisabilityType> disabilityTypes,
 
         @Schema(example = "말이 느림")
         @Size(max = 100, message = "특징 키워드는 최대 100자까지 입력 가능합니다.")
@@ -38,13 +48,21 @@ public record UpdateUserProfileRequest(
 
         @Size(max = 3, message = "관심사는 최대 3개까지 선택 가능합니다.")
         @ArraySchema(
-                arraySchema = @Schema(example = "[1, 2]"),
-                schema = @Schema(type = "integer", allowableValues = {"1", "2", "3", "4"})
+                arraySchema = @Schema(example = "[\"INSTITUTION\", \"HOSPITAL\", \"WELFARE\"]"),
+                schema = @Schema(
+                        type = "string",
+                        allowableValues = {
+                                "INSTITUTION",
+                                "HOSPITAL",
+                                "WELFARE",
+                                "EMPLOYMENT",
+                                "EDUCATION"
+                        }
+                )
         )
-        List<@Min(value = 1, message = "지원하지 않는 관심사입니다.")
-                @Max(value = 4, message = "지원하지 않는 관심사입니다.") Integer> interestCategoryIds,
+        List<InterestCategory> interestCategories,
 
-        @Schema(example = "1", description = "지역 ID (GET /api/v1/regions 로 조회한 regionId)")
+        @Schema(example = "1", description = "지역 ID")
         Long regionId,
 
         @Schema(allowableValues = {"PARENT", "GRANDPARENT", "SIBLING", "OTHER"})

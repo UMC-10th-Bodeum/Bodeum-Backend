@@ -4,10 +4,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
+import static org.mockito.ArgumentMatchers.any;
 
 import com.bodeum.domain.auth.enumtype.SocialProvider;
 import com.bodeum.domain.auth.exception.AuthErrorCode;
 import com.bodeum.domain.auth.repository.RefreshTokenSessionRepository;
+import com.bodeum.domain.region.service.RegionService;
 import com.bodeum.domain.user.dto.request.CreateUserAgreementRequest;
 import com.bodeum.domain.user.dto.request.WithdrawUserRequest;
 import com.bodeum.domain.user.dto.response.UserAgreementResponse;
@@ -39,6 +41,9 @@ class UserServiceTest {
 
     @Mock
     private UserProfileImageUpdater userProfileImageUpdater;
+
+    @Mock
+    private RegionService regionService;
 
     @InjectMocks
     private UserService userService;
@@ -165,5 +170,48 @@ class UserServiceTest {
                 .isInstanceOf(ProjectException.class)
                 .extracting(exception -> ((ProjectException) exception).getErrorCode())
                 .isEqualTo(AuthErrorCode.ALREADY_WITHDRAWN);
+    }
+
+    @Test
+    void socialLoginRestoresWithdrawnUser() {
+        User user = User.createSocialUser(
+                SocialProvider.KAKAO, "kakao-1", "parent@example.com", "민준맘");
+        ReflectionTestUtils.setField(user, "id", 1L);
+        user.withdraw("다시 가입 테스트");
+        given(userRepository.findByProviderAndProviderUserId(SocialProvider.KAKAO, "kakao-1"))
+                .willReturn(Optional.of(user));
+        given(userRepository.saveAndFlush(any(User.class))).willAnswer(invocation -> invocation.getArgument(0));
+
+        UserService.UserCreationResult result = userService.getOrCreateSocialUser(
+                SocialProvider.KAKAO,
+                "kakao-1",
+                "parent@example.com",
+                "민준맘"
+        );
+
+        assertThat(result.userId()).isEqualTo(1L);
+        assertThat(result.created()).isFalse();
+        assertThat(user.isActive()).isTrue();
+        assertThat(user.getDeletedAt()).isNull();
+        assertThat(user.getWithdrawalReason()).isNull();
+    }
+
+    @Test
+    void socialLoginRejectsHiddenUser() {
+        User user = User.createSocialUser(
+                SocialProvider.KAKAO, "kakao-1", "parent@example.com", "민준맘");
+        user.hideByAdmin();
+        given(userRepository.findByProviderAndProviderUserId(SocialProvider.KAKAO, "kakao-1"))
+                .willReturn(Optional.of(user));
+
+        assertThatThrownBy(() -> userService.getOrCreateSocialUser(
+                SocialProvider.KAKAO,
+                "kakao-1",
+                "parent@example.com",
+                "민준맘"
+        ))
+                .isInstanceOf(ProjectException.class)
+                .extracting(exception -> ((ProjectException) exception).getErrorCode())
+                .isEqualTo(AuthErrorCode.INACTIVE_USER);
     }
 }

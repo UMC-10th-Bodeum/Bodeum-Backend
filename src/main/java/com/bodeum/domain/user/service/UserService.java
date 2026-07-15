@@ -68,9 +68,9 @@ public class UserService {
                 request.nickname(),
                 request.childNickname(),
                 request.childBirth(),
-                request.disabilityTypeIds(),
+                request.disabilityTypes(),
                 request.keywordText(),
-                request.interestCategoryIds(),
+                request.interestCategories(),
                 region,
                 GuardianType.fromNullable(request.guardianType()),
                 CommunityRoleType.fromNullable(request.communityRoleType())
@@ -145,7 +145,7 @@ public class UserService {
                 providerUserId
         );
         if (existingUser.isPresent()) {
-            return new UserCreationResult(requireActive(existingUser.get()).getId(), false);
+            return restoreOrRequireActive(existingUser.get());
         }
 
         try {
@@ -153,7 +153,7 @@ public class UserService {
             return new UserCreationResult(userRepository.saveAndFlush(user).getId(), true);
         } catch (DataIntegrityViolationException e) {
             return userRepository.findByProviderAndProviderUserId(provider, providerUserId)
-                    .map(user -> new UserCreationResult(requireActive(user).getId(), false))
+                    .map(this::restoreOrRequireActive)
                     .orElseThrow(() -> e);
         }
     }
@@ -188,6 +188,15 @@ public class UserService {
         }
 
         return user;
+    }
+
+    private UserCreationResult restoreOrRequireActive(User user) {
+        if (user.isWithdrawn()) {
+            user.reactivate();
+            return new UserCreationResult(userRepository.saveAndFlush(user).getId(), false);
+        }
+
+        return new UserCreationResult(requireActive(user).getId(), false);
     }
 
     public record UserCreationResult(

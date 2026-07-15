@@ -32,7 +32,7 @@ public class OnboardingService {
         user.updateChildProfile(
                 request.childNickname(),
                 request.birth(),
-                request.disabilityTypeIds(),
+                request.disabilityTypes(),
                 request.keywordText()
         );
 
@@ -46,7 +46,7 @@ public class OnboardingService {
     ) {
         User user = userService.getCurrentUser(userId);
         Region region = regionService.getById(request.regionId());
-        user.updateInterestRegion(request.interestCategoryIds(), region);
+        user.updateInterestRegion(request.interestCategories(), region);
 
         return OnboardingStepResponse.of(OnboardingStep.INTEREST_REGION, user.isOnboardingCompleted());
     }

@@ -5,6 +5,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.bodeum.domain.auth.enumtype.SocialProvider;
 import com.bodeum.domain.region.entity.Region;
 import com.bodeum.domain.user.entity.User;
+import com.bodeum.domain.user.enumtype.DisabilityType;
+import java.util.Collections;
 import java.time.LocalDate;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -19,7 +21,7 @@ class UserHeaderResponseTest {
         assertThat(response.nickname()).isNull();
         assertThat(response.level()).isNull();
         assertThat(response.badgeName()).isNull();
-        assertThat(response.childDisabilityTypeIds()).isNull();
+        assertThat(response.childDisabilityTypes()).isNull();
         assertThat(response.childAge()).isNull();
         assertThat(response.region()).isNull();
     }
@@ -38,7 +40,7 @@ class UserHeaderResponseTest {
     @Test
     void exposesRegionFullName() {
         User user = newUser();
-        user.updateInterestRegion(List.of(), Region.create("서울특별시", "강남구"));
+        user.updateInterestRegion(Collections.emptyList(), Region.create("서울특별시", "강남구"));
 
         assertThat(UserHeaderResponse.from(user).region()).isEqualTo("서울특별시 강남구");
     }
@@ -53,12 +55,17 @@ class UserHeaderResponseTest {
         int birthYear = LocalDate.now().getYear() - 5;
         User user = newUser();
         // 1월생은 어느 시점에 조회해도 당해 생월이 지났거나 당월이므로 만 나이 = 연도 차이
-        user.updateChildProfile("민준이", String.format("%04d-01", birthYear), List.of(1), null);
+        user.updateChildProfile(
+                "민준이",
+                String.format("%04d-01", birthYear),
+                List.of(DisabilityType.AUTISM),
+                null
+        );
 
         UserHeaderResponse response = UserHeaderResponse.from(user);
 
         assertThat(response.childAge()).isEqualTo(5);
-        assertThat(response.childDisabilityTypeIds()).containsExactly(1);
+        assertThat(response.childDisabilityTypes()).containsExactly(DisabilityType.AUTISM);
     }
 
     @Test
@@ -66,7 +73,12 @@ class UserHeaderResponseTest {
         LocalDate now = LocalDate.now();
         int birthYear = now.getYear() - 3;
         User user = newUser();
-        user.updateChildProfile("민준이", String.format("%04d-12", birthYear), List.of(4), null);
+        user.updateChildProfile(
+                "민준이",
+                String.format("%04d-12", birthYear),
+                List.of(DisabilityType.ADHD),
+                null
+        );
 
         // 12월생: 아직 12월 전이면 생일 전이므로 한 살 적게 계산된다.
         int expected = now.getMonthValue() < 12 ? 2 : 3;

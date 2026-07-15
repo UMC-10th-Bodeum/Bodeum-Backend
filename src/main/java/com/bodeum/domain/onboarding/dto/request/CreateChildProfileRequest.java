@@ -1,11 +1,10 @@
 package com.bodeum.domain.onboarding.dto.request;
 
+import com.bodeum.domain.user.enumtype.DisabilityType;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import io.swagger.v3.oas.annotations.media.ArraySchema;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.AssertTrue;
-import jakarta.validation.constraints.Max;
-import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
@@ -26,11 +25,21 @@ public record CreateChildProfileRequest(
 
         @NotEmpty(message = "집중 케어 영역을 하나 이상 선택해주세요.")
         @ArraySchema(
-                arraySchema = @Schema(example = "[1, 3]"),
-                schema = @Schema(type = "integer", allowableValues = {"1", "2", "3", "4", "5", "6", "7"})
+                arraySchema = @Schema(example = "[\"AUTISM\", \"DEVELOPMENTAL_DELAY\"]"),
+                schema = @Schema(
+                        type = "string",
+                        allowableValues = {
+                                "AUTISM",
+                                "INTELLECTUAL_DISABILITY",
+                                "CEREBRAL_PALSY",
+                                "ADHD",
+                                "DEVELOPMENTAL_DELAY",
+                                "LANGUAGE_DISORDER",
+                                "ETC"
+                        }
+                )
         )
-        List<@Min(value = 1, message = "지원하지 않는 케어 영역입니다.")
-                @Max(value = 7, message = "지원하지 않는 케어 영역입니다.") Integer> disabilityTypeIds,
+        List<DisabilityType> disabilityTypes,
 
         @Schema(example = "말이 느림")
         @Size(max = 100, message = "특징 키워드는 최대 100자까지 입력 가능합니다.")

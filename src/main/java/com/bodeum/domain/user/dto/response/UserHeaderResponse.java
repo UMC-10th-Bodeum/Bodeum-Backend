@@ -1,6 +1,7 @@
 package com.bodeum.domain.user.dto.response;
 
 import com.bodeum.domain.user.entity.User;
+import com.bodeum.domain.user.enumtype.DisabilityType;
 import java.util.List;
 
 public record UserHeaderResponse(
@@ -9,7 +10,7 @@ public record UserHeaderResponse(
         String profileImageUrl,
         Integer level,
         String badgeName,
-        List<Integer> childDisabilityTypeIds,
+        List<DisabilityType> childDisabilityTypes,
         Integer childAge,
         String region
 ) {
@@ -25,7 +26,7 @@ public record UserHeaderResponse(
                 user.getProfileImageUrl(),
                 user.getGuardianLevel().getLevelNumber(),
                 user.getGuardianLevel().getBadgeName(),
-                user.getDisabilityTypeIds(),
+                user.getDisabilityTypes(),
                 user.getChildAge(),
                 user.getRegion() == null ? null : user.getRegion().getFullName()
         );

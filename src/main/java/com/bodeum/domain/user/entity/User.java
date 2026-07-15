@@ -4,11 +4,12 @@ import com.bodeum.domain.auth.enumtype.SocialProvider;
 import com.bodeum.domain.onboarding.enumtype.CommunityRoleType;
 import com.bodeum.domain.onboarding.enumtype.GuardianType;
 import com.bodeum.domain.region.entity.Region;
+import com.bodeum.domain.user.enumtype.DisabilityType;
 import com.bodeum.domain.user.enumtype.GuardianLevel;
+import com.bodeum.domain.user.enumtype.InterestCategory;
 import com.bodeum.domain.user.enumtype.UserStatus;
-import jakarta.persistence.CollectionTable;
+import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
-import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -16,20 +17,20 @@ import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.OneToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.YearMonth;
-import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import lombok.AccessLevel;
+import lombok.Getter;
 
+@Getter
 @Entity
 @Table(
         name = "users",
@@ -72,57 +73,24 @@ public class User {
     @Column(name = "profile_image_url", length = 512)
     private String profileImageUrl;
 
-    @Column(name = "service_terms_agreed", nullable = false)
-    private boolean serviceTermsAgreed;
+    @Getter(AccessLevel.NONE)
+    @OneToOne(mappedBy = "user", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
+    private UserAgreement userAgreement;
 
-    @Column(name = "privacy_policy_agreed", nullable = false)
-    private boolean privacyPolicyAgreed;
+    @Getter(AccessLevel.NONE)
+    @OneToOne(mappedBy = "user", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
+    private ChildProfile childProfile;
 
-    @Column(name = "ai_terms_agreed", nullable = false)
-    private boolean aiTermsAgreed;
+    @Getter(AccessLevel.NONE)
+    @OneToOne(mappedBy = "user", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
+    private GuardianProfile guardianProfile;
 
-    @Column(name = "agreement_agreed_at")
-    private LocalDateTime agreementAgreedAt;
-
-    @Column(name = "child_nickname", length = 20)
-    private String childNickname;
-
-    @Column(name = "child_birth", length = 7)
-    private String childBirth;
-
-    @ElementCollection(fetch = FetchType.LAZY)
-    @CollectionTable(name = "user_disability_types", joinColumns = @JoinColumn(name = "user_id"))
-    @Column(name = "disability_type_id", nullable = false)
-    private List<Integer> disabilityTypeIds = new ArrayList<>();
-
-    @Column(name = "keyword_text", length = 100)
-    private String keywordText;
-
-    @ElementCollection(fetch = FetchType.LAZY)
-    @CollectionTable(name = "user_interests", joinColumns = @JoinColumn(name = "user_id"))
-    @Column(name = "interest_category_id", nullable = false)
-    private List<Integer> interestCategoryIds = new ArrayList<>();
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "region_id")
-    private Region region;
-
-    @Column(name = "guardian_nickname", length = 20)
-    private String guardianNickname;
-
-    @Enumerated(EnumType.STRING)
-    @Column(name = "guardian_type", length = 50)
-    private GuardianType guardianType;
-
-    @Enumerated(EnumType.STRING)
-    @Column(name = "community_role_type", length = 50)
-    private CommunityRoleType communityRoleType;
+    @Getter(AccessLevel.NONE)
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<UserInterest> userInterests = new ArrayList<>();
 
     @Column(name = "onboarding_skipped", nullable = false)
     private boolean onboardingSkipped;
-
-    @Column(nullable = false)
-    private int point;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
@@ -187,32 +155,34 @@ public class User {
     }
 
     public void agreeTerms(boolean serviceTermsAgreed, boolean privacyPolicyAgreed, boolean aiTermsAgreed) {
-        this.serviceTermsAgreed = serviceTermsAgreed;
-        this.privacyPolicyAgreed = privacyPolicyAgreed;
-        this.aiTermsAgreed = aiTermsAgreed;
-        this.agreementAgreedAt = LocalDateTime.now();
+        if (userAgreement == null) {
+            userAgreement = UserAgreement.create(this, serviceTermsAgreed, privacyPolicyAgreed, aiTermsAgreed);
+        } else {
+            userAgreement.agree(serviceTermsAgreed, privacyPolicyAgreed, aiTermsAgreed);
+        }
         touch();
     }
 
     public void updateChildProfile(
             String childNickname,
             String childBirth,
-            List<Integer> disabilityTypeIds,
+            List<DisabilityType> disabilityTypes,
             String keywordText
     ) {
-        this.childNickname = childNickname;
-        this.childBirth = childBirth;
-        this.disabilityTypeIds = new ArrayList<>(disabilityTypeIds);
-        this.keywordText = keywordText;
+        if (childProfile == null) {
+            childProfile = ChildProfile.create(this, childNickname, childBirth, disabilityTypes, keywordText);
+        } else {
+            childProfile.update(childNickname, childBirth, disabilityTypes, keywordText);
+        }
         touch();
     }
 
     public void updateInterestRegion(
-            List<Integer> interestCategoryIds,
+            List<InterestCategory> interestCategories,
             Region region
     ) {
-        this.interestCategoryIds = new ArrayList<>(interestCategoryIds);
-        this.region = region;
+        replaceUserInterests(interestCategories);
+        guardianProfile().updateRegion(region);
         touch();
     }
 
@@ -221,9 +191,8 @@ public class User {
             GuardianType guardianType,
             CommunityRoleType communityRoleType
     ) {
-        this.guardianNickname = guardianNickname;
-        this.guardianType = guardianType;
-        this.communityRoleType = communityRoleType;
+        GuardianProfile profile = guardianProfile();
+        profile.updateGuardian(guardianNickname, guardianType, communityRoleType);
         this.nickname = guardianNickname;
         touch();
     }
@@ -242,51 +211,60 @@ public class User {
             String nickname,
             String childNickname,
             String childBirth,
-            List<Integer> disabilityTypeIds,
+            List<DisabilityType> disabilityTypes,
             String keywordText,
-            List<Integer> interestCategoryIds,
+            List<InterestCategory> interestCategories,
             Region region,
             GuardianType guardianType,
             CommunityRoleType communityRoleType
     ) {
         if (nickname != null && !nickname.isBlank()) {
             this.nickname = nickname;
-            this.guardianNickname = nickname;
+            guardianProfile().updateNickname(nickname);
         }
 
-        if (childNickname != null && !childNickname.isBlank()) {
-            this.childNickname = childNickname;
+        if (childNickname != null || childBirth != null || disabilityTypes != null || keywordText != null) {
+            childProfile().updatePartial(childNickname, childBirth, disabilityTypes, keywordText);
         }
 
-        if (childBirth != null) {
-            this.childBirth = childBirth;
-        }
-
-        if (disabilityTypeIds != null) {
-            this.disabilityTypeIds = new ArrayList<>(disabilityTypeIds);
-        }
-
-        if (keywordText != null) {
-            this.keywordText = blankToNull(keywordText);
-        }
-
-        if (interestCategoryIds != null) {
-            this.interestCategoryIds = new ArrayList<>(interestCategoryIds);
+        if (interestCategories != null) {
+            replaceUserInterests(interestCategories);
         }
 
         if (region != null) {
-            this.region = region;
+            guardianProfile().updateRegion(region);
         }
 
         if (guardianType != null) {
-            this.guardianType = guardianType;
+            guardianProfile().updateGuardianType(guardianType);
         }
 
         if (communityRoleType != null) {
-            this.communityRoleType = communityRoleType;
+            guardianProfile().updateCommunityRoleType(communityRoleType);
         }
 
         touch();
+    }
+
+    private ChildProfile childProfile() {
+        if (childProfile == null) {
+            childProfile = ChildProfile.create(this, null, null, List.of(), null);
+        }
+        return childProfile;
+    }
+
+    private GuardianProfile guardianProfile() {
+        if (guardianProfile == null) {
+            guardianProfile = GuardianProfile.create(this, null, null, null, null);
+        }
+        return guardianProfile;
+    }
+
+    private void replaceUserInterests(List<InterestCategory> interestCategories) {
+        userInterests.clear();
+        interestCategories.forEach(interestCategory ->
+                userInterests.add(UserInterest.create(this, interestCategory))
+        );
     }
 
     private String blankToNull(String value) {
@@ -300,6 +278,13 @@ public class User {
         touch();
     }
 
+    public void reactivate() {
+        this.status = UserStatus.ACTIVE;
+        this.deletedAt = null;
+        this.withdrawalReason = null;
+        touch();
+    }
+
     public void hideByAdmin() {
         this.status = UserStatus.HIDDEN;
         touch();
@@ -310,20 +295,35 @@ public class User {
     }
 
     public boolean isAgreementCompleted() {
-        return serviceTermsAgreed && privacyPolicyAgreed;
+        return userAgreement != null && userAgreement.isRequiredAgreed();
+    }
+
+    public boolean isServiceTermsAgreed() {
+        return userAgreement != null && userAgreement.isServiceTermsAgreed();
+    }
+
+    public boolean isPrivacyPolicyAgreed() {
+        return userAgreement != null && userAgreement.isPrivacyPolicyAgreed();
+    }
+
+    public boolean isAiTermsAgreed() {
+        return userAgreement != null && userAgreement.isAiTermsAgreed();
+    }
+
+    public LocalDateTime getAgreementAgreedAt() {
+        return userAgreement == null ? null : userAgreement.getAgreedAt();
     }
 
     public boolean isChildProfileRegistered() {
-        return childBirth != null && !disabilityTypeIds.isEmpty();
+        return childProfile != null && childProfile.isRegistered();
     }
 
     public boolean isInterestRegionRegistered() {
-        return !interestCategoryIds.isEmpty() && region != null;
+        return !userInterests.isEmpty() && getRegion() != null;
     }
 
     public boolean isGuardianProfileRegistered() {
-        // 보호자 유형/커뮤니티 성향은 선택 항목이므로 필수인 프로필 닉네임만으로 단계 완료를 판단한다.
-        return guardianNickname != null;
+        return guardianProfile != null && guardianProfile.isRegistered();
     }
 
     public boolean isOnboardingCompleted() {
@@ -338,127 +338,54 @@ public class User {
         return isOnboardingCompleted() || onboardingSkipped;
     }
 
-    public Long getId() {
-        return id;
-    }
-
-    public SocialProvider getProvider() {
-        return provider;
-    }
-
-    public String getProviderUserId() {
-        return providerUserId;
-    }
-
-    public String getAuthSubject() {
-        return authSubject;
-    }
-
-    public LocalDateTime getCreatedAt() {
-        return createdAt;
-    }
-
-    public String getEmail() {
-        return email;
-    }
-
-    public String getNickname() {
-        return nickname;
-    }
-
-    public String getProfileImageUrl() {
-        return profileImageUrl;
-    }
-
-    public boolean isServiceTermsAgreed() {
-        return serviceTermsAgreed;
-    }
-
-    public boolean isPrivacyPolicyAgreed() {
-        return privacyPolicyAgreed;
-    }
-
-    public boolean isAiTermsAgreed() {
-        return aiTermsAgreed;
-    }
-
-    public LocalDateTime getAgreementAgreedAt() {
-        return agreementAgreedAt;
-    }
-
     public String getChildName() {
-        return childNickname;
+        return childProfile == null ? null : childProfile.getNickname();
     }
 
     public String getChildBirth() {
-        return childBirth;
+        return childProfile == null ? null : childProfile.getBirth();
     }
 
-    /**
-     * 자녀 출생 연월 기준 만 나이. 생월이 아직 지나지 않았으면 한 살을 뺀다.
-     * 생년월이 없으면 나이를 계산할 수 없으므로 null을 반환한다.
-     */
     public Integer getChildAge() {
-        if (childBirth == null) {
-            return null;
-        }
-
-        YearMonth birth;
-        try {
-            birth = YearMonth.parse(childBirth);
-        } catch (DateTimeParseException e) {
-            // 저장 시 검증을 거치지만, 마이그레이션·수작업 수정 등으로 형식이 깨진 데이터가
-            // 조회 API를 500으로 터뜨리지 않도록 나이를 계산 불가로 처리한다.
-            return null;
-        }
-
-        LocalDate now = LocalDate.now();
-        int age = now.getYear() - birth.getYear();
-        if (now.getMonthValue() < birth.getMonthValue()) {
-            age--;
-        }
-
-        return age;
+        return childProfile == null ? null : childProfile.getAge();
     }
 
-    public List<Integer> getDisabilityTypeIds() {
-        return List.copyOf(disabilityTypeIds);
+    public List<DisabilityType> getDisabilityTypes() {
+        return childProfile == null ? List.of() : childProfile.getDisabilityTypes();
     }
 
     public String getKeywordText() {
-        return keywordText;
+        return childProfile == null ? null : childProfile.getKeywordText();
     }
 
-    public List<Integer> getInterestCategoryIds() {
-        return List.copyOf(interestCategoryIds);
+    public List<InterestCategory> getInterestCategories() {
+        return userInterests.stream()
+                .map(UserInterest::getInterestCategory)
+                .toList();
     }
 
     public Region getRegion() {
-        return region;
+        return guardianProfile == null ? null : guardianProfile.getRegion();
     }
 
     public String getGuardianNickname() {
-        return guardianNickname;
+        return guardianProfile == null ? null : guardianProfile.getNickname();
     }
 
     public GuardianType getGuardianType() {
-        return guardianType;
+        return guardianProfile == null ? null : guardianProfile.getGuardianType();
     }
 
     public CommunityRoleType getCommunityRoleType() {
-        return communityRoleType;
-    }
-
-    public boolean isOnboardingSkipped() {
-        return onboardingSkipped;
+        return guardianProfile == null ? null : guardianProfile.getCommunityRoleType();
     }
 
     public int getPoint() {
-        return point;
+        return guardianProfile == null ? 0 : guardianProfile.getPoint();
     }
 
     public GuardianLevel getGuardianLevel() {
-        return GuardianLevel.from(point);
+        return GuardianLevel.from(getPoint());
     }
 
     public boolean isWithdrawn() {
@@ -471,21 +398,5 @@ public class User {
 
     public boolean isActive() {
         return status == UserStatus.ACTIVE;
-    }
-
-    public UserStatus getStatus() {
-        return status;
-    }
-
-    public LocalDateTime getUpdatedAt() {
-        return updatedAt;
-    }
-
-    public LocalDateTime getDeletedAt() {
-        return deletedAt;
-    }
-
-    public String getWithdrawalReason() {
-        return withdrawalReason;
     }
 }

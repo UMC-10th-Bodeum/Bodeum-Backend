@@ -191,7 +191,7 @@ class AuthControllerTest {
                                   "nickname": "민준맘",
                                   "childNickname": "민준",
                                   "childBirth": "2020-03",
-                                  "disabilityTypeIds": [1, 3]
+                                  "disabilityTypes": ["AUTISM", "CEREBRAL_PALSY"]
                                 }
                                 """))
                 .andExpect(status().isOk())
@@ -224,19 +224,26 @@ class AuthControllerTest {
     }
 
     @Test
-    void withdrawnUserCallbackReturnsInactiveUserError() throws Exception {
-        mockMvc.perform(get("/api/v1/auth/callback/kakao")
+    void withdrawnUserIsReactivatedOnSocialRelogin() throws Exception {
+        JsonNode firstLogin = readBody(mockMvc.perform(get("/api/v1/auth/callback/kakao")
                         .param("code", "withdrawn-user-code"))
-                .andExpect(status().isOk());
+                .andExpect(status().isOk())
+                .andReturn());
+        long userId = firstLogin.at("/result/userId").asLong();
 
         var user = userRepository.findAll().getFirst();
         user.withdraw(null);
         userRepository.saveAndFlush(user);
+        assertThat(userRepository.findById(userId).orElseThrow().isWithdrawn()).isTrue();
 
-        mockMvc.perform(get("/api/v1/auth/callback/kakao")
+        // 같은 소셜 계정으로 다시 로그인하면 새 회원이 아니라 기존 회원이 복구된다.
+        JsonNode secondLogin = readBody(mockMvc.perform(get("/api/v1/auth/callback/kakao")
                         .param("code", "withdrawn-user-code"))
-                .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.code").value("AUTH401_5"));
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.isNewUser").value(false))
+                .andReturn());
+        assertThat(secondLogin.at("/result/userId").asLong()).isEqualTo(userId);
+        assertThat(userRepository.findById(userId).orElseThrow().isActive()).isTrue();
     }
 
     @Test

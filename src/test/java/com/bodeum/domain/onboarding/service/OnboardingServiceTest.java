@@ -18,6 +18,8 @@ import com.bodeum.domain.onboarding.exception.OnboardingErrorCode;
 import com.bodeum.domain.region.entity.Region;
 import com.bodeum.domain.region.service.RegionService;
 import com.bodeum.domain.user.entity.User;
+import com.bodeum.domain.user.enumtype.DisabilityType;
+import com.bodeum.domain.user.enumtype.InterestCategory;
 import com.bodeum.domain.user.service.UserService;
 import com.bodeum.global.apiPayload.exception.ProjectException;
 import java.util.List;
@@ -100,38 +102,58 @@ class OnboardingServiceTest {
     }
 
     @Test
-    void registerChildProfileStoresDisabilityTypeIds() {
+    void registerChildProfileStoresDisabilityTypes() {
         User user = newUser();
         given(userService.getCurrentUser(1L)).willReturn(user);
         CreateChildProfileRequest request = new CreateChildProfileRequest(
                 "민준이",
                 "2020-01",
-                List.of(1, 4, 6, 5, 7),
+                List.of(
+                        DisabilityType.AUTISM,
+                        DisabilityType.ADHD,
+                        DisabilityType.LANGUAGE_DISORDER,
+                        DisabilityType.DEVELOPMENTAL_DELAY,
+                        DisabilityType.ETC
+                ),
                 "소심함"
         );
 
         OnboardingStepResponse response = onboardingService.registerChildProfile(1L, request);
 
         assertThat(user.getChildBirth()).isEqualTo("2020-01");
-        assertThat(user.getDisabilityTypeIds()).containsExactly(1, 4, 6, 5, 7);
+        assertThat(user.getDisabilityTypes()).containsExactly(
+                DisabilityType.AUTISM,
+                DisabilityType.ADHD,
+                DisabilityType.LANGUAGE_DISORDER,
+                DisabilityType.DEVELOPMENTAL_DELAY,
+                DisabilityType.ETC
+        );
         assertThat(response.step()).isEqualTo(1);
         assertThat(response.completedStep()).isEqualTo(OnboardingStep.CHILD_PROFILE);
     }
 
     @Test
-    void registerInterestRegionStoresInterestCategoryIdsAndRegion() {
+    void registerInterestRegionStoresInterestCategoriesAndRegion() {
         User user = newUser();
         Region region = Region.create("서울특별시", "강남구");
         given(userService.getCurrentUser(1L)).willReturn(user);
         given(regionService.getById(10L)).willReturn(region);
         CreateInterestRegionRequest request = new CreateInterestRegionRequest(
-                List.of(1, 2, 3),
+                List.of(
+                        InterestCategory.INSTITUTION,
+                        InterestCategory.HOSPITAL,
+                        InterestCategory.WELFARE
+                ),
                 10L
         );
 
         OnboardingStepResponse response = onboardingService.registerInterestRegion(1L, request);
 
-        assertThat(user.getInterestCategoryIds()).containsExactly(1, 2, 3);
+        assertThat(user.getInterestCategories()).containsExactly(
+                InterestCategory.INSTITUTION,
+                InterestCategory.HOSPITAL,
+                InterestCategory.WELFARE
+        );
         assertThat(user.getRegion()).isEqualTo(region);
         assertThat(response.step()).isEqualTo(2);
         assertThat(response.completedStep()).isEqualTo(OnboardingStep.INTEREST_REGION);
