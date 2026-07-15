@@ -9,7 +9,7 @@ import com.bodeum.domain.user.enumtype.GuardianLevel;
 import com.bodeum.domain.user.enumtype.InterestCategory;
 import com.bodeum.domain.user.enumtype.UserStatus;
 import com.bodeum.global.common.entity.BaseCreatedUpdatedDeletedEntity;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -259,7 +259,7 @@ public class User extends BaseCreatedUpdatedDeletedEntity {
         return userAgreement != null && userAgreement.isAiTermsAgreed();
     }
 
-    public LocalDateTime getAgreementAgreedAt() {
+    public Instant getAgreementAgreedAt() {
         return userAgreement == null ? null : userAgreement.getAgreedAt();
     }
 

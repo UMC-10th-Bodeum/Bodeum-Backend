@@ -9,7 +9,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 @Entity
 @Table(name = "user_agreements")
@@ -33,7 +33,7 @@ public class UserAgreement {
     private boolean aiTermsAgreed;
 
     @Column(name = "agreed_at")
-    private LocalDateTime agreedAt;
+    private Instant agreedAt;
 
     protected UserAgreement() {
     }
@@ -65,7 +65,7 @@ public class UserAgreement {
         this.serviceTermsAgreed = serviceTermsAgreed;
         this.privacyPolicyAgreed = privacyPolicyAgreed;
         this.aiTermsAgreed = aiTermsAgreed;
-        this.agreedAt = LocalDateTime.now();
+        this.agreedAt = Instant.now();
     }
 
     public boolean isRequiredAgreed() {
@@ -84,7 +84,7 @@ public class UserAgreement {
         return aiTermsAgreed;
     }
 
-    public LocalDateTime getAgreedAt() {
+    public Instant getAgreedAt() {
         return agreedAt;
     }
 }

@@ -1,19 +1,19 @@
 package com.bodeum.domain.term.dto.response;
 
 import com.bodeum.domain.term.enumtype.TermType;
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 public record TermsResponse(
         String type,
         String title,
         String content,
-        LocalDateTime updatedAt
+        Instant updatedAt
 ) {
 
     public static TermsResponse of(
             TermType type,
             String content,
-            LocalDateTime updatedAt
+            Instant updatedAt
     ) {
         return new TermsResponse(
                 type.getPath(),

@@ -2,13 +2,13 @@ package com.bodeum.domain.user.dto.response;
 
 import com.bodeum.domain.auth.enumtype.AuthNextStep;
 import com.bodeum.domain.user.entity.User;
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 public record UserAgreementResponse(
         boolean serviceTermsAgreed,
         boolean privacyPolicyAgreed,
         boolean aiTermsAgreed,
-        LocalDateTime agreedAt,
+        Instant agreedAt,
         AuthNextStep nextStep
 ) {
 
