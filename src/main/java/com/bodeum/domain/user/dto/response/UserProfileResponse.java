@@ -6,7 +6,7 @@ import com.bodeum.domain.region.entity.Region;
 import com.bodeum.domain.user.entity.User;
 import com.bodeum.domain.user.enumtype.DisabilityType;
 import com.bodeum.domain.user.enumtype.InterestCategory;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.List;
 
 public record UserProfileResponse(
@@ -19,8 +19,8 @@ public record UserProfileResponse(
         int level,
         String badgeName,
         String levelDescription,
-        LocalDateTime joinedAt,
-        LocalDateTime updatedAt,
+        Instant joinedAt,
+        Instant updatedAt,
         ChildProfile childProfile,
         String keywordText,
         List<InterestCategory> interestCategories,

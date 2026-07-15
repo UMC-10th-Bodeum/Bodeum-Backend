@@ -8,6 +8,8 @@ import com.bodeum.domain.user.enumtype.DisabilityType;
 import com.bodeum.domain.user.enumtype.GuardianLevel;
 import com.bodeum.domain.user.enumtype.InterestCategory;
 import com.bodeum.domain.user.enumtype.UserStatus;
+import com.bodeum.global.common.entity.BaseCreatedUpdatedDeletedEntity;
+import java.time.LocalDateTime;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -19,11 +21,8 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.OneToOne;
-import jakarta.persistence.PrePersist;
-import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -42,7 +41,7 @@ import lombok.Getter;
                 @UniqueConstraint(name = "uk_users_auth_subject", columnNames = "auth_subject")
         }
 )
-public class User {
+public class User extends BaseCreatedUpdatedDeletedEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -57,12 +56,6 @@ public class User {
 
     @Column(name = "auth_subject", nullable = false, length = 36)
     private String authSubject;
-
-    @Column(name = "created_at", nullable = false, updatable = false)
-    private LocalDateTime createdAt;
-
-    @Column(name = "updated_at", nullable = false)
-    private LocalDateTime updatedAt;
 
     @Column(length = 255)
     private String email;
@@ -96,9 +89,6 @@ public class User {
     @Column(nullable = false, length = 20)
     private UserStatus status;
 
-    @Column(name = "deleted_at")
-    private LocalDateTime deletedAt;
-
     @Column(name = "withdrawal_reason", length = 255)
     private String withdrawalReason;
 
@@ -116,8 +106,6 @@ public class User {
         this.authSubject = UUID.randomUUID().toString();
         this.email = email;
         this.nickname = nickname;
-        this.createdAt = LocalDateTime.now();
-        this.updatedAt = this.createdAt;
         this.status = UserStatus.ACTIVE;
     }
 
@@ -130,37 +118,12 @@ public class User {
         return new User(provider, providerUserId, email, nickname);
     }
 
-    @PrePersist
-    void prePersist() {
-        if (authSubject == null) {
-            authSubject = UUID.randomUUID().toString();
-        }
-
-        if (createdAt == null) {
-            createdAt = LocalDateTime.now();
-        }
-
-        if (updatedAt == null) {
-            updatedAt = createdAt;
-        }
-
-        if (status == null) {
-            status = UserStatus.ACTIVE;
-        }
-    }
-
-    @PreUpdate
-    void preUpdate() {
-        this.updatedAt = LocalDateTime.now();
-    }
-
     public void agreeTerms(boolean serviceTermsAgreed, boolean privacyPolicyAgreed, boolean aiTermsAgreed) {
         if (userAgreement == null) {
             userAgreement = UserAgreement.create(this, serviceTermsAgreed, privacyPolicyAgreed, aiTermsAgreed);
         } else {
             userAgreement.agree(serviceTermsAgreed, privacyPolicyAgreed, aiTermsAgreed);
         }
-        touch();
     }
 
     public void updateChildProfile(
@@ -174,7 +137,6 @@ public class User {
         } else {
             childProfile.update(childNickname, childBirth, disabilityTypes, keywordText);
         }
-        touch();
     }
 
     public void updateInterestRegion(
@@ -183,7 +145,6 @@ public class User {
     ) {
         replaceUserInterests(interestCategories);
         guardianProfile().updateRegion(region);
-        touch();
     }
 
     public void updateGuardianProfile(
@@ -194,17 +155,14 @@ public class User {
         GuardianProfile profile = guardianProfile();
         profile.updateGuardian(guardianNickname, guardianType, communityRoleType);
         this.nickname = guardianNickname;
-        touch();
     }
 
     public void skipOnboarding() {
         this.onboardingSkipped = true;
-        touch();
     }
 
     public void updateProfileImage(String profileImageUrl) {
         this.profileImageUrl = profileImageUrl;
-        touch();
     }
 
     public void updateProfile(
@@ -242,8 +200,6 @@ public class User {
         if (communityRoleType != null) {
             guardianProfile().updateCommunityRoleType(communityRoleType);
         }
-
-        touch();
     }
 
     private ChildProfile childProfile() {
@@ -273,25 +229,18 @@ public class User {
 
     public void withdraw(String reason) {
         this.status = UserStatus.DELETED;
-        this.deletedAt = LocalDateTime.now();
         this.withdrawalReason = blankToNull(reason);
-        touch();
+        delete();
     }
 
     public void reactivate() {
         this.status = UserStatus.ACTIVE;
-        this.deletedAt = null;
         this.withdrawalReason = null;
-        touch();
+        restore();
     }
 
     public void hideByAdmin() {
         this.status = UserStatus.HIDDEN;
-        touch();
-    }
-
-    private void touch() {
-        this.updatedAt = LocalDateTime.now();
     }
 
     public boolean isAgreementCompleted() {
