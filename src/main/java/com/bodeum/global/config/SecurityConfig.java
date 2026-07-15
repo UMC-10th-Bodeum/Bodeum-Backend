@@ -35,8 +35,6 @@ public class SecurityConfig {
             // access token이 만료된 상태에서도 refresh token 폐기가 가능해야 한다.
             "/api/v1/auth/logout",
             "/api/v1/terms/**",
-            // 지역 목록은 지역 선택 드롭다운용 참조 데이터라 비로그인 상태에서도 조회 가능해야 한다.
-            "/api/v1/regions",
             // 헤더/사이드바 공통 조회는 비로그인 상태에서도 200으로 응답해야 한다.
             "/api/v1/users/me/brief"
     };
