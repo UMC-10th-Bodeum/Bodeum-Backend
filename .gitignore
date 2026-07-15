@@ -41,3 +41,6 @@ application.properties
 application-*.properties
 application-*.yml
 .env
+
+### Claude Code (로컬 개발 설정) ###
+.claude/
