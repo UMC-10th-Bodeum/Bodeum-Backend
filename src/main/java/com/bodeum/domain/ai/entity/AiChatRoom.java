@@ -27,6 +27,9 @@ public class AiChatRoom extends BaseCreatedEntity {
     @Column(name = "last_message_at")
     private Instant lastMessageAt;
 
+    @Column(name = "last_guide_confirmed_at")
+    private Instant lastGuideConfirmedAt;
+
 //    TODO: User 엔티티 구현 후 생성 메서드 추가
 //    @Builder
 //    private AiChatRoom(User user) {
