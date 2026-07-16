@@ -1,5 +1,6 @@
 package com.bodeum.domain.user.controller;
 
+import com.bodeum.domain.user.dto.request.AiTermsAgreementRequest;
 import com.bodeum.domain.user.dto.response.AiTermsAgreementResponse;
 import com.bodeum.domain.onboarding.dto.response.OnboardingStatusResponse;
 import com.bodeum.domain.onboarding.service.OnboardingService;
@@ -113,6 +114,22 @@ public class UserController {
         return ApiResponse.of(
                 GeneralSuccessCode.OK,
                 userService.getAiTermsAgreement(userId)
+        );
+    }
+
+    @Operation(
+            summary = "AI 챗봇 이용동의 등록",
+            description = "현재 로그인한 사용자의 AI 챗봇 이용동의를 등록한다. "
+                    + "이미 동의한 경우 기존 동의 일시를 반환한다."
+    )
+    @PostMapping("/me/ai-terms")
+    public ApiResponse<AiTermsAgreementResponse> agreeAiTerms(
+            @LoginUser Long userId,
+            @Valid @RequestBody AiTermsAgreementRequest request
+    ) {
+        return ApiResponse.of(
+                GeneralSuccessCode.OK,
+                userService.agreeAiTerms(userId, request)
         );
     }
 }

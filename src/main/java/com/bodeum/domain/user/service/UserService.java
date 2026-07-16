@@ -1,5 +1,6 @@
 package com.bodeum.domain.user.service;
 
+import com.bodeum.domain.user.dto.request.AiTermsAgreementRequest;
 import com.bodeum.domain.user.dto.response.AiTermsAgreementResponse;
 import com.bodeum.domain.auth.enumtype.SocialProvider;
 import com.bodeum.domain.auth.exception.AuthErrorCode;
@@ -15,7 +16,9 @@ import com.bodeum.domain.user.dto.response.UserProfileResponse;
 import com.bodeum.domain.user.dto.response.UserProfileUpdateResponse;
 import com.bodeum.domain.user.dto.response.UserWithdrawResponse;
 import com.bodeum.domain.user.entity.User;
+import com.bodeum.domain.user.entity.UserAgreement;
 import com.bodeum.domain.user.exception.UserErrorCode;
+import com.bodeum.domain.user.repository.UserAgreementRepository;
 import com.bodeum.domain.user.repository.UserRepository;
 import com.bodeum.global.apiPayload.code.GeneralErrorCode;
 import com.bodeum.global.apiPayload.exception.ProjectException;
@@ -39,6 +42,7 @@ public class UserService {
     private final S3ImageStorage s3ImageStorage;
     private final UserProfileImageUpdater userProfileImageUpdater;
     private final RegionService regionService;
+    private final UserAgreementRepository userAgreementRepository;
 
     @Transactional(readOnly = true)
     public UserProfileResponse getProfile(Long userId) {
@@ -184,12 +188,28 @@ public class UserService {
 
     @Transactional(readOnly = true)
     public AiTermsAgreementResponse getAiTermsAgreement(Long userId) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new ProjectException(UserErrorCode.USER_NOT_FOUND));
+        UserAgreement agreement = userAgreementRepository.findByUserId(userId)
+                .orElseThrow(() -> new ProjectException(UserErrorCode.USER_AGREEMENT_NOT_FOUND));
 
         return AiTermsAgreementResponse.of(
-                user.isAiTermsAgreed(),
-                user.getAiTermsAgreedAt()
+                agreement.isAiTermsAgreed(),
+                agreement.getAiTermsAgreedAt()
+        );
+    }
+
+    @Transactional
+    public AiTermsAgreementResponse agreeAiTerms(
+            Long userId,
+            AiTermsAgreementRequest request
+    ) {
+        UserAgreement agreement = userAgreementRepository.findByUserId(userId)
+                .orElseThrow(() -> new ProjectException(UserErrorCode.USER_AGREEMENT_NOT_FOUND));
+
+        agreement.agreeAiTerms();
+
+        return AiTermsAgreementResponse.of(
+                agreement.isAiTermsAgreed(),
+                agreement.getAiTermsAgreedAt()
         );
     }
 
