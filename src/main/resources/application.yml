@@ -3,7 +3,10 @@ spring:
     import: optional:file:.env[.properties]
 
   application:
-    name: Bodeum
+    name: bodeum
+
+  jackson:
+    time-zone: UTC
 
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
@@ -17,6 +20,11 @@ spring:
     show-sql: false
     hibernate:
       ddl-auto: validate
+    properties:
+      hibernate:
+        format_sql: true
+        jdbc:
+          time_zone: UTC
 
   servlet:
     multipart:
