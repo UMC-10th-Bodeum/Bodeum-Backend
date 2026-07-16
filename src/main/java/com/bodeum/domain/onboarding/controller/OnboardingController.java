@@ -5,7 +5,6 @@ import com.bodeum.domain.onboarding.dto.request.CreateGuardianProfileRequest;
 import com.bodeum.domain.onboarding.dto.request.CreateInterestRegionRequest;
 import com.bodeum.domain.onboarding.dto.response.OnboardingStatusResponse;
 import com.bodeum.domain.onboarding.dto.response.OnboardingStepResponse;
-import com.bodeum.domain.onboarding.dto.response.ProfileSelectionOptionsResponse;
 import com.bodeum.domain.onboarding.service.OnboardingService;
 import com.bodeum.global.apiPayload.ApiResponse;
 import com.bodeum.global.apiPayload.code.GeneralSuccessCode;
@@ -15,7 +14,6 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
-import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -29,12 +27,6 @@ import org.springframework.web.bind.annotation.RestController;
 public class OnboardingController {
 
     private final OnboardingService onboardingService;
-
-    @Operation(summary = "프로필 선택지 조회", description = "아이 진단명과 정보 카테고리 선택지를 code/label 형태로 조회한다.")
-    @GetMapping("/profile-options")
-    public ApiResponse<ProfileSelectionOptionsResponse> getProfileSelectionOptions() {
-        return ApiResponse.of(GeneralSuccessCode.OK, onboardingService.getProfileSelectionOptions());
-    }
 
     @Operation(summary = "아이 프로필 등록", description = "온보딩 1단계. 아이 이름/생년월/집중 케어 영역/특징 키워드를 등록한다.")
     @PostMapping("/child-profile")

@@ -5,7 +5,6 @@ import com.bodeum.domain.onboarding.dto.request.CreateGuardianProfileRequest;
 import com.bodeum.domain.onboarding.dto.request.CreateInterestRegionRequest;
 import com.bodeum.domain.onboarding.dto.response.OnboardingStatusResponse;
 import com.bodeum.domain.onboarding.dto.response.OnboardingStepResponse;
-import com.bodeum.domain.onboarding.dto.response.ProfileSelectionOptionsResponse;
 import com.bodeum.domain.onboarding.enumtype.OnboardingStep;
 import com.bodeum.domain.region.entity.Region;
 import com.bodeum.domain.region.service.RegionService;
@@ -76,9 +75,5 @@ public class OnboardingService {
     @Transactional(readOnly = true)
     public OnboardingStatusResponse getStatus(Long userId) {
         return OnboardingStatusResponse.from(userService.getCurrentUser(userId));
-    }
-
-    public ProfileSelectionOptionsResponse getProfileSelectionOptions() {
-        return ProfileSelectionOptionsResponse.fromEnums();
     }
 }
