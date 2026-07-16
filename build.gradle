@@ -29,11 +29,18 @@ dependencies {
     testImplementation 'org.springframework.boot:spring-boot-starter-security-oauth2-client-test'
     testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
     testCompileOnly 'org.projectlombok:lombok'
+    runtimeOnly 'com.mysql:mysql-connector-j'
+    testRuntimeOnly 'com.h2database:h2'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
     testAnnotationProcessor 'org.projectlombok:lombok'
 
     // validation
     implementation 'org.springframework.boot:spring-boot-starter-validation'
+
+    // JWT
+    implementation 'io.jsonwebtoken:jjwt-api:0.12.6'
+    runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.12.6'
+    runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.12.6'
 
     // Swagger
     implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:3.0.1'
@@ -43,9 +50,14 @@ dependencies {
     implementation 'org.jsoup:jsoup:1.22.2'
     implementation 'org.seleniumhq.selenium:selenium-java:4.44.0'
     implementation 'io.github.bonigarcia:webdrivermanager:6.3.4'
-    
+
     // MySQL
     runtimeOnly 'com.mysql:mysql-connector-j'
+
+
+    // AWS S3 (프로필 이미지 업로드)
+    implementation platform('software.amazon.awssdk:bom:2.29.0')
+    implementation 'software.amazon.awssdk:s3'
 }
 
 tasks.named('test') {

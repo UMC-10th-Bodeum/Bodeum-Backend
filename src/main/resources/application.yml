@@ -1,4 +1,7 @@
 spring:
+  config:
+    import: optional:file:.env[.properties]
+
   application:
     name: "bodeum"
 
@@ -15,10 +18,66 @@ spring:
     database: mysql
     database-platform: org.hibernate.dialect.MySQLDialect
     show-sql: true
-    hibernate:
-      ddl-auto: update
     properties:
       hibernate:
         format_sql: true
         jdbc:
           time_zone: UTC
+
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 5MB
+
+bodeum:
+  auth:
+    jwt-secret: ${JWT_SECRET:}
+    access-token-ttl: ${AUTH_ACCESS_TOKEN_TTL:1h}
+    refresh-token-ttl: ${AUTH_REFRESH_TOKEN_TTL:14d}
+
+  oauth:
+    base-url: ${BODEUM_BASE_URL:http://localhost:8080}
+    mock-enabled: ${OAUTH_MOCK_ENABLED:false}
+
+    kakao:
+      client-id: ${KAKAO_CLIENT_ID:}
+      client-secret: ${KAKAO_CLIENT_SECRET:}
+      redirect-uri: ${KAKAO_REDIRECT_URI:}
+      scope: ${KAKAO_SCOPE:}
+      token-uri: ${KAKAO_TOKEN_URI:}
+      user-info-uri: ${KAKAO_USER_INFO_URI:}
+
+    naver:
+      client-id: ${NAVER_CLIENT_ID:}
+      client-secret: ${NAVER_CLIENT_SECRET:}
+      redirect-uri: ${NAVER_REDIRECT_URI:}
+      token-uri: ${NAVER_TOKEN_URI:}
+      user-info-uri: ${NAVER_USER_INFO_URI:}
+
+  aws:
+    s3:
+      bucket: ${AWS_S3_BUCKET:}
+      region: ${AWS_S3_REGION:ap-northeast-2}
+      access-key: ${AWS_ACCESS_KEY:}
+      secret-key: ${AWS_SECRET_KEY:}
+      public-base-url: ${AWS_S3_PUBLIC_BASE_URL:}
+
+---
+spring:
+  config:
+    activate:
+      on-profile: "local | test"
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+
+---
+spring:
+  config:
+    activate:
+      on-profile: dev
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
