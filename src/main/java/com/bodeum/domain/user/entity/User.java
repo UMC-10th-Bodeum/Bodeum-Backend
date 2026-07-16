@@ -218,6 +218,9 @@ public class User extends BaseCreatedUpdatedDeletedEntity {
 
     private void replaceUserInterests(List<InterestCategory> interestCategories) {
         userInterests.clear();
+        if (interestCategories == null) {
+            return;
+        }
         interestCategories.forEach(interestCategory ->
                 userInterests.add(UserInterest.create(this, interestCategory))
         );
@@ -261,6 +264,10 @@ public class User extends BaseCreatedUpdatedDeletedEntity {
 
     public Instant getAgreementAgreedAt() {
         return userAgreement == null ? null : userAgreement.getAgreedAt();
+    }
+
+    public Instant getAiTermsAgreedAt() {
+        return userAgreement == null ? null : userAgreement.getAiTermsAgreedAt();
     }
 
     public boolean isChildProfileRegistered() {

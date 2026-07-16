@@ -8,6 +8,7 @@ public record UserAgreementResponse(
         boolean serviceTermsAgreed,
         boolean privacyPolicyAgreed,
         boolean aiTermsAgreed,
+        Instant aiTermsAgreedAt,
         Instant agreedAt,
         AuthNextStep nextStep
 ) {
@@ -17,6 +18,7 @@ public record UserAgreementResponse(
                 user.isServiceTermsAgreed(),
                 user.isPrivacyPolicyAgreed(),
                 user.isAiTermsAgreed(),
+                user.getAiTermsAgreedAt(),
                 user.getAgreementAgreedAt(),
                 user.isOnboardingResolved() ? AuthNextStep.HOME : AuthNextStep.ONBOARDING
         );

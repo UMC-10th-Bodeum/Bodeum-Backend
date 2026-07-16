@@ -129,6 +129,8 @@ class UserServiceTest {
         assertThat(response.serviceTermsAgreed()).isTrue();
         assertThat(response.privacyPolicyAgreed()).isTrue();
         assertThat(response.aiTermsAgreed()).isFalse();
+        assertThat(response.aiTermsAgreedAt()).isNull();
+        assertThat(user.getAiTermsAgreedAt()).isNull();
         assertThat(user.isAgreementCompleted()).isTrue();
     }
 
@@ -145,6 +147,24 @@ class UserServiceTest {
         );
 
         assertThat(response.aiTermsAgreed()).isTrue();
+        assertThat(response.aiTermsAgreedAt()).isNotNull();
+        assertThat(user.getAiTermsAgreedAt()).isEqualTo(response.aiTermsAgreedAt());
+    }
+
+    @Test
+    void agreeTermsKeepsFirstAiConsentTimeWhenAlreadyAgreed() {
+        User user = User.createSocialUser(
+                SocialProvider.KAKAO, "kakao-1", "parent@example.com", "민준맘");
+        user.agreeTerms(true, true, true);
+        var firstAiTermsAgreedAt = user.getAiTermsAgreedAt();
+        given(userRepository.findById(1L)).willReturn(Optional.of(user));
+
+        UserAgreementResponse response = userService.agreeTerms(
+                1L,
+                new CreateUserAgreementRequest(true, true, true)
+        );
+
+        assertThat(response.aiTermsAgreedAt()).isEqualTo(firstAiTermsAgreedAt);
     }
 
     @Test

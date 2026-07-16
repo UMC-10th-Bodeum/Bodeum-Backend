@@ -32,6 +32,9 @@ public class UserAgreement {
     @Column(name = "ai_terms_agreed", nullable = false)
     private boolean aiTermsAgreed;
 
+    @Column(name = "ai_terms_agreed_at")
+    private Instant aiTermsAgreedAt;
+
     @Column(name = "agreed_at")
     private Instant agreedAt;
 
@@ -62,10 +65,16 @@ public class UserAgreement {
             boolean privacyPolicyAgreed,
             boolean aiTermsAgreed
     ) {
+        Instant now = Instant.now();
         this.serviceTermsAgreed = serviceTermsAgreed;
         this.privacyPolicyAgreed = privacyPolicyAgreed;
+        if (aiTermsAgreed && !this.aiTermsAgreed) {
+            this.aiTermsAgreedAt = now;
+        } else if (!aiTermsAgreed) {
+            this.aiTermsAgreedAt = null;
+        }
         this.aiTermsAgreed = aiTermsAgreed;
-        this.agreedAt = Instant.now();
+        this.agreedAt = now;
     }
 
     public boolean isRequiredAgreed() {
@@ -86,5 +95,9 @@ public class UserAgreement {
 
     public Instant getAgreedAt() {
         return agreedAt;
+    }
+
+    public Instant getAiTermsAgreedAt() {
+        return aiTermsAgreedAt;
     }
 }
