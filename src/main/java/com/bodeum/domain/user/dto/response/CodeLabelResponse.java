@@ -1,7 +1,7 @@
 package com.bodeum.domain.user.dto.response;
 
-import com.bodeum.domain.user.enumtype.DisabilityType;
-import com.bodeum.domain.user.enumtype.InterestCategory;
+import com.bodeum.domain.user.enums.DisabilityType;
+import com.bodeum.domain.user.enums.InterestCategory;
 
 public record CodeLabelResponse(
         String code,

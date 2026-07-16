@@ -1,6 +1,6 @@
 package com.bodeum.domain.auth.entity;
 
-import com.bodeum.domain.auth.enumtype.SocialProvider;
+import com.bodeum.domain.auth.enums.SocialProvider;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;

@@ -4,7 +4,7 @@ import com.bodeum.domain.auth.dto.request.LogoutAuthRequest;
 import com.bodeum.domain.auth.dto.request.RefreshAuthTokenRequest;
 import com.bodeum.domain.auth.dto.response.AuthLoginResponse;
 import com.bodeum.domain.auth.dto.response.AuthTokenResponse;
-import com.bodeum.domain.auth.enumtype.SocialProvider;
+import com.bodeum.domain.auth.enums.SocialProvider;
 import com.bodeum.domain.auth.service.AuthService;
 import com.bodeum.global.apiPayload.ApiResponse;
 import com.bodeum.global.apiPayload.code.GeneralSuccessCode;

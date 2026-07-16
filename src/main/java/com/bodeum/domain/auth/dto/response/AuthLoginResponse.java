@@ -1,6 +1,6 @@
 package com.bodeum.domain.auth.dto.response;
 
-import com.bodeum.domain.auth.enumtype.AuthNextStep;
+import com.bodeum.domain.auth.enums.AuthNextStep;
 import com.bodeum.domain.auth.service.AuthTokenService;
 import com.bodeum.domain.user.entity.User;
 import java.time.Instant;

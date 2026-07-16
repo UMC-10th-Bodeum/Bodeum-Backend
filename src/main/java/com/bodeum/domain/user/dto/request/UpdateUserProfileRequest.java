@@ -1,9 +1,9 @@
 package com.bodeum.domain.user.dto.request;
 
-import com.bodeum.domain.onboarding.enumtype.CommunityRoleType;
-import com.bodeum.domain.onboarding.enumtype.GuardianType;
-import com.bodeum.domain.user.enumtype.DisabilityType;
-import com.bodeum.domain.user.enumtype.InterestCategory;
+import com.bodeum.domain.onboarding.enums.CommunityRoleType;
+import com.bodeum.domain.onboarding.enums.GuardianType;
+import com.bodeum.domain.user.enums.DisabilityType;
+import com.bodeum.domain.user.enums.InterestCategory;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import io.swagger.v3.oas.annotations.media.ArraySchema;
 import io.swagger.v3.oas.annotations.media.Schema;

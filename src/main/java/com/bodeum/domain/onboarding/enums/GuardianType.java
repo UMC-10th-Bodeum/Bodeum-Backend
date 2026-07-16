@@ -1,4 +1,4 @@
-package com.bodeum.domain.onboarding.enumtype;
+package com.bodeum.domain.onboarding.enums;
 
 import com.bodeum.domain.onboarding.exception.OnboardingErrorCode;
 import com.bodeum.global.apiPayload.exception.ProjectException;

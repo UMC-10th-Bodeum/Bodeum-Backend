@@ -1,4 +1,4 @@
-package com.bodeum.domain.auth.enumtype;
+package com.bodeum.domain.auth.enums;
 
 import com.bodeum.domain.auth.exception.AuthErrorCode;
 import com.bodeum.global.apiPayload.exception.ProjectException;

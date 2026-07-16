@@ -1,6 +1,6 @@
 package com.bodeum.domain.onboarding.dto.request;
 
-import com.bodeum.domain.user.enumtype.DisabilityType;
+import com.bodeum.domain.user.enums.DisabilityType;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import io.swagger.v3.oas.annotations.media.ArraySchema;
 import io.swagger.v3.oas.annotations.media.Schema;

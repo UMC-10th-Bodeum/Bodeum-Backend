@@ -1,7 +1,7 @@
 package com.bodeum.domain.onboarding.dto.request;
 
-import com.bodeum.domain.onboarding.enumtype.CommunityRoleType;
-import com.bodeum.domain.onboarding.enumtype.GuardianType;
+import com.bodeum.domain.onboarding.enums.CommunityRoleType;
+import com.bodeum.domain.onboarding.enums.GuardianType;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;

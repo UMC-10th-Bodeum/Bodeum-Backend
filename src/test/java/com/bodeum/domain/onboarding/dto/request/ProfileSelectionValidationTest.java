@@ -3,8 +3,8 @@ package com.bodeum.domain.onboarding.dto.request;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.bodeum.domain.user.dto.request.UpdateUserProfileRequest;
-import com.bodeum.domain.user.enumtype.DisabilityType;
-import com.bodeum.domain.user.enumtype.InterestCategory;
+import com.bodeum.domain.user.enums.DisabilityType;
+import com.bodeum.domain.user.enums.InterestCategory;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
 import java.util.List;

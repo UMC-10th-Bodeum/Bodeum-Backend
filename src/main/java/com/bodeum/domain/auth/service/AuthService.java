@@ -2,8 +2,8 @@ package com.bodeum.domain.auth.service;
 
 import com.bodeum.domain.auth.dto.response.AuthLoginResponse;
 import com.bodeum.domain.auth.dto.response.AuthTokenResponse;
-import com.bodeum.domain.auth.enumtype.AuthNextStep;
-import com.bodeum.domain.auth.enumtype.SocialProvider;
+import com.bodeum.domain.auth.enums.AuthNextStep;
+import com.bodeum.domain.auth.enums.SocialProvider;
 import com.bodeum.domain.auth.exception.AuthErrorCode;
 import com.bodeum.domain.user.entity.User;
 import com.bodeum.domain.user.service.UserService;

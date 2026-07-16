@@ -1,7 +1,7 @@
 package com.bodeum.domain.onboarding.dto.response;
 
-import com.bodeum.domain.auth.enumtype.AuthNextStep;
-import com.bodeum.domain.onboarding.enumtype.OnboardingStep;
+import com.bodeum.domain.auth.enums.AuthNextStep;
+import com.bodeum.domain.onboarding.enums.OnboardingStep;
 
 public record OnboardingStepResponse(
         int step,

@@ -1,4 +1,4 @@
-package com.bodeum.domain.onboarding.enumtype;
+package com.bodeum.domain.onboarding.enums;
 
 public enum OnboardingStep {
 
