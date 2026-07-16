@@ -1,4 +1,4 @@
-package com.bodeum.domain.ai.entity.enums;
+package com.bodeum.domain.ai.enums;
 
 public enum AiResponseSourceType {
     INFO,

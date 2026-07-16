@@ -1,6 +1,6 @@
 package com.bodeum.domain.ai.entity;
 
-import com.bodeum.domain.ai.entity.enums.AiFeedbackType;
+import com.bodeum.domain.ai.enums.AiFeedbackType;
 import com.bodeum.global.common.entity.BaseCreatedEntity;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
