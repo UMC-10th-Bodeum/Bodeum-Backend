@@ -1,0 +1,357 @@
+package com.bodeum.domain.auth.controller;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import com.bodeum.domain.auth.repository.OAuthStateRepository;
+import com.bodeum.domain.auth.repository.RefreshTokenSessionRepository;
+import com.bodeum.domain.user.repository.UserRepository;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.Map;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
+
+@SpringBootTest(properties = {
+        "bodeum.auth.jwt-secret=test-jwt-secret-32-bytes-minimum-value",
+        "bodeum.oauth.mock-enabled=true",
+        "bodeum.oauth.naver.client-id=test-naver-client",
+        "bodeum.oauth.naver.client-secret=test-naver-secret"
+})
+@AutoConfigureMockMvc
+class AuthControllerTest {
+
+    @Autowired
+    private MockMvc mockMvc;
+
+    private final ObjectMapper objectMapper = new ObjectMapper();
+
+    @Autowired
+    private UserRepository userRepository;
+
+    @Autowired
+    private RefreshTokenSessionRepository refreshTokenSessionRepository;
+
+    @Autowired
+    private OAuthStateRepository oAuthStateRepository;
+
+    @BeforeEach
+    void setUp() {
+        refreshTokenSessionRepository.deleteAll();
+        oAuthStateRepository.deleteAll();
+        userRepository.deleteAll();
+    }
+
+    @Test
+    void mockCallbackIssuesTokenThatAuthenticatesProtectedEndpoint() throws Exception {
+        MvcResult loginResult = mockMvc.perform(get("/api/v1/auth/callback/kakao")
+                        .param("code", "mock-code"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.accessToken").isNotEmpty())
+                .andExpect(jsonPath("$.result.refreshToken").isNotEmpty())
+                .andReturn();
+
+        JsonNode loginBody = readBody(loginResult);
+        String accessToken = loginBody.at("/result/accessToken").asText();
+
+        mockMvc.perform(get("/api/v1/users/me/profile")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.userId").isNumber())
+                .andExpect(jsonPath("$.result.provider").value("kakao"));
+    }
+
+    @Test
+    void refreshRotatesRefreshTokenAndRejectsOldToken() throws Exception {
+        JsonNode loginBody = readBody(mockMvc.perform(get("/api/v1/auth/callback/kakao")
+                        .param("code", "refresh-code"))
+                .andExpect(status().isOk())
+                .andReturn());
+        String refreshToken = loginBody.at("/result/refreshToken").asText();
+
+        String refreshBody = objectMapper.writeValueAsString(Map.of("refreshToken", refreshToken));
+        MvcResult refreshResult = mockMvc.perform(post("/api/v1/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(refreshBody))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        JsonNode refreshedBody = readBody(refreshResult);
+        assertThat(refreshedBody.at("/result/refreshToken").asText()).isNotEqualTo(refreshToken);
+
+        mockMvc.perform(post("/api/v1/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(refreshBody))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void loginRedirectForConfiguredProviderIncludesState() throws Exception {
+        MvcResult result = mockMvc.perform(get("/api/v1/auth/login/naver"))
+                .andExpect(status().isFound())
+                .andReturn();
+
+        String location = result.getResponse().getHeader(HttpHeaders.LOCATION);
+        assertThat(location)
+                .startsWith("https://nid.naver.com/oauth2.0/authorize")
+                .contains("client_id=test-naver-client")
+                .contains("state=");
+    }
+
+    @Test
+    void configuredProviderCallbackWithoutStateIsUnauthorized() throws Exception {
+        mockMvc.perform(get("/api/v1/auth/callback/naver")
+                        .param("code", "provider-code"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void callbackWithoutCodeReturnsMissingAuthCodeError() throws Exception {
+        mockMvc.perform(get("/api/v1/auth/callback/kakao"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("AUTH400_2"));
+    }
+
+    @Test
+    void agreementCanBeRegisteredThroughPluralPath() throws Exception {
+        JsonNode loginBody = readBody(mockMvc.perform(get("/api/v1/auth/callback/kakao")
+                        .param("code", "agreement-code"))
+                .andExpect(status().isOk())
+                .andReturn());
+        String accessToken = loginBody.at("/result/accessToken").asText();
+
+        mockMvc.perform(post("/api/v1/users/me/agreements")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "serviceTermsAgreed": true,
+                                  "privacyPolicyAgreed": true,
+                                  "aiTermsAgreed": false
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.serviceTermsAgreed").value(true))
+                .andExpect(jsonPath("$.result.privacyPolicyAgreed").value(true));
+    }
+
+    @Test
+    void agreementWithoutRequiredTermsReturnsError() throws Exception {
+        JsonNode loginBody = readBody(mockMvc.perform(get("/api/v1/auth/callback/kakao")
+                        .param("code", "agreement-required-code"))
+                .andExpect(status().isOk())
+                .andReturn());
+        String accessToken = loginBody.at("/result/accessToken").asText();
+
+        mockMvc.perform(post("/api/v1/users/me/agreements")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "serviceTermsAgreed": true,
+                                  "privacyPolicyAgreed": false,
+                                  "aiTermsAgreed": false
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("AUTH400_4"));
+    }
+
+    @Test
+    void profileCanBeReadAndUpdatedThroughProfilePath() throws Exception {
+        JsonNode loginBody = readBody(mockMvc.perform(get("/api/v1/auth/callback/kakao")
+                        .param("code", "profile-path-code"))
+                .andExpect(status().isOk())
+                .andReturn());
+        String accessToken = loginBody.at("/result/accessToken").asText();
+
+        mockMvc.perform(get("/api/v1/users/me/profile")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.joinedAt").isNotEmpty())
+                .andExpect(jsonPath("$.result.updatedAt").isNotEmpty())
+                .andExpect(jsonPath("$.result.childProfile").exists());
+
+        mockMvc.perform(patch("/api/v1/users/me/profile")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "nickname": "민준맘",
+                                  "childNickname": "민준",
+                                  "childBirth": "2020-03",
+                                  "disabilityTypes": ["AUTISM", "CEREBRAL_PALSY"]
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.updated").value(true));
+    }
+
+    @Test
+    void briefReturnsLoggedOutWhenAnonymous() throws Exception {
+        mockMvc.perform(get("/api/v1/users/me/brief"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.isLoggedIn").value(false));
+    }
+
+    @Test
+    void protectedEndpointRejectsWithdrawnUserTokenAsInvalidAccessToken() throws Exception {
+        JsonNode loginBody = readBody(mockMvc.perform(get("/api/v1/auth/callback/kakao")
+                        .param("code", "withdrawn-token-code"))
+                .andExpect(status().isOk())
+                .andReturn());
+        String accessToken = loginBody.at("/result/accessToken").asText();
+
+        var user = userRepository.findAll().getFirst();
+        user.withdraw(null);
+        userRepository.saveAndFlush(user);
+
+        mockMvc.perform(get("/api/v1/users/me/profile")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("AUTH401_1"));
+    }
+
+    @Test
+    void withdrawnUserIsReactivatedOnSocialRelogin() throws Exception {
+        JsonNode firstLogin = readBody(mockMvc.perform(get("/api/v1/auth/callback/kakao")
+                        .param("code", "withdrawn-user-code"))
+                .andExpect(status().isOk())
+                .andReturn());
+        long userId = firstLogin.at("/result/userId").asLong();
+
+        var user = userRepository.findAll().getFirst();
+        user.withdraw(null);
+        userRepository.saveAndFlush(user);
+        assertThat(userRepository.findById(userId).orElseThrow().isWithdrawn()).isTrue();
+
+        // 같은 소셜 계정으로 다시 로그인하면 새 회원이 아니라 기존 회원이 복구된다.
+        JsonNode secondLogin = readBody(mockMvc.perform(get("/api/v1/auth/callback/kakao")
+                        .param("code", "withdrawn-user-code"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.isNewUser").value(false))
+                .andReturn());
+        assertThat(secondLogin.at("/result/userId").asLong()).isEqualTo(userId);
+        assertThat(userRepository.findById(userId).orElseThrow().isActive()).isTrue();
+    }
+
+    @Test
+    void swaggerDocumentsOnlyClientInputFields() throws Exception {
+        JsonNode openApi = readBody(mockMvc.perform(get("/v3/api-docs"))
+                .andExpect(status().isOk())
+                .andReturn());
+
+        JsonNode codeParameter = findCallbackParameter(openApi, "code");
+        assertThat(codeParameter).isNotNull();
+        assertThat(codeParameter.path("required").asBoolean()).isTrue();
+        assertThat(openApi.at("/paths/~1api~1v1~1users~1me~1summary").isMissingNode())
+                .isTrue();
+        assertThat(hasParameter(openApi, "/paths/~1api~1v1~1users~1me~1profile/patch/parameters", "userId"))
+                .isFalse();
+        assertThat(hasParameter(openApi, "/paths/~1api~1v1~1onboarding~1child-profile/post/parameters", "userId"))
+                .isFalse();
+        assertThat(openApi.at("/components/schemas/UpdateUserProfileRequest/properties/childBirth/example").asText())
+                .isEqualTo("2020-03");
+        assertThat(openApi.at("/components/schemas/CreateChildProfileRequest/properties/birth/example").asText())
+                .isEqualTo("2020-03");
+        assertThat(openApi.at("/components/schemas/CreateChildProfileRequest/properties/birthValid").isMissingNode())
+                .isTrue();
+        assertThat(openApi.at("/components/schemas/CreateUserAgreementRequest/properties/requiredAgreementCompleted").isMissingNode())
+                .isTrue();
+        assertThat(openApi.at("/components/schemas/CreateUserAgreementRequest/properties/aiTermsAgreedValue").isMissingNode())
+                .isTrue();
+    }
+
+    @Test
+    void invalidProviderIsBadRequest() throws Exception {
+        mockMvc.perform(get("/api/v1/auth/callback/google")
+                        .param("code", "provider-code"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void malformedRefreshBodyIsBadRequest() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("잘못된 요청입니다."))
+                .andExpect(jsonPath("$.result").doesNotExist());
+    }
+
+    @Test
+    void logoutWithoutRefreshTokenIsBadRequest() throws Exception {
+        JsonNode loginBody = readBody(mockMvc.perform(get("/api/v1/auth/callback/kakao")
+                        .param("code", "logout-validation-code"))
+                .andExpect(status().isOk())
+                .andReturn());
+        String accessToken = loginBody.at("/result/accessToken").asText();
+
+        mockMvc.perform(post("/api/v1/auth/logout")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void logoutRequiresAccessToken() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/logout")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "refreshToken": "refresh-token"
+                                }
+                                """))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("AUTH401_1"));
+    }
+
+    private JsonNode readBody(MvcResult result) throws Exception {
+        return objectMapper.readTree(result.getResponse().getContentAsString());
+    }
+
+    private JsonNode findCallbackParameter(JsonNode openApi, String name) {
+        for (JsonNode parameter : openApi.at("/paths/~1api~1v1~1auth~1callback~1{provider}/get/parameters")) {
+            if (name.equals(parameter.path("name").asText())) {
+                return parameter;
+            }
+        }
+
+        return null;
+    }
+
+    private boolean hasParameter(JsonNode openApi, String parametersPath, String name) {
+        JsonNode parameters = openApi.at(parametersPath);
+        if (parameters.isMissingNode()) {
+            String operationPath = parametersPath.substring(0, parametersPath.lastIndexOf("/parameters"));
+            assertThat(openApi.at(operationPath).isMissingNode())
+                    .as("OpenAPI operation path must exist: %s", operationPath)
+                    .isFalse();
+            return false;
+        }
+
+        assertThat(parameters.isArray())
+                .as("OpenAPI parameters must be an array: %s", parametersPath)
+                .isTrue();
+
+        for (JsonNode parameter : parameters) {
+            if (name.equals(parameter.path("name").asText())) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+}

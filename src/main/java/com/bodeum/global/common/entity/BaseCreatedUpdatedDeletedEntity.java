@@ -17,6 +17,10 @@ public abstract class BaseCreatedUpdatedDeletedEntity extends BaseCreatedUpdated
         this.deletedAt = Instant.now();
     }
 
+    public void restore() {
+        this.deletedAt = null;
+    }
+
     public boolean isDeleted() {
         return deletedAt != null;
     }
