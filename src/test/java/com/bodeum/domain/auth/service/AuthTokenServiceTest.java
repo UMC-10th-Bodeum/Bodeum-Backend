@@ -192,14 +192,14 @@ class AuthTokenServiceTest {
     }
 
     @Test
-    void authenticateRestoresPrincipalForWithdrawnUser() {
+    void authenticateFailsForWithdrawnUser() {
         User user = createUser();
         AuthTokenService.AuthTokenPair tokenPair = authTokenService.issueTokens(user.getId());
 
         user.withdraw(null);
         userRepository.saveAndFlush(user);
 
-        assertThat(authTokenService.authenticate(tokenPair.accessToken())).isPresent();
+        assertThat(authTokenService.authenticate(tokenPair.accessToken())).isEmpty();
     }
 
     @Test

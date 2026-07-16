@@ -65,7 +65,7 @@ public class AuthTokenService {
     @Transactional(readOnly = true)
     public Optional<AuthUserPrincipal> authenticate(String accessToken) {
         return jwtTokenProvider.parseAuthSubject(accessToken)
-                .flatMap(userService::findUserByAuthSubject)
+                .flatMap(userService::findActiveUserByAuthSubject)
                 .map(this::toPrincipal);
     }
 

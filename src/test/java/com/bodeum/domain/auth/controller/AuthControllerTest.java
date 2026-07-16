@@ -206,7 +206,7 @@ class AuthControllerTest {
     }
 
     @Test
-    void protectedEndpointReturnsInactiveUserErrorForWithdrawnUserToken() throws Exception {
+    void protectedEndpointRejectsWithdrawnUserTokenAsInvalidAccessToken() throws Exception {
         JsonNode loginBody = readBody(mockMvc.perform(get("/api/v1/auth/callback/kakao")
                         .param("code", "withdrawn-token-code"))
                 .andExpect(status().isOk())
@@ -220,7 +220,7 @@ class AuthControllerTest {
         mockMvc.perform(get("/api/v1/users/me/profile")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
                 .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.code").value("AUTH401_5"));
+                .andExpect(jsonPath("$.code").value("AUTH401_1"));
     }
 
     @Test
