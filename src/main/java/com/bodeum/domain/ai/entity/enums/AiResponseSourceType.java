@@ -1,4 +1,4 @@
-package com.bodeum.domain.chatbot.entity.enums;
+package com.bodeum.domain.ai.entity.enums;
 
 public enum AiResponseSourceType {
     INFO,

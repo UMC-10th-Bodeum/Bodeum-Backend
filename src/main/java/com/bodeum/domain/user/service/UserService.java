@@ -1,5 +1,6 @@
 package com.bodeum.domain.user.service;
 
+import com.bodeum.domain.user.dto.response.AiTermsAgreementResponse;
 import com.bodeum.domain.auth.enumtype.SocialProvider;
 import com.bodeum.domain.auth.exception.AuthErrorCode;
 import com.bodeum.domain.auth.repository.RefreshTokenSessionRepository;
@@ -14,6 +15,7 @@ import com.bodeum.domain.user.dto.response.UserProfileResponse;
 import com.bodeum.domain.user.dto.response.UserProfileUpdateResponse;
 import com.bodeum.domain.user.dto.response.UserWithdrawResponse;
 import com.bodeum.domain.user.entity.User;
+import com.bodeum.domain.user.exception.UserErrorCode;
 import com.bodeum.domain.user.repository.UserRepository;
 import com.bodeum.global.apiPayload.code.GeneralErrorCode;
 import com.bodeum.global.apiPayload.exception.ProjectException;
@@ -178,6 +180,17 @@ public class UserService {
     @Transactional(readOnly = true)
     public Optional<User> findUserByAuthSubject(String authSubject) {
         return userRepository.findByAuthSubject(authSubject);
+    }
+
+    @Transactional(readOnly = true)
+    public AiTermsAgreementResponse getAiTermsAgreement(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ProjectException(UserErrorCode.USER_NOT_FOUND));
+
+        return AiTermsAgreementResponse.of(
+                user.isAiTermsAgreed(),
+                user.getAiTermsAgreedAt()
+        );
     }
 
     private User requireActive(User user) {

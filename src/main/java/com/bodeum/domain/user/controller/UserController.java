@@ -1,5 +1,6 @@
 package com.bodeum.domain.user.controller;
 
+import com.bodeum.domain.user.dto.response.AiTermsAgreementResponse;
 import com.bodeum.domain.onboarding.dto.response.OnboardingStatusResponse;
 import com.bodeum.domain.onboarding.service.OnboardingService;
 import com.bodeum.domain.user.dto.request.CreateUserAgreementRequest;
@@ -99,5 +100,19 @@ public class UserController {
             @Valid @RequestBody(required = false) WithdrawUserRequest request
     ) {
         return ApiResponse.of(GeneralSuccessCode.OK, userService.withdraw(userId, request));
+    }
+
+    @Operation(
+            summary = "AI 챗봇 이용동의 여부 조회",
+            description = "현재 로그인한 사용자의 AI 챗봇 이용동의 여부와 동의 일시를 조회한다."
+    )
+    @GetMapping("/me/ai-terms")
+    public ApiResponse<AiTermsAgreementResponse> getAiTermsAgreement(
+            @LoginUser Long userId
+    ) {
+        return ApiResponse.of(
+                GeneralSuccessCode.OK,
+                userService.getAiTermsAgreement(userId)
+        );
     }
 }

@@ -1,9 +1,8 @@
-package com.bodeum.domain.chatbot.entity;
+package com.bodeum.domain.ai.entity;
 
 import com.bodeum.global.common.entity.BaseCreatedEntity;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
-import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
