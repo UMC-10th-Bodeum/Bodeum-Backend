@@ -1,7 +1,7 @@
 package com.bodeum.domain.term.controller;
 
 import com.bodeum.domain.term.dto.response.TermsResponse;
-import com.bodeum.domain.term.enumtype.TermType;
+import com.bodeum.domain.term.enums.TermType;
 import com.bodeum.domain.term.service.TermsService;
 import com.bodeum.global.apiPayload.ApiResponse;
 import com.bodeum.global.apiPayload.code.GeneralSuccessCode;

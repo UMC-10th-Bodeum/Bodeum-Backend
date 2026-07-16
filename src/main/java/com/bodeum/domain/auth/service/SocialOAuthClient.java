@@ -1,6 +1,6 @@
 package com.bodeum.domain.auth.service;
 
-import com.bodeum.domain.auth.enumtype.SocialProvider;
+import com.bodeum.domain.auth.enums.SocialProvider;
 import com.bodeum.domain.auth.exception.AuthErrorCode;
 import com.bodeum.global.apiPayload.exception.ProjectException;
 import java.nio.charset.StandardCharsets;

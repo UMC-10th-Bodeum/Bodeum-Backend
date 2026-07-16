@@ -1,9 +1,9 @@
 package com.bodeum.domain.user.service;
 
+import com.bodeum.domain.auth.enums.SocialProvider;
+import com.bodeum.domain.auth.exception.AuthErrorCode;
 import com.bodeum.domain.user.dto.request.AiTermsAgreementRequest;
 import com.bodeum.domain.user.dto.response.AiTermsAgreementResponse;
-import com.bodeum.domain.auth.enumtype.SocialProvider;
-import com.bodeum.domain.auth.exception.AuthErrorCode;
 import com.bodeum.domain.auth.repository.RefreshTokenSessionRepository;
 import com.bodeum.domain.region.entity.Region;
 import com.bodeum.domain.region.service.RegionService;

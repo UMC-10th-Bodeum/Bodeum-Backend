@@ -1,7 +1,7 @@
 package com.bodeum.domain.term.service;
 
 import com.bodeum.domain.term.dto.response.TermsResponse;
-import com.bodeum.domain.term.enumtype.TermType;
+import com.bodeum.domain.term.enums.TermType;
 import java.time.Instant;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;

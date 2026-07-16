@@ -1,4 +1,4 @@
-package com.bodeum.domain.auth.enumtype;
+package com.bodeum.domain.auth.enums;
 
 public enum AuthNextStep {
     TERMS,

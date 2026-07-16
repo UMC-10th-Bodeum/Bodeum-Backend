@@ -1,6 +1,6 @@
 package com.bodeum.domain.auth.service;
 
-import com.bodeum.domain.auth.enumtype.SocialProvider;
+import com.bodeum.domain.auth.enums.SocialProvider;
 import com.bodeum.domain.auth.entity.OAuthState;
 import com.bodeum.domain.auth.repository.OAuthStateRepository;
 import java.time.Duration;

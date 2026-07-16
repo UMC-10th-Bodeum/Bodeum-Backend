@@ -1,7 +1,7 @@
 package com.bodeum.domain.user.entity;
 
-import com.bodeum.domain.onboarding.enumtype.CommunityRoleType;
-import com.bodeum.domain.onboarding.enumtype.GuardianType;
+import com.bodeum.domain.onboarding.enums.CommunityRoleType;
+import com.bodeum.domain.onboarding.enums.GuardianType;
 import com.bodeum.domain.region.entity.Region;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;

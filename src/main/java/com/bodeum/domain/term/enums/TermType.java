@@ -1,4 +1,4 @@
-package com.bodeum.domain.term.enumtype;
+package com.bodeum.domain.term.enums;
 
 import com.bodeum.domain.term.exception.TermsErrorCode;
 import com.bodeum.global.apiPayload.exception.ProjectException;

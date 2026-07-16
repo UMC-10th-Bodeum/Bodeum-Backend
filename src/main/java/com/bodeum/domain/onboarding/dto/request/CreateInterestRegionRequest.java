@@ -1,6 +1,6 @@
 package com.bodeum.domain.onboarding.dto.request;
 
-import com.bodeum.domain.user.enumtype.InterestCategory;
+import com.bodeum.domain.user.enums.InterestCategory;
 import io.swagger.v3.oas.annotations.media.ArraySchema;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotEmpty;

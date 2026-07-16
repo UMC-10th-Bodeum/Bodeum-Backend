@@ -5,7 +5,7 @@ import com.bodeum.domain.onboarding.dto.request.CreateGuardianProfileRequest;
 import com.bodeum.domain.onboarding.dto.request.CreateInterestRegionRequest;
 import com.bodeum.domain.onboarding.dto.response.OnboardingStatusResponse;
 import com.bodeum.domain.onboarding.dto.response.OnboardingStepResponse;
-import com.bodeum.domain.onboarding.enumtype.OnboardingStep;
+import com.bodeum.domain.onboarding.enums.OnboardingStep;
 import com.bodeum.domain.region.entity.Region;
 import com.bodeum.domain.region.service.RegionService;
 import com.bodeum.domain.user.entity.User;

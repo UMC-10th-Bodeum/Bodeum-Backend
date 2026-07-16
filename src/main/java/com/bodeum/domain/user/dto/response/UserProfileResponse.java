@@ -1,7 +1,7 @@
 package com.bodeum.domain.user.dto.response;
 
-import com.bodeum.domain.onboarding.enumtype.CommunityRoleType;
-import com.bodeum.domain.onboarding.enumtype.GuardianType;
+import com.bodeum.domain.onboarding.enums.CommunityRoleType;
+import com.bodeum.domain.onboarding.enums.GuardianType;
 import com.bodeum.domain.region.entity.Region;
 import com.bodeum.domain.user.entity.User;
 import java.time.Instant;

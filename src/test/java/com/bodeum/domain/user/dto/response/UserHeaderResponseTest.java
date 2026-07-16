@@ -2,10 +2,10 @@ package com.bodeum.domain.user.dto.response;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.bodeum.domain.auth.enumtype.SocialProvider;
+import com.bodeum.domain.auth.enums.SocialProvider;
 import com.bodeum.domain.region.entity.Region;
 import com.bodeum.domain.user.entity.User;
-import com.bodeum.domain.user.enumtype.DisabilityType;
+import com.bodeum.domain.user.enums.DisabilityType;
 import java.util.Collections;
 import java.time.LocalDate;
 import java.util.List;

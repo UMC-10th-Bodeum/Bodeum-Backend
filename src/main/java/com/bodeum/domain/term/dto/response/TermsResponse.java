@@ -1,6 +1,6 @@
 package com.bodeum.domain.term.dto.response;
 
-import com.bodeum.domain.term.enumtype.TermType;
+import com.bodeum.domain.term.enums.TermType;
 import java.time.Instant;
 
 public record TermsResponse(

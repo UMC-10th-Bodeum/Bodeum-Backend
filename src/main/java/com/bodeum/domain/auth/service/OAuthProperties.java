@@ -1,6 +1,6 @@
 package com.bodeum.domain.auth.service;
 
-import com.bodeum.domain.auth.enumtype.SocialProvider;
+import com.bodeum.domain.auth.enums.SocialProvider;
 import jakarta.annotation.PostConstruct;
 import java.util.Arrays;
 import java.util.Locale;

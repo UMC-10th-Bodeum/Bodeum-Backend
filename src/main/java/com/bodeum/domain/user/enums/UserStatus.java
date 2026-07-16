@@ -1,4 +1,4 @@
-package com.bodeum.domain.user.enumtype;
+package com.bodeum.domain.user.enums;
 
 public enum UserStatus {
     ACTIVE,

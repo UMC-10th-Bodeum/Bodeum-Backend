@@ -1,6 +1,6 @@
 package com.bodeum.domain.user.entity;
 
-import com.bodeum.domain.user.enumtype.InterestCategory;
+import com.bodeum.domain.user.enums.InterestCategory;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
