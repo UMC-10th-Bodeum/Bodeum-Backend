@@ -103,6 +103,9 @@ public class ChildProfile {
 
     private void replaceDisabilities(List<DisabilityType> disabilityTypes) {
         disabilities.clear();
+        if (disabilityTypes == null) {
+            return;
+        }
         disabilityTypes.forEach(disabilityType ->
                 disabilities.add(ChildDisability.create(this, disabilityType))
         );

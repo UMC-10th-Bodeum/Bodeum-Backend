@@ -64,7 +64,7 @@ public class AuthController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "로그인 성공"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "400",
-                    description = "AUTH400_1: 지원하지 않는 제공자 / AUTH400_2: 유효하지 않은 인가 코드 / AUTH400_4: 소셜 토큰 교환 실패"
+                    description = "AUTH400_1: 지원하지 않는 제공자 / AUTH400_2: 유효하지 않은 인가 코드 / AUTH400_5: 소셜 토큰 교환 실패"
             ),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "401",

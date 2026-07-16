@@ -2,6 +2,7 @@ package com.bodeum.global.infrastructure.storage;
 
 import com.bodeum.global.apiPayload.exception.ProjectException;
 import java.io.IOException;
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -61,7 +62,9 @@ public class S3ImageStorage {
             throw new ProjectException(StorageErrorCode.INVALID_IMAGE_TYPE);
         }
 
-        String extension = ALLOWED_CONTENT_TYPES.get(contentType);
+        // "image/jpeg; charset=utf-8"처럼 파라미터가 붙어 와도 미디어 타입만으로 판별한다.
+        String mediaType = contentType.split(";", 2)[0].trim().toLowerCase(Locale.ROOT);
+        String extension = ALLOWED_CONTENT_TYPES.get(mediaType);
         if (extension == null) {
             throw new ProjectException(StorageErrorCode.INVALID_IMAGE_TYPE);
         }
