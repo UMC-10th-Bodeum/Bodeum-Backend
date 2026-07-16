@@ -40,8 +40,8 @@ class UserProfileResponseTest {
         assertThat(response.childProfile().nickname()).isEqualTo("민준");
         assertThat(response.childProfile().birth()).isEqualTo("2020-03");
         assertThat(response.childProfile().disabilityTypes()).containsExactly(
-                DisabilityType.AUTISM,
-                DisabilityType.CEREBRAL_PALSY
+                new CodeLabelResponse("AUTISM", "자폐스펙트럼"),
+                new CodeLabelResponse("CEREBRAL_PALSY", "뇌병변장애")
         );
     }
 
@@ -62,6 +62,6 @@ class UserProfileResponseTest {
         assertThat(response.regionId()).isEqualTo(10L);
         assertThat(response.regionLevel1()).isEqualTo("서울특별시");
         assertThat(response.regionLevel2()).isEqualTo("강남구");
-        assertThat(response.interestCategories()).containsExactly(InterestCategory.INSTITUTION);
+        assertThat(response.interestCategories()).containsExactly(new CodeLabelResponse("INSTITUTION", "기관"));
     }
 }

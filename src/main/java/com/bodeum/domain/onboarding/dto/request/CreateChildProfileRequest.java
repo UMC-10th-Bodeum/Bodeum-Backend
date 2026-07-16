@@ -12,6 +12,7 @@ import jakarta.validation.constraints.Size;
 import java.time.YearMonth;
 import java.time.format.DateTimeParseException;
 import java.util.List;
+import org.hibernate.validator.constraints.UniqueElements;
 
 public record CreateChildProfileRequest(
         @Schema(example = "민준")
@@ -39,6 +40,7 @@ public record CreateChildProfileRequest(
                         }
                 )
         )
+        @UniqueElements(message = "집중 케어 영역은 중복 선택할 수 없습니다.")
         List<DisabilityType> disabilityTypes,
 
         @Schema(example = "말이 느림")

@@ -3,8 +3,6 @@ package com.bodeum.domain.user.service;
 import com.bodeum.domain.auth.enumtype.SocialProvider;
 import com.bodeum.domain.auth.exception.AuthErrorCode;
 import com.bodeum.domain.auth.repository.RefreshTokenSessionRepository;
-import com.bodeum.domain.onboarding.enumtype.CommunityRoleType;
-import com.bodeum.domain.onboarding.enumtype.GuardianType;
 import com.bodeum.domain.region.entity.Region;
 import com.bodeum.domain.region.service.RegionService;
 import com.bodeum.domain.user.dto.request.CreateUserAgreementRequest;
@@ -72,8 +70,8 @@ public class UserService {
                 request.keywordText(),
                 request.interestCategories(),
                 region,
-                GuardianType.fromNullable(request.guardianType()),
-                CommunityRoleType.fromNullable(request.communityRoleType())
+                request.guardianType(),
+                request.communityRoleType()
         );
 
         return UserProfileUpdateResponse.ofSuccess();

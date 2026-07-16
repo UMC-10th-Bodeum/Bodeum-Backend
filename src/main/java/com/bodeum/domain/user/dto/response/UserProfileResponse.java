@@ -4,8 +4,6 @@ import com.bodeum.domain.onboarding.enumtype.CommunityRoleType;
 import com.bodeum.domain.onboarding.enumtype.GuardianType;
 import com.bodeum.domain.region.entity.Region;
 import com.bodeum.domain.user.entity.User;
-import com.bodeum.domain.user.enumtype.DisabilityType;
-import com.bodeum.domain.user.enumtype.InterestCategory;
 import java.time.Instant;
 import java.util.List;
 
@@ -23,7 +21,7 @@ public record UserProfileResponse(
         Instant updatedAt,
         ChildProfile childProfile,
         String keywordText,
-        List<InterestCategory> interestCategories,
+        List<CodeLabelResponse> interestCategories,
         Long regionId,
         String regionLevel1,
         String regionLevel2,
@@ -48,7 +46,9 @@ public record UserProfileResponse(
                 user.getUpdatedAt(),
                 ChildProfile.from(user),
                 user.getKeywordText(),
-                user.getInterestCategories(),
+                user.getInterestCategories().stream()
+                        .map(CodeLabelResponse::from)
+                        .toList(),
                 region == null ? null : region.getId(),
                 region == null ? null : region.getRegionLevel1(),
                 region == null ? null : region.getRegionLevel2(),
@@ -61,14 +61,16 @@ public record UserProfileResponse(
     public record ChildProfile(
             String nickname,
             String birth,
-            List<DisabilityType> disabilityTypes
+            List<CodeLabelResponse> disabilityTypes
     ) {
 
         private static ChildProfile from(User user) {
             return new ChildProfile(
                     user.getChildName(),
                     user.getChildBirth(),
-                    user.getDisabilityTypes()
+                    user.getDisabilityTypes().stream()
+                            .map(CodeLabelResponse::from)
+                            .toList()
             );
         }
     }

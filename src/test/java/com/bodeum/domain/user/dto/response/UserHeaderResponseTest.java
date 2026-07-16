@@ -65,7 +65,8 @@ class UserHeaderResponseTest {
         UserHeaderResponse response = UserHeaderResponse.from(user);
 
         assertThat(response.childAge()).isEqualTo(5);
-        assertThat(response.childDisabilityTypes()).containsExactly(DisabilityType.AUTISM);
+        assertThat(response.childDisabilityTypes())
+                .containsExactly(new CodeLabelResponse("AUTISM", "자폐스펙트럼"));
     }
 
     @Test

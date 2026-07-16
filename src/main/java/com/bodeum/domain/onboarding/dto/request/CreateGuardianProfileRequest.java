@@ -1,8 +1,9 @@
 package com.bodeum.domain.onboarding.dto.request;
 
+import com.bodeum.domain.onboarding.enumtype.CommunityRoleType;
+import com.bodeum.domain.onboarding.enumtype.GuardianType;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 public record CreateGuardianProfileRequest(
@@ -11,11 +12,9 @@ public record CreateGuardianProfileRequest(
         String guardianNickname,
 
         @Schema(allowableValues = {"PARENT", "GRANDPARENT", "SIBLING", "OTHER"})
-        @Pattern(regexp = "PARENT|GRANDPARENT|SIBLING|OTHER", message = "보호자 유형을 확인해주세요.")
-        String guardianType,
+        GuardianType guardianType,
 
         @Schema(allowableValues = {"INFO_SEEKER", "EXPERIENCE_SHARER", "WISDOM_HELPER"})
-        @Pattern(regexp = "INFO_SEEKER|EXPERIENCE_SHARER|WISDOM_HELPER", message = "커뮤니티 성향을 확인해주세요.")
-        String communityRoleType
+        CommunityRoleType communityRoleType
 ) {
 }

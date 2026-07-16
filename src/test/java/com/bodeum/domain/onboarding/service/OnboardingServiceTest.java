@@ -1,7 +1,6 @@
 package com.bodeum.domain.onboarding.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.BDDMockito.given;
 
 import com.bodeum.domain.auth.enumtype.AuthNextStep;
@@ -14,14 +13,12 @@ import com.bodeum.domain.onboarding.dto.response.OnboardingStepResponse;
 import com.bodeum.domain.onboarding.enumtype.CommunityRoleType;
 import com.bodeum.domain.onboarding.enumtype.GuardianType;
 import com.bodeum.domain.onboarding.enumtype.OnboardingStep;
-import com.bodeum.domain.onboarding.exception.OnboardingErrorCode;
 import com.bodeum.domain.region.entity.Region;
 import com.bodeum.domain.region.service.RegionService;
 import com.bodeum.domain.user.entity.User;
 import com.bodeum.domain.user.enumtype.DisabilityType;
 import com.bodeum.domain.user.enumtype.InterestCategory;
 import com.bodeum.domain.user.service.UserService;
-import com.bodeum.global.apiPayload.exception.ProjectException;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -63,7 +60,11 @@ class OnboardingServiceTest {
     void registerGuardianProfileStoresGuardianTypeAndCommunityRoleAsEnum() {
         User user = newUser();
         given(userService.getCurrentUser(1L)).willReturn(user);
-        CreateGuardianProfileRequest request = new CreateGuardianProfileRequest("민준맘", "PARENT", "INFO_SEEKER");
+        CreateGuardianProfileRequest request = new CreateGuardianProfileRequest(
+                "민준맘",
+                GuardianType.PARENT,
+                CommunityRoleType.INFO_SEEKER
+        );
 
         OnboardingStepResponse response = onboardingService.registerGuardianProfile(1L, request);
 
@@ -87,18 +88,6 @@ class OnboardingServiceTest {
         assertThat(user.getGuardianType()).isNull();
         assertThat(user.getCommunityRoleType()).isNull();
         assertThat(user.isGuardianProfileRegistered()).isTrue();
-    }
-
-    @Test
-    void registerGuardianProfileRejectsUnsupportedGuardianType() {
-        User user = newUser();
-        given(userService.getCurrentUser(1L)).willReturn(user);
-        CreateGuardianProfileRequest request = new CreateGuardianProfileRequest("민준맘", "이웃", "INFO_SEEKER");
-
-        assertThatThrownBy(() -> onboardingService.registerGuardianProfile(1L, request))
-                .isInstanceOf(ProjectException.class)
-                .extracting(exception -> ((ProjectException) exception).getErrorCode())
-                .isEqualTo(OnboardingErrorCode.INVALID_GUARDIAN_TYPE);
     }
 
     @Test
@@ -141,8 +130,7 @@ class OnboardingServiceTest {
         CreateInterestRegionRequest request = new CreateInterestRegionRequest(
                 List.of(
                         InterestCategory.INSTITUTION,
-                        InterestCategory.HOSPITAL,
-                        InterestCategory.WELFARE
+                        InterestCategory.HOSPITAL
                 ),
                 10L
         );
@@ -151,8 +139,7 @@ class OnboardingServiceTest {
 
         assertThat(user.getInterestCategories()).containsExactly(
                 InterestCategory.INSTITUTION,
-                InterestCategory.HOSPITAL,
-                InterestCategory.WELFARE
+                InterestCategory.HOSPITAL
         );
         assertThat(user.getRegion()).isEqualTo(region);
         assertThat(response.step()).isEqualTo(2);

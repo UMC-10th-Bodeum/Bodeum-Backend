@@ -1,5 +1,7 @@
 package com.bodeum.domain.user.dto.request;
 
+import com.bodeum.domain.onboarding.enumtype.CommunityRoleType;
+import com.bodeum.domain.onboarding.enumtype.GuardianType;
 import com.bodeum.domain.user.enumtype.DisabilityType;
 import com.bodeum.domain.user.enumtype.InterestCategory;
 import com.fasterxml.jackson.annotation.JsonIgnore;
@@ -11,6 +13,7 @@ import jakarta.validation.constraints.Size;
 import java.time.YearMonth;
 import java.time.format.DateTimeParseException;
 import java.util.List;
+import org.hibernate.validator.constraints.UniqueElements;
 
 public record UpdateUserProfileRequest(
         @Schema(example = "민준맘")
@@ -40,15 +43,17 @@ public record UpdateUserProfileRequest(
                         }
                 )
         )
+        @UniqueElements(message = "집중 케어 영역은 중복 선택할 수 없습니다.")
         List<DisabilityType> disabilityTypes,
 
         @Schema(example = "말이 느림")
         @Size(max = 100, message = "특징 키워드는 최대 100자까지 입력 가능합니다.")
         String keywordText,
 
-        @Size(max = 3, message = "관심사는 최대 3개까지 선택 가능합니다.")
+        @Size(max = 2, message = "관심사는 최대 2개까지 선택 가능합니다.")
+        @UniqueElements(message = "관심사는 중복 선택할 수 없습니다.")
         @ArraySchema(
-                arraySchema = @Schema(example = "[\"INSTITUTION\", \"HOSPITAL\", \"WELFARE\"]"),
+                arraySchema = @Schema(example = "[\"INSTITUTION\", \"HOSPITAL\"]"),
                 schema = @Schema(
                         type = "string",
                         allowableValues = {
@@ -66,12 +71,10 @@ public record UpdateUserProfileRequest(
         Long regionId,
 
         @Schema(allowableValues = {"PARENT", "GRANDPARENT", "SIBLING", "OTHER"})
-        @Pattern(regexp = "PARENT|GRANDPARENT|SIBLING|OTHER", message = "보호자 유형을 확인해주세요.")
-        String guardianType,
+        GuardianType guardianType,
 
         @Schema(allowableValues = {"INFO_SEEKER", "EXPERIENCE_SHARER", "WISDOM_HELPER"})
-        @Pattern(regexp = "INFO_SEEKER|EXPERIENCE_SHARER|WISDOM_HELPER", message = "커뮤니티 성향을 확인해주세요.")
-        String communityRoleType
+        CommunityRoleType communityRoleType
 ) {
 
     @JsonIgnore
