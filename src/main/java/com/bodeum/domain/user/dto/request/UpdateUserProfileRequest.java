@@ -70,7 +70,7 @@ public record UpdateUserProfileRequest(
         @Schema(example = "1", description = "지역 ID")
         Long regionId,
 
-        @Schema(allowableValues = {"PARENT", "GRANDPARENT", "SIBLING", "OTHER"})
+        @Schema(allowableValues = {"PARENT", "GRANDPARENT", "SIBLING", "ETC"})
         GuardianType guardianType,
 
         @Schema(allowableValues = {"INFO_SEEKER", "EXPERIENCE_SHARER", "WISDOM_HELPER"})

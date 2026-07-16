@@ -11,7 +11,7 @@ public record CreateGuardianProfileRequest(
         @Size(max = 20, message = "프로필 닉네임은 최대 20자까지 입력 가능합니다.")
         String guardianNickname,
 
-        @Schema(allowableValues = {"PARENT", "GRANDPARENT", "SIBLING", "OTHER"})
+        @Schema(allowableValues = {"PARENT", "GRANDPARENT", "SIBLING", "ETC"})
         GuardianType guardianType,
 
         @Schema(allowableValues = {"INFO_SEEKER", "EXPERIENCE_SHARER", "WISDOM_HELPER"})

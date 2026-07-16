@@ -9,7 +9,7 @@ public enum GuardianType {
     PARENT,
     GRANDPARENT,
     SIBLING,
-    OTHER;
+    ETC;
 
     public static GuardianType from(String value) {
         return Arrays.stream(values())
