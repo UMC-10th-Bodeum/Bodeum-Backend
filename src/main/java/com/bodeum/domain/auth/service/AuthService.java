@@ -84,8 +84,9 @@ public class AuthService {
         return AuthTokenResponse.from(authTokenService.refresh(refreshToken));
     }
 
-    public void logout(String refreshToken) {
-        authTokenService.revoke(refreshToken);
+    public void logout(Long userId, String refreshToken) {
+        userService.getCurrentUser(userId);
+        authTokenService.revoke(userId, refreshToken);
     }
 
     private void validateState(SocialProvider provider, String state) {

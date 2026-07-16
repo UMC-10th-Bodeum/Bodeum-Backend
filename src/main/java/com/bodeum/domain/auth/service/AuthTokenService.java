@@ -97,6 +97,15 @@ public class AuthTokenService {
         }
     }
 
+    @Transactional
+    public void revoke(Long userId, String refreshToken) {
+        if (refreshToken != null && !refreshToken.isBlank()) {
+            refreshTokenSessionRepository.findById(hashToken(refreshToken))
+                    .filter(session -> session.getUserId().equals(userId))
+                    .ifPresent(refreshTokenSessionRepository::delete);
+        }
+    }
+
     private AuthUserPrincipal toPrincipal(User user) {
         return new AuthUserPrincipal(
                 user.getId(),

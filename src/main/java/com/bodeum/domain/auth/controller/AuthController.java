@@ -8,6 +8,7 @@ import com.bodeum.domain.auth.enums.SocialProvider;
 import com.bodeum.domain.auth.service.AuthService;
 import com.bodeum.global.apiPayload.ApiResponse;
 import com.bodeum.global.apiPayload.code.GeneralSuccessCode;
+import com.bodeum.global.auth.LoginUser;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -110,12 +111,12 @@ public class AuthController {
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "로그아웃 성공")
     })
-    @SecurityRequirements
     @PostMapping("/logout")
     public ApiResponse<Void> logout(
+            @LoginUser Long userId,
             @Valid @RequestBody LogoutAuthRequest request
     ) {
-        authService.logout(request.refreshToken());
+        authService.logout(userId, request.refreshToken());
 
         return ApiResponse.of(GeneralSuccessCode.OK, null);
     }

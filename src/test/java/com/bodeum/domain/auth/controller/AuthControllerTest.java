@@ -292,10 +292,30 @@ class AuthControllerTest {
 
     @Test
     void logoutWithoutRefreshTokenIsBadRequest() throws Exception {
+        JsonNode loginBody = readBody(mockMvc.perform(get("/api/v1/auth/callback/kakao")
+                        .param("code", "logout-validation-code"))
+                .andExpect(status().isOk())
+                .andReturn());
+        String accessToken = loginBody.at("/result/accessToken").asText();
+
         mockMvc.perform(post("/api/v1/auth/logout")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void logoutRequiresAccessToken() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/logout")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "refreshToken": "refresh-token"
+                                }
+                                """))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("AUTH401_1"));
     }
 
     private JsonNode readBody(MvcResult result) throws Exception {
