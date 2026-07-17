@@ -16,11 +16,11 @@ jobs:
     permissions:
       contents: read
       packages: write # GHCR push 권한
-    outputs:
-      image: ${{ steps.meta.outputs.image }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false # 이 워크플로우는 리포에 push하지 않으므로 토큰 미보존
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3

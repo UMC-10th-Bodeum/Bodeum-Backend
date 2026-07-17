@@ -41,4 +41,5 @@ ENV SPRING_PROFILES_ACTIVE=dev
 ENV JAVA_OPTS="-XX:MaxRAMPercentage=75.0"
 
 EXPOSE 8080
-ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]
+# exec로 실행해야 쉘이 java로 대체되어 컨테이너 종료 시 SIGTERM이 앱에 전달된다(graceful shutdown)
+ENTRYPOINT ["sh", "-c", "exec java $JAVA_OPTS -jar app.jar"]
