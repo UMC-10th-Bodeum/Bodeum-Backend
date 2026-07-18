@@ -3,6 +3,15 @@ spring:
     hibernate:
       ddl-auto: validate
 
+  # 운영에서만 Flyway 사용. 기존 테이블이 있는 RDS라 baseline으로 현재 상태를 v1로 마킹한다.
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    baseline-version: 1
+    locations: classpath:db/migration
+    # 마이그레이션 폴더가 아직 비어 있어도 실패하지 않도록.
+    fail-on-missing-locations: false
+
 bodeum:
   cors:
     # 프론트(Vercel) 운영 도메인 + 프리뷰 배포 + 통합 초기 로컬 개발용
