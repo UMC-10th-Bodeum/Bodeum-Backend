@@ -42,6 +42,9 @@ out/
 application.properties
 application-*.properties
 application-*.yml
+# 비밀값이 없는 프로파일 설정 파일은 추적한다(비밀값은 .env로 주입).
+!application-local.yml
+!application-prod.yml
 .env
 
 ### Claude Code (로컬 개발 설정) ###

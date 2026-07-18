@@ -36,8 +36,8 @@ USER appuser
 
 COPY --from=build /workspace/app.jar app.jar
 
-# dev 프로파일(운영: ddl-auto=validate)로 구동
-ENV SPRING_PROFILES_ACTIVE=dev
+# prod 프로파일(운영: ddl-auto=validate)로 구동. 서버 .env에서 덮어쓸 수 있다.
+ENV SPRING_PROFILES_ACTIVE=prod
 ENV JAVA_OPTS="-XX:MaxRAMPercentage=75.0"
 
 EXPOSE 8080

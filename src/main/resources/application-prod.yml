@@ -1,0 +1,12 @@
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: validate
+
+bodeum:
+  cors:
+    # 프론트(Vercel) 운영 도메인 + 프리뷰 배포 + 통합 초기 로컬 개발용
+    allowed-origins:
+      - https://bodeum-site.vercel.app
+      - https://bodeum-site-*.vercel.app
+      - http://localhost:*
