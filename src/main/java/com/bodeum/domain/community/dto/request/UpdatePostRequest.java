@@ -11,6 +11,7 @@ import io.swagger.v3.oas.annotations.media.ArraySchema;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import java.util.List;
@@ -38,7 +39,10 @@ public record UpdatePostRequest(
                 schema = @Schema(implementation = DisabilityType.class)
         )
         @UniqueElements(message = "장애 유형 태그는 중복 선택할 수 없습니다.")
-        List<DisabilityType> disabilityTypes,
+        List<
+                @NotNull(message = "장애 유형 태그는 null일 수 없습니다.")
+                DisabilityType
+                > disabilityTypes,
 
         @ArraySchema(arraySchema = @Schema(example = "[\"정보공유\"]"))
         @UniqueElements(message = "해시태그는 중복 입력할 수 없습니다.")

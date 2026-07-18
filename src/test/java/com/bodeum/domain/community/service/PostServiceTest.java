@@ -102,6 +102,8 @@ class PostServiceTest {
         assertThat(response.title()).isEqualTo("수정 제목");
         assertThat(response.content()).isEqualTo("게시글 내용");
         assertThat(response.anonymityType()).isEqualTo(PostAnonymityType.FULLY_ANONYMOUS);
+        assertThat(response.authorId()).isNull();
+        assertThat(response.isMine()).isTrue();
     }
 
     @Test
@@ -136,10 +138,28 @@ class PostServiceTest {
     void getPostRejectsMissingPost() {
         given(postRepository.findById(99L)).willReturn(Optional.empty());
 
-        assertThatThrownBy(() -> postService.getPost(99L))
+        assertThatThrownBy(() -> postService.getPost(10L, 99L))
                 .isInstanceOf(CommunityException.class)
                 .extracting(exception -> ((CommunityException) exception).getErrorCode())
                 .isEqualTo(CommunityErrorCode.POST_NOT_FOUND);
+    }
+
+    @Test
+    void getAnonymousPostHidesAuthorIdAndCalculatesOwnership() {
+        Post post = Post.create(
+                10L,
+                PostBoardType.FREE_COMMUNICATION,
+                PostAnonymityType.FULLY_ANONYMOUS,
+                "익명 게시글",
+                "익명 게시글 내용"
+        );
+        ReflectionTestUtils.setField(post, "id", 1L);
+        given(postRepository.findById(1L)).willReturn(Optional.of(post));
+
+        PostResponse response = postService.getPost(20L, 1L);
+
+        assertThat(response.authorId()).isNull();
+        assertThat(response.isMine()).isFalse();
     }
 
     @Test

@@ -62,7 +62,10 @@ public class PostController {
 
     @Operation(summary = "게시글 상세 조회", description = "게시글과 장애 유형·해시태그·이미지를 상세 조회한다.")
     @GetMapping("/{postId}")
-    public ApiResponse<PostResponse> getPost(@PathVariable Long postId) {
-        return ApiResponse.of(GeneralSuccessCode.OK, postService.getPost(postId));
+    public ApiResponse<PostResponse> getPost(
+            @LoginUser Long userId,
+            @PathVariable Long postId
+    ) {
+        return ApiResponse.of(GeneralSuccessCode.OK, postService.getPost(userId, postId));
     }
 }

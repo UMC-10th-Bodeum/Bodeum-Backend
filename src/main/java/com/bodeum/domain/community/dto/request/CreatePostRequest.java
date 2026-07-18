@@ -38,7 +38,10 @@ public record CreatePostRequest(
                 schema = @Schema(implementation = DisabilityType.class)
         )
         @UniqueElements(message = "장애 유형 태그는 중복 선택할 수 없습니다.")
-        List<DisabilityType> disabilityTypes,
+        List<
+                @NotNull(message = "장애 유형 태그는 null일 수 없습니다.")
+                DisabilityType
+                > disabilityTypes,
 
         @ArraySchema(arraySchema = @Schema(example = "[\"육아\", \"공원추천\"]"))
         @UniqueElements(message = "해시태그는 중복 입력할 수 없습니다.")

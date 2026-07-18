@@ -12,8 +12,15 @@ public record PostResponse(
         @Schema(example = "1")
         Long postId,
 
-        @Schema(example = "10")
+        @Schema(
+                description = "작성자 ID. 완전 익명 게시글이면 null",
+                example = "10",
+                nullable = true
+        )
         Long authorId,
+
+        @Schema(description = "현재 로그인 사용자의 게시글 여부", example = "true")
+        boolean isMine,
 
         PostBoardType boardType,
         PostAnonymityType anonymityType,
@@ -33,13 +40,15 @@ public record PostResponse(
 
     public static PostResponse of(
             Post post,
+            Long viewerId,
             List<DisabilityType> disabilityTypes,
             List<String> hashtags,
             List<String> imageUrls
     ) {
         return new PostResponse(
                 post.getId(),
-                post.getUserId(),
+                post.getAnonymityType() == PostAnonymityType.FULLY_ANONYMOUS ? null : post.getUserId(),
+                post.getUserId().equals(viewerId),
                 post.getBoardType(),
                 post.getAnonymityType(),
                 post.getTitle(),

@@ -105,6 +105,25 @@ class PostControllerTest {
     }
 
     @Test
+    void createPostRejectsNullDisabilityType() throws Exception {
+        mockMvc.perform(post("/api/community/posts")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "boardType": "FREE_COMMUNICATION",
+                                  "anonymityType": "PROFILE_TAG_VISIBLE",
+                                  "title": "게시글 제목",
+                                  "content": "게시글 내용",
+                                  "disabilityTypes": [null]
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("COMMON400_1"));
+
+        then(postService).should(never()).createPost(any(), any(CreatePostRequest.class));
+    }
+
+    @Test
     void updatePostUsesPostPath() throws Exception {
         given(postService.updatePost(any(), any(), any(UpdatePostRequest.class))).willReturn(postResponse());
 
@@ -130,17 +149,18 @@ class PostControllerTest {
 
     @Test
     void getPostReturnsDetailResponse() throws Exception {
-        given(postService.getPost(1L)).willReturn(postResponse());
+        given(postService.getPost(10L, 1L)).willReturn(postResponse());
 
         mockMvc.perform(get("/api/community/posts/1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.result.title").value("게시글 제목"))
+                .andExpect(jsonPath("$.result.isMine").value(true))
                 .andExpect(jsonPath("$.result.disabilityTypes[0]").value("AUTISM"));
     }
 
     @Test
     void getPostReturnsCommunityNotFoundError() throws Exception {
-        given(postService.getPost(99L))
+        given(postService.getPost(10L, 99L))
                 .willThrow(new CommunityException(CommunityErrorCode.POST_NOT_FOUND));
 
         mockMvc.perform(get("/api/community/posts/99"))
@@ -171,6 +191,7 @@ class PostControllerTest {
         return new PostResponse(
                 1L,
                 10L,
+                true,
                 PostBoardType.FREE_COMMUNICATION,
                 PostAnonymityType.PROFILE_TAG_VISIBLE,
                 "게시글 제목",

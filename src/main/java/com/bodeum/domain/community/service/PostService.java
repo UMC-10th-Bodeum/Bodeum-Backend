@@ -54,11 +54,11 @@ public class PostService {
                 request.content()
         ));
 
-        replaceDisabilityTags(post, safeList(request.disabilityTypes()));
-        replaceHashtags(post, normalizeHashtags(request.hashtags()));
-        replaceImages(post, safeList(request.imageUrls()));
+        saveDisabilityTags(post, safeList(request.disabilityTypes()));
+        saveHashtags(post, normalizeHashtags(request.hashtags()));
+        saveImages(post, safeList(request.imageUrls()));
 
-        return getPostResponse(post);
+        return getPostResponse(post, userId);
     }
 
     @Transactional
@@ -81,7 +81,7 @@ public class PostService {
             replaceImages(post, request.imageUrls());
         }
 
-        return getPostResponse(post);
+        return getPostResponse(post, userId);
     }
 
     @Transactional
@@ -105,8 +105,9 @@ public class PostService {
     }
 
     @Transactional(readOnly = true)
-    public PostResponse getPost(Long postId) {
-        return getPostResponse(findPost(postId));
+    public PostResponse getPost(Long userId, Long postId) {
+        validateAuthenticatedUser(userId);
+        return getPostResponse(findPost(postId), userId);
     }
 
     private Post getOwnedPost(Long userId, Long postId) {
@@ -124,7 +125,7 @@ public class PostService {
                 .orElseThrow(() -> new CommunityException(CommunityErrorCode.POST_NOT_FOUND));
     }
 
-    private PostResponse getPostResponse(Post post) {
+    private PostResponse getPostResponse(Post post, Long viewerId) {
         List<DisabilityType> disabilityTypes = postDisabilityTagRepository
                 .findAllByPost_IdOrderByIdAsc(post.getId())
                 .stream()
@@ -142,12 +143,16 @@ public class PostService {
                 .map(PostImage::getImageUrl)
                 .toList();
 
-        return PostResponse.of(post, disabilityTypes, hashtags, imageUrls);
+        return PostResponse.of(post, viewerId, disabilityTypes, hashtags, imageUrls);
     }
 
     private void replaceDisabilityTags(Post post, List<DisabilityType> disabilityTypes) {
         postDisabilityTagRepository.deleteAllByPost_Id(post.getId());
         postDisabilityTagRepository.flush();
+        saveDisabilityTags(post, disabilityTypes);
+    }
+
+    private void saveDisabilityTags(Post post, List<DisabilityType> disabilityTypes) {
         postDisabilityTagRepository.saveAll(disabilityTypes.stream()
                 .map(disabilityType -> PostDisabilityTag.create(post, disabilityType))
                 .toList());
@@ -156,6 +161,10 @@ public class PostService {
     private void replaceHashtags(Post post, List<String> hashtagNames) {
         postHashtagRepository.deleteAllByPost_Id(post.getId());
         postHashtagRepository.flush();
+        saveHashtags(post, hashtagNames);
+    }
+
+    private void saveHashtags(Post post, List<String> hashtagNames) {
         postHashtagRepository.saveAll(hashtagNames.stream()
                 .map(this::getOrCreateHashtag)
                 .map(hashtag -> PostHashtag.create(post, hashtag))
@@ -170,6 +179,10 @@ public class PostService {
     private void replaceImages(Post post, List<String> imageUrls) {
         postImageRepository.deleteAllByPost_Id(post.getId());
         postImageRepository.flush();
+        saveImages(post, imageUrls);
+    }
+
+    private void saveImages(Post post, List<String> imageUrls) {
         postImageRepository.saveAll(java.util.stream.IntStream.range(0, imageUrls.size())
                 .mapToObj(index -> PostImage.create(post, imageUrls.get(index), index))
                 .toList());
