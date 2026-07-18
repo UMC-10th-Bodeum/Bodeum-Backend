@@ -54,6 +54,10 @@ dependencies {
     implementation 'org.jsoup:jsoup:1.22.2'
     implementation 'org.seleniumhq.selenium:selenium-java:4.44.0'
     implementation 'io.github.bonigarcia:webdrivermanager:6.3.4'
+
+    // Flyway (DB 마이그레이션) - MySQL 8.x는 flyway-mysql 모듈 필요
+    implementation 'org.flywaydb:flyway-core'
+    implementation 'org.flywaydb:flyway-mysql'
 }
 
 tasks.named('test') {
