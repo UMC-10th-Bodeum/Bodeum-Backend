@@ -1,0 +1,176 @@
+package com.bodeum.domain.community.service;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.then;
+
+import com.bodeum.domain.community.dto.request.CreatePostRequest;
+import com.bodeum.domain.community.dto.request.UpdatePostRequest;
+import com.bodeum.domain.community.dto.response.PostResponse;
+import com.bodeum.domain.community.entity.Post;
+import com.bodeum.domain.community.enums.DisabilityType;
+import com.bodeum.domain.community.enums.PostAnonymityType;
+import com.bodeum.domain.community.enums.PostBoardType;
+import com.bodeum.domain.community.exception.CommunityErrorCode;
+import com.bodeum.domain.community.exception.CommunityException;
+import com.bodeum.domain.community.repository.CommentLikeRepository;
+import com.bodeum.domain.community.repository.CommentRepository;
+import com.bodeum.domain.community.repository.HashtagRepository;
+import com.bodeum.domain.community.repository.PostDisabilityTagRepository;
+import com.bodeum.domain.community.repository.PostHashtagRepository;
+import com.bodeum.domain.community.repository.PostImageRepository;
+import com.bodeum.domain.community.repository.PostLikeRepository;
+import com.bodeum.domain.community.repository.PostReportRepository;
+import com.bodeum.domain.community.repository.PostRepository;
+import com.bodeum.domain.community.repository.PostScrapRepository;
+import java.util.List;
+import java.util.Optional;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
+
+@ExtendWith(MockitoExtension.class)
+class PostServiceTest {
+
+    @Mock
+    private PostRepository postRepository;
+    @Mock
+    private HashtagRepository hashtagRepository;
+    @Mock
+    private PostHashtagRepository postHashtagRepository;
+    @Mock
+    private PostImageRepository postImageRepository;
+    @Mock
+    private PostDisabilityTagRepository postDisabilityTagRepository;
+    @Mock
+    private PostLikeRepository postLikeRepository;
+    @Mock
+    private PostScrapRepository postScrapRepository;
+    @Mock
+    private PostReportRepository postReportRepository;
+    @Mock
+    private CommentRepository commentRepository;
+    @Mock
+    private CommentLikeRepository commentLikeRepository;
+
+    @InjectMocks
+    private PostService postService;
+
+    @Test
+    void createPostStoresPostAndRelatedData() {
+        given(postRepository.save(any(Post.class))).willAnswer(invocation -> {
+            Post post = invocation.getArgument(0);
+            ReflectionTestUtils.setField(post, "id", 1L);
+            return post;
+        });
+
+        PostResponse response = postService.createPost(10L, createRequest());
+
+        assertThat(response.postId()).isEqualTo(1L);
+        assertThat(response.authorId()).isEqualTo(10L);
+        assertThat(response.title()).isEqualTo("게시글 제목");
+        then(postDisabilityTagRepository).should().saveAll(anyList());
+        then(postHashtagRepository).should().saveAll(anyList());
+        then(postImageRepository).should().saveAll(anyList());
+    }
+
+    @Test
+    void updatePostChangesOnlyRequestedFieldsForOwner() {
+        Post post = post(1L, 10L);
+        given(postRepository.findById(1L)).willReturn(Optional.of(post));
+
+        PostResponse response = postService.updatePost(
+                10L,
+                1L,
+                new UpdatePostRequest(
+                        null,
+                        PostAnonymityType.FULLY_ANONYMOUS,
+                        "수정 제목",
+                        null,
+                        null,
+                        null,
+                        null
+                )
+        );
+
+        assertThat(response.title()).isEqualTo("수정 제목");
+        assertThat(response.content()).isEqualTo("게시글 내용");
+        assertThat(response.anonymityType()).isEqualTo(PostAnonymityType.FULLY_ANONYMOUS);
+    }
+
+    @Test
+    void updatePostRejectsNonOwner() {
+        given(postRepository.findById(1L)).willReturn(Optional.of(post(1L, 10L)));
+
+        assertThatThrownBy(() -> postService.updatePost(
+                20L,
+                1L,
+                new UpdatePostRequest(null, null, "수정 제목", null, null, null, null)
+        ))
+                .isInstanceOf(CommunityException.class)
+                .extracting(exception -> ((CommunityException) exception).getErrorCode())
+                .isEqualTo(CommunityErrorCode.POST_FORBIDDEN);
+    }
+
+    @Test
+    void deletePostRemovesRelatedDataBeforePost() {
+        Post post = post(1L, 10L);
+        given(postRepository.findById(1L)).willReturn(Optional.of(post));
+
+        postService.deletePost(10L, 1L);
+
+        then(commentLikeRepository).should().deleteAllByComment_Post_Id(1L);
+        then(postDisabilityTagRepository).should().deleteAllByPost_Id(1L);
+        then(postHashtagRepository).should().deleteAllByPost_Id(1L);
+        then(postImageRepository).should().deleteAllByPost_Id(1L);
+        then(postRepository).should().delete(post);
+    }
+
+    @Test
+    void getPostRejectsMissingPost() {
+        given(postRepository.findById(99L)).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> postService.getPost(99L))
+                .isInstanceOf(CommunityException.class)
+                .extracting(exception -> ((CommunityException) exception).getErrorCode())
+                .isEqualTo(CommunityErrorCode.POST_NOT_FOUND);
+    }
+
+    @Test
+    void createPostRejectsMissingAuthenticatedUser() {
+        assertThatThrownBy(() -> postService.createPost(null, createRequest()))
+                .isInstanceOf(CommunityException.class)
+                .extracting(exception -> ((CommunityException) exception).getErrorCode())
+                .isEqualTo(CommunityErrorCode.AUTHENTICATION_REQUIRED);
+    }
+
+    private CreatePostRequest createRequest() {
+        return new CreatePostRequest(
+                PostBoardType.FREE_COMMUNICATION,
+                PostAnonymityType.PROFILE_TAG_VISIBLE,
+                "게시글 제목",
+                "게시글 내용",
+                List.of(DisabilityType.AUTISM),
+                List.of("육아"),
+                List.of("https://example.com/image.jpg")
+        );
+    }
+
+    private Post post(Long postId, Long userId) {
+        Post post = Post.create(
+                userId,
+                PostBoardType.FREE_COMMUNICATION,
+                PostAnonymityType.PROFILE_TAG_VISIBLE,
+                "게시글 제목",
+                "게시글 내용"
+        );
+        ReflectionTestUtils.setField(post, "id", postId);
+        return post;
+    }
+}
