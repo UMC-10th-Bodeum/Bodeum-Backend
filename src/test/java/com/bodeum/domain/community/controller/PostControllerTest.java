@@ -25,6 +25,7 @@ import com.bodeum.global.auth.LoginUser;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Instant;
 import java.util.List;
+import java.util.stream.IntStream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -117,6 +118,30 @@ class PostControllerTest {
                                   "disabilityTypes": [null]
                                 }
                                 """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("COMMON400_1"));
+
+        then(postService).should(never()).createPost(any(), any(CreatePostRequest.class));
+    }
+
+    @Test
+    void createPostRejectsMoreThanTenImages() throws Exception {
+        List<String> imageUrls = IntStream.rangeClosed(1, 11)
+                .mapToObj(index -> "https://example.com/" + index + ".jpg")
+                .toList();
+        CreatePostRequest request = new CreatePostRequest(
+                PostBoardType.FREE_COMMUNICATION,
+                PostAnonymityType.PROFILE_TAG_VISIBLE,
+                "게시글 제목",
+                "게시글 내용",
+                List.of(DisabilityType.AUTISM),
+                List.of("육아"),
+                imageUrls
+        );
+
+        mockMvc.perform(post("/api/community/posts")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("COMMON400_1"));
 

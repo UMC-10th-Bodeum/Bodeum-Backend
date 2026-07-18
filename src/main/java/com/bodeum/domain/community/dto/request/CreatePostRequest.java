@@ -37,6 +37,7 @@ public record CreatePostRequest(
                 arraySchema = @Schema(example = "[\"AUTISM\", \"DEVELOPMENTAL_DELAY\"]"),
                 schema = @Schema(implementation = DisabilityType.class)
         )
+        @Size(max = 10, message = "장애 유형 태그는 최대 10개까지 입력할 수 있습니다.")
         @UniqueElements(message = "장애 유형 태그는 중복 선택할 수 없습니다.")
         List<
                 @NotNull(message = "장애 유형 태그는 null일 수 없습니다.")
@@ -44,6 +45,7 @@ public record CreatePostRequest(
                 > disabilityTypes,
 
         @ArraySchema(arraySchema = @Schema(example = "[\"육아\", \"공원추천\"]"))
+        @Size(max = 10, message = "해시태그는 최대 10개까지 입력할 수 있습니다.")
         @UniqueElements(message = "해시태그는 중복 입력할 수 없습니다.")
         List<
                 @NotBlank(message = "해시태그는 비어 있을 수 없습니다.")
@@ -52,6 +54,7 @@ public record CreatePostRequest(
                 > hashtags,
 
         @ArraySchema(arraySchema = @Schema(example = "[\"https://example.com/post-image.jpg\"]"))
+        @Size(max = 10, message = "이미지는 최대 10개까지 입력할 수 있습니다.")
         List<
                 @NotBlank(message = "이미지 URL은 비어 있을 수 없습니다.")
                 @Size(max = PostImage.IMAGE_URL_MAX_LENGTH, message = "이미지 URL은 500자 이하로 입력해주세요.")

@@ -154,6 +154,7 @@ public class PostService {
 
     private void saveDisabilityTags(Post post, List<DisabilityType> disabilityTypes) {
         postDisabilityTagRepository.saveAll(disabilityTypes.stream()
+                .distinct()
                 .map(disabilityType -> PostDisabilityTag.create(post, disabilityType))
                 .toList());
     }

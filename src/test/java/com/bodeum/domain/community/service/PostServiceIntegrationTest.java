@@ -62,7 +62,7 @@ class PostServiceIntegrationTest {
                         PostAnonymityType.FULLY_ANONYMOUS,
                         "익명 게시글",
                         "익명 게시글 내용",
-                        List.of(DisabilityType.AUTISM, DisabilityType.ADHD),
+                        List.of(DisabilityType.AUTISM, DisabilityType.AUTISM, DisabilityType.ADHD),
                         List.of("육아", "정보공유"),
                         List.of("https://example.com/1.jpg", "https://example.com/2.jpg")
                 )
