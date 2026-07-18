@@ -2,6 +2,8 @@ package com.bodeum.domain.community.entity;
 
 import com.bodeum.domain.community.entity.enums.PostAnonymityType;
 import com.bodeum.domain.community.entity.enums.PostBoardType;
+import com.bodeum.domain.community.exception.CommunityErrorCode;
+import com.bodeum.domain.community.exception.CommunityException;
 import com.bodeum.global.common.entity.BaseCreatedUpdatedEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -55,6 +57,9 @@ public class Post extends BaseCreatedUpdatedEntity {
             String title,
             String content
     ) {
+        validateTitle(title);
+        validateContent(content);
+
         this.userId = userId;
         this.boardType = boardType;
         this.anonymityType = anonymityType;
@@ -84,9 +89,24 @@ public class Post extends BaseCreatedUpdatedEntity {
             String title,
             String content
     ) {
+        validateTitle(title);
+        validateContent(content);
+
         this.boardType = boardType;
         this.anonymityType = anonymityType;
         this.title = title;
         this.content = content;
+    }
+
+    private static void validateTitle(String title) {
+        if (title != null && title.length() > TITLE_MAX_LENGTH) {
+            throw new CommunityException(CommunityErrorCode.POST_TITLE_TOO_LONG);
+        }
+    }
+
+    private static void validateContent(String content) {
+        if (content != null && content.length() > CONTENT_MAX_LENGTH) {
+            throw new CommunityException(CommunityErrorCode.POST_CONTENT_TOO_LONG);
+        }
     }
 }
