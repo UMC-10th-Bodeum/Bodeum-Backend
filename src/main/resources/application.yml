@@ -31,6 +31,10 @@ spring:
       max-file-size: 5MB
       max-request-size: 5MB
 
+  # Flyway는 운영(prod)에서만 켠다. 로컬은 ddl-auto=update, 테스트는 H2라 기본 비활성화.
+  flyway:
+    enabled: false
+
 bodeum:
   auth:
     jwt-secret: ${JWT_SECRET:}
@@ -59,23 +63,3 @@ bodeum:
       access-key: ${AWS_ACCESS_KEY:}
       secret-key: ${AWS_SECRET_KEY:}
       public-base-url: ${AWS_S3_PUBLIC_BASE_URL:}
-
----
-spring:
-  config:
-    activate:
-      on-profile: local | test
-
-  jpa:
-    hibernate:
-      ddl-auto: update
-
----
-spring:
-  config:
-    activate:
-      on-profile: dev
-
-  jpa:
-    hibernate:
-      ddl-auto: validate
