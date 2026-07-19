@@ -18,7 +18,8 @@ public enum UserErrorCode implements BaseErrorCode {
             HttpStatus.NOT_FOUND,
             "USER404_2",
             "사용자 약관 동의 정보를 찾을 수 없습니다."
-    );
+    ),
+    ;
 
     private final HttpStatus status;
     private final String code;

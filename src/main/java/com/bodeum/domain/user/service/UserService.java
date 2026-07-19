@@ -188,13 +188,9 @@ public class UserService {
 
     @Transactional(readOnly = true)
     public AiTermsAgreementResponse getAiTermsAgreement(Long userId) {
-        UserAgreement agreement = userAgreementRepository.findByUserId(userId)
-                .orElseThrow(() -> new ProjectException(UserErrorCode.USER_AGREEMENT_NOT_FOUND));
-
-        return AiTermsAgreementResponse.of(
-                agreement.isAiTermsAgreed(),
-                agreement.getAiTermsAgreedAt()
-        );
+        return userAgreementRepository.findByUserId(userId)
+                .map(a -> AiTermsAgreementResponse.of(a.isAiTermsAgreed(), a.getAiTermsAgreedAt()))
+                .orElse(AiTermsAgreementResponse.of(false, null));
     }
 
     @Transactional
@@ -202,15 +198,35 @@ public class UserService {
             Long userId,
             AiTermsAgreementRequest request
     ) {
+        ensureUserAgreementExists(userId);
+
         UserAgreement agreement = userAgreementRepository.findByUserId(userId)
                 .orElseThrow(() -> new ProjectException(UserErrorCode.USER_AGREEMENT_NOT_FOUND));
 
         agreement.agreeAiTerms();
 
         return AiTermsAgreementResponse.of(
+
                 agreement.isAiTermsAgreed(),
                 agreement.getAiTermsAgreedAt()
         );
+    }
+
+    // 동시 요청 시 UserAgreement 중복 생성을 방지
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    public void ensureUserAgreementExists(Long userId) {
+        if (userAgreementRepository.findByUserId(userId).isPresent()) {
+            return;
+        }
+
+        try {
+            User user = getCurrentUser(userId);
+            userAgreementRepository.saveAndFlush(UserAgreement.create(user, false, false, false));
+        } catch (DataIntegrityViolationException e) {
+            if (userAgreementRepository.findByUserId(userId).isEmpty()) {
+                throw e;
+            }
+        }
     }
 
     private User requireActive(User user) {

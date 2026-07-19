@@ -1,0 +1,21 @@
+# 빌드 컨텍스트에서 제외 (이미지 용량/보안)
+.git
+.gitignore
+.idea
+.gradle
+build
+out
+docs
+sql
+output
+tmp
+*.md
+.env
+.env.*
+!.env.example
+docker-compose*.yml
+Dockerfile
+.dockerignore
+.DS_Store
+**/.DS_Store
+.claude

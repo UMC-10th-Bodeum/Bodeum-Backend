@@ -31,6 +31,9 @@ public class AiMessage extends BaseCreatedEntity {
     @Column(name = "content", nullable = false)
     private String content;
 
+    @Column(name = "is_warning", nullable = false)
+    private boolean warning = false;
+
     @Builder
     private AiMessage(
             AiChatRoom chatRoom,
