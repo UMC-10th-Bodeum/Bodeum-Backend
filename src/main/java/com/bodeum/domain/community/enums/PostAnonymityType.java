@@ -1,4 +1,4 @@
-package com.bodeum.domain.community.entity.enums;
+package com.bodeum.domain.community.enums;
 
 public enum PostAnonymityType {
     PROFILE_TAG_VISIBLE,
