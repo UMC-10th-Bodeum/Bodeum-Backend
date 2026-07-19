@@ -1,6 +1,8 @@
 package com.bodeum.domain.home.service;
 
 import com.bodeum.domain.community.entity.Post;
+import com.bodeum.domain.community.enums.DisabilityType;
+import com.bodeum.domain.community.repository.PostDisabilityTagRepository;
 import com.bodeum.domain.home.dto.response.*;
 import com.bodeum.domain.home.repository.*;
 import com.bodeum.domain.news.entity.NewsType;
@@ -21,6 +23,7 @@ public class HomeService {
     private final HomePostLikeRepository homePostLikeRepository;
     private final HomeCommentRepository homeCommentRepository;
     private final HomeInfoItemRepository homeInfoItemRepository;
+    private final PostDisabilityTagRepository postDisabilityTagRepository;
 
     public List<RecommendedNewsResponse> getRecommendedNews() {
         return homeNewsRepository.findTopRecommended(PageRequest.of(0, 5))
@@ -46,11 +49,19 @@ public class HomeService {
     public List<RecommendedPostResponse> getRecommendedPosts(int limit) {
         return homePostRepository.findTopByPopularity(PageRequest.of(0, limit))
                 .stream()
-                .map(post -> RecommendedPostResponse.of(
-                        post,
-                        homePostLikeRepository.countByPostId(post.getId()),
-                        homeCommentRepository.countByPostId(post.getId())
-                ))
+                .map(post -> {
+                    List<DisabilityType> tags = postDisabilityTagRepository
+                            .findAllByPost_IdOrderByIdAsc(post.getId())
+                            .stream()
+                            .map(tag -> tag.getDisabilityType())
+                            .toList();
+                    return RecommendedPostResponse.of(
+                            post,
+                            tags,
+                            homePostLikeRepository.countByPostId(post.getId()),
+                            homeCommentRepository.countByPostId(post.getId())
+                    );
+                })
                 .toList();
     }
 

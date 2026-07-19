@@ -1,7 +1,7 @@
 package com.bodeum.domain.home.dto.response;
 
 import com.bodeum.domain.community.entity.Post;
-import com.bodeum.domain.community.entity.enums.PostBoardType;
+import com.bodeum.domain.community.enums.PostBoardType;
 
 public record PostPreviewResponse(
         Long postId,
