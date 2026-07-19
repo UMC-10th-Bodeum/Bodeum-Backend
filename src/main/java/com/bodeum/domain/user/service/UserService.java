@@ -17,6 +17,7 @@ import com.bodeum.domain.user.dto.response.UserProfileUpdateResponse;
 import com.bodeum.domain.user.dto.response.UserWithdrawResponse;
 import com.bodeum.domain.user.entity.User;
 import com.bodeum.domain.user.entity.UserAgreement;
+import com.bodeum.domain.user.exception.UserErrorCode;
 import com.bodeum.domain.user.repository.UserAgreementRepository;
 import com.bodeum.domain.user.repository.UserRepository;
 import com.bodeum.global.apiPayload.code.GeneralErrorCode;
@@ -197,18 +198,35 @@ public class UserService {
             Long userId,
             AiTermsAgreementRequest request
     ) {
+        ensureUserAgreementExists(userId);
+
         UserAgreement agreement = userAgreementRepository.findByUserId(userId)
-                .orElseGet(() -> {
-                    User user = getCurrentUser(userId);
-                    return userAgreementRepository.save(UserAgreement.create(user, false, false, false));
-                });
+                .orElseThrow(() -> new ProjectException(UserErrorCode.USER_AGREEMENT_NOT_FOUND));
 
         agreement.agreeAiTerms();
 
         return AiTermsAgreementResponse.of(
+
                 agreement.isAiTermsAgreed(),
                 agreement.getAiTermsAgreedAt()
         );
+    }
+
+    // 동시 요청 시 UserAgreement 중복 생성을 방지
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    public void ensureUserAgreementExists(Long userId) {
+        if (userAgreementRepository.findByUserId(userId).isPresent()) {
+            return;
+        }
+
+        try {
+            User user = getCurrentUser(userId);
+            userAgreementRepository.saveAndFlush(UserAgreement.create(user, false, false, false));
+        } catch (DataIntegrityViolationException e) {
+            if (userAgreementRepository.findByUserId(userId).isEmpty()) {
+                throw e;
+            }
+        }
     }
 
     private User requireActive(User user) {
