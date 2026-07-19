@@ -37,7 +37,7 @@ public class AiChatRoomController {
     }
 
     @Operation(
-            summary = "내 AI 채팅방 조회 또는 생성",
+            summary = "내 채팅방 조회 또는 생성",
             description = "현재 로그인한 사용자의 AI 채팅방을 조회하고, 존재하지 않으면 새로 생성한다."
     )
     @GetMapping
