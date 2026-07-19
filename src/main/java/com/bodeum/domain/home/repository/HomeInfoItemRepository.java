@@ -8,6 +8,6 @@ import java.util.List;
 
 public interface HomeInfoItemRepository extends JpaRepository<InfoItem, Long> {
 
-    @Query("SELECT i.category, COUNT(i) FROM InfoItem i GROUP BY i.category")
+    @Query("SELECT i.infoCategory.mainCategory, COUNT(i) FROM InfoItem i GROUP BY i.infoCategory.mainCategory")
     List<Object[]> countByCategory();
 }
