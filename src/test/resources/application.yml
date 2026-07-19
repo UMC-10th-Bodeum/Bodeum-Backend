@@ -1,4 +1,7 @@
 spring:
+  autoconfigure:
+    exclude:
+      - org.springframework.ai.vectorstore.chroma.autoconfigure.ChromaVectorStoreAutoConfiguration
   profiles:
     active: test
 
@@ -13,6 +16,9 @@ spring:
       ddl-auto: create-drop
   flyway:
     enabled: false
+  ai:
+    openai:
+      api-key: sk-test-not-used
 
 bodeum:
   aws:

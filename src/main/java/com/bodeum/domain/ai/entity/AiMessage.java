@@ -38,11 +38,13 @@ public class AiMessage extends BaseCreatedEntity {
     private AiMessage(
             AiChatRoom chatRoom,
             SenderType senderType,
-            String content
+            String content,
+            boolean warning
     ) {
         this.chatRoom = chatRoom;
         this.senderType = senderType;
         this.content = content;
+        this.warning = warning;
     }
 
     public static AiMessage createUserMessage(
@@ -53,17 +55,20 @@ public class AiMessage extends BaseCreatedEntity {
                 .chatRoom(chatRoom)
                 .senderType(SenderType.USER)
                 .content(content)
+                .warning(false)
                 .build();
     }
 
     public static AiMessage createAiMessage(
             AiChatRoom chatRoom,
-            String content
+            String content,
+            boolean warning
     ) {
         return AiMessage.builder()
                 .chatRoom(chatRoom)
                 .senderType(SenderType.AI)
                 .content(content)
+                .warning(warning)
                 .build();
     }
 }

@@ -38,7 +38,7 @@ public class AiResponseSource extends BaseCreatedEntity {
     @Column(name = "source_url", length = 500)
     private String sourceUrl;
 
-    @Column(name = "source_updated_at", nullable = false)
+    @Column(name = "source_updated_at")
     private Instant sourceUpdatedAt;
 
     @Builder
