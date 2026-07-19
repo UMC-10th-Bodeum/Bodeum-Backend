@@ -17,7 +17,6 @@ import com.bodeum.domain.user.dto.response.UserProfileUpdateResponse;
 import com.bodeum.domain.user.dto.response.UserWithdrawResponse;
 import com.bodeum.domain.user.entity.User;
 import com.bodeum.domain.user.entity.UserAgreement;
-import com.bodeum.domain.user.exception.UserErrorCode;
 import com.bodeum.domain.user.repository.UserAgreementRepository;
 import com.bodeum.domain.user.repository.UserRepository;
 import com.bodeum.global.apiPayload.code.GeneralErrorCode;
@@ -188,13 +187,9 @@ public class UserService {
 
     @Transactional(readOnly = true)
     public AiTermsAgreementResponse getAiTermsAgreement(Long userId) {
-        UserAgreement agreement = userAgreementRepository.findByUserId(userId)
-                .orElseThrow(() -> new ProjectException(UserErrorCode.USER_AGREEMENT_NOT_FOUND));
-
-        return AiTermsAgreementResponse.of(
-                agreement.isAiTermsAgreed(),
-                agreement.getAiTermsAgreedAt()
-        );
+        return userAgreementRepository.findByUserId(userId)
+                .map(a -> AiTermsAgreementResponse.of(a.isAiTermsAgreed(), a.getAiTermsAgreedAt()))
+                .orElse(AiTermsAgreementResponse.of(false, null));
     }
 
     @Transactional
@@ -203,7 +198,10 @@ public class UserService {
             AiTermsAgreementRequest request
     ) {
         UserAgreement agreement = userAgreementRepository.findByUserId(userId)
-                .orElseThrow(() -> new ProjectException(UserErrorCode.USER_AGREEMENT_NOT_FOUND));
+                .orElseGet(() -> {
+                    User user = getCurrentUser(userId);
+                    return userAgreementRepository.save(UserAgreement.create(user, false, false, false));
+                });
 
         agreement.agreeAiTerms();
 
