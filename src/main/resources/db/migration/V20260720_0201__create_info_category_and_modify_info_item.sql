@@ -1,7 +1,7 @@
--- 1. info_category 테이블 생성
+-- 1. info_category 테이블 생성 (parent_category를 ENUM 타입으로 수정)
 CREATE TABLE info_category (
                                info_category_id BIGINT NOT NULL AUTO_INCREMENT,
-                               parent_category VARCHAR(50) NOT NULL,
+                               parent_category ENUM('HOSPITAL', 'INSTITUTION', 'WELFARE', 'EDUCATION', 'EMPLOYMENT') NOT NULL,
                                parent_category_ko VARCHAR(50) NOT NULL,
                                sub_category VARCHAR(50) NOT NULL,
                                sub_category_ko VARCHAR(50) NOT NULL,
