@@ -28,15 +28,23 @@ public record RecommendedNewsResponse(
     }
 
     private static String calculateDDay(LocalDate applyEndDate) {
-        if (applyEndDate == null) return null;
+        if (applyEndDate == null) {
+            return null;
+        }
         long days = ChronoUnit.DAYS.between(LocalDate.now(), applyEndDate);
-        if (days < 0) return "마감";
-        if (days == 0) return "D-Day";
+        if (days < 0) {
+            return "마감";
+        }
+        if (days == 0) {
+            return "D-Day";
+        }
         return "D-" + days;
     }
 
     private static String toStatusLabel(RecruitmentStatus status) {
-        if (status == null) return null;
+        if (status == null) {
+            return null;
+        }
         return switch (status) {
             case OPEN -> "모집중";
             case CLOSED -> "모집 마감";

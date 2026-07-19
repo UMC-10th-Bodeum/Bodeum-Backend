@@ -8,5 +8,7 @@ public interface PostDisabilityTagRepository extends JpaRepository<PostDisabilit
 
     List<PostDisabilityTag> findAllByPost_IdOrderByIdAsc(Long postId);
 
+    List<PostDisabilityTag> findAllByPost_IdIn(List<Long> postIds);
+
     void deleteAllByPost_Id(Long postId);
 }

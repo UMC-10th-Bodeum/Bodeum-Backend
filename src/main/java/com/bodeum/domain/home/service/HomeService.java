@@ -1,6 +1,7 @@
 package com.bodeum.domain.home.service;
 
 import com.bodeum.domain.community.entity.Post;
+import com.bodeum.domain.community.entity.PostDisabilityTag;
 import com.bodeum.domain.community.enums.DisabilityType;
 import com.bodeum.domain.community.repository.PostDisabilityTagRepository;
 import com.bodeum.domain.home.dto.response.*;
@@ -12,11 +13,15 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class HomeService {
+
+    private static final String SORT_LATEST = "latest";
 
     private final HomeNewsRepository homeNewsRepository;
     private final HomePostRepository homePostRepository;
@@ -33,36 +38,49 @@ public class HomeService {
     }
 
     public List<PostPreviewResponse> getPostsPreview(String sort, int limit) {
-        List<Post> posts = "latest".equals(sort)
+        List<Post> posts = SORT_LATEST.equals(sort)
                 ? homePostRepository.findAllByOrderByCreatedAtDesc(PageRequest.of(0, limit))
                 : homePostRepository.findTopByPopularity(PageRequest.of(0, limit));
+
+        List<Long> postIds = posts.stream().map(Post::getId).toList();
+        Map<Long, Long> likeCountMap = toCountMap(homePostLikeRepository.countGroupByPostIdIn(postIds));
+        Map<Long, Long> commentCountMap = toCountMap(homeCommentRepository.countGroupByPostIdIn(postIds));
 
         return posts.stream()
                 .map(post -> PostPreviewResponse.of(
                         post,
-                        homePostLikeRepository.countByPostId(post.getId()),
-                        homeCommentRepository.countByPostId(post.getId())
+                        likeCountMap.getOrDefault(post.getId(), 0L),
+                        commentCountMap.getOrDefault(post.getId(), 0L)
                 ))
                 .toList();
     }
 
     public List<RecommendedPostResponse> getRecommendedPosts(int limit) {
-        return homePostRepository.findTopByPopularity(PageRequest.of(0, limit))
+        List<Post> posts = homePostRepository.findTopByPopularity(PageRequest.of(0, limit));
+
+        List<Long> postIds = posts.stream().map(Post::getId).toList();
+        Map<Long, List<DisabilityType>> tagsMap = postDisabilityTagRepository.findAllByPost_IdIn(postIds)
                 .stream()
-                .map(post -> {
-                    List<DisabilityType> tags = postDisabilityTagRepository
-                            .findAllByPost_IdOrderByIdAsc(post.getId())
-                            .stream()
-                            .map(tag -> tag.getDisabilityType())
-                            .toList();
-                    return RecommendedPostResponse.of(
-                            post,
-                            tags,
-                            homePostLikeRepository.countByPostId(post.getId()),
-                            homeCommentRepository.countByPostId(post.getId())
-                    );
-                })
+                .collect(Collectors.groupingBy(
+                        tag -> tag.getPost().getId(),
+                        Collectors.mapping(PostDisabilityTag::getDisabilityType, Collectors.toList())
+                ));
+        Map<Long, Long> likeCountMap = toCountMap(homePostLikeRepository.countGroupByPostIdIn(postIds));
+        Map<Long, Long> commentCountMap = toCountMap(homeCommentRepository.countGroupByPostIdIn(postIds));
+
+        return posts.stream()
+                .map(post -> RecommendedPostResponse.of(
+                        post,
+                        tagsMap.getOrDefault(post.getId(), List.of()),
+                        likeCountMap.getOrDefault(post.getId(), 0L),
+                        commentCountMap.getOrDefault(post.getId(), 0L)
+                ))
                 .toList();
+    }
+
+    private Map<Long, Long> toCountMap(List<Object[]> rows) {
+        return rows.stream()
+                .collect(Collectors.toMap(row -> (Long) row[0], row -> (Long) row[1]));
     }
 
     public List<NewsPreviewResponse> getNewsPreview(NewsType newsType, int limit) {
