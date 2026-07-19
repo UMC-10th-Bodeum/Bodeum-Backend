@@ -4,8 +4,10 @@ import com.bodeum.global.apiPayload.ApiResponse;
 import com.bodeum.global.apiPayload.code.BaseErrorCode;
 import com.bodeum.global.apiPayload.code.GeneralErrorCode;
 import com.bodeum.global.apiPayload.exception.ProjectException;
+import jakarta.validation.ConstraintViolationException;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -57,6 +59,28 @@ public class GeneralExceptionAdvice {
         BaseErrorCode errorCode = GeneralErrorCode.BAD_REQUEST;
         return ResponseEntity.status(errorCode.getStatus())
                 .body(ApiResponse.onFailure(errorCode, null));
+    }
+
+    @ExceptionHandler(ConstraintViolationException.class)
+    public ResponseEntity<ApiResponse<String>> handleConstraintViolationException(
+            ConstraintViolationException e
+    ) {
+        BaseErrorCode errorCode = GeneralErrorCode.BAD_REQUEST;
+        String message = e.getConstraintViolations().stream()
+                .map(v -> v.getPropertyPath() + ": " + v.getMessage())
+                .collect(Collectors.joining(", "));
+        return ResponseEntity.status(errorCode.getStatus())
+                .body(ApiResponse.onFailure(errorCode, message));
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ApiResponse<String>> handleMethodArgumentTypeMismatchException(
+            MethodArgumentTypeMismatchException e
+    ) {
+        BaseErrorCode errorCode = GeneralErrorCode.BAD_REQUEST;
+        String message = e.getName() + " 파라미터 값이 올바르지 않습니다.";
+        return ResponseEntity.status(errorCode.getStatus())
+                .body(ApiResponse.onFailure(errorCode, message));
     }
 
     @ExceptionHandler(MissingServletRequestParameterException.class)
