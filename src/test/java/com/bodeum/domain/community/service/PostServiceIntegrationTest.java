@@ -13,6 +13,7 @@ import com.bodeum.domain.community.entity.PostScrap;
 import com.bodeum.domain.community.enums.DisabilityType;
 import com.bodeum.domain.community.enums.PostAnonymityType;
 import com.bodeum.domain.community.enums.PostBoardType;
+import com.bodeum.domain.community.enums.PostStatus;
 import com.bodeum.domain.community.repository.CommentLikeRepository;
 import com.bodeum.domain.community.repository.CommentRepository;
 import com.bodeum.domain.community.repository.PostDisabilityTagRepository;
@@ -64,7 +65,8 @@ class PostServiceIntegrationTest {
                         "익명 게시글 내용",
                         List.of(DisabilityType.AUTISM, DisabilityType.AUTISM, DisabilityType.ADHD),
                         List.of("육아", "정보공유"),
-                        List.of("https://example.com/1.jpg", "https://example.com/2.jpg")
+                        List.of("https://example.com/1.jpg", "https://example.com/2.jpg"),
+                        true
                 )
         );
 
@@ -72,8 +74,10 @@ class PostServiceIntegrationTest {
 
         assertThat(created.authorId()).isNull();
         assertThat(created.isMine()).isTrue();
+        assertThat(created.isQuestion()).isTrue();
         assertThat(viewed.authorId()).isNull();
         assertThat(viewed.isMine()).isFalse();
+        assertThat(viewed.viewCount()).isEqualTo(1);
         assertThat(viewed.disabilityTypes()).containsExactly(DisabilityType.AUTISM, DisabilityType.ADHD);
         assertThat(viewed.hashtags()).containsExactly("육아", "정보공유");
         assertThat(viewed.imageUrls()).containsExactly(
@@ -83,13 +87,14 @@ class PostServiceIntegrationTest {
     }
 
     @Test
-    void deletePostRemovesAllRelatedData() {
+    void deletePostSoftDeletesPostAndKeepsRelatedData() {
         Post post = postRepository.saveAndFlush(Post.create(
                 10L,
                 PostBoardType.INFORMATION_QUESTION,
                 PostAnonymityType.PROFILE_TAG_VISIBLE,
                 "삭제할 게시글",
-                "삭제할 게시글 내용"
+                "삭제할 게시글 내용",
+                true
         ));
         Comment rootComment = commentRepository.saveAndFlush(Comment.create(post, 20L, "댓글"));
         Comment reply = commentRepository.saveAndFlush(Comment.createReply(rootComment, 30L, "답글"));
@@ -100,12 +105,14 @@ class PostServiceIntegrationTest {
 
         postService.deletePost(10L, post.getId());
 
-        assertThat(postRepository.findById(post.getId())).isEmpty();
-        assertThat(commentRepository.count()).isZero();
-        assertThat(commentLikeRepository.count()).isZero();
-        assertThat(postLikeRepository.count()).isZero();
-        assertThat(postScrapRepository.count()).isZero();
-        assertThat(postReportRepository.count()).isZero();
+        Post deletedPost = postRepository.findById(post.getId()).orElseThrow();
+        assertThat(deletedPost.getStatus()).isEqualTo(PostStatus.DELETED);
+        assertThat(deletedPost.getDeletedAt()).isNotNull();
+        assertThat(commentRepository.count()).isEqualTo(2);
+        assertThat(commentLikeRepository.count()).isOne();
+        assertThat(postLikeRepository.count()).isOne();
+        assertThat(postScrapRepository.count()).isOne();
+        assertThat(postReportRepository.count()).isOne();
         assertThat(postDisabilityTagRepository.count()).isZero();
         assertThat(postHashtagRepository.count()).isZero();
         assertThat(postImageRepository.count()).isZero();

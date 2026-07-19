@@ -9,18 +9,14 @@ import com.bodeum.domain.community.entity.PostDisabilityTag;
 import com.bodeum.domain.community.entity.PostHashtag;
 import com.bodeum.domain.community.entity.PostImage;
 import com.bodeum.domain.community.enums.DisabilityType;
+import com.bodeum.domain.community.enums.PostStatus;
 import com.bodeum.domain.community.exception.CommunityErrorCode;
 import com.bodeum.domain.community.exception.CommunityException;
-import com.bodeum.domain.community.repository.CommentLikeRepository;
-import com.bodeum.domain.community.repository.CommentRepository;
 import com.bodeum.domain.community.repository.HashtagRepository;
 import com.bodeum.domain.community.repository.PostDisabilityTagRepository;
 import com.bodeum.domain.community.repository.PostHashtagRepository;
 import com.bodeum.domain.community.repository.PostImageRepository;
-import com.bodeum.domain.community.repository.PostLikeRepository;
-import com.bodeum.domain.community.repository.PostReportRepository;
 import com.bodeum.domain.community.repository.PostRepository;
-import com.bodeum.domain.community.repository.PostScrapRepository;
 import java.util.List;
 import java.util.Objects;
 import lombok.RequiredArgsConstructor;
@@ -36,11 +32,6 @@ public class PostService {
     private final PostHashtagRepository postHashtagRepository;
     private final PostImageRepository postImageRepository;
     private final PostDisabilityTagRepository postDisabilityTagRepository;
-    private final PostLikeRepository postLikeRepository;
-    private final PostScrapRepository postScrapRepository;
-    private final PostReportRepository postReportRepository;
-    private final CommentRepository commentRepository;
-    private final CommentLikeRepository commentLikeRepository;
 
     @Transactional
     public PostResponse createPost(Long userId, CreatePostRequest request) {
@@ -51,7 +42,8 @@ public class PostService {
                 request.boardType(),
                 request.anonymityType(),
                 request.title(),
-                request.content()
+                request.content(),
+                request.isQuestion()
         ));
 
         saveDisabilityTags(post, safeList(request.disabilityTypes()));
@@ -68,7 +60,8 @@ public class PostService {
                 request.boardType() == null ? post.getBoardType() : request.boardType(),
                 request.anonymityType() == null ? post.getAnonymityType() : request.anonymityType(),
                 request.title() == null ? post.getTitle() : request.title(),
-                request.content() == null ? post.getContent() : request.content()
+                request.content() == null ? post.getContent() : request.content(),
+                request.isQuestion() == null ? post.isQuestion() : request.isQuestion()
         );
 
         if (request.disabilityTypes() != null) {
@@ -88,25 +81,15 @@ public class PostService {
     public void deletePost(Long userId, Long postId) {
         Post post = getOwnedPost(userId, postId);
 
-        commentLikeRepository.deleteAllByComment_Post_Id(postId);
-        commentLikeRepository.flush();
-        commentRepository.deleteAllByPost_IdAndParentIsNotNull(postId);
-        commentRepository.flush();
-        commentRepository.deleteAllByPost_IdAndParentIsNull(postId);
-        commentRepository.flush();
-        postLikeRepository.deleteAllByPost_Id(postId);
-        postScrapRepository.deleteAllByPost_Id(postId);
-        postReportRepository.deleteAllByPost_Id(postId);
-        postDisabilityTagRepository.deleteAllByPost_Id(postId);
-        postHashtagRepository.deleteAllByPost_Id(postId);
-        postImageRepository.deleteAllByPost_Id(postId);
-
-        postRepository.delete(post);
+        post.delete();
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public PostResponse getPost(Long userId, Long postId) {
         validateAuthenticatedUser(userId);
+        if (postRepository.incrementViewCount(postId, PostStatus.ACTIVE) == 0) {
+            throw new CommunityException(CommunityErrorCode.POST_NOT_FOUND);
+        }
         return getPostResponse(findPost(postId), userId);
     }
 
@@ -121,7 +104,7 @@ public class PostService {
     }
 
     private Post findPost(Long postId) {
-        return postRepository.findById(postId)
+        return postRepository.findByIdAndStatus(postId, PostStatus.ACTIVE)
                 .orElseThrow(() -> new CommunityException(CommunityErrorCode.POST_NOT_FOUND));
     }
 

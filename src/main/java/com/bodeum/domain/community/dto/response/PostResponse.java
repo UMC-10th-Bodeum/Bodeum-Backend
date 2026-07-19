@@ -31,6 +31,14 @@ public record PostResponse(
         @Schema(example = "주말에 방문하기 좋은 조용한 공원을 찾고 있습니다.")
         String content,
 
+        @Schema(description = "질문글 여부", example = "true")
+        boolean isQuestion,
+
+        int viewCount,
+        int likeCount,
+        int commentCount,
+        int scrapCount,
+
         List<DisabilityType> disabilityTypes,
         List<String> hashtags,
         List<String> imageUrls,
@@ -53,6 +61,11 @@ public record PostResponse(
                 post.getAnonymityType(),
                 post.getTitle(),
                 post.getContent(),
+                post.isQuestion(),
+                post.getViewCount(),
+                post.getLikeCount(),
+                post.getCommentCount(),
+                post.getScrapCount(),
                 List.copyOf(disabilityTypes),
                 List.copyOf(hashtags),
                 List.copyOf(imageUrls),

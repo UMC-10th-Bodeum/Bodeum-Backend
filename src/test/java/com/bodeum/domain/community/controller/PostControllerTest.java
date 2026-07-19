@@ -72,6 +72,7 @@ class PostControllerTest {
                                 {
                                   "boardType": "FREE_COMMUNICATION",
                                   "anonymityType": "PROFILE_TAG_VISIBLE",
+                                  "isQuestion": true,
                                   "title": "게시글 제목",
                                   "content": "게시글 내용",
                                   "disabilityTypes": ["AUTISM"],
@@ -82,7 +83,8 @@ class PostControllerTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.isSuccess").value(true))
                 .andExpect(jsonPath("$.code").value("COMMON201_1"))
-                .andExpect(jsonPath("$.result.postId").value(1));
+                .andExpect(jsonPath("$.result.postId").value(1))
+                .andExpect(jsonPath("$.result.isQuestion").value(true));
 
         then(postService).should().createPost(any(), any(CreatePostRequest.class));
     }
@@ -136,7 +138,8 @@ class PostControllerTest {
                 "게시글 내용",
                 List.of(DisabilityType.AUTISM),
                 List.of("육아"),
-                imageUrls
+                imageUrls,
+                false
         );
 
         mockMvc.perform(post("/api/community/posts")
@@ -180,6 +183,10 @@ class PostControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.result.title").value("게시글 제목"))
                 .andExpect(jsonPath("$.result.isMine").value(true))
+                .andExpect(jsonPath("$.result.viewCount").value(3))
+                .andExpect(jsonPath("$.result.likeCount").value(4))
+                .andExpect(jsonPath("$.result.commentCount").value(5))
+                .andExpect(jsonPath("$.result.scrapCount").value(6))
                 .andExpect(jsonPath("$.result.disabilityTypes[0]").value("AUTISM"));
     }
 
@@ -221,6 +228,11 @@ class PostControllerTest {
                 PostAnonymityType.PROFILE_TAG_VISIBLE,
                 "게시글 제목",
                 "게시글 내용",
+                true,
+                3,
+                4,
+                5,
+                6,
                 List.of(DisabilityType.AUTISM),
                 List.of("육아"),
                 List.of("https://example.com/image.jpg"),

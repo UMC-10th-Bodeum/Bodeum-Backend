@@ -1,8 +1,11 @@
 package com.bodeum.domain.community.entity;
 
-import com.bodeum.global.common.entity.BaseCreatedUpdatedEntity;
+import com.bodeum.domain.community.enums.CommentStatus;
+import com.bodeum.global.common.entity.BaseCreatedUpdatedDeletedEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -20,7 +23,7 @@ import lombok.NoArgsConstructor;
 @Entity
 @Table(name = "comments")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class Comment extends BaseCreatedUpdatedEntity {
+public class Comment extends BaseCreatedUpdatedDeletedEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -45,12 +48,20 @@ public class Comment extends BaseCreatedUpdatedEntity {
     @Column(name = "is_accepted", nullable = false)
     private boolean accepted = false;
 
+    @Column(name = "like_count", nullable = false)
+    private int likeCount;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false, length = 20)
+    private CommentStatus status = CommentStatus.ACTIVE;
+
     @Builder
     private Comment(Post post, Long userId, Comment parent, String content) {
         this.post = post;
         this.userId = userId;
         this.parent = parent;
         this.content = content;
+        this.status = CommentStatus.ACTIVE;
     }
 
     public static Comment create(Post post, Long userId, String content) {
@@ -76,5 +87,29 @@ public class Comment extends BaseCreatedUpdatedEntity {
 
     public void accept() {
         this.accepted = true;
+    }
+
+    public void increaseLikeCount() {
+        this.likeCount++;
+    }
+
+    public void decreaseLikeCount() {
+        this.likeCount = Math.max(0, this.likeCount - 1);
+    }
+
+    public void hide() {
+        this.status = CommentStatus.HIDDEN;
+    }
+
+    @Override
+    public void delete() {
+        super.delete();
+        this.status = CommentStatus.DELETED;
+    }
+
+    @Override
+    public void restore() {
+        super.restore();
+        this.status = CommentStatus.ACTIVE;
     }
 }

@@ -14,18 +14,14 @@ import com.bodeum.domain.community.entity.Post;
 import com.bodeum.domain.community.enums.DisabilityType;
 import com.bodeum.domain.community.enums.PostAnonymityType;
 import com.bodeum.domain.community.enums.PostBoardType;
+import com.bodeum.domain.community.enums.PostStatus;
 import com.bodeum.domain.community.exception.CommunityErrorCode;
 import com.bodeum.domain.community.exception.CommunityException;
-import com.bodeum.domain.community.repository.CommentLikeRepository;
-import com.bodeum.domain.community.repository.CommentRepository;
 import com.bodeum.domain.community.repository.HashtagRepository;
 import com.bodeum.domain.community.repository.PostDisabilityTagRepository;
 import com.bodeum.domain.community.repository.PostHashtagRepository;
 import com.bodeum.domain.community.repository.PostImageRepository;
-import com.bodeum.domain.community.repository.PostLikeRepository;
-import com.bodeum.domain.community.repository.PostReportRepository;
 import com.bodeum.domain.community.repository.PostRepository;
-import com.bodeum.domain.community.repository.PostScrapRepository;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
@@ -48,17 +44,6 @@ class PostServiceTest {
     private PostImageRepository postImageRepository;
     @Mock
     private PostDisabilityTagRepository postDisabilityTagRepository;
-    @Mock
-    private PostLikeRepository postLikeRepository;
-    @Mock
-    private PostScrapRepository postScrapRepository;
-    @Mock
-    private PostReportRepository postReportRepository;
-    @Mock
-    private CommentRepository commentRepository;
-    @Mock
-    private CommentLikeRepository commentLikeRepository;
-
     @InjectMocks
     private PostService postService;
 
@@ -74,6 +59,7 @@ class PostServiceTest {
 
         assertThat(response.postId()).isEqualTo(1L);
         assertThat(response.authorId()).isEqualTo(10L);
+        assertThat(response.isQuestion()).isTrue();
         assertThat(response.title()).isEqualTo("게시글 제목");
         then(postDisabilityTagRepository).should().saveAll(anyList());
         then(postHashtagRepository).should().saveAll(anyList());
@@ -83,7 +69,7 @@ class PostServiceTest {
     @Test
     void updatePostChangesOnlyRequestedFieldsForOwner() {
         Post post = post(1L, 10L);
-        given(postRepository.findById(1L)).willReturn(Optional.of(post));
+        given(postRepository.findByIdAndStatus(1L, PostStatus.ACTIVE)).willReturn(Optional.of(post));
 
         PostResponse response = postService.updatePost(
                 10L,
@@ -95,7 +81,8 @@ class PostServiceTest {
                         null,
                         null,
                         null,
-                        null
+                        null,
+                        false
                 )
         );
 
@@ -108,12 +95,13 @@ class PostServiceTest {
 
     @Test
     void updatePostRejectsNonOwner() {
-        given(postRepository.findById(1L)).willReturn(Optional.of(post(1L, 10L)));
+        given(postRepository.findByIdAndStatus(1L, PostStatus.ACTIVE))
+                .willReturn(Optional.of(post(1L, 10L)));
 
         assertThatThrownBy(() -> postService.updatePost(
                 20L,
                 1L,
-                new UpdatePostRequest(null, null, "수정 제목", null, null, null, null)
+                new UpdatePostRequest(null, null, "수정 제목", null, null, null, null, null)
         ))
                 .isInstanceOf(CommunityException.class)
                 .extracting(exception -> ((CommunityException) exception).getErrorCode())
@@ -121,23 +109,18 @@ class PostServiceTest {
     }
 
     @Test
-    void deletePostRemovesRelatedDataBeforePost() {
+    void deletePostMarksOwnedPostAsDeleted() {
         Post post = post(1L, 10L);
-        given(postRepository.findById(1L)).willReturn(Optional.of(post));
+        given(postRepository.findByIdAndStatus(1L, PostStatus.ACTIVE)).willReturn(Optional.of(post));
 
         postService.deletePost(10L, 1L);
 
-        then(commentLikeRepository).should().deleteAllByComment_Post_Id(1L);
-        then(postDisabilityTagRepository).should().deleteAllByPost_Id(1L);
-        then(postHashtagRepository).should().deleteAllByPost_Id(1L);
-        then(postImageRepository).should().deleteAllByPost_Id(1L);
-        then(postRepository).should().delete(post);
+        assertThat(post.getStatus()).isEqualTo(PostStatus.DELETED);
+        assertThat(post.getDeletedAt()).isNotNull();
     }
 
     @Test
     void getPostRejectsMissingPost() {
-        given(postRepository.findById(99L)).willReturn(Optional.empty());
-
         assertThatThrownBy(() -> postService.getPost(10L, 99L))
                 .isInstanceOf(CommunityException.class)
                 .extracting(exception -> ((CommunityException) exception).getErrorCode())
@@ -151,10 +134,12 @@ class PostServiceTest {
                 PostBoardType.FREE_COMMUNICATION,
                 PostAnonymityType.FULLY_ANONYMOUS,
                 "익명 게시글",
-                "익명 게시글 내용"
+                "익명 게시글 내용",
+                false
         );
         ReflectionTestUtils.setField(post, "id", 1L);
-        given(postRepository.findById(1L)).willReturn(Optional.of(post));
+        given(postRepository.incrementViewCount(1L, PostStatus.ACTIVE)).willReturn(1);
+        given(postRepository.findByIdAndStatus(1L, PostStatus.ACTIVE)).willReturn(Optional.of(post));
 
         PostResponse response = postService.getPost(20L, 1L);
 
@@ -178,7 +163,8 @@ class PostServiceTest {
                 "게시글 내용",
                 List.of(DisabilityType.AUTISM),
                 List.of("육아"),
-                List.of("https://example.com/image.jpg")
+                List.of("https://example.com/image.jpg"),
+                true
         );
     }
 
@@ -188,7 +174,8 @@ class PostServiceTest {
                 PostBoardType.FREE_COMMUNICATION,
                 PostAnonymityType.PROFILE_TAG_VISIBLE,
                 "게시글 제목",
-                "게시글 내용"
+                "게시글 내용",
+                false
         );
         ReflectionTestUtils.setField(post, "id", postId);
         return post;

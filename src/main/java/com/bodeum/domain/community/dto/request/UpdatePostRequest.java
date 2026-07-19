@@ -60,7 +60,10 @@ public record UpdatePostRequest(
                 @NotBlank(message = "이미지 URL은 비어 있을 수 없습니다.")
                 @Size(max = PostImage.IMAGE_URL_MAX_LENGTH, message = "이미지 URL은 500자 이하로 입력해주세요.")
                 String
-                > imageUrls
+                > imageUrls,
+
+        @Schema(description = "질문글 여부", example = "true", nullable = true)
+        Boolean isQuestion
 ) {
 
     @JsonIgnore
@@ -71,6 +74,7 @@ public record UpdatePostRequest(
                 || anonymityType != null
                 || title != null
                 || content != null
+                || isQuestion != null
                 || disabilityTypes != null
                 || hashtags != null
                 || imageUrls != null;
