@@ -39,7 +39,13 @@ public class SecurityConfig {
             "/api/v1/auth/refresh",
             "/api/v1/terms/**",
             // 헤더/사이드바 공통 조회는 비로그인 상태에서도 200으로 응답해야 한다.
-            "/api/v1/users/me/brief"
+            "/api/v1/users/me/brief",
+            // 홈 화면 API
+            "/api/v1/news/recommended",
+            "/api/v1/home/posts/preview",
+            "/api/v1/community/posts/recommended",
+            "/api/v1/home/news/preview",
+            "/api/v1/info-items/counts"
     };
 
     @Bean
