@@ -2,7 +2,9 @@ package com.bodeum.domain.community.controller;
 
 import com.bodeum.domain.community.dto.request.CreatePostRequest;
 import com.bodeum.domain.community.dto.request.UpdatePostRequest;
+import com.bodeum.domain.community.dto.response.PostLikeResponse;
 import com.bodeum.domain.community.dto.response.PostResponse;
+import com.bodeum.domain.community.dto.response.PostScrapResponse;
 import com.bodeum.domain.community.service.PostService;
 import com.bodeum.global.apiPayload.ApiResponse;
 import com.bodeum.global.apiPayload.code.GeneralSuccessCode;
@@ -17,6 +19,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -50,7 +53,7 @@ public class PostController {
         return ApiResponse.of(GeneralSuccessCode.OK, postService.updatePost(userId, postId, request));
     }
 
-    @Operation(summary = "게시글 삭제", description = "작성자가 게시글과 연관 데이터를 삭제한다.")
+    @Operation(summary = "게시글 삭제", description = "작성자가 게시글을 논리 삭제한다.")
     @DeleteMapping("/{postId}")
     public ApiResponse<Void> deletePost(
             @LoginUser Long userId,
@@ -67,5 +70,41 @@ public class PostController {
             @PathVariable Long postId
     ) {
         return ApiResponse.of(GeneralSuccessCode.OK, postService.getPost(userId, postId));
+    }
+
+    @Operation(summary = "게시글 좋아요 등록")
+    @PutMapping("/{postId}/likes")
+    public ApiResponse<PostLikeResponse> likePost(
+            @LoginUser Long userId,
+            @PathVariable Long postId
+    ) {
+        return ApiResponse.of(GeneralSuccessCode.OK, postService.likePost(userId, postId));
+    }
+
+    @Operation(summary = "게시글 좋아요 취소")
+    @DeleteMapping("/{postId}/likes")
+    public ApiResponse<PostLikeResponse> unlikePost(
+            @LoginUser Long userId,
+            @PathVariable Long postId
+    ) {
+        return ApiResponse.of(GeneralSuccessCode.OK, postService.unlikePost(userId, postId));
+    }
+
+    @Operation(summary = "게시글 스크랩 등록")
+    @PutMapping("/{postId}/scraps")
+    public ApiResponse<PostScrapResponse> scrapPost(
+            @LoginUser Long userId,
+            @PathVariable Long postId
+    ) {
+        return ApiResponse.of(GeneralSuccessCode.OK, postService.scrapPost(userId, postId));
+    }
+
+    @Operation(summary = "게시글 스크랩 취소")
+    @DeleteMapping("/{postId}/scraps")
+    public ApiResponse<PostScrapResponse> unscrapPost(
+            @LoginUser Long userId,
+            @PathVariable Long postId
+    ) {
+        return ApiResponse.of(GeneralSuccessCode.OK, postService.unscrapPost(userId, postId));
     }
 }

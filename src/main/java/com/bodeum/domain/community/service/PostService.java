@@ -2,12 +2,16 @@ package com.bodeum.domain.community.service;
 
 import com.bodeum.domain.community.dto.request.CreatePostRequest;
 import com.bodeum.domain.community.dto.request.UpdatePostRequest;
+import com.bodeum.domain.community.dto.response.PostLikeResponse;
 import com.bodeum.domain.community.dto.response.PostResponse;
+import com.bodeum.domain.community.dto.response.PostScrapResponse;
 import com.bodeum.domain.community.entity.Hashtag;
 import com.bodeum.domain.community.entity.Post;
 import com.bodeum.domain.community.entity.PostDisabilityTag;
 import com.bodeum.domain.community.entity.PostHashtag;
 import com.bodeum.domain.community.entity.PostImage;
+import com.bodeum.domain.community.entity.PostLike;
+import com.bodeum.domain.community.entity.PostScrap;
 import com.bodeum.domain.community.enums.DisabilityType;
 import com.bodeum.domain.community.enums.PostStatus;
 import com.bodeum.domain.community.exception.CommunityErrorCode;
@@ -16,9 +20,12 @@ import com.bodeum.domain.community.repository.HashtagRepository;
 import com.bodeum.domain.community.repository.PostDisabilityTagRepository;
 import com.bodeum.domain.community.repository.PostHashtagRepository;
 import com.bodeum.domain.community.repository.PostImageRepository;
+import com.bodeum.domain.community.repository.PostLikeRepository;
 import com.bodeum.domain.community.repository.PostRepository;
+import com.bodeum.domain.community.repository.PostScrapRepository;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,6 +39,8 @@ public class PostService {
     private final PostHashtagRepository postHashtagRepository;
     private final PostImageRepository postImageRepository;
     private final PostDisabilityTagRepository postDisabilityTagRepository;
+    private final PostLikeRepository postLikeRepository;
+    private final PostScrapRepository postScrapRepository;
 
     @Transactional
     public PostResponse createPost(Long userId, CreatePostRequest request) {
@@ -93,22 +102,82 @@ public class PostService {
         return getPostResponse(findPost(postId), userId);
     }
 
+    @Transactional
+    public PostLikeResponse likePost(Long userId, Long postId) {
+        validateAuthenticatedUser(userId);
+        Post post = findPostForUpdate(postId);
+
+        if (!postLikeRepository.existsByPost_IdAndUserId(postId, userId)) {
+            postLikeRepository.save(PostLike.create(post, userId));
+            post.increaseLikeCount();
+        }
+
+        return new PostLikeResponse(true, post.getLikeCount());
+    }
+
+    @Transactional
+    public PostLikeResponse unlikePost(Long userId, Long postId) {
+        validateAuthenticatedUser(userId);
+        Post post = findPostForUpdate(postId);
+
+        Optional<PostLike> postLike = postLikeRepository.findByPost_IdAndUserId(postId, userId);
+        if (postLike.isPresent()) {
+            postLikeRepository.delete(postLike.get());
+            post.decreaseLikeCount();
+        }
+
+        return new PostLikeResponse(false, post.getLikeCount());
+    }
+
+    @Transactional
+    public PostScrapResponse scrapPost(Long userId, Long postId) {
+        validateAuthenticatedUser(userId);
+        Post post = findPostForUpdate(postId);
+
+        if (!postScrapRepository.existsByPost_IdAndUserId(postId, userId)) {
+            postScrapRepository.save(PostScrap.create(post, userId));
+            post.increaseScrapCount();
+        }
+
+        return new PostScrapResponse(true, post.getScrapCount());
+    }
+
+    @Transactional
+    public PostScrapResponse unscrapPost(Long userId, Long postId) {
+        validateAuthenticatedUser(userId);
+        Post post = findPostForUpdate(postId);
+
+        Optional<PostScrap> postScrap = postScrapRepository.findByPost_IdAndUserId(postId, userId);
+        if (postScrap.isPresent()) {
+            postScrapRepository.delete(postScrap.get());
+            post.decreaseScrapCount();
+        }
+
+        return new PostScrapResponse(false, post.getScrapCount());
+    }
+
     private Post getOwnedPost(Long userId, Long postId) {
         validateAuthenticatedUser(userId);
-        Post post = findPost(postId);
+        Post post = findPostForUpdate(postId);
         if (!Objects.equals(post.getUserId(), userId)) {
             throw new CommunityException(CommunityErrorCode.POST_FORBIDDEN);
         }
-
         return post;
     }
 
     private Post findPost(Long postId) {
-        return postRepository.findByIdAndStatus(postId, PostStatus.ACTIVE)
+        return postRepository.findByIdAndStatusAndDeletedAtIsNull(postId, PostStatus.ACTIVE)
+                .orElseThrow(() -> new CommunityException(CommunityErrorCode.POST_NOT_FOUND));
+    }
+
+    private Post findPostForUpdate(Long postId) {
+        return postRepository.findByIdAndStatusForUpdate(postId, PostStatus.ACTIVE)
                 .orElseThrow(() -> new CommunityException(CommunityErrorCode.POST_NOT_FOUND));
     }
 
     private PostResponse getPostResponse(Post post, Long viewerId) {
+        boolean liked = postLikeRepository.existsByPost_IdAndUserId(post.getId(), viewerId);
+        boolean scrapped = postScrapRepository.existsByPost_IdAndUserId(post.getId(), viewerId);
         List<DisabilityType> disabilityTypes = postDisabilityTagRepository
                 .findAllByPost_IdOrderByIdAsc(post.getId())
                 .stream()
@@ -126,7 +195,7 @@ public class PostService {
                 .map(PostImage::getImageUrl)
                 .toList();
 
-        return PostResponse.of(post, viewerId, disabilityTypes, hashtags, imageUrls);
+        return PostResponse.of(post, viewerId, liked, scrapped, disabilityTypes, hashtags, imageUrls);
     }
 
     private void replaceDisabilityTags(Post post, List<DisabilityType> disabilityTypes) {
