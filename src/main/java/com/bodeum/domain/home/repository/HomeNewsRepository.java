@@ -11,9 +11,9 @@ import java.util.List;
 
 public interface HomeNewsRepository extends JpaRepository<News, Long> {
 
-    @Query("SELECT n FROM News n WHERE n.active = true ORDER BY (n.viewCount + n.scrapCount) DESC")
+    @Query("SELECT n FROM News n WHERE n.active = true AND n.deletedAt IS NULL ORDER BY (n.viewCount + n.scrapCount) DESC")
     List<News> findTopRecommended(Pageable pageable);
 
-    @Query("SELECT n FROM News n WHERE n.newsCategory.newsType = :newsType AND n.active = true ORDER BY n.viewCount DESC")
+    @Query("SELECT n FROM News n WHERE n.newsCategory.newsType = :newsType AND n.active = true AND n.deletedAt IS NULL ORDER BY n.viewCount DESC")
     List<News> findByNewsType(@Param("newsType") NewsType newsType, Pageable pageable);
 }
