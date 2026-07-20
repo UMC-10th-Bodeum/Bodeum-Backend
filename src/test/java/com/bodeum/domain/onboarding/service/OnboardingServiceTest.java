@@ -129,8 +129,8 @@ class OnboardingServiceTest {
         given(regionService.getById(10L)).willReturn(region);
         CreateInterestRegionRequest request = new CreateInterestRegionRequest(
                 List.of(
-                        InterestCategory.INSTITUTION,
-                        InterestCategory.HOSPITAL
+                        InterestCategory.WELFARE_SUBSIDY,
+                        InterestCategory.HOSPITAL_HEALTH
                 ),
                 10L
         );
@@ -138,8 +138,8 @@ class OnboardingServiceTest {
         OnboardingStepResponse response = onboardingService.registerInterestRegion(1L, request);
 
         assertThat(user.getInterestCategories()).containsExactly(
-                InterestCategory.INSTITUTION,
-                InterestCategory.HOSPITAL
+                InterestCategory.WELFARE_SUBSIDY,
+                InterestCategory.HOSPITAL_HEALTH
         );
         assertThat(user.getRegion()).isEqualTo(region);
         assertThat(response.step()).isEqualTo(2);

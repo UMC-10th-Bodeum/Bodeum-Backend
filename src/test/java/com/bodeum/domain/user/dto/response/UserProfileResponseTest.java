@@ -55,13 +55,13 @@ class UserProfileResponseTest {
         );
         Region region = Region.create("서울특별시", "강남구");
         ReflectionTestUtils.setField(region, "id", 10L);
-        user.updateInterestRegion(List.of(InterestCategory.INSTITUTION), region);
+        user.updateInterestRegion(List.of(InterestCategory.WELFARE_SUBSIDY), region);
 
         UserProfileResponse response = UserProfileResponse.from(user);
 
         assertThat(response.regionId()).isEqualTo(10L);
         assertThat(response.regionLevel1()).isEqualTo("서울특별시");
         assertThat(response.regionLevel2()).isEqualTo("강남구");
-        assertThat(response.interestCategories()).containsExactly(new CodeLabelResponse("INSTITUTION", "기관"));
+        assertThat(response.interestCategories()).containsExactly(new CodeLabelResponse("WELFARE_SUBSIDY", "맞춤 복지 지원금"));
     }
 }
