@@ -1,6 +1,6 @@
-package com.bodeum.domain.chatbot.entity;
+package com.bodeum.domain.ai.entity;
 
-import com.bodeum.domain.chatbot.entity.enums.SenderType;
+import com.bodeum.domain.ai.enums.SenderType;
 import com.bodeum.global.common.entity.BaseCreatedEntity;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
@@ -30,6 +30,9 @@ public class AiMessage extends BaseCreatedEntity {
     @Lob
     @Column(name = "content", nullable = false)
     private String content;
+
+    @Column(name = "is_warning", nullable = false)
+    private boolean warning = false;
 
     @Builder
     private AiMessage(
