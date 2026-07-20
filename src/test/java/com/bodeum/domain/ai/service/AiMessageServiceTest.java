@@ -15,7 +15,6 @@ import com.bodeum.domain.ai.entity.AiMessage;
 import com.bodeum.domain.ai.enums.AiResponseSourceType;
 import com.bodeum.domain.ai.enums.AiAnswerStatus;
 import com.bodeum.domain.ai.enums.AiWarningType;
-import com.bodeum.domain.ai.enums.AiSourceReviewStatus;
 import com.bodeum.domain.ai.enums.SenderType;
 import com.bodeum.domain.ai.exception.AiErrorCode;
 import com.bodeum.domain.ai.infrastructure.retrieval.AiReferenceDocumentResolver;
@@ -23,6 +22,7 @@ import com.bodeum.domain.ai.service.port.AiAnswerGenerator;
 import com.bodeum.domain.ai.service.port.AiDocumentRetriever;
 import com.bodeum.domain.ai.service.port.AiExternalAnswerProvider;
 import com.bodeum.domain.ai.model.rag.AiReferenceDocument;
+import com.bodeum.domain.ai.model.rag.AiSourceKey;
 import com.bodeum.domain.ai.model.answer.GeneratedAiAnswer;
 import com.bodeum.domain.ai.model.answer.ExternalAiAnswer;
 import com.bodeum.domain.ai.repository.AiChatRoomRepository;
@@ -137,11 +137,6 @@ class AiMessageServiceTest {
         when(documentRetriever.retrieve(eq(question), any())).thenReturn(List.of());
         when(externalAnswerProvider.search(eq(question), any())).thenReturn(
                 new ExternalAiAnswer("수원시에서 확인 가능한 복지기관 정보입니다.", List.of(externalSource)));
-        when(aiSourceReviewRepository.existsBySourceTypeAndSourceIdAndReviewStatus(
-                AiResponseSourceType.SITE,
-                20L,
-                AiSourceReviewStatus.CONFIRMED_INCORRECT
-        )).thenReturn(false);
         AiMessage saved = savedAiMessage("수원시에서 확인 가능한 복지기관 정보입니다.");
         when(persistenceService.saveAiMessage(
                 chatRoom,
@@ -201,10 +196,8 @@ class AiMessageServiceTest {
                 .thenReturn(List.of(source));
         when(answerGenerator.generate(eq("지원금 확인 사이트 알려줘"), any(), eq(List.of(source))))
                 .thenReturn(new GeneratedAiAnswer("복지로에서 확인할 수 있습니다.", List.of("DOC-1")));
-        when(aiSourceReviewRepository.existsBySourceTypeAndSourceIdAndReviewStatus(
-                AiResponseSourceType.SITE,
-                10L,
-                AiSourceReviewStatus.CONFIRMED_INCORRECT
+        when(aiSourceReviewRepository.existsConfirmedIncorrectBySources(
+                java.util.Set.of(new AiSourceKey(AiResponseSourceType.SITE, 10L))
         )).thenReturn(true);
         AiMessage saved = savedAiMessage("복지로에서 확인할 수 있습니다.");
         when(persistenceService.saveAiMessage(

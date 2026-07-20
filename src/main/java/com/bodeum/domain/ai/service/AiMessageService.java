@@ -6,10 +6,10 @@ import com.bodeum.domain.ai.dto.response.AiMessageWarningResponse;
 import com.bodeum.domain.ai.dto.response.CreateAiMessageResponse;
 import com.bodeum.domain.ai.entity.AiChatRoom;
 import com.bodeum.domain.ai.entity.AiMessage;
-import com.bodeum.domain.ai.enums.AiSourceReviewStatus;
 import com.bodeum.domain.ai.enums.AiWarningType;
 import com.bodeum.domain.ai.exception.AiErrorCode;
 import com.bodeum.domain.ai.model.rag.AiReferenceDocument;
+import com.bodeum.domain.ai.model.rag.AiSourceKey;
 import com.bodeum.domain.ai.model.rag.AiUserProfile;
 import com.bodeum.domain.ai.model.answer.GeneratedAiAnswer;
 import com.bodeum.domain.ai.model.answer.ExternalAiAnswer;
@@ -112,7 +112,7 @@ public class AiMessageService {
             return createNoEvidenceResponse(chatRoom);
         }
 
-        boolean warning = citedSources.stream().anyMatch(this::hasIncorrectFeedback);
+        boolean warning = hasIncorrectFeedback(citedSources);
         AiMessage message = persistenceService.saveAiMessage(
                 chatRoom, generated.answer(), warning, citedSources);
 
@@ -129,7 +129,7 @@ public class AiMessageService {
             return createNoEvidenceResponse(chatRoom);
         }
 
-        boolean warning = externalAnswer.sources().stream().anyMatch(this::hasIncorrectFeedback);
+        boolean warning = hasIncorrectFeedback(externalAnswer.sources());
         AiMessage message = persistenceService.saveAiMessage(
                 chatRoom, externalAnswer.answer(), warning, externalAnswer.sources());
         return answeredResponse(
@@ -182,12 +182,14 @@ public class AiMessageService {
         return cited;
     }
 
-    private boolean hasIncorrectFeedback(AiReferenceDocument source) {
-        return aiSourceReviewRepository.existsBySourceTypeAndSourceIdAndReviewStatus(
-                source.sourceType(),
-                source.sourceId(),
-                AiSourceReviewStatus.CONFIRMED_INCORRECT
-        );
+    private boolean hasIncorrectFeedback(List<AiReferenceDocument> sources) {
+        if (sources.isEmpty()) {
+            return false;
+        }
+        Set<AiSourceKey> sourceKeys = sources.stream()
+                .map(source -> new AiSourceKey(source.sourceType(), source.sourceId()))
+                .collect(java.util.stream.Collectors.toSet());
+        return aiSourceReviewRepository.existsConfirmedIncorrectBySources(sourceKeys);
     }
 
     private AiUserProfile toProfile(
