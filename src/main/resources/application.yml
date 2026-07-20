@@ -59,9 +59,10 @@ bodeum:
   ai:
     rag:
       top-k: ${AI_RAG_TOP_K:5}
-      similarity-threshold: ${AI_RAG_SIMILARITY_THRESHOLD:0.7}
+      similarity-threshold: ${AI_RAG_SIMILARITY_THRESHOLD:0.4}
     web-search:
       model: ${OPENAI_WEB_SEARCH_MODEL:gpt-5.4-mini}
+      max-output-tokens: ${OPENAI_WEB_SEARCH_MAX_OUTPUT_TOKENS:1200}
       connect-timeout: ${OPENAI_WEB_SEARCH_CONNECT_TIMEOUT:3s}
       read-timeout: ${OPENAI_WEB_SEARCH_READ_TIMEOUT:30s}
     request-limit:

@@ -27,8 +27,7 @@ public class AiMessage extends BaseCreatedEntity {
     @Column(name = "sender_type", nullable = false)
     private SenderType senderType;
 
-    @Lob
-    @Column(name = "content", nullable = false)
+    @Column(name = "content", nullable = false, columnDefinition = "TEXT")
     private String content;
 
     @Column(name = "is_warning", nullable = false)

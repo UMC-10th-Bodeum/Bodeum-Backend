@@ -46,4 +46,8 @@ CREATE INDEX idx_ai_external_resource_source
     ON ai_external_resource (ai_external_source_id);
 
 ALTER TABLE ai_response_source
-    MODIFY source_updated_at DATETIME(6) NULL;
+    MODIFY COLUMN source_type VARCHAR(20) NOT NULL,
+    MODIFY COLUMN source_updated_at DATETIME(6) NULL;
+
+ALTER TABLE ai_message
+    MODIFY COLUMN content TEXT NOT NULL;

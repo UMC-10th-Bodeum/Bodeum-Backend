@@ -67,9 +67,9 @@ public class SpringAiAnswerGenerator implements AiAnswerGenerator {
             throw e;
         } catch (Exception e) {
             if (AiTimeoutDetector.isTimeout(e)) {
-                throw new ProjectException(AiErrorCode.AI_RESPONSE_TIMEOUT);
+                throw new ProjectException(AiErrorCode.AI_RESPONSE_TIMEOUT, e);
             }
-            throw new ProjectException(AiErrorCode.AI_RESPONSE_FAILED);
+            throw new ProjectException(AiErrorCode.AI_RESPONSE_FAILED, e);
         }
     }
 

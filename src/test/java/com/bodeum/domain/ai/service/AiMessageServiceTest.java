@@ -13,6 +13,8 @@ import static org.mockito.Mockito.when;
 import com.bodeum.domain.ai.entity.AiChatRoom;
 import com.bodeum.domain.ai.entity.AiMessage;
 import com.bodeum.domain.ai.enums.AiResponseSourceType;
+import com.bodeum.domain.ai.enums.AiAnswerStatus;
+import com.bodeum.domain.ai.enums.AiWarningType;
 import com.bodeum.domain.ai.enums.AiSourceReviewStatus;
 import com.bodeum.domain.ai.enums.SenderType;
 import com.bodeum.domain.ai.exception.AiErrorCode;
@@ -71,6 +73,8 @@ class AiMessageServiceTest {
                 .thenReturn(Optional.of(UserAgreement.create(user, true, true, true)));
         lenient().when(aiChatRoomRepository.findByUserId(1L)).thenReturn(Optional.of(chatRoom));
         lenient().when(userRepository.findAiProfileById(1L)).thenReturn(Optional.of(user));
+        lenient().when(userRepository.findAiDisabilityProfileById(1L))
+                .thenReturn(Optional.of(user));
         lenient().when(externalAnswerProvider.search(any(), any()))
                 .thenReturn(ExternalAiAnswer.empty());
         lenient().when(referenceDocumentResolver.resolve(any()))
@@ -113,6 +117,7 @@ class AiMessageServiceTest {
         var result = service.createMessage(1L, "김치찌개 레시피 알려줘");
 
         assertThat(result.aiMessage().content()).isEqualTo("관련 정보를 찾을 수 없습니다.");
+        assertThat(result.aiMessage().answerStatus()).isEqualTo(AiAnswerStatus.NO_EVIDENCE);
         assertThat(result.aiMessage().sources()).isEmpty();
         verify(answerGenerator, never()).generate(any(), any(), any());
     }
@@ -152,7 +157,38 @@ class AiMessageServiceTest {
         assertThat(result.aiMessage().sources()).hasSize(1);
         assertThat(result.aiMessage().sources().getFirst().sourceType())
                 .isEqualTo(AiResponseSourceType.SITE);
+        assertThat(result.aiMessage().answerStatus()).isEqualTo(AiAnswerStatus.ANSWERED);
+        assertThat(result.aiMessage().warning()).isNull();
         verify(answerGenerator, never()).generate(any(), any(), any());
+    }
+
+    @Test
+    void returnsNoEvidenceWhenGeneratedAnswerHasNoValidCitation() {
+        String question = "지원 제도를 알려줘";
+        AiReferenceDocument retrievedSource = new AiReferenceDocument(
+                "INFO-1-0",
+                "지원 제도 안내",
+                AiResponseSourceType.INFO,
+                1L,
+                "지원 제도",
+                "https://example.com/info/1",
+                Instant.parse("2026-07-01T00:00:00Z")
+        );
+        when(documentRetriever.retrieve(eq(question), any()))
+                .thenReturn(List.of(retrievedSource));
+        when(answerGenerator.generate(eq(question), any(), eq(List.of(retrievedSource))))
+                .thenReturn(new GeneratedAiAnswer("근거가 검증되지 않은 답변", List.of("UNKNOWN")));
+        AiMessage saved = savedAiMessage("관련 정보를 찾을 수 없습니다.");
+        when(persistenceService.saveAiMessage(
+                chatRoom, "관련 정보를 찾을 수 없습니다.", false, List.of()))
+                .thenReturn(saved);
+
+        var result = service.createMessage(1L, question);
+
+        assertThat(result.aiMessage().answerStatus()).isEqualTo(AiAnswerStatus.NO_EVIDENCE);
+        assertThat(result.aiMessage().content()).isEqualTo("관련 정보를 찾을 수 없습니다.");
+        assertThat(result.aiMessage().sources()).isEmpty();
+        assertThat(result.aiMessage().warning()).isNull();
     }
 
     @Test
@@ -180,7 +216,9 @@ class AiMessageServiceTest {
         assertThat(result.aiMessage().sources()).hasSize(1);
         assertThat(result.aiMessage().sources().getFirst().sourceUrl())
                 .isEqualTo("https://www.bokjiro.go.kr");
-        assertThat(result.aiMessage().warning()).contains("오류 피드백");
+        assertThat(result.aiMessage().answerStatus()).isEqualTo(AiAnswerStatus.ANSWERED);
+        assertThat(result.aiMessage().warning().type()).isEqualTo(AiWarningType.INCORRECT_SOURCE);
+        assertThat(result.aiMessage().warning().message()).contains("오류 피드백");
     }
 
     private AiMessage savedAiMessage(String content) {

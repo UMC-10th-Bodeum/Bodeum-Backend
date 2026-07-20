@@ -8,6 +8,8 @@ import com.bodeum.domain.ai.service.port.AiDocumentRetriever;
 import com.bodeum.global.apiPayload.exception.ProjectException;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.springframework.ai.document.Document;
@@ -16,10 +18,14 @@ import org.springframework.ai.vectorstore.VectorStoreRetriever;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.context.annotation.Profile;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Component
 @Profile("!test")
 public class SpringAiDocumentRetriever implements AiDocumentRetriever {
+
+    private static final Logger log = LoggerFactory.getLogger(SpringAiDocumentRetriever.class);
 
     private final VectorStoreRetriever vectorStoreRetriever;
     private final int topK;
@@ -28,7 +34,7 @@ public class SpringAiDocumentRetriever implements AiDocumentRetriever {
     public SpringAiDocumentRetriever(
             VectorStoreRetriever vectorStoreRetriever,
             @Value("${bodeum.ai.rag.top-k:5}") int topK,
-            @Value("${bodeum.ai.rag.similarity-threshold:0.7}") double similarityThreshold
+            @Value("${bodeum.ai.rag.similarity-threshold:0.4}") double similarityThreshold
     ) {
         this.vectorStoreRetriever = vectorStoreRetriever;
         this.topK = topK;
@@ -39,19 +45,45 @@ public class SpringAiDocumentRetriever implements AiDocumentRetriever {
     public List<AiReferenceDocument> retrieve(String question, AiUserProfile profile) {
         try {
             String searchQuery = buildSearchQuery(question, profile);
-            return vectorStoreRetriever.similaritySearch(SearchRequest.builder()
-                            .query(searchQuery)
-                            .topK(topK)
-                            .similarityThreshold(similarityThreshold)
-                            .build())
-                    .stream()
+            List<Document> personalizedDocuments = search(searchQuery);
+            List<Document> questionDocuments = search(question);
+
+            Map<String, Document> documentsById = new LinkedHashMap<>();
+            personalizedDocuments.forEach(document -> documentsById.put(document.getId(), document));
+            questionDocuments.forEach(document -> documentsById.merge(
+                    document.getId(), document, this::higherScore));
+
+            documentsById.values().forEach(document -> log.info(
+                    "[AI] RAG candidate: id={}, score={}, threshold={}",
+                    document.getId(), score(document), similarityThreshold));
+
+            return documentsById.values().stream()
+                    .filter(document -> score(document) >= similarityThreshold)
+                    .sorted(Comparator.comparingDouble(this::score).reversed())
+                    .limit(topK)
                     .map(this::mapDocument)
                     .toList();
         } catch (ProjectException e) {
             throw e;
         } catch (Exception e) {
-            throw new ProjectException(AiErrorCode.AI_RESPONSE_FAILED);
+            throw new ProjectException(AiErrorCode.AI_RESPONSE_FAILED, e);
         }
+    }
+
+    private List<Document> search(String query) {
+        return vectorStoreRetriever.similaritySearch(SearchRequest.builder()
+                .query(query)
+                .topK(topK)
+                .similarityThreshold(0.0)
+                .build());
+    }
+
+    private Document higherScore(Document left, Document right) {
+        return score(left) >= score(right) ? left : right;
+    }
+
+    private double score(Document document) {
+        return document.getScore() == null ? 0.0 : document.getScore();
     }
 
     private String buildSearchQuery(String question, AiUserProfile profile) {

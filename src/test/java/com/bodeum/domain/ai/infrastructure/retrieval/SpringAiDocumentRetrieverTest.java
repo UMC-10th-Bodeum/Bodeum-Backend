@@ -2,6 +2,7 @@ package com.bodeum.domain.ai.infrastructure.retrieval;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.when;
 
 import com.bodeum.domain.ai.model.rag.AiUserProfile;
@@ -37,8 +38,10 @@ class SpringAiDocumentRetrieverTest {
         retriever.retrieve("복지 센터 알려줘", profile);
 
         ArgumentCaptor<SearchRequest> requestCaptor = ArgumentCaptor.forClass(SearchRequest.class);
-        verify(vectorStoreRetriever).similaritySearch(requestCaptor.capture());
-        assertThat(requestCaptor.getValue().getQuery())
+        verify(vectorStoreRetriever, times(2)).similaritySearch(requestCaptor.capture());
+        assertThat(requestCaptor.getAllValues()).extracting(SearchRequest::getQuery)
+                .contains("복지 센터 알려줘");
+        assertThat(requestCaptor.getAllValues().getFirst().getQuery())
                 .contains("복지 센터 알려줘")
                 .contains("활동 지역: 서울 강남구")
                 .contains("집중 케어 영역: AUTISM_SPECTRUM")

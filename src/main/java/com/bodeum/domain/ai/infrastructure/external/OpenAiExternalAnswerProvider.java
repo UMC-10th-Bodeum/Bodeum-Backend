@@ -15,6 +15,7 @@ import com.bodeum.domain.ai.repository.AiExternalSourceRepository;
 import com.bodeum.domain.ai.service.port.AiExternalAnswerProvider;
 import com.bodeum.global.apiPayload.exception.ProjectException;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.net.URI;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -43,11 +44,14 @@ import org.springframework.web.client.RestClient;
 public class OpenAiExternalAnswerProvider implements AiExternalAnswerProvider {
 
     private static final int MAX_ALLOWED_DOMAINS = 100;
+    private static final String NO_EVIDENCE_MARKER = "[[NO_EVIDENCE]]";
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     private final AiExternalSourceRepository externalSourceRepository;
     private final AiExternalResourceRepository externalResourceRepository;
     private final RestClient restClient;
     private final String model;
+    private final int maxOutputTokens;
     private final String externalSearchSystemPrompt;
     private final AiPromptFormatter promptFormatter;
 
@@ -57,6 +61,7 @@ public class OpenAiExternalAnswerProvider implements AiExternalAnswerProvider {
             RestClient.Builder restClientBuilder,
             @Value("${spring.ai.openai.api-key}") String apiKey,
             @Value("${bodeum.ai.web-search.model:gpt-5.4-mini}") String model,
+            @Value("${bodeum.ai.web-search.max-output-tokens:1200}") int maxOutputTokens,
             @Value("${bodeum.ai.web-search.connect-timeout:3s}") Duration connectTimeout,
             @Value("${bodeum.ai.web-search.read-timeout:30s}") Duration readTimeout,
             @Value("classpath:prompts/ai-external-search-system-prompt.txt") Resource promptResource,
@@ -73,6 +78,7 @@ public class OpenAiExternalAnswerProvider implements AiExternalAnswerProvider {
                 .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + apiKey)
                 .build();
         this.model = model;
+        this.maxOutputTokens = maxOutputTokens;
         this.externalSearchSystemPrompt = readPrompt(promptResource);
         this.promptFormatter = promptFormatter;
     }
@@ -90,20 +96,23 @@ public class OpenAiExternalAnswerProvider implements AiExternalAnswerProvider {
         }
 
         try {
-            JsonNode response = restClient.post()
+            String responseBody = restClient.post()
                     .uri("/v1/responses")
                     .contentType(MediaType.APPLICATION_JSON)
                     .body(requestBody(question, profile, sourcesByDomain.keySet().stream().toList()))
                     .retrieve()
-                    .body(JsonNode.class);
+                    .body(String.class);
+            JsonNode response = responseBody == null
+                    ? null
+                    : OBJECT_MAPPER.readTree(responseBody);
             return mapResponse(response, sourcesByDomain);
         } catch (ProjectException e) {
             throw e;
         } catch (Exception e) {
             if (AiTimeoutDetector.isTimeout(e)) {
-                throw new ProjectException(AiErrorCode.AI_RESPONSE_TIMEOUT);
+                throw new ProjectException(AiErrorCode.AI_RESPONSE_TIMEOUT, e);
             }
-            throw new ProjectException(AiErrorCode.AI_RESPONSE_FAILED);
+            throw new ProjectException(AiErrorCode.AI_RESPONSE_FAILED, e);
         }
     }
 
@@ -121,6 +130,7 @@ public class OpenAiExternalAnswerProvider implements AiExternalAnswerProvider {
 
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("model", model);
+        body.put("max_output_tokens", maxOutputTokens);
         body.put("tools", List.of(webSearch));
         body.put("tool_choice", "required");
         body.put("include", List.of("web_search_call.action.sources"));
@@ -168,11 +178,11 @@ public class OpenAiExternalAnswerProvider implements AiExternalAnswerProvider {
                     continue;
                 }
                 String answer = content.path("text").asText(null);
-                List<AiReferenceDocument> references = mapCitations(
-                        content.path("annotations"), sourcesByDomain);
-                if (answer == null || answer.isBlank()) {
+                if (answer == null || answer.isBlank() || isNoEvidenceAnswer(answer)) {
                     return ExternalAiAnswer.empty();
                 }
+                List<AiReferenceDocument> references = mapCitations(
+                        content.path("annotations"), sourcesByDomain);
                 if (references.isEmpty()) {
                     return linkGuidance(
                             mapSearchSources(response.path("output"), sourcesByDomain),
@@ -183,6 +193,15 @@ public class OpenAiExternalAnswerProvider implements AiExternalAnswerProvider {
             }
         }
         return ExternalAiAnswer.empty();
+    }
+
+    static boolean isNoEvidenceAnswer(String answer) {
+        String normalized = answer.strip();
+        return normalized.contains(NO_EVIDENCE_MARKER)
+                || normalized.contains("찾지 못했습니다")
+                || normalized.contains("확인하지 못했습니다")
+                || normalized.contains("확인되지 않았습니다")
+                || normalized.contains("확인할 수 없습니다");
     }
 
     private ExternalAiAnswer linkGuidance(

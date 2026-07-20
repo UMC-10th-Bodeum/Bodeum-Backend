@@ -2,10 +2,12 @@ package com.bodeum.domain.ai.service;
 
 import com.bodeum.domain.ai.dto.response.AiMessageResponse;
 import com.bodeum.domain.ai.dto.response.AiMessageSourceResponse;
+import com.bodeum.domain.ai.dto.response.AiMessageWarningResponse;
 import com.bodeum.domain.ai.dto.response.CreateAiMessageResponse;
 import com.bodeum.domain.ai.entity.AiChatRoom;
 import com.bodeum.domain.ai.entity.AiMessage;
 import com.bodeum.domain.ai.enums.AiSourceReviewStatus;
+import com.bodeum.domain.ai.enums.AiWarningType;
 import com.bodeum.domain.ai.exception.AiErrorCode;
 import com.bodeum.domain.ai.model.rag.AiReferenceDocument;
 import com.bodeum.domain.ai.model.rag.AiUserProfile;
@@ -27,17 +29,17 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class AiMessageService {
 
     private static final String NO_RESULT_MESSAGE = "관련 정보를 찾을 수 없습니다.";
-    private static final String DISCLAIMER =
-            "AI 답변은 참고용이며, 정확한 내용은 공식 기관에서 최종 확인해 주세요.";
     private static final String INCORRECT_WARNING =
-            "일부 사용자로부터 오류 피드백이 접수된 정보입니다. 공식 기관에서 다시 확인해 주세요.";
+            "일부 사용자로부터 오류 피드백이 접수된 정보입니다. 정확한 내용은 공식 기관에서 다시 확인해 주세요.";
 
     private final AiChatRoomRepository aiChatRoomRepository;
     private final UserAgreementRepository userAgreementRepository;
@@ -64,30 +66,57 @@ public class AiMessageService {
             Long userId,
             String content
     ) {
+        log.info("[AI] 사용자 프로필 조회 시작");
+
         User user = userRepository.findAiProfileById(userId)
                 .orElseThrow(() -> new ProjectException(UserErrorCode.USER_NOT_FOUND));
 
-        User disabilityProfileUser = userRepository.findAiDisabilityProfileById(userId)
+        User userWithDisabilities = userRepository.findAiDisabilityProfileById(userId)
                 .orElseThrow(() -> new ProjectException(UserErrorCode.USER_NOT_FOUND));
 
-        persistenceService.saveUserMessage(chatRoom, content);
-        AiUserProfile profile = toProfile(user, disabilityProfileUser);
+        log.info("[AI] 사용자 프로필 조회 완료");
 
+        persistenceService.saveUserMessage(chatRoom, content);
+
+        AiUserProfile profile = toProfile(user, userWithDisabilities);
+
+        log.info("[AI] 문서 검색 시작");
         List<AiReferenceDocument> retrievedDocuments = referenceDocumentResolver.resolve(
-                documentRetriever.retrieve(content, profile));
+                documentRetriever.retrieve(content, profile)
+        );
+
+        log.info("[AI] 검색 문서 수: {}", retrievedDocuments.size());
+        log.info("[AI] 검색 documentKeys: {}",
+                retrievedDocuments.stream()
+                        .map(AiReferenceDocument::documentKey)
+                        .toList());
 
         if (retrievedDocuments.isEmpty()) {
+            log.info("[AI] 내부 문서 없음, 외부 검색 시작");
             return createExternalOrNoResultResponse(chatRoom, content, profile);
         }
 
+        log.info("[AI] 답변 생성 시작");
+
         GeneratedAiAnswer generated = answerGenerator.generate(
-                content, profile, retrievedDocuments);
-        List<AiReferenceDocument> citedSources = validateCitations(generated, retrievedDocuments);
+                content, profile, retrievedDocuments
+        );
+
+        log.info("[AI] 답변 생성 완료");
+        log.info("[AI] citedDocumentKeys: {}", generated.citedDocumentKeys());
+
+        List<AiReferenceDocument> citedSources =
+                validateCitations(generated, retrievedDocuments);
+
+        if (citedSources.isEmpty()) {
+            return createNoEvidenceResponse(chatRoom);
+        }
+
         boolean warning = citedSources.stream().anyMatch(this::hasIncorrectFeedback);
         AiMessage message = persistenceService.saveAiMessage(
                 chatRoom, generated.answer(), warning, citedSources);
 
-        return response(message, citedSources, warning ? INCORRECT_WARNING : null);
+        return answeredResponse(message, citedSources, warningResponse(warning));
     }
 
     private CreateAiMessageResponse createExternalOrNoResultResponse(
@@ -97,33 +126,59 @@ public class AiMessageService {
     ) {
         ExternalAiAnswer externalAnswer = externalAnswerProvider.search(question, profile);
         if (!externalAnswer.hasEvidence()) {
-            AiMessage message = persistenceService.saveAiMessage(
-                    chatRoom, NO_RESULT_MESSAGE, false, List.of());
-            return response(message, List.of(), null);
+            return createNoEvidenceResponse(chatRoom);
         }
 
         boolean warning = externalAnswer.sources().stream().anyMatch(this::hasIncorrectFeedback);
         AiMessage message = persistenceService.saveAiMessage(
                 chatRoom, externalAnswer.answer(), warning, externalAnswer.sources());
-        return response(
+        return answeredResponse(
                 message,
                 externalAnswer.sources(),
-                warning ? INCORRECT_WARNING : null
+                warningResponse(warning)
         );
+    }
+
+    private CreateAiMessageResponse createNoEvidenceResponse(AiChatRoom chatRoom) {
+        AiMessage message = persistenceService.saveAiMessage(
+                chatRoom, NO_RESULT_MESSAGE, false, List.of());
+        return new CreateAiMessageResponse(AiMessageResponse.noEvidence(
+                message.getId(),
+                message.getSenderType(),
+                message.getContent(),
+                message.getCreatedAt()
+        ));
     }
 
     private List<AiReferenceDocument> validateCitations(
             GeneratedAiAnswer generated,
             List<AiReferenceDocument> retrievedDocuments
     ) {
+        log.info("[AI] citation 검증 시작");
+
         Set<String> citedKeys = new HashSet<>(
-                generated.citedDocumentKeys() == null ? List.of() : generated.citedDocumentKeys());
+                generated.citedDocumentKeys() == null
+                        ? List.of()
+                        : generated.citedDocumentKeys()
+        );
+
         List<AiReferenceDocument> cited = retrievedDocuments.stream()
                 .filter(document -> citedKeys.contains(document.documentKey()))
                 .toList();
+
+        log.info("[AI] 유효 citation 수: {}", cited.size());
+
         if (cited.isEmpty()) {
-            throw new ProjectException(AiErrorCode.AI_RESPONSE_FAILED);
+            log.warn(
+                    "[AI] citation 검증 실패. citedKeys={}, retrievedKeys={}",
+                    citedKeys,
+                    retrievedDocuments.stream()
+                            .map(AiReferenceDocument::documentKey)
+                            .toList()
+            );
+
         }
+
         return cited;
     }
 
@@ -152,12 +207,12 @@ public class AiMessageService {
         );
     }
 
-    private CreateAiMessageResponse response(
+    private CreateAiMessageResponse answeredResponse(
             AiMessage message,
             List<AiReferenceDocument> sources,
-            String warning
+            AiMessageWarningResponse warning
     ) {
-        return new CreateAiMessageResponse(new AiMessageResponse(
+        return new CreateAiMessageResponse(AiMessageResponse.answered(
                 message.getId(),
                 message.getSenderType(),
                 message.getContent(),
@@ -167,8 +222,13 @@ public class AiMessageService {
                                 source.sourceType(), source.sourceId(), source.title(),
                                 source.url(), source.updatedAt()))
                         .toList(),
-                warning,
-                DISCLAIMER));
+                warning));
+    }
+
+    private AiMessageWarningResponse warningResponse(boolean warning) {
+        return warning
+                ? new AiMessageWarningResponse(AiWarningType.INCORRECT_SOURCE, INCORRECT_WARNING)
+                : null;
     }
 
     private void validateAiTermsAgreement(Long userId) {
