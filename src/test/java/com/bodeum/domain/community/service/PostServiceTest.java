@@ -53,8 +53,6 @@ class PostServiceTest {
     private PostLikeRepository postLikeRepository;
     @Mock
     private PostScrapRepository postScrapRepository;
-    @Mock
-    private PostViewCountService postViewCountService;
     @InjectMocks
     private PostService postService;
 
@@ -162,7 +160,6 @@ class PostServiceTest {
         assertThat(response.isMine()).isFalse();
         assertThat(response.isLiked()).isTrue();
         assertThat(response.isScrapped()).isTrue();
-        then(postViewCountService).should().increaseViewCount(1L);
     }
 
     @Test

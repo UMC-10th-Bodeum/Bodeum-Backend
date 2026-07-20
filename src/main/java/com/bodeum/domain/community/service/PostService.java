@@ -41,7 +41,6 @@ public class PostService {
     private final PostDisabilityTagRepository postDisabilityTagRepository;
     private final PostLikeRepository postLikeRepository;
     private final PostScrapRepository postScrapRepository;
-    private final PostViewCountService postViewCountService;
 
     @Transactional
     public PostResponse createPost(Long userId, CreatePostRequest request) {
@@ -97,7 +96,6 @@ public class PostService {
     @Transactional(readOnly = true)
     public PostResponse getPost(Long userId, Long postId) {
         validateAuthenticatedUser(userId);
-        postViewCountService.increaseViewCount(postId);
         return getPostResponse(findPost(postId), userId);
     }
 

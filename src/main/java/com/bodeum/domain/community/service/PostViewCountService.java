@@ -6,7 +6,6 @@ import com.bodeum.domain.community.exception.CommunityException;
 import com.bodeum.domain.community.repository.PostRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
@@ -15,7 +14,7 @@ public class PostViewCountService {
 
     private final PostRepository postRepository;
 
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @Transactional
     public void increaseViewCount(Long postId) {
         if (postRepository.incrementViewCount(postId, PostStatus.ACTIVE) == 0) {
             throw new CommunityException(CommunityErrorCode.POST_NOT_FOUND);

@@ -41,6 +41,8 @@ class PostServiceIntegrationTest {
     @Autowired
     private PostService postService;
     @Autowired
+    private PostQueryFacade postQueryFacade;
+    @Autowired
     private PostRepository postRepository;
     @Autowired
     private PostDisabilityTagRepository postDisabilityTagRepository;
@@ -79,7 +81,7 @@ class PostServiceIntegrationTest {
             );
             postId = created.postId();
 
-            PostResponse viewed = postService.getPost(20L, postId);
+            PostResponse viewed = postQueryFacade.getPost(20L, postId);
 
             assertThat(created.authorId()).isNull();
             assertThat(created.isMine()).isTrue();
@@ -148,7 +150,7 @@ class PostServiceIntegrationTest {
             postService.scrapPost(20L, postId);
             postService.scrapPost(20L, postId);
 
-            PostResponse reacted = postService.getPost(20L, postId);
+            PostResponse reacted = postQueryFacade.getPost(20L, postId);
 
             assertThat(postLikeRepository.count()).isOne();
             assertThat(postScrapRepository.count()).isOne();
