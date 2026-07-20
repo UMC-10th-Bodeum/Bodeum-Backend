@@ -11,6 +11,11 @@ spring:
     locations: classpath:db/migration
     # 마이그레이션 폴더가 아직 비어 있어도 실패하지 않도록.
     fail-on-missing-locations: false
+    # 타임스탬프 버전 규칙(V{yyyyMMdd}_{HHmm})은 파일의 "작성 시각"을 버전으로 쓴다.
+    # 그런데 실제 적용 순서는 PR "merge 시각"을 따르므로, 나중 시각 마이그레이션이 먼저 merge/적용된 뒤
+    # 더 이른 시각 마이그레이션이 뒤늦게 배포되면 Flyway 기본값(false)은 이를 순서 역행으로 판단해
+    # 검증 실패로 부팅을 막는다. 타임스탬프 방식에는 out-of-order 실행 허용이 필수다.
+    out-of-order: true
 
 bodeum:
   cors:
