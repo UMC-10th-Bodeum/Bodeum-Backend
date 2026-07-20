@@ -34,7 +34,7 @@ public class AiSourceIndexEventHandler {
                 return;
             }
             if (event.sourceType() == AiResponseSourceType.INFO) {
-                infoItemRepository.findById(event.sourceId())
+                infoItemRepository.findIndexableById(event.sourceId())
                         .ifPresentOrElse(
                                 indexingService::replaceInfo,
                                 () -> indexingService.delete(event.sourceType(), event.sourceId())

@@ -3,6 +3,7 @@ package com.bodeum.domain.ai.infrastructure;
 import com.bodeum.domain.ai.enums.AiResponseSourceType;
 import com.bodeum.domain.ai.model.AiReferenceDocument;
 import com.bodeum.domain.info.entity.InfoItem;
+import com.bodeum.domain.info.entity.InfoCategory;
 import com.bodeum.domain.info.repository.InfoItemRepository;
 import com.bodeum.domain.news.entity.News;
 import com.bodeum.domain.news.repository.NewsRepository;
@@ -44,7 +45,7 @@ public class AiReferenceDocumentResolver {
         Set<Long> newsIds = sourceIds(retrievedDocuments, AiResponseSourceType.NEWS);
         Map<Long, InfoItem> infoById = infoIds.isEmpty()
                 ? Map.of()
-                : infoItemRepository.findAllById(infoIds).stream()
+                : infoItemRepository.findAllIndexableByIdIn(infoIds).stream()
                         .collect(Collectors.toMap(InfoItem::getId, Function.identity()));
         Map<Long, News> newsById = newsIds.isEmpty()
                 ? Map.of()
@@ -108,9 +109,13 @@ public class AiReferenceDocumentResolver {
     }
 
     private String infoContent(InfoItem info) {
+        InfoCategory category = info.getInfoCategory();
         return lines(
                 line("정보명", info.getName()),
-                line("카테고리", info.getCategory()),
+                line("대분류", category.getMainCategoryKo()),
+                line("대분류 코드", category.getMainCategory().name()),
+                line("세부 분류", category.getSubCategoryKo()),
+                line("세부 분류 코드", category.getSubCategory()),
                 line("소개", info.getIntroduction()),
                 line("주소", info.getAddress()),
                 line("지역", "%s %s".formatted(info.getSido(), info.getSigungu())),
@@ -126,7 +131,7 @@ public class AiReferenceDocumentResolver {
                 line("소식 유형", news.getNewsType()),
                 line("요약", news.getSummary()),
                 line("본문", news.getContent()),
-                line("제공 기관", news.getSourceName()),
+                line("제공 기관", newsSourceName(news)),
                 line("게시일", news.getPublishedAt()),
                 line("대상", news.getTargetAudience()),
                 line("신청 기간", dateRange(news.getApplyStartDate(), news.getApplyEndDate())),
@@ -136,6 +141,13 @@ public class AiReferenceDocumentResolver {
                 line("담당자", news.getManager()),
                 line("원문", news.getOriginalUrl())
         );
+    }
+
+    private String newsSourceName(News news) {
+        if (news.getSourceName() != null && !news.getSourceName().isBlank()) {
+            return news.getSourceName();
+        }
+        return news.getNewsSource() == null ? null : news.getNewsSource().getName();
     }
 
     private Instant sourceUpdatedAt(

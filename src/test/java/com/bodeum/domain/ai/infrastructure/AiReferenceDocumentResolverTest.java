@@ -8,7 +8,8 @@ import static org.mockito.Mockito.when;
 import com.bodeum.domain.ai.enums.AiResponseSourceType;
 import com.bodeum.domain.ai.model.AiReferenceDocument;
 import com.bodeum.domain.info.entity.InfoItem;
-import com.bodeum.domain.info.entity.enums.InfoCategory;
+import com.bodeum.domain.info.entity.InfoCategory;
+import com.bodeum.domain.info.entity.enums.MainCategory;
 import com.bodeum.domain.info.repository.InfoItemRepository;
 import com.bodeum.domain.news.repository.NewsRepository;
 import java.time.Instant;
@@ -25,9 +26,14 @@ class AiReferenceDocumentResolverTest {
     @Test
     void replacesVectorMetadataAndContentWithLatestMysqlInfoAndRemovesDuplicateChunks() {
         InfoItem info = mock(InfoItem.class);
+        InfoCategory category = mock(InfoCategory.class);
+        when(category.getMainCategory()).thenReturn(MainCategory.INSTITUTION);
+        when(category.getMainCategoryKo()).thenReturn("기관");
+        when(category.getSubCategory()).thenReturn("FAMILY_SUPPORT");
+        when(category.getSubCategoryKo()).thenReturn("장애인가족지원센터");
         when(info.getId()).thenReturn(12L);
         when(info.getName()).thenReturn("최신 기관명");
-        when(info.getCategory()).thenReturn(InfoCategory.INSTITUTION);
+        when(info.getInfoCategory()).thenReturn(category);
         when(info.getIntroduction()).thenReturn("최신 소개");
         when(info.getAddress()).thenReturn("경기도 수원시 팔달구");
         when(info.getSido()).thenReturn("경기도");
@@ -35,7 +41,7 @@ class AiReferenceDocumentResolverTest {
         when(info.getPhone()).thenReturn("031-111-2222");
         when(info.getHomepageUrl()).thenReturn("https://new.example.com");
         when(info.getUpdatedAt()).thenReturn(Instant.parse("2026-07-20T01:00:00Z"));
-        when(infoItemRepository.findAllById(any())).thenReturn(List.of(info));
+        when(infoItemRepository.findAllIndexableByIdIn(any())).thenReturn(List.of(info));
         AiReferenceDocument firstChunk = staleInfo("INFO-12-0");
         AiReferenceDocument secondChunk = staleInfo("INFO-12-1");
 
@@ -54,7 +60,7 @@ class AiReferenceDocumentResolverTest {
 
     @Test
     void excludesDocumentWhenMysqlSourceNoLongerExists() {
-        when(infoItemRepository.findAllById(any())).thenReturn(List.of());
+        when(infoItemRepository.findAllIndexableByIdIn(any())).thenReturn(List.of());
 
         assertThat(resolver.resolve(List.of(staleInfo("INFO-12-0")))).isEmpty();
     }

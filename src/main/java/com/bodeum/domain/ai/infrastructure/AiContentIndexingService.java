@@ -4,8 +4,10 @@ import com.bodeum.domain.ai.enums.AiResponseSourceType;
 import com.bodeum.domain.ai.exception.AiErrorCode;
 import com.bodeum.domain.ai.model.AiIndexingResult;
 import com.bodeum.domain.info.entity.InfoItem;
+import com.bodeum.domain.info.entity.InfoCategory;
 import com.bodeum.domain.info.repository.InfoItemRepository;
 import com.bodeum.domain.news.entity.News;
+import com.bodeum.domain.news.entity.NewsSource;
 import com.bodeum.domain.news.repository.NewsRepository;
 import com.bodeum.global.apiPayload.exception.ProjectException;
 import java.time.Instant;
@@ -59,7 +61,7 @@ public class AiContentIndexingService {
 
     public AiIndexingResult rebuildAll() {
         try {
-            List<InfoItem> infoItems = infoItemRepository.findAll();
+            List<InfoItem> infoItems = infoItemRepository.findAllIndexable();
             List<News> newsItems = newsRepository.findAllIndexable();
 
             List<Document> documents = new ArrayList<>();
@@ -113,6 +115,7 @@ public class AiContentIndexingService {
     }
 
     private List<Document> createInfoDocuments(InfoItem item) {
+        InfoCategory category = item.getInfoCategory();
         Map<String, Object> metadata = baseMetadata(
                 AiResponseSourceType.INFO,
                 item.getId(),
@@ -121,13 +124,20 @@ public class AiContentIndexingService {
                 sourceUpdatedAt(item.getUpdatedAt(), item.getCreatedAt(), () ->
                         item.getSyncedAt().atZone(sourceTimeZone).toInstant())
         );
-        metadata.put("category", item.getCategory().name());
+        metadata.put("infoCategoryId", category.getId());
+        metadata.put("mainCategory", category.getMainCategory().name());
+        metadata.put("mainCategoryKo", category.getMainCategoryKo());
+        metadata.put("subCategory", category.getSubCategory());
+        metadata.put("subCategoryKo", category.getSubCategoryKo());
         metadata.put("sido", item.getSido());
         metadata.put("sigungu", item.getSigungu());
 
         String content = lines(
                 line("정보명", item.getName()),
-                line("카테고리", item.getCategory().name()),
+                line("대분류", category.getMainCategoryKo()),
+                line("대분류 코드", category.getMainCategory().name()),
+                line("세부 분류", category.getSubCategoryKo()),
+                line("세부 분류 코드", category.getSubCategory()),
                 line("소개", item.getIntroduction()),
                 line("주소", item.getAddress()),
                 line("지역", "%s %s".formatted(item.getSido(), item.getSigungu())),
@@ -138,6 +148,7 @@ public class AiContentIndexingService {
     }
 
     private List<Document> createNewsDocuments(News news) {
+        NewsSource newsSource = news.getNewsSource();
         Map<String, Object> metadata = baseMetadata(
                 AiResponseSourceType.NEWS,
                 news.getId(),
@@ -146,8 +157,14 @@ public class AiContentIndexingService {
                 sourceUpdatedAt(news.getUpdatedAt(), news.getCreatedAt(), () ->
                         news.getPublishedAt().atZone(sourceTimeZone).toInstant())
         );
-        metadata.put("category", news.getNewsCategory().getName());
+        metadata.put("newsCategoryId", news.getNewsCategory().getId());
+        metadata.put("newsCategory", news.getNewsCategory().getName());
         metadata.put("newsType", news.getNewsType().name());
+        if (newsSource != null) {
+            metadata.put("newsSourceId", newsSource.getId());
+            metadata.put("newsSourceType", newsSource.getSourceType().name());
+            metadata.put("newsSourceName", newsSource.getName());
+        }
         if (news.getRegionId() != null) {
             metadata.put("regionId", news.getRegionId());
         }
@@ -158,7 +175,7 @@ public class AiContentIndexingService {
                 line("소식 유형", news.getNewsType().name()),
                 line("요약", news.getSummary()),
                 line("본문", news.getContent()),
-                line("제공 기관", news.getSourceName()),
+                line("제공 기관", newsSourceName(news)),
                 line("게시일", news.getPublishedAt()),
                 line("대상", news.getTargetAudience()),
                 line("신청 기간", dateRange(news.getApplyStartDate(), news.getApplyEndDate())),
@@ -169,6 +186,13 @@ public class AiContentIndexingService {
                 line("원문", news.getOriginalUrl())
         );
         return split(AiResponseSourceType.NEWS, news.getId(), content, metadata);
+    }
+
+    private String newsSourceName(News news) {
+        if (news.getSourceName() != null && !news.getSourceName().isBlank()) {
+            return news.getSourceName();
+        }
+        return news.getNewsSource() == null ? null : news.getNewsSource().getName();
     }
 
     private List<Document> split(

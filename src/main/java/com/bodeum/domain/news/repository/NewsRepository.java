@@ -11,7 +11,7 @@ import org.springframework.data.repository.query.Param;
 
 public interface NewsRepository extends JpaRepository<News, Long> {
 
-    @EntityGraph(attributePaths = "newsCategory")
+    @EntityGraph(attributePaths = {"newsCategory", "newsSource"})
     @Query("""
             select news
             from News news
@@ -20,7 +20,7 @@ public interface NewsRepository extends JpaRepository<News, Long> {
             """)
     List<News> findAllIndexable();
 
-    @EntityGraph(attributePaths = "newsCategory")
+    @EntityGraph(attributePaths = {"newsCategory", "newsSource"})
     @Query("""
             select news
             from News news
@@ -30,7 +30,7 @@ public interface NewsRepository extends JpaRepository<News, Long> {
             """)
     List<News> findAllIndexableByIdIn(@Param("ids") Collection<Long> ids);
 
-    @EntityGraph(attributePaths = "newsCategory")
+    @EntityGraph(attributePaths = {"newsCategory", "newsSource"})
     @Query("""
             select news
             from News news

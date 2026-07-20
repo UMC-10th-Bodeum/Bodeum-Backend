@@ -23,7 +23,7 @@ class AiSourceIndexEventHandlerTest {
     @Test
     void replacesInfoAfterCommittedUpsert() {
         InfoItem info = mock(InfoItem.class);
-        when(infoItemRepository.findById(12L)).thenReturn(Optional.of(info));
+        when(infoItemRepository.findIndexableById(12L)).thenReturn(Optional.of(info));
 
         handler.handle(new AiSourceChangedEvent(
                 AiResponseSourceType.INFO,

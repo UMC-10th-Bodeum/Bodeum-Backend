@@ -26,7 +26,7 @@ public class AiSourceJpaEventListener implements
         PostDeleteEventListener {
 
     private static final Set<String> INFO_INDEXED_PROPERTIES = Set.of(
-            "category", "name", "introduction", "address", "sido", "sigungu",
+            "infoCategory", "name", "introduction", "address", "sido", "sigungu",
             "phone", "homepageUrl"
     );
     private static final Set<String> NEWS_IGNORED_PROPERTIES = Set.of(
