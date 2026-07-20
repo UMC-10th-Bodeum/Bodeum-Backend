@@ -1,6 +1,6 @@
-package com.bodeum.domain.chatbot.entity;
+package com.bodeum.domain.ai.entity;
 
-import com.bodeum.domain.chatbot.entity.enums.AiFeedbackReasonType;
+import com.bodeum.domain.ai.enums.AiFeedbackReasonType;
 import com.bodeum.global.common.entity.BaseCreatedEntity;
 import jakarta.persistence.*;
 import lombok.AccessLevel;

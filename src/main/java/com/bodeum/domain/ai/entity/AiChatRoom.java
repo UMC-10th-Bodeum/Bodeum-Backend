@@ -1,5 +1,6 @@
-package com.bodeum.domain.chatbot.entity;
+package com.bodeum.domain.ai.entity;
 
+import com.bodeum.domain.user.entity.User;
 import com.bodeum.global.common.entity.BaseCreatedEntity;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
@@ -20,27 +21,32 @@ public class AiChatRoom extends BaseCreatedEntity {
     @Column(name = "ai_chat_room_id")
     private Long id;
 
-//    TODO: User 엔티티 구현 후 user_id FK 및 UNIQUE 제약조건 적용 예정
-//    @OneToOne(fetch = FetchType.LAZY)
-//    @JoinColumn(name = "user_id", nullable = false, unique = true)
-//    private User user;
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", nullable = false, unique = true)
+    private User user;
 
     @Column(name = "last_message_at")
     private Instant lastMessageAt;
 
-//    TODO: User 엔티티 구현 후 생성 메서드 추가
-//    @Builder
-//    private AiChatRoom(User user) {
-//        this.user = user;
-//    }
-//
-//    public static AiChatRoom create(User user) {
-//        return AiChatRoom.builder()
-//                .user(user)
-//                .build();
-//    }
+    @Column(name = "last_guide_confirmed_at")
+    private Instant lastGuideConfirmedAt;
+
+    @Builder
+    private AiChatRoom(User user) {
+        this.user = user;
+    }
+
+    public static AiChatRoom create(User user) {
+        return AiChatRoom.builder()
+                .user(user)
+                .build();
+    }
 
     public void updateLastMessageAt(Instant lastMessageAt) {
         this.lastMessageAt = lastMessageAt;
+    }
+
+    public void confirmGuide() {
+        this.lastGuideConfirmedAt = Instant.now();
     }
 }

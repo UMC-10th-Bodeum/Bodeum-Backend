@@ -77,6 +77,15 @@ public class UserAgreement {
         this.agreedAt = now;
     }
 
+    public void agreeAiTerms() {
+        if (this.aiTermsAgreed) {
+            return;
+        }
+
+        this.aiTermsAgreed = true;
+        this.aiTermsAgreedAt = Instant.now();
+    }
+
     public boolean isRequiredAgreed() {
         return serviceTermsAgreed && privacyPolicyAgreed;
     }

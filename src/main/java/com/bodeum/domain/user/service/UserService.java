@@ -2,6 +2,8 @@ package com.bodeum.domain.user.service;
 
 import com.bodeum.domain.auth.enums.SocialProvider;
 import com.bodeum.domain.auth.exception.AuthErrorCode;
+import com.bodeum.domain.user.dto.request.AiTermsAgreementRequest;
+import com.bodeum.domain.user.dto.response.AiTermsAgreementResponse;
 import com.bodeum.domain.auth.repository.RefreshTokenSessionRepository;
 import com.bodeum.domain.region.entity.Region;
 import com.bodeum.domain.region.service.RegionService;
@@ -14,6 +16,9 @@ import com.bodeum.domain.user.dto.response.UserProfileResponse;
 import com.bodeum.domain.user.dto.response.UserProfileUpdateResponse;
 import com.bodeum.domain.user.dto.response.UserWithdrawResponse;
 import com.bodeum.domain.user.entity.User;
+import com.bodeum.domain.user.entity.UserAgreement;
+import com.bodeum.domain.user.exception.UserErrorCode;
+import com.bodeum.domain.user.repository.UserAgreementRepository;
 import com.bodeum.domain.user.repository.UserRepository;
 import com.bodeum.global.apiPayload.code.GeneralErrorCode;
 import com.bodeum.global.apiPayload.exception.ProjectException;
@@ -37,6 +42,7 @@ public class UserService {
     private final S3ImageStorage s3ImageStorage;
     private final UserProfileImageUpdater userProfileImageUpdater;
     private final RegionService regionService;
+    private final UserAgreementRepository userAgreementRepository;
 
     @Transactional(readOnly = true)
     public UserProfileResponse getProfile(Long userId) {
@@ -178,6 +184,49 @@ public class UserService {
     @Transactional(readOnly = true)
     public Optional<User> findUserByAuthSubject(String authSubject) {
         return userRepository.findByAuthSubject(authSubject);
+    }
+
+    @Transactional(readOnly = true)
+    public AiTermsAgreementResponse getAiTermsAgreement(Long userId) {
+        return userAgreementRepository.findByUserId(userId)
+                .map(a -> AiTermsAgreementResponse.of(a.isAiTermsAgreed(), a.getAiTermsAgreedAt()))
+                .orElse(AiTermsAgreementResponse.of(false, null));
+    }
+
+    @Transactional
+    public AiTermsAgreementResponse agreeAiTerms(
+            Long userId,
+            AiTermsAgreementRequest request
+    ) {
+        ensureUserAgreementExists(userId);
+
+        UserAgreement agreement = userAgreementRepository.findByUserId(userId)
+                .orElseThrow(() -> new ProjectException(UserErrorCode.USER_AGREEMENT_NOT_FOUND));
+
+        agreement.agreeAiTerms();
+
+        return AiTermsAgreementResponse.of(
+
+                agreement.isAiTermsAgreed(),
+                agreement.getAiTermsAgreedAt()
+        );
+    }
+
+    // 동시 요청 시 UserAgreement 중복 생성을 방지
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    public void ensureUserAgreementExists(Long userId) {
+        if (userAgreementRepository.findByUserId(userId).isPresent()) {
+            return;
+        }
+
+        try {
+            User user = getCurrentUser(userId);
+            userAgreementRepository.saveAndFlush(UserAgreement.create(user, false, false, false));
+        } catch (DataIntegrityViolationException e) {
+            if (userAgreementRepository.findByUserId(userId).isEmpty()) {
+                throw e;
+            }
+        }
     }
 
     private User requireActive(User user) {
