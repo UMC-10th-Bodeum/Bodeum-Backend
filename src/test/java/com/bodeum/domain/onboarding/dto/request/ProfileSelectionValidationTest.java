@@ -30,7 +30,7 @@ class ProfileSelectionValidationTest {
     @Test
     void createInterestRegionRejectsDuplicateInterestCategories() {
         CreateInterestRegionRequest request = new CreateInterestRegionRequest(
-                List.of(InterestCategory.INSTITUTION, InterestCategory.INSTITUTION),
+                List.of(InterestCategory.WELFARE_SUBSIDY, InterestCategory.WELFARE_SUBSIDY),
                 1L
         );
 
@@ -46,7 +46,7 @@ class ProfileSelectionValidationTest {
                 null,
                 List.of(DisabilityType.AUTISM, DisabilityType.AUTISM),
                 null,
-                List.of(InterestCategory.INSTITUTION, InterestCategory.INSTITUTION),
+                List.of(InterestCategory.WELFARE_SUBSIDY, InterestCategory.WELFARE_SUBSIDY),
                 null,
                 null,
                 null
