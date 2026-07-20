@@ -45,7 +45,9 @@ public class SecurityConfig {
             "/api/v1/home/posts/preview",
             "/api/v1/community/posts/recommended",
             "/api/v1/home/news/preview",
-            "/api/v1/info-items/counts"
+            "/api/v1/info-items/counts",
+            // 검색 API
+            "/api/v1/search"
     };
 
     @Bean
