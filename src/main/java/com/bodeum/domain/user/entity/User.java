@@ -85,6 +85,9 @@ public class User extends BaseCreatedUpdatedDeletedEntity {
     @Column(name = "onboarding_skipped", nullable = false)
     private boolean onboardingSkipped;
 
+    @Column(name = "registered_at")
+    private Instant registeredAt;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private UserStatus status;
@@ -292,6 +295,23 @@ public class User extends BaseCreatedUpdatedDeletedEntity {
      */
     public boolean isOnboardingResolved() {
         return isOnboardingCompleted() || onboardingSkipped;
+    }
+
+    /**
+     * 온보딩 완료 또는 건너뛰기로 가입이 확정되는 시점에 호출한다.
+     * 가입 확정 시각(registeredAt)을 최초 1회만 기록하는 멱등 메서드다.
+     */
+    public void markRegisteredIfResolved() {
+        if (registeredAt == null && isOnboardingResolved()) {
+            this.registeredAt = Instant.now();
+        }
+    }
+
+    /**
+     * 정식 회원 여부. registeredAt이 기록되어 있으면 가입 완료, null이면 가입 진행중이다.
+     */
+    public boolean isSignupCompleted() {
+        return registeredAt != null;
     }
 
     public String getChildName() {
