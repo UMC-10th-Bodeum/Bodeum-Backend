@@ -14,8 +14,7 @@ public interface HomePostRepository extends JpaRepository<Post, Long> {
             SELECT p FROM Post p
             WHERE p.status = :status
               AND p.deletedAt IS NULL
-            ORDER BY (SELECT COUNT(pl) FROM PostLike pl WHERE pl.post = p) DESC,
-                     p.createdAt DESC
+            ORDER BY p.likeCount DESC, p.createdAt DESC
             """)
     List<Post> findTopByPopularity(@Param("status") PostStatus status, Pageable pageable);
 

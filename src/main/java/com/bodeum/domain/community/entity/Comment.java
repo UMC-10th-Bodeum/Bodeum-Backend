@@ -62,6 +62,7 @@ public class Comment extends BaseCreatedUpdatedDeletedEntity {
         this.parent = parent;
         this.content = content;
         this.status = CommentStatus.ACTIVE;
+        this.post.increaseCommentCount();
     }
 
     public static Comment create(Post post, Long userId, String content) {
@@ -98,18 +99,36 @@ public class Comment extends BaseCreatedUpdatedDeletedEntity {
     }
 
     public void hide() {
+        if (this.status != CommentStatus.ACTIVE) {
+            return;
+        }
+
         this.status = CommentStatus.HIDDEN;
+        this.post.decreaseCommentCount();
     }
 
     @Override
     public void delete() {
+        if (this.status == CommentStatus.DELETED) {
+            return;
+        }
+
+        if (this.status == CommentStatus.ACTIVE) {
+            this.post.decreaseCommentCount();
+        }
+
         super.delete();
         this.status = CommentStatus.DELETED;
     }
 
     @Override
     public void restore() {
+        if (this.status == CommentStatus.ACTIVE) {
+            return;
+        }
+
         super.restore();
         this.status = CommentStatus.ACTIVE;
+        this.post.increaseCommentCount();
     }
 }

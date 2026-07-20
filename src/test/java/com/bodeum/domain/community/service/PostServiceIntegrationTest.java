@@ -183,7 +183,7 @@ class PostServiceIntegrationTest {
     }
 
     @Test
-    void commentDeleteSetsStatusAndDeletedAt() {
+    void commentLifecycleKeepsPostCommentCountSynchronized() {
         Post post = postRepository.saveAndFlush(Post.create(
                 10L,
                 PostBoardType.FREE_COMMUNICATION,
@@ -194,10 +194,37 @@ class PostServiceIntegrationTest {
         ));
         Comment comment = commentRepository.save(Comment.create(post, 20L, "삭제할 댓글"));
 
+        assertThat(post.getCommentCount()).isOne();
+
+        comment.hide();
+        assertThat(comment.getStatus()).isEqualTo(CommentStatus.HIDDEN);
+        assertThat(post.getCommentCount()).isZero();
+
+        comment.hide();
+        assertThat(post.getCommentCount()).isZero();
+
+        comment.restore();
+        assertThat(comment.getStatus()).isEqualTo(CommentStatus.ACTIVE);
+        assertThat(post.getCommentCount()).isOne();
+
+        comment.restore();
+        assertThat(post.getCommentCount()).isOne();
+
         comment.delete();
         commentRepository.flush();
 
         assertThat(comment.getStatus()).isEqualTo(CommentStatus.DELETED);
         assertThat(comment.getDeletedAt()).isNotNull();
+        assertThat(post.getCommentCount()).isZero();
+
+        comment.delete();
+        assertThat(post.getCommentCount()).isZero();
+
+        comment.restore();
+        commentRepository.flush();
+
+        assertThat(comment.getStatus()).isEqualTo(CommentStatus.ACTIVE);
+        assertThat(comment.getDeletedAt()).isNull();
+        assertThat(post.getCommentCount()).isOne();
     }
 }

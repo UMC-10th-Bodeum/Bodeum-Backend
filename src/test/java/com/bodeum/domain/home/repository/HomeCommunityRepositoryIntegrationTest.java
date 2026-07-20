@@ -73,6 +73,28 @@ class HomeCommunityRepositoryIntegrationTest {
         assertThat(counts.getFirst()[1]).isEqualTo(1L);
     }
 
+    @Test
+    void popularityQueryOrdersPostsBySynchronizedLikeCount() {
+        Post popularPost = post("인기 게시글");
+        popularPost.increaseLikeCount();
+        popularPost.increaseLikeCount();
+        homePostRepository.saveAndFlush(popularPost);
+
+        Post recentPost = post("최근 게시글");
+        recentPost.increaseLikeCount();
+        homePostRepository.saveAndFlush(recentPost);
+
+        List<Post> posts = homePostRepository.findTopByPopularity(
+                PostStatus.ACTIVE,
+                PageRequest.of(0, 10)
+        );
+
+        assertThat(posts).extracting(Post::getId).containsExactly(
+                popularPost.getId(),
+                recentPost.getId()
+        );
+    }
+
     private Post post(String title) {
         return Post.create(
                 10L,
