@@ -1,6 +1,5 @@
 package com.bodeum.domain.user.controller;
 
-import com.bodeum.domain.user.dto.request.AiTermsAgreementRequest;
 import com.bodeum.domain.user.dto.response.AiTermsAgreementResponse;
 import com.bodeum.domain.onboarding.dto.response.OnboardingStatusResponse;
 import com.bodeum.domain.onboarding.service.OnboardingService;
@@ -124,12 +123,11 @@ public class UserController {
     )
     @PostMapping("/me/ai-terms")
     public ApiResponse<AiTermsAgreementResponse> agreeAiTerms(
-            @LoginUser Long userId,
-            @Valid @RequestBody AiTermsAgreementRequest request
+            @LoginUser Long userId
     ) {
         return ApiResponse.of(
                 GeneralSuccessCode.OK,
-                userService.agreeAiTerms(userId, request)
+                userService.agreeAiTerms(userId)
         );
     }
 }

@@ -9,6 +9,11 @@ import org.springframework.http.HttpStatus;
 @RequiredArgsConstructor
 public enum AiErrorCode implements BaseErrorCode {
 
+    AI_TERMS_NOT_AGREED(
+            HttpStatus.FORBIDDEN,
+            "AI403_1",
+            "AI 챗봇 이용동의가 필요합니다."
+    ),
     AI_CHAT_ROOM_NOT_FOUND(
             HttpStatus.NOT_FOUND,
             "AI404_1",
