@@ -19,26 +19,33 @@ public record AiMessageResponse(
     public AiMessageResponse {
         Objects.requireNonNull(answerStatus, "answerStatus must not be null");
         sources = sources == null ? List.of() : List.copyOf(sources);
-        if (answerStatus == AiAnswerStatus.ANSWERED && sources.isEmpty()) {
-            throw new IllegalArgumentException("ANSWERED message must have at least one source");
+        if ((answerStatus == AiAnswerStatus.ANSWERED
+                || answerStatus == AiAnswerStatus.LINK_GUIDANCE) && sources.isEmpty()) {
+            throw new IllegalArgumentException(
+                    "ANSWERED or LINK_GUIDANCE message must have at least one source");
         }
         if (answerStatus == AiAnswerStatus.NO_EVIDENCE && !sources.isEmpty()) {
             throw new IllegalArgumentException("NO_EVIDENCE message must not have sources");
         }
     }
 
-    public static AiMessageResponse answered(
+    public static AiMessageResponse sourceBacked(
             Long aiMessageId,
             SenderType senderType,
+            AiAnswerStatus answerStatus,
             String content,
             Instant createdAt,
             List<AiMessageSourceResponse> sources,
             AiMessageWarningResponse warning
     ) {
+        if (answerStatus == AiAnswerStatus.NO_EVIDENCE) {
+            throw new IllegalArgumentException(
+                    "source-backed response cannot have NO_EVIDENCE status");
+        }
         return new AiMessageResponse(
                 aiMessageId,
                 senderType,
-                AiAnswerStatus.ANSWERED,
+                answerStatus,
                 content,
                 createdAt,
                 sources,

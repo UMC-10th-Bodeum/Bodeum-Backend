@@ -123,7 +123,7 @@ class AiMessageServiceTest {
     }
 
     @Test
-    void usesExternalAnswerWhenInternalReferenceDoesNotExist() {
+    void returnsLinkGuidanceWhenExternalSearchHasNoCitation() {
         String question = "수원시 복지기관 알려줘";
         AiReferenceDocument externalSource = new AiReferenceDocument(
                 "SITE-20",
@@ -136,7 +136,9 @@ class AiMessageServiceTest {
         );
         when(documentRetriever.retrieve(eq(question), any())).thenReturn(List.of());
         when(externalAnswerProvider.search(eq(question), any())).thenReturn(
-                new ExternalAiAnswer("수원시에서 확인 가능한 복지기관 정보입니다.", List.of(externalSource)));
+                ExternalAiAnswer.linkGuidance(
+                        "수원시에서 확인 가능한 복지기관 정보입니다.",
+                        List.of(externalSource)));
         AiMessage saved = savedAiMessage("수원시에서 확인 가능한 복지기관 정보입니다.");
         when(persistenceService.saveAiMessage(
                 chatRoom,
@@ -152,7 +154,7 @@ class AiMessageServiceTest {
         assertThat(result.aiMessage().sources()).hasSize(1);
         assertThat(result.aiMessage().sources().getFirst().sourceType())
                 .isEqualTo(AiResponseSourceType.SITE);
-        assertThat(result.aiMessage().answerStatus()).isEqualTo(AiAnswerStatus.ANSWERED);
+        assertThat(result.aiMessage().answerStatus()).isEqualTo(AiAnswerStatus.LINK_GUIDANCE);
         assertThat(result.aiMessage().warning()).isNull();
         verify(answerGenerator, never()).generate(any(), any(), any());
     }

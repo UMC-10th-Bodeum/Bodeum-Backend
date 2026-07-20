@@ -10,7 +10,6 @@ import com.bodeum.domain.ai.infrastructure.support.AiTimeoutDetector;
 import com.bodeum.domain.ai.model.rag.AiReferenceDocument;
 import com.bodeum.domain.ai.model.rag.AiUserProfile;
 import com.bodeum.domain.ai.model.answer.ExternalAiAnswer;
-import com.bodeum.domain.ai.repository.AiExternalResourceRepository;
 import com.bodeum.domain.ai.repository.AiExternalSourceRepository;
 import com.bodeum.domain.ai.service.port.AiExternalAnswerProvider;
 import com.bodeum.global.apiPayload.exception.ProjectException;
@@ -22,7 +21,6 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
-import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
@@ -48,7 +46,7 @@ public class OpenAiExternalAnswerProvider implements AiExternalAnswerProvider {
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     private final AiExternalSourceRepository externalSourceRepository;
-    private final AiExternalResourceRepository externalResourceRepository;
+    private final AiExternalResourcePersistenceService externalResourcePersistenceService;
     private final RestClient restClient;
     private final String model;
     private final int maxOutputTokens;
@@ -57,7 +55,7 @@ public class OpenAiExternalAnswerProvider implements AiExternalAnswerProvider {
 
     public OpenAiExternalAnswerProvider(
             AiExternalSourceRepository externalSourceRepository,
-            AiExternalResourceRepository externalResourceRepository,
+            AiExternalResourcePersistenceService externalResourcePersistenceService,
             RestClient.Builder restClientBuilder,
             @Value("${spring.ai.openai.api-key}") String apiKey,
             @Value("${bodeum.ai.web-search.model:gpt-5.4-mini}") String model,
@@ -68,7 +66,7 @@ public class OpenAiExternalAnswerProvider implements AiExternalAnswerProvider {
             AiPromptFormatter promptFormatter
     ) {
         this.externalSourceRepository = externalSourceRepository;
-        this.externalResourceRepository = externalResourceRepository;
+        this.externalResourcePersistenceService = externalResourcePersistenceService;
         SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
         requestFactory.setConnectTimeout(connectTimeout);
         requestFactory.setReadTimeout(readTimeout);
@@ -216,7 +214,7 @@ public class OpenAiExternalAnswerProvider implements AiExternalAnswerProvider {
         if (externalSource == null) {
             return ExternalAiAnswer.empty();
         }
-        return new ExternalAiAnswer(
+        return ExternalAiAnswer.linkGuidance(
                 "관련 상세 내용을 확인하지 못했습니다. %s에서 직접 확인해 주세요."
                         .formatted(externalSource.getName()),
                 List.of(source)
@@ -227,7 +225,7 @@ public class OpenAiExternalAnswerProvider implements AiExternalAnswerProvider {
             JsonNode outputs,
             Map<String, AiExternalSource> sourcesByDomain
     ) {
-        Map<String, AiReferenceDocument> referencesByUrl = new LinkedHashMap<>();
+        Map<String, AiExternalResourceCandidate> candidatesByUrl = new LinkedHashMap<>();
         for (JsonNode output : outputs) {
             if (!"web_search_call".equals(output.path("type").asText())) {
                 continue;
@@ -243,19 +241,18 @@ public class OpenAiExternalAnswerProvider implements AiExternalAnswerProvider {
                     continue;
                 }
                 String title = source.path("title").asText(externalSource.getName());
-                AiExternalResource resource = findOrCreateResource(
-                        externalSource, title, normalizedUrl);
-                referencesByUrl.putIfAbsent(normalizedUrl, toReference(resource));
+                candidatesByUrl.putIfAbsent(normalizedUrl, new AiExternalResourceCandidate(
+                        externalSource, title, normalizedUrl, sha256(normalizedUrl)));
             }
         }
-        return new ArrayList<>(referencesByUrl.values());
+        return saveResources(candidatesByUrl.values());
     }
 
     private List<AiReferenceDocument> mapCitations(
             JsonNode annotations,
             Map<String, AiExternalSource> sourcesByDomain
     ) {
-        Map<String, AiReferenceDocument> referencesByUrl = new LinkedHashMap<>();
+        Map<String, AiExternalResourceCandidate> candidatesByUrl = new LinkedHashMap<>();
         for (JsonNode annotation : annotations) {
             if (!"url_citation".equals(annotation.path("type").asText())) {
                 continue;
@@ -270,11 +267,10 @@ public class OpenAiExternalAnswerProvider implements AiExternalAnswerProvider {
             if (externalSource == null) {
                 continue;
             }
-            AiExternalResource resource = findOrCreateResource(
-                    externalSource, title, normalizedUrl);
-            referencesByUrl.putIfAbsent(normalizedUrl, toReference(resource));
+            candidatesByUrl.putIfAbsent(normalizedUrl, new AiExternalResourceCandidate(
+                    externalSource, title, normalizedUrl, sha256(normalizedUrl)));
         }
-        return new ArrayList<>(referencesByUrl.values());
+        return saveResources(candidatesByUrl.values());
     }
 
     private AiReferenceDocument toReference(AiExternalResource resource) {
@@ -289,19 +285,12 @@ public class OpenAiExternalAnswerProvider implements AiExternalAnswerProvider {
         );
     }
 
-    private AiExternalResource findOrCreateResource(
-            AiExternalSource externalSource,
-            String title,
-            String normalizedUrl
+    private List<AiReferenceDocument> saveResources(
+            java.util.Collection<AiExternalResourceCandidate> candidates
     ) {
-        String urlHash = sha256(normalizedUrl);
-        return externalResourceRepository.findBySourceUrlHash(urlHash)
-                .map(resource -> {
-                    resource.updateReference(title, normalizedUrl, resource.getSourceUpdatedAt());
-                    return externalResourceRepository.save(resource);
-                })
-                .orElseGet(() -> externalResourceRepository.save(AiExternalResource.create(
-                        externalSource, title, normalizedUrl, urlHash, null)));
+        return externalResourcePersistenceService.saveAll(candidates).stream()
+                .map(this::toReference)
+                .toList();
     }
 
     private Map<String, AiExternalSource> indexByDomain(List<AiExternalSource> sources) {

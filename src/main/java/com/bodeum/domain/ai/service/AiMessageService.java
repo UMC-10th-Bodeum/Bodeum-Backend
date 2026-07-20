@@ -6,6 +6,7 @@ import com.bodeum.domain.ai.dto.response.AiMessageWarningResponse;
 import com.bodeum.domain.ai.dto.response.CreateAiMessageResponse;
 import com.bodeum.domain.ai.entity.AiChatRoom;
 import com.bodeum.domain.ai.entity.AiMessage;
+import com.bodeum.domain.ai.enums.AiAnswerStatus;
 import com.bodeum.domain.ai.enums.AiWarningType;
 import com.bodeum.domain.ai.exception.AiErrorCode;
 import com.bodeum.domain.ai.model.rag.AiReferenceDocument;
@@ -116,7 +117,8 @@ public class AiMessageService {
         AiMessage message = persistenceService.saveAiMessage(
                 chatRoom, generated.answer(), warning, citedSources);
 
-        return answeredResponse(message, citedSources, warningResponse(warning));
+        return sourceBackedResponse(
+                message, citedSources, warningResponse(warning), AiAnswerStatus.ANSWERED);
     }
 
     private CreateAiMessageResponse createExternalOrNoResultResponse(
@@ -132,10 +134,11 @@ public class AiMessageService {
         boolean warning = hasIncorrectFeedback(externalAnswer.sources());
         AiMessage message = persistenceService.saveAiMessage(
                 chatRoom, externalAnswer.answer(), warning, externalAnswer.sources());
-        return answeredResponse(
+        return sourceBackedResponse(
                 message,
                 externalAnswer.sources(),
-                warningResponse(warning)
+                warningResponse(warning),
+                externalAnswer.answerStatus()
         );
     }
 
@@ -209,22 +212,26 @@ public class AiMessageService {
         );
     }
 
-    private CreateAiMessageResponse answeredResponse(
+    private CreateAiMessageResponse sourceBackedResponse(
             AiMessage message,
             List<AiReferenceDocument> sources,
-            AiMessageWarningResponse warning
+            AiMessageWarningResponse warning,
+            AiAnswerStatus answerStatus
     ) {
-        return new CreateAiMessageResponse(AiMessageResponse.answered(
+        List<AiMessageSourceResponse> sourceResponses = sources.stream()
+                .map(source -> new AiMessageSourceResponse(
+                        source.sourceType(), source.sourceId(), source.title(),
+                        source.url(), source.updatedAt()))
+                .toList();
+        AiMessageResponse response = AiMessageResponse.sourceBacked(
                 message.getId(),
                 message.getSenderType(),
+                answerStatus,
                 message.getContent(),
                 message.getCreatedAt(),
-                sources.stream()
-                        .map(source -> new AiMessageSourceResponse(
-                                source.sourceType(), source.sourceId(), source.title(),
-                                source.url(), source.updatedAt()))
-                        .toList(),
-                warning));
+                sourceResponses,
+                warning);
+        return new CreateAiMessageResponse(response);
     }
 
     private AiMessageWarningResponse warningResponse(boolean warning) {
