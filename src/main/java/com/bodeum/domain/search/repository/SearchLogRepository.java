@@ -16,5 +16,5 @@ public interface SearchLogRepository extends JpaRepository<SearchLog, Long> {
 
     @Modifying
     @Query("DELETE FROM SearchLog s WHERE s.userId = :userId AND s.keyword = :keyword")
-    void deleteByUserIdAndKeyword(@Param("userId") Long userId, @Param("keyword") String keyword);
+    int deleteByUserIdAndKeyword(@Param("userId") Long userId, @Param("keyword") String keyword);
 }

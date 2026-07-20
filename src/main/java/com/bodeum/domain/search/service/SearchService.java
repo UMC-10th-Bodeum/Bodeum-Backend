@@ -22,6 +22,7 @@ import java.util.List;
 public class SearchService {
 
     private static final int HISTORY_LIMIT = 10;
+    private static final int SEARCH_RESULT_LIMIT = 50;
 
     private final SearchInfoItemRepository searchInfoItemRepository;
     private final SearchLogRepository searchLogRepository;
@@ -31,7 +32,7 @@ public class SearchService {
         if (keyword == null || keyword.length() < 2) {
             throw new SearchException(SearchErrorCode.KEYWORD_TOO_SHORT);
         }
-        List<InfoItem> items = searchInfoItemRepository.findByNameContaining(keyword);
+        List<InfoItem> items = searchInfoItemRepository.findByNameContaining(keyword, PageRequest.of(0, SEARCH_RESULT_LIMIT));
         searchLogRepository.save(SearchLog.create(userId, keyword, SearchType.INFO, (long) items.size()));
         return InfoSearchResponse.of(items);
     }
@@ -45,6 +46,9 @@ public class SearchService {
 
     @Transactional
     public void deleteSearchHistory(Long userId, String keyword) {
-        searchLogRepository.deleteByUserIdAndKeyword(userId, keyword);
+        int deleted = searchLogRepository.deleteByUserIdAndKeyword(userId, keyword);
+        if (deleted == 0) {
+            throw new SearchException(SearchErrorCode.SEARCH_HISTORY_NOT_FOUND);
+        }
     }
 }
