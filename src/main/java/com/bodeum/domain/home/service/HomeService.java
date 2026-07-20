@@ -2,7 +2,9 @@ package com.bodeum.domain.home.service;
 
 import com.bodeum.domain.community.entity.Post;
 import com.bodeum.domain.community.entity.PostDisabilityTag;
+import com.bodeum.domain.community.enums.CommentStatus;
 import com.bodeum.domain.community.enums.DisabilityType;
+import com.bodeum.domain.community.enums.PostStatus;
 import com.bodeum.domain.community.repository.PostDisabilityTagRepository;
 import com.bodeum.domain.home.dto.response.*;
 import com.bodeum.domain.home.repository.*;
@@ -39,12 +41,18 @@ public class HomeService {
 
     public List<PostPreviewResponse> getPostsPreview(String sort, int limit) {
         List<Post> posts = SORT_LATEST.equals(sort)
-                ? homePostRepository.findAllByOrderByCreatedAtDesc(PageRequest.of(0, limit))
-                : homePostRepository.findTopByPopularity(PageRequest.of(0, limit));
+                ? homePostRepository.findAllByStatusAndDeletedAtIsNullOrderByCreatedAtDesc(
+                        PostStatus.ACTIVE,
+                        PageRequest.of(0, limit)
+                )
+                : homePostRepository.findTopByPopularity(PostStatus.ACTIVE, PageRequest.of(0, limit));
 
         List<Long> postIds = posts.stream().map(Post::getId).toList();
         Map<Long, Long> likeCountMap = toCountMap(homePostLikeRepository.countGroupByPostIdIn(postIds));
-        Map<Long, Long> commentCountMap = toCountMap(homeCommentRepository.countGroupByPostIdIn(postIds));
+        Map<Long, Long> commentCountMap = toCountMap(homeCommentRepository.countGroupByPostIdIn(
+                postIds,
+                CommentStatus.ACTIVE
+        ));
 
         return posts.stream()
                 .map(post -> PostPreviewResponse.of(
@@ -56,7 +64,10 @@ public class HomeService {
     }
 
     public List<RecommendedPostResponse> getRecommendedPosts(int limit) {
-        List<Post> posts = homePostRepository.findTopByPopularity(PageRequest.of(0, limit));
+        List<Post> posts = homePostRepository.findTopByPopularity(
+                PostStatus.ACTIVE,
+                PageRequest.of(0, limit)
+        );
 
         List<Long> postIds = posts.stream().map(Post::getId).toList();
         Map<Long, List<DisabilityType>> tagsMap = postDisabilityTagRepository.findAllByPost_IdIn(postIds)
@@ -66,7 +77,10 @@ public class HomeService {
                         Collectors.mapping(PostDisabilityTag::getDisabilityType, Collectors.toList())
                 ));
         Map<Long, Long> likeCountMap = toCountMap(homePostLikeRepository.countGroupByPostIdIn(postIds));
-        Map<Long, Long> commentCountMap = toCountMap(homeCommentRepository.countGroupByPostIdIn(postIds));
+        Map<Long, Long> commentCountMap = toCountMap(homeCommentRepository.countGroupByPostIdIn(
+                postIds,
+                CommentStatus.ACTIVE
+        ));
 
         return posts.stream()
                 .map(post -> RecommendedPostResponse.of(

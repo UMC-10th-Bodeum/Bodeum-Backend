@@ -14,15 +14,14 @@ public record CreateInterestRegionRequest(
         @Size(max = 2, message = "관심사는 최대 2개까지 선택 가능합니다.")
         @UniqueElements(message = "관심사는 중복 선택할 수 없습니다.")
         @ArraySchema(
-                arraySchema = @Schema(example = "[\"INSTITUTION\", \"HOSPITAL\"]"),
+                arraySchema = @Schema(example = "[\"WELFARE_SUBSIDY\", \"HOSPITAL_HEALTH\"]"),
                 schema = @Schema(
                         type = "string",
                         allowableValues = {
-                                "INSTITUTION",
-                                "HOSPITAL",
-                                "WELFARE",
-                                "EMPLOYMENT",
-                                "EDUCATION"
+                                "WELFARE_SUBSIDY",
+                                "HOSPITAL_HEALTH",
+                                "PARENTING_COMMUNICATION",
+                                "GROWTH_EDUCATION"
                         }
                 )
         )

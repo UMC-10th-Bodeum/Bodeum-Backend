@@ -8,12 +8,15 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.bodeum.domain.community.dto.request.CreatePostRequest;
 import com.bodeum.domain.community.dto.request.UpdatePostRequest;
+import com.bodeum.domain.community.dto.response.PostLikeResponse;
 import com.bodeum.domain.community.dto.response.PostResponse;
+import com.bodeum.domain.community.dto.response.PostScrapResponse;
 import com.bodeum.domain.community.enums.DisabilityType;
 import com.bodeum.domain.community.enums.PostAnonymityType;
 import com.bodeum.domain.community.enums.PostBoardType;
@@ -72,6 +75,7 @@ class PostControllerTest {
                                 {
                                   "boardType": "FREE_COMMUNICATION",
                                   "anonymityType": "PROFILE_TAG_VISIBLE",
+                                  "isQuestion": true,
                                   "title": "게시글 제목",
                                   "content": "게시글 내용",
                                   "disabilityTypes": ["AUTISM"],
@@ -82,7 +86,8 @@ class PostControllerTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.isSuccess").value(true))
                 .andExpect(jsonPath("$.code").value("COMMON201_1"))
-                .andExpect(jsonPath("$.result.postId").value(1));
+                .andExpect(jsonPath("$.result.postId").value(1))
+                .andExpect(jsonPath("$.result.isQuestion").value(true));
 
         then(postService).should().createPost(any(), any(CreatePostRequest.class));
     }
@@ -136,7 +141,8 @@ class PostControllerTest {
                 "게시글 내용",
                 List.of(DisabilityType.AUTISM),
                 List.of("육아"),
-                imageUrls
+                imageUrls,
+                false
         );
 
         mockMvc.perform(post("/api/community/posts")
@@ -180,6 +186,12 @@ class PostControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.result.title").value("게시글 제목"))
                 .andExpect(jsonPath("$.result.isMine").value(true))
+                .andExpect(jsonPath("$.result.viewCount").value(3))
+                .andExpect(jsonPath("$.result.likeCount").value(4))
+                .andExpect(jsonPath("$.result.isLiked").value(true))
+                .andExpect(jsonPath("$.result.commentCount").value(5))
+                .andExpect(jsonPath("$.result.scrapCount").value(6))
+                .andExpect(jsonPath("$.result.isScrapped").value(false))
                 .andExpect(jsonPath("$.result.disabilityTypes[0]").value("AUTISM"));
     }
 
@@ -191,6 +203,46 @@ class PostControllerTest {
         mockMvc.perform(get("/api/community/posts/99"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("COMMUNITY404_1"));
+    }
+
+    @Test
+    void likePostReturnsCurrentLikeStateAndCount() throws Exception {
+        given(postService.likePost(10L, 1L)).willReturn(new PostLikeResponse(true, 5));
+
+        mockMvc.perform(put("/api/community/posts/1/likes"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.isLiked").value(true))
+                .andExpect(jsonPath("$.result.likeCount").value(5));
+    }
+
+    @Test
+    void unlikePostReturnsCurrentLikeStateAndCount() throws Exception {
+        given(postService.unlikePost(10L, 1L)).willReturn(new PostLikeResponse(false, 3));
+
+        mockMvc.perform(delete("/api/community/posts/1/likes"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.isLiked").value(false))
+                .andExpect(jsonPath("$.result.likeCount").value(3));
+    }
+
+    @Test
+    void scrapPostReturnsCurrentScrapStateAndCount() throws Exception {
+        given(postService.scrapPost(10L, 1L)).willReturn(new PostScrapResponse(true, 7));
+
+        mockMvc.perform(put("/api/community/posts/1/scraps"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.isScrapped").value(true))
+                .andExpect(jsonPath("$.result.scrapCount").value(7));
+    }
+
+    @Test
+    void unscrapPostReturnsCurrentScrapStateAndCount() throws Exception {
+        given(postService.unscrapPost(10L, 1L)).willReturn(new PostScrapResponse(false, 6));
+
+        mockMvc.perform(delete("/api/community/posts/1/scraps"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.isScrapped").value(false))
+                .andExpect(jsonPath("$.result.scrapCount").value(6));
     }
 
     private HandlerMethodArgumentResolver loginUserArgumentResolver() {
@@ -221,6 +273,13 @@ class PostControllerTest {
                 PostAnonymityType.PROFILE_TAG_VISIBLE,
                 "게시글 제목",
                 "게시글 내용",
+                true,
+                3,
+                4,
+                true,
+                5,
+                6,
+                false,
                 List.of(DisabilityType.AUTISM),
                 List.of("육아"),
                 List.of("https://example.com/image.jpg"),

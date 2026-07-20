@@ -57,6 +57,62 @@ class OnboardingServiceTest {
     }
 
     @Test
+    void skipOnboardingMarksUserAsSignupCompleted() {
+        User user = newUser();
+        given(userService.getCurrentUser(1L)).willReturn(user);
+
+        // 건너뛰기도 가입 확정 기준이므로 정식 회원(registeredAt 기록)으로 전환된다.
+        assertThat(user.isSignupCompleted()).isFalse();
+
+        onboardingService.skipOnboarding(1L);
+
+        assertThat(user.isSignupCompleted()).isTrue();
+        assertThat(user.getRegisteredAt()).isNotNull();
+    }
+
+    @Test
+    void completingAllOnboardingStepsMarksUserAsSignupCompleted() {
+        User user = newUser();
+        Region region = Region.create("서울특별시", "강남구");
+        given(userService.getCurrentUser(1L)).willReturn(user);
+        given(regionService.getById(10L)).willReturn(region);
+
+        // 1·2단계까지는 온보딩이 확정되지 않아 가입 진행중 상태를 유지한다.
+        onboardingService.registerChildProfile(1L, new CreateChildProfileRequest(
+                "민준이", "2020-01", List.of(DisabilityType.AUTISM), "소심함"
+        ));
+        onboardingService.registerInterestRegion(1L, new CreateInterestRegionRequest(
+                List.of(InterestCategory.WELFARE_SUBSIDY), 10L
+        ));
+        assertThat(user.isSignupCompleted()).isFalse();
+
+        // 3단계(보호자 프로필)로 온보딩이 완료되면 가입이 확정된다.
+        onboardingService.registerGuardianProfile(1L, new CreateGuardianProfileRequest(
+                "민준맘", GuardianType.PARENT, CommunityRoleType.INFO_SEEKER
+        ));
+
+        assertThat(user.isOnboardingCompleted()).isTrue();
+        assertThat(user.isSignupCompleted()).isTrue();
+        assertThat(user.getRegisteredAt()).isNotNull();
+    }
+
+    @Test
+    void registeredAtIsFixedAtFirstResolutionAndNotOverwritten() {
+        User user = newUser();
+        given(userService.getCurrentUser(1L)).willReturn(user);
+
+        onboardingService.skipOnboarding(1L);
+        java.time.Instant firstRegisteredAt = user.getRegisteredAt();
+
+        // 이미 확정된 뒤 추가 단계를 입력해도 최초 확정 시각은 덮어쓰지 않는다(멱등).
+        onboardingService.registerChildProfile(1L, new CreateChildProfileRequest(
+                "민준이", "2020-01", List.of(DisabilityType.AUTISM), "소심함"
+        ));
+
+        assertThat(user.getRegisteredAt()).isEqualTo(firstRegisteredAt);
+    }
+
+    @Test
     void registerGuardianProfileStoresGuardianTypeAndCommunityRoleAsEnum() {
         User user = newUser();
         given(userService.getCurrentUser(1L)).willReturn(user);
@@ -129,8 +185,8 @@ class OnboardingServiceTest {
         given(regionService.getById(10L)).willReturn(region);
         CreateInterestRegionRequest request = new CreateInterestRegionRequest(
                 List.of(
-                        InterestCategory.INSTITUTION,
-                        InterestCategory.HOSPITAL
+                        InterestCategory.WELFARE_SUBSIDY,
+                        InterestCategory.HOSPITAL_HEALTH
                 ),
                 10L
         );
@@ -138,8 +194,8 @@ class OnboardingServiceTest {
         OnboardingStepResponse response = onboardingService.registerInterestRegion(1L, request);
 
         assertThat(user.getInterestCategories()).containsExactly(
-                InterestCategory.INSTITUTION,
-                InterestCategory.HOSPITAL
+                InterestCategory.WELFARE_SUBSIDY,
+                InterestCategory.HOSPITAL_HEALTH
         );
         assertThat(user.getRegion()).isEqualTo(region);
         assertThat(response.step()).isEqualTo(2);

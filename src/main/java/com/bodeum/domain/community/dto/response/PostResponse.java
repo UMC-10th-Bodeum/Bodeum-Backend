@@ -31,6 +31,18 @@ public record PostResponse(
         @Schema(example = "주말에 방문하기 좋은 조용한 공원을 찾고 있습니다.")
         String content,
 
+        @Schema(description = "질문글 여부", example = "true")
+        boolean isQuestion,
+
+        int viewCount,
+        int likeCount,
+        @Schema(description = "현재 사용자의 좋아요 여부", example = "true")
+        boolean isLiked,
+        int commentCount,
+        int scrapCount,
+        @Schema(description = "현재 사용자의 스크랩 여부", example = "false")
+        boolean isScrapped,
+
         List<DisabilityType> disabilityTypes,
         List<String> hashtags,
         List<String> imageUrls,
@@ -41,6 +53,8 @@ public record PostResponse(
     public static PostResponse of(
             Post post,
             Long viewerId,
+            boolean liked,
+            boolean scrapped,
             List<DisabilityType> disabilityTypes,
             List<String> hashtags,
             List<String> imageUrls
@@ -53,6 +67,13 @@ public record PostResponse(
                 post.getAnonymityType(),
                 post.getTitle(),
                 post.getContent(),
+                post.isQuestion(),
+                post.getViewCount(),
+                post.getLikeCount(),
+                liked,
+                post.getCommentCount(),
+                post.getScrapCount(),
+                scrapped,
                 List.copyOf(disabilityTypes),
                 List.copyOf(hashtags),
                 List.copyOf(imageUrls),
