@@ -1,5 +1,6 @@
-package com.bodeum.domain.ai.infrastructure;
+package com.bodeum.domain.ai.infrastructure.config;
 
+import com.bodeum.domain.ai.infrastructure.indexing.AiSourceJpaEventListener;
 import java.util.List;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;

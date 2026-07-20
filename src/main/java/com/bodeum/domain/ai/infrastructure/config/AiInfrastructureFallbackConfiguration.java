@@ -1,10 +1,10 @@
-package com.bodeum.domain.ai.infrastructure;
+package com.bodeum.domain.ai.infrastructure.config;
 
 import com.bodeum.domain.ai.exception.AiErrorCode;
-import com.bodeum.domain.ai.service.AiAnswerGenerator;
-import com.bodeum.domain.ai.service.AiDocumentRetriever;
-import com.bodeum.domain.ai.service.AiExternalAnswerProvider;
-import com.bodeum.domain.ai.model.ExternalAiAnswer;
+import com.bodeum.domain.ai.service.port.AiAnswerGenerator;
+import com.bodeum.domain.ai.service.port.AiDocumentRetriever;
+import com.bodeum.domain.ai.service.port.AiExternalAnswerProvider;
+import com.bodeum.domain.ai.model.answer.ExternalAiAnswer;
 import com.bodeum.global.apiPayload.exception.ProjectException;
 import java.util.List;
 import org.springframework.context.annotation.Bean;

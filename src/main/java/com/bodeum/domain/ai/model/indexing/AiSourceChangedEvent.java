@@ -1,4 +1,4 @@
-package com.bodeum.domain.ai.model;
+package com.bodeum.domain.ai.model.indexing;
 
 import com.bodeum.domain.ai.enums.AiResponseSourceType;
 

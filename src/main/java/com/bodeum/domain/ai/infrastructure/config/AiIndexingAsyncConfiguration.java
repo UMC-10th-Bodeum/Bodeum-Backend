@@ -1,4 +1,4 @@
-package com.bodeum.domain.ai.infrastructure;
+package com.bodeum.domain.ai.infrastructure.config;
 
 import java.util.concurrent.Executor;
 import java.util.concurrent.ThreadPoolExecutor;

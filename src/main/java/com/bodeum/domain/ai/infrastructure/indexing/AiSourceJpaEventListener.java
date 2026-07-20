@@ -1,7 +1,7 @@
-package com.bodeum.domain.ai.infrastructure;
+package com.bodeum.domain.ai.infrastructure.indexing;
 
 import com.bodeum.domain.ai.enums.AiResponseSourceType;
-import com.bodeum.domain.ai.model.AiSourceChangedEvent;
+import com.bodeum.domain.ai.model.indexing.AiSourceChangedEvent;
 import com.bodeum.domain.info.entity.InfoItem;
 import com.bodeum.domain.news.entity.News;
 import java.util.Arrays;

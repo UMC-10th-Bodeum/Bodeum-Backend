@@ -1,4 +1,4 @@
-package com.bodeum.domain.ai.infrastructure;
+package com.bodeum.domain.ai.infrastructure.indexing;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyList;

@@ -1,11 +1,11 @@
-package com.bodeum.domain.ai.infrastructure;
+package com.bodeum.domain.ai.infrastructure.indexing;
 
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.bodeum.domain.ai.enums.AiResponseSourceType;
-import com.bodeum.domain.ai.model.AiSourceChangedEvent;
+import com.bodeum.domain.ai.model.indexing.AiSourceChangedEvent;
 import com.bodeum.domain.info.entity.InfoItem;
 import com.bodeum.domain.info.repository.InfoItemRepository;
 import com.bodeum.domain.news.repository.NewsRepository;

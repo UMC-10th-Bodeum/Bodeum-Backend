@@ -1,6 +1,6 @@
-package com.bodeum.domain.ai.infrastructure;
+package com.bodeum.domain.ai.infrastructure.generation;
 
-import com.bodeum.domain.ai.model.AiUserProfile;
+import com.bodeum.domain.ai.model.rag.AiUserProfile;
 import java.util.Collection;
 import org.springframework.stereotype.Component;
 

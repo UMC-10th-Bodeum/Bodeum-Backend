@@ -1,7 +1,7 @@
-package com.bodeum.domain.ai.infrastructure;
+package com.bodeum.domain.ai.infrastructure.retrieval;
 
 import com.bodeum.domain.ai.enums.AiResponseSourceType;
-import com.bodeum.domain.ai.model.AiReferenceDocument;
+import com.bodeum.domain.ai.model.rag.AiReferenceDocument;
 import com.bodeum.domain.info.entity.InfoItem;
 import com.bodeum.domain.info.entity.InfoCategory;
 import com.bodeum.domain.info.repository.InfoItemRepository;

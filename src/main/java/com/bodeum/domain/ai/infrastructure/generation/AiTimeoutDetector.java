@@ -1,4 +1,4 @@
-package com.bodeum.domain.ai.infrastructure;
+package com.bodeum.domain.ai.infrastructure.generation;
 
 import java.net.SocketTimeoutException;
 import java.net.http.HttpTimeoutException;

@@ -1,6 +1,6 @@
-package com.bodeum.domain.ai.infrastructure;
+package com.bodeum.domain.ai.infrastructure.indexing;
 
-import com.bodeum.domain.ai.model.AiIndexingResult;
+import com.bodeum.domain.ai.model.indexing.AiIndexingResult;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.SpringApplication;

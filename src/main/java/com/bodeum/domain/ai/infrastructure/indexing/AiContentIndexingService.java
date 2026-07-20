@@ -1,8 +1,8 @@
-package com.bodeum.domain.ai.infrastructure;
+package com.bodeum.domain.ai.infrastructure.indexing;
 
 import com.bodeum.domain.ai.enums.AiResponseSourceType;
 import com.bodeum.domain.ai.exception.AiErrorCode;
-import com.bodeum.domain.ai.model.AiIndexingResult;
+import com.bodeum.domain.ai.model.indexing.AiIndexingResult;
 import com.bodeum.domain.info.entity.InfoItem;
 import com.bodeum.domain.info.entity.InfoCategory;
 import com.bodeum.domain.info.repository.InfoItemRepository;

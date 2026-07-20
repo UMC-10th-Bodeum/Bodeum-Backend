@@ -1,4 +1,4 @@
-package com.bodeum.domain.ai.model;
+package com.bodeum.domain.ai.model.rag;
 
 import java.util.List;
 

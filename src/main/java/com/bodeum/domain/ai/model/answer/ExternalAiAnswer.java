@@ -1,5 +1,6 @@
-package com.bodeum.domain.ai.model;
+package com.bodeum.domain.ai.model.answer;
 
+import com.bodeum.domain.ai.model.rag.AiReferenceDocument;
 import java.util.List;
 
 public record ExternalAiAnswer(

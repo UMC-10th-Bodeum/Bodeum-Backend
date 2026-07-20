@@ -1,10 +1,10 @@
-package com.bodeum.domain.ai.infrastructure;
+package com.bodeum.domain.ai.infrastructure.generation;
 
 import com.bodeum.domain.ai.exception.AiErrorCode;
-import com.bodeum.domain.ai.model.AiReferenceDocument;
-import com.bodeum.domain.ai.model.AiUserProfile;
-import com.bodeum.domain.ai.model.GeneratedAiAnswer;
-import com.bodeum.domain.ai.service.AiAnswerGenerator;
+import com.bodeum.domain.ai.model.rag.AiReferenceDocument;
+import com.bodeum.domain.ai.model.rag.AiUserProfile;
+import com.bodeum.domain.ai.model.answer.GeneratedAiAnswer;
+import com.bodeum.domain.ai.service.port.AiAnswerGenerator;
 import com.bodeum.global.apiPayload.exception.ProjectException;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;

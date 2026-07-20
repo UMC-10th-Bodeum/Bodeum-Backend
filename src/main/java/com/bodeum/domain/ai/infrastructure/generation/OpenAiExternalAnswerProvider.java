@@ -1,16 +1,16 @@
-package com.bodeum.domain.ai.infrastructure;
+package com.bodeum.domain.ai.infrastructure.generation;
 
 import com.bodeum.domain.ai.entity.AiExternalResource;
 import com.bodeum.domain.ai.entity.AiExternalSource;
 import com.bodeum.domain.ai.enums.AiExternalSourceType;
 import com.bodeum.domain.ai.enums.AiResponseSourceType;
 import com.bodeum.domain.ai.exception.AiErrorCode;
-import com.bodeum.domain.ai.model.AiReferenceDocument;
-import com.bodeum.domain.ai.model.AiUserProfile;
-import com.bodeum.domain.ai.model.ExternalAiAnswer;
+import com.bodeum.domain.ai.model.rag.AiReferenceDocument;
+import com.bodeum.domain.ai.model.rag.AiUserProfile;
+import com.bodeum.domain.ai.model.answer.ExternalAiAnswer;
 import com.bodeum.domain.ai.repository.AiExternalResourceRepository;
 import com.bodeum.domain.ai.repository.AiExternalSourceRepository;
-import com.bodeum.domain.ai.service.AiExternalAnswerProvider;
+import com.bodeum.domain.ai.service.port.AiExternalAnswerProvider;
 import com.bodeum.global.apiPayload.exception.ProjectException;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.net.URI;

@@ -1,10 +1,10 @@
-package com.bodeum.domain.ai.infrastructure;
+package com.bodeum.domain.ai.infrastructure.retrieval;
 
 import com.bodeum.domain.ai.enums.AiResponseSourceType;
 import com.bodeum.domain.ai.exception.AiErrorCode;
-import com.bodeum.domain.ai.model.AiReferenceDocument;
-import com.bodeum.domain.ai.model.AiUserProfile;
-import com.bodeum.domain.ai.service.AiDocumentRetriever;
+import com.bodeum.domain.ai.model.rag.AiReferenceDocument;
+import com.bodeum.domain.ai.model.rag.AiUserProfile;
+import com.bodeum.domain.ai.service.port.AiDocumentRetriever;
 import com.bodeum.global.apiPayload.exception.ProjectException;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
