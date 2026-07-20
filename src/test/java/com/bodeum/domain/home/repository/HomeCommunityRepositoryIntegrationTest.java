@@ -19,6 +19,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional
 class HomeCommunityRepositoryIntegrationTest {
 
+    private static final int DEFAULT_PAGE_SIZE = 10;
+
     @Autowired
     private HomePostRepository homePostRepository;
 
@@ -41,11 +43,11 @@ class HomeCommunityRepositoryIntegrationTest {
         List<Post> latestPosts = homePostRepository
                 .findAllByStatusAndDeletedAtIsNullOrderByCreatedAtDesc(
                         PostStatus.ACTIVE,
-                        PageRequest.of(0, 10)
+                        PageRequest.of(0, DEFAULT_PAGE_SIZE)
                 );
         List<Post> popularPosts = homePostRepository.findTopByPopularity(
                 PostStatus.ACTIVE,
-                PageRequest.of(0, 10)
+                PageRequest.of(0, DEFAULT_PAGE_SIZE)
         );
 
         assertThat(latestPosts).extracting(Post::getId).containsExactly(activePost.getId());
@@ -86,7 +88,7 @@ class HomeCommunityRepositoryIntegrationTest {
 
         List<Post> posts = homePostRepository.findTopByPopularity(
                 PostStatus.ACTIVE,
-                PageRequest.of(0, 10)
+                PageRequest.of(0, DEFAULT_PAGE_SIZE)
         );
 
         assertThat(posts).extracting(Post::getId).containsExactly(
