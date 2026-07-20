@@ -47,7 +47,11 @@ public class SecurityConfig {
             "/api/v1/home/news/preview",
             "/api/v1/info-items/counts",
             // 검색 API
-            "/api/v1/search"
+            "/api/v1/search",
+
+            // Open API 동기화
+            "/api/v1/admin/openapi/**"
+
     };
 
     @Bean

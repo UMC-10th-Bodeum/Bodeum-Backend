@@ -63,3 +63,9 @@ bodeum:
       access-key: ${AWS_ACCESS_KEY:}
       secret-key: ${AWS_SECRET_KEY:}
       public-base-url: ${AWS_S3_PUBLIC_BASE_URL:}
+
+openapi:
+  secret:
+    datago: ${OPENAPI_SECRET_DATAGO:}
+    odcloud: ${OPENAPI_SECRET_ODCLOUD:}
+    gg: ${OPENAPI_SECRET_GG:}
