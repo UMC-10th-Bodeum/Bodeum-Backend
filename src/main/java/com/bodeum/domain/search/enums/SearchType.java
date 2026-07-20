@@ -1,4 +1,4 @@
-package com.bodeum.domain.search.entity;
+package com.bodeum.domain.search.enums;
 
 public enum SearchType {
     ALL,

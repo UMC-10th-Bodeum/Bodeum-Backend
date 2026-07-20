@@ -1,5 +1,6 @@
 package com.bodeum.domain.search.entity;
 
+import com.bodeum.domain.search.enums.SearchType;
 import com.bodeum.global.common.entity.BaseCreatedEntity;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
@@ -19,11 +20,6 @@ public class SearchLog extends BaseCreatedEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "search_log_id")
     private Long id;
-
-//    TODO: User 엔티티 구현 후 user_id FK 적용 예정 (비로그인 사용자 검색 로그 허용을 위해 nullable = true 유지)
-//    @ManyToOne(fetch = FetchType.LAZY)
-//    @JoinColumn(name = "user_id", nullable = true)
-//    private User user;
 
     @Column(name = "user_id")
     private Long userId;
