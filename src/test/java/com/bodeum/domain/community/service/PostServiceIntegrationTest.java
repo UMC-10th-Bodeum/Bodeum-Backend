@@ -29,7 +29,10 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 @SpringBootTest(properties = "bodeum.auth.jwt-secret=test-jwt-secret-32-bytes-minimum-value")
 @Transactional
@@ -53,37 +56,46 @@ class PostServiceIntegrationTest {
     private CommentRepository commentRepository;
     @Autowired
     private CommentLikeRepository commentLikeRepository;
+    @Autowired
+    private PlatformTransactionManager transactionManager;
 
     @Test
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     void createAndReadAnonymousPostWithRelatedData() {
-        PostResponse created = postService.createPost(
-                10L,
-                new CreatePostRequest(
-                        PostBoardType.FREE_COMMUNICATION,
-                        PostAnonymityType.FULLY_ANONYMOUS,
-                        "익명 게시글",
-                        "익명 게시글 내용",
-                        List.of(DisabilityType.AUTISM, DisabilityType.AUTISM, DisabilityType.ADHD),
-                        List.of("육아", "정보공유"),
-                        List.of("https://example.com/1.jpg", "https://example.com/2.jpg"),
-                        true
-                )
-        );
+        Long postId = null;
+        try {
+            PostResponse created = postService.createPost(
+                    10L,
+                    new CreatePostRequest(
+                            PostBoardType.FREE_COMMUNICATION,
+                            PostAnonymityType.FULLY_ANONYMOUS,
+                            "익명 게시글",
+                            "익명 게시글 내용",
+                            List.of(DisabilityType.AUTISM, DisabilityType.AUTISM, DisabilityType.ADHD),
+                            List.of("육아", "정보공유"),
+                            List.of("https://example.com/1.jpg", "https://example.com/2.jpg"),
+                            true
+                    )
+            );
+            postId = created.postId();
 
-        PostResponse viewed = postService.getPost(20L, created.postId());
+            PostResponse viewed = postService.getPost(20L, postId);
 
-        assertThat(created.authorId()).isNull();
-        assertThat(created.isMine()).isTrue();
-        assertThat(created.isQuestion()).isTrue();
-        assertThat(viewed.authorId()).isNull();
-        assertThat(viewed.isMine()).isFalse();
-        assertThat(viewed.viewCount()).isEqualTo(1);
-        assertThat(viewed.disabilityTypes()).containsExactly(DisabilityType.AUTISM, DisabilityType.ADHD);
-        assertThat(viewed.hashtags()).containsExactly("육아", "정보공유");
-        assertThat(viewed.imageUrls()).containsExactly(
-                "https://example.com/1.jpg",
-                "https://example.com/2.jpg"
-        );
+            assertThat(created.authorId()).isNull();
+            assertThat(created.isMine()).isTrue();
+            assertThat(created.isQuestion()).isTrue();
+            assertThat(viewed.authorId()).isNull();
+            assertThat(viewed.isMine()).isFalse();
+            assertThat(viewed.viewCount()).isEqualTo(1);
+            assertThat(viewed.disabilityTypes()).containsExactly(DisabilityType.AUTISM, DisabilityType.ADHD);
+            assertThat(viewed.hashtags()).containsExactly("육아", "정보공유");
+            assertThat(viewed.imageUrls()).containsExactly(
+                    "https://example.com/1.jpg",
+                    "https://example.com/2.jpg"
+            );
+        } finally {
+            deleteCommittedPostData(postId);
+        }
     }
 
     @Test
@@ -117,40 +129,47 @@ class PostServiceIntegrationTest {
     }
 
     @Test
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     void likeAndScrapRequestsAreIdempotentAndReflectedInPostDetail() {
-        Post post = postRepository.saveAndFlush(Post.create(
-                10L,
-                PostBoardType.FREE_COMMUNICATION,
-                PostAnonymityType.PROFILE_TAG_VISIBLE,
-                "반응 테스트 게시글",
-                "좋아요와 스크랩을 테스트합니다.",
-                false
-        ));
+        Long postId = null;
+        try {
+            Post post = postRepository.saveAndFlush(Post.create(
+                    10L,
+                    PostBoardType.FREE_COMMUNICATION,
+                    PostAnonymityType.PROFILE_TAG_VISIBLE,
+                    "반응 테스트 게시글",
+                    "좋아요와 스크랩을 테스트합니다.",
+                    false
+            ));
+            postId = post.getId();
 
-        postService.likePost(20L, post.getId());
-        postService.likePost(20L, post.getId());
-        postService.scrapPost(20L, post.getId());
-        postService.scrapPost(20L, post.getId());
+            postService.likePost(20L, postId);
+            postService.likePost(20L, postId);
+            postService.scrapPost(20L, postId);
+            postService.scrapPost(20L, postId);
 
-        PostResponse reacted = postService.getPost(20L, post.getId());
+            PostResponse reacted = postService.getPost(20L, postId);
 
-        assertThat(postLikeRepository.count()).isOne();
-        assertThat(postScrapRepository.count()).isOne();
-        assertThat(reacted.likeCount()).isOne();
-        assertThat(reacted.scrapCount()).isOne();
-        assertThat(reacted.isLiked()).isTrue();
-        assertThat(reacted.isScrapped()).isTrue();
+            assertThat(postLikeRepository.count()).isOne();
+            assertThat(postScrapRepository.count()).isOne();
+            assertThat(reacted.likeCount()).isOne();
+            assertThat(reacted.scrapCount()).isOne();
+            assertThat(reacted.isLiked()).isTrue();
+            assertThat(reacted.isScrapped()).isTrue();
 
-        postService.unlikePost(20L, post.getId());
-        postService.unlikePost(20L, post.getId());
-        postService.unscrapPost(20L, post.getId());
-        postService.unscrapPost(20L, post.getId());
+            postService.unlikePost(20L, postId);
+            postService.unlikePost(20L, postId);
+            postService.unscrapPost(20L, postId);
+            postService.unscrapPost(20L, postId);
 
-        Post updatedPost = postRepository.findById(post.getId()).orElseThrow();
-        assertThat(postLikeRepository.count()).isZero();
-        assertThat(postScrapRepository.count()).isZero();
-        assertThat(updatedPost.getLikeCount()).isZero();
-        assertThat(updatedPost.getScrapCount()).isZero();
+            Post updatedPost = postRepository.findById(postId).orElseThrow();
+            assertThat(postLikeRepository.count()).isZero();
+            assertThat(postScrapRepository.count()).isZero();
+            assertThat(updatedPost.getLikeCount()).isZero();
+            assertThat(updatedPost.getScrapCount()).isZero();
+        } finally {
+            deleteCommittedPostData(postId);
+        }
     }
 
     @Test
@@ -206,5 +225,21 @@ class PostServiceIntegrationTest {
         assertThat(comment.getStatus()).isEqualTo(CommentStatus.ACTIVE);
         assertThat(comment.getDeletedAt()).isNull();
         assertThat(post.getCommentCount()).isOne();
+    }
+
+    private void deleteCommittedPostData(Long postId) {
+        if (postId == null) {
+            return;
+        }
+
+        new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
+            postLikeRepository.deleteAllByPost_Id(postId);
+            postScrapRepository.deleteAllByPost_Id(postId);
+            postDisabilityTagRepository.deleteAllByPost_Id(postId);
+            postHashtagRepository.deleteAllByPost_Id(postId);
+            postImageRepository.deleteAllByPost_Id(postId);
+            postRepository.flush();
+            postRepository.deleteById(postId);
+        });
     }
 }

@@ -41,6 +41,7 @@ public class PostService {
     private final PostDisabilityTagRepository postDisabilityTagRepository;
     private final PostLikeRepository postLikeRepository;
     private final PostScrapRepository postScrapRepository;
+    private final PostViewCountService postViewCountService;
 
     @Transactional
     public PostResponse createPost(Long userId, CreatePostRequest request) {
@@ -93,12 +94,10 @@ public class PostService {
         post.delete();
     }
 
-    @Transactional
+    @Transactional(readOnly = true)
     public PostResponse getPost(Long userId, Long postId) {
         validateAuthenticatedUser(userId);
-        if (postRepository.incrementViewCount(postId, PostStatus.ACTIVE) == 0) {
-            throw new CommunityException(CommunityErrorCode.POST_NOT_FOUND);
-        }
+        postViewCountService.increaseViewCount(postId);
         return getPostResponse(findPost(postId), userId);
     }
 

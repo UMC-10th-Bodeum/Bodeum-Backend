@@ -53,6 +53,8 @@ class PostServiceTest {
     private PostLikeRepository postLikeRepository;
     @Mock
     private PostScrapRepository postScrapRepository;
+    @Mock
+    private PostViewCountService postViewCountService;
     @InjectMocks
     private PostService postService;
 
@@ -149,7 +151,6 @@ class PostServiceTest {
                 false
         );
         ReflectionTestUtils.setField(post, "id", 1L);
-        given(postRepository.incrementViewCount(1L, PostStatus.ACTIVE)).willReturn(1);
         given(postRepository.findByIdAndStatusAndDeletedAtIsNull(1L, PostStatus.ACTIVE))
                 .willReturn(Optional.of(post));
         given(postLikeRepository.existsByPost_IdAndUserId(1L, 20L)).willReturn(true);
@@ -161,6 +162,7 @@ class PostServiceTest {
         assertThat(response.isMine()).isFalse();
         assertThat(response.isLiked()).isTrue();
         assertThat(response.isScrapped()).isTrue();
+        then(postViewCountService).should().increaseViewCount(1L);
     }
 
     @Test
