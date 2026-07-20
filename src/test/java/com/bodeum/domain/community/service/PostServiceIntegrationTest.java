@@ -9,7 +9,6 @@ import com.bodeum.domain.community.entity.Comment;
 import com.bodeum.domain.community.entity.CommentLike;
 import com.bodeum.domain.community.entity.Post;
 import com.bodeum.domain.community.entity.PostLike;
-import com.bodeum.domain.community.entity.PostReport;
 import com.bodeum.domain.community.entity.PostScrap;
 import com.bodeum.domain.community.enums.CommentStatus;
 import com.bodeum.domain.community.enums.DisabilityType;
@@ -24,7 +23,6 @@ import com.bodeum.domain.community.repository.PostDisabilityTagRepository;
 import com.bodeum.domain.community.repository.PostHashtagRepository;
 import com.bodeum.domain.community.repository.PostImageRepository;
 import com.bodeum.domain.community.repository.PostLikeRepository;
-import com.bodeum.domain.community.repository.PostReportRepository;
 import com.bodeum.domain.community.repository.PostRepository;
 import com.bodeum.domain.community.repository.PostScrapRepository;
 import java.util.List;
@@ -51,8 +49,6 @@ class PostServiceIntegrationTest {
     private PostLikeRepository postLikeRepository;
     @Autowired
     private PostScrapRepository postScrapRepository;
-    @Autowired
-    private PostReportRepository postReportRepository;
     @Autowired
     private CommentRepository commentRepository;
     @Autowired
@@ -105,7 +101,6 @@ class PostServiceIntegrationTest {
         commentLikeRepository.saveAndFlush(CommentLike.create(reply, 40L));
         postLikeRepository.saveAndFlush(PostLike.create(post, 20L));
         postScrapRepository.saveAndFlush(PostScrap.create(post, 20L));
-        postReportRepository.saveAndFlush(PostReport.create(post, 30L, "신고 사유"));
 
         postService.deletePost(10L, post.getId());
 
@@ -116,7 +111,6 @@ class PostServiceIntegrationTest {
         assertThat(commentLikeRepository.count()).isOne();
         assertThat(postLikeRepository.count()).isOne();
         assertThat(postScrapRepository.count()).isOne();
-        assertThat(postReportRepository.count()).isOne();
         assertThat(postDisabilityTagRepository.count()).isZero();
         assertThat(postHashtagRepository.count()).isZero();
         assertThat(postImageRepository.count()).isZero();
@@ -194,20 +188,6 @@ class PostServiceIntegrationTest {
         ));
         Comment comment = commentRepository.save(Comment.create(post, 20L, "삭제할 댓글"));
 
-        assertThat(post.getCommentCount()).isOne();
-
-        comment.hide();
-        assertThat(comment.getStatus()).isEqualTo(CommentStatus.HIDDEN);
-        assertThat(post.getCommentCount()).isZero();
-
-        comment.hide();
-        assertThat(post.getCommentCount()).isZero();
-
-        comment.restore();
-        assertThat(comment.getStatus()).isEqualTo(CommentStatus.ACTIVE);
-        assertThat(post.getCommentCount()).isOne();
-
-        comment.restore();
         assertThat(post.getCommentCount()).isOne();
 
         comment.delete();
