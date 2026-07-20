@@ -67,8 +67,12 @@ public class AiMessageService {
         User user = userRepository.findAiProfileById(userId)
                 .orElseThrow(() -> new ProjectException(UserErrorCode.USER_NOT_FOUND));
 
+        User disabilityProfileUser = userRepository.findAiDisabilityProfileById(userId)
+                .orElseThrow(() -> new ProjectException(UserErrorCode.USER_NOT_FOUND));
+
         persistenceService.saveUserMessage(chatRoom, content);
-        AiUserProfile profile = toProfile(user);
+        AiUserProfile profile = toProfile(user, disabilityProfileUser);
+
         List<AiReferenceDocument> retrievedDocuments = referenceDocumentResolver.resolve(
                 documentRetriever.retrieve(content, profile));
 
@@ -131,13 +135,21 @@ public class AiMessageService {
         );
     }
 
-    private AiUserProfile toProfile(User user) {
+    private AiUserProfile toProfile(
+            User user,
+            User disabilityProfileUser
+    ) {
         return new AiUserProfile(
                 user.getRegion() == null ? null : user.getRegion().getFullName(),
                 user.getChildAge(),
-                user.getDisabilityTypes().stream().map(Enum::name).toList(),
-                user.getInterestCategories().stream().map(Enum::name).toList(),
-                user.getKeywordText());
+                disabilityProfileUser.getDisabilityTypes().stream()
+                        .map(Enum::name)
+                        .toList(),
+                user.getInterestCategories().stream()
+                        .map(Enum::name)
+                        .toList(),
+                user.getKeywordText()
+        );
     }
 
     private CreateAiMessageResponse response(

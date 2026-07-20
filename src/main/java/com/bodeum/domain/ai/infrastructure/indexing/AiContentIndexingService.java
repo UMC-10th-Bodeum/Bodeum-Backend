@@ -76,7 +76,7 @@ public class AiContentIndexingService {
         } catch (ProjectException e) {
             throw e;
         } catch (Exception e) {
-            throw new ProjectException(AiErrorCode.AI_INDEXING_FAILED);
+            throw new ProjectException(AiErrorCode.AI_INDEXING_FAILED, e);
         }
     }
 
@@ -92,7 +92,7 @@ public class AiContentIndexingService {
         try {
             vectorStore.delete(sourceFilter(sourceType, sourceId));
         } catch (Exception e) {
-            throw new ProjectException(AiErrorCode.AI_INDEXING_FAILED);
+            throw new ProjectException(AiErrorCode.AI_INDEXING_FAILED, e);
         }
     }
 
@@ -110,7 +110,7 @@ public class AiContentIndexingService {
         } catch (ProjectException e) {
             throw e;
         } catch (Exception e) {
-            throw new ProjectException(AiErrorCode.AI_INDEXING_FAILED);
+            throw new ProjectException(AiErrorCode.AI_INDEXING_FAILED, e);
         }
     }
 

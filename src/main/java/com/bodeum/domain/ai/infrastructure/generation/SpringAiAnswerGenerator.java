@@ -1,5 +1,6 @@
 package com.bodeum.domain.ai.infrastructure.generation;
 
+import com.bodeum.domain.ai.infrastructure.support.AiTimeoutDetector;
 import com.bodeum.domain.ai.exception.AiErrorCode;
 import com.bodeum.domain.ai.model.rag.AiReferenceDocument;
 import com.bodeum.domain.ai.model.rag.AiUserProfile;
@@ -38,7 +39,6 @@ public class SpringAiAnswerGenerator implements AiAnswerGenerator {
             List<AiReferenceDocument> documents
     ) {
         String prompt = """
-                [사용자 프로필]
                 %s
 
                 [참고자료]

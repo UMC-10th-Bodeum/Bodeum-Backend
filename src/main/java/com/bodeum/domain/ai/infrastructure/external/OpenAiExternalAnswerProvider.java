@@ -1,10 +1,12 @@
-package com.bodeum.domain.ai.infrastructure.generation;
+package com.bodeum.domain.ai.infrastructure.external;
 
 import com.bodeum.domain.ai.entity.AiExternalResource;
 import com.bodeum.domain.ai.entity.AiExternalSource;
 import com.bodeum.domain.ai.enums.AiExternalSourceType;
 import com.bodeum.domain.ai.enums.AiResponseSourceType;
 import com.bodeum.domain.ai.exception.AiErrorCode;
+import com.bodeum.domain.ai.infrastructure.generation.AiPromptFormatter;
+import com.bodeum.domain.ai.infrastructure.support.AiTimeoutDetector;
 import com.bodeum.domain.ai.model.rag.AiReferenceDocument;
 import com.bodeum.domain.ai.model.rag.AiUserProfile;
 import com.bodeum.domain.ai.model.answer.ExternalAiAnswer;
@@ -130,7 +132,6 @@ public class OpenAiExternalAnswerProvider implements AiExternalAnswerProvider {
         return """
                 %s
 
-                [사용자 프로필]
                 %s
 
                 [사용자 질문]

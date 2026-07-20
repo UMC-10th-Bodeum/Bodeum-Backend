@@ -41,7 +41,7 @@ class SpringAiDocumentRetrieverTest {
         assertThat(requestCaptor.getValue().getQuery())
                 .contains("복지 센터 알려줘")
                 .contains("활동 지역: 서울 강남구")
-                .contains("장애 유형: AUTISM_SPECTRUM")
+                .contains("집중 케어 영역: AUTISM_SPECTRUM")
                 .contains("관심사: HOSPITAL_HEALTH")
                 .contains("자녀 관련 관심 키워드: 언어치료, 사회성 발달");
     }

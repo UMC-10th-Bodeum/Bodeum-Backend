@@ -39,7 +39,7 @@ spring:
     retry:
       max-attempts: 1
     openai:
-      api-key: ${OPENAI_API_KEY:sk-not-configured}
+      api-key: ${OPENAI_API_KEY}
       timeout: ${OPENAI_REQUEST_TIMEOUT:20s}
       max-retries: 0
       chat:
@@ -51,7 +51,6 @@ spring:
     vectorstore:
       chroma:
         client:
-          host: ${CHROMA_HOST:http://localhost}
           port: 8000
         collection-name: bodeum-rag
         initialize-schema: true
@@ -71,9 +70,9 @@ bodeum:
       time-zone: ${AI_REQUEST_LIMIT_TIME_ZONE:Asia/Seoul}
     indexing:
       run-once: ${AI_INDEXING_RUN_ONCE:false}
-      chunk-size: ${AI_INDEXING_CHUNK_SIZE:500}
-      write-batch-size: ${AI_INDEXING_WRITE_BATCH_SIZE:50}
-      source-time-zone: ${AI_INDEXING_SOURCE_TIME_ZONE:Asia/Seoul}
+      chunk-size: 500
+      write-batch-size: 50
+      source-time-zone: Asia/Seoul
   auth:
     jwt-secret: ${JWT_SECRET:}
     access-token-ttl: ${AUTH_ACCESS_TOKEN_TTL:1h}

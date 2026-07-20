@@ -19,11 +19,33 @@ services:
     restart: unless-stopped
     env_file:
       - .env
+    environment:
+      AI_INDEXING_RUN_ONCE: "false"
     depends_on:
       - chroma
     # Nginx(호스트)만 접근하도록 localhost 에만 바인딩한다. 외부에는 노출하지 않는다.
     ports:
       - "127.0.0.1:8080:8080"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Run after a direct SQL bulk insert or when a full Chroma rebuild is required:
+  # docker compose --profile indexing run --rm indexer
+  indexer:
+    image: ghcr.io/umc-10th-bodeum/bodeum-backend:latest
+    profiles:
+      - indexing
+    restart: "no"
+    env_file:
+      - .env
+    environment:
+      AI_INDEXING_RUN_ONCE: "true"
+      SPRING_MAIN_WEB_APPLICATION_TYPE: "none"
+    depends_on:
+      - chroma
     logging:
       driver: json-file
       options:

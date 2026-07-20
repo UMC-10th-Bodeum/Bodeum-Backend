@@ -57,7 +57,7 @@ public class SpringAiDocumentRetriever implements AiDocumentRetriever {
     private String buildSearchQuery(String question, AiUserProfile profile) {
         StringBuilder query = new StringBuilder(question);
         append(query, "활동 지역", profile.region());
-        append(query, "장애 유형", String.join(", ", profile.disabilityTypes()));
+        append(query, "집중 케어 영역", String.join(", ", profile.disabilityTypes()));
         append(query, "관심사", String.join(", ", profile.interests()));
         append(query, "자녀 관련 관심 키워드", profile.keywordText());
         return query.toString();

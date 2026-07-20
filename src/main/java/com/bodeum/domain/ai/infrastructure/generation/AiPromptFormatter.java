@@ -9,16 +9,19 @@ public class AiPromptFormatter {
 
     public String formatProfile(AiUserProfile profile) {
         return """
-                지역: %s
-                자녀 나이: %s
-                장애 유형: %s
+                [사용자 맞춤 정보]
+                활동 지역: %s
                 관심사: %s
+
+                [자녀 관련 정보]
+                자녀 나이: %s
+                집중 케어 영역: %s
                 자녀 관련 키워드: %s
                 """.formatted(
                 valueOrNotProvided(profile.region()),
+                valueOrNotProvided(profile.interests()),
                 valueOrNotProvided(profile.childAge()),
                 valueOrNotProvided(profile.disabilityTypes()),
-                valueOrNotProvided(profile.interests()),
                 valueOrNotProvided(profile.keywordText())
         );
     }

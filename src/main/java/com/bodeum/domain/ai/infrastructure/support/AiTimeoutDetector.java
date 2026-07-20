@@ -1,14 +1,14 @@
-package com.bodeum.domain.ai.infrastructure.generation;
+package com.bodeum.domain.ai.infrastructure.support;
 
 import java.net.SocketTimeoutException;
 import java.net.http.HttpTimeoutException;
 
-final class AiTimeoutDetector {
+public final class AiTimeoutDetector {
 
     private AiTimeoutDetector() {
     }
 
-    static boolean isTimeout(Throwable throwable) {
+    public static boolean isTimeout(Throwable throwable) {
         Throwable current = throwable;
         while (current != null) {
             if (current instanceof SocketTimeoutException
