@@ -11,6 +11,7 @@ import com.bodeum.domain.ai.model.AiReferenceDocument;
 import com.bodeum.domain.ai.model.AiUserProfile;
 import com.bodeum.domain.ai.model.GeneratedAiAnswer;
 import com.bodeum.domain.ai.model.ExternalAiAnswer;
+import com.bodeum.domain.ai.infrastructure.AiReferenceDocumentResolver;
 import com.bodeum.domain.ai.repository.AiChatRoomRepository;
 import com.bodeum.domain.ai.repository.AiSourceReviewRepository;
 import com.bodeum.domain.user.entity.User;
@@ -44,6 +45,7 @@ public class AiMessageService {
     private final AiMessagePersistenceService persistenceService;
     private final AiSourceReviewRepository aiSourceReviewRepository;
     private final AiRequestGuard requestGuard;
+    private final AiReferenceDocumentResolver referenceDocumentResolver;
 
     public CreateAiMessageResponse createMessage(Long userId, String content) {
         validateAiTermsAgreement(userId);
@@ -64,7 +66,8 @@ public class AiMessageService {
 
         persistenceService.saveUserMessage(chatRoom, content);
         AiUserProfile profile = toProfile(user);
-        List<AiReferenceDocument> retrievedDocuments = documentRetriever.retrieve(content, profile);
+        List<AiReferenceDocument> retrievedDocuments = referenceDocumentResolver.resolve(
+                documentRetriever.retrieve(content, profile));
 
         if (retrievedDocuments.isEmpty()) {
             return createExternalOrNoResultResponse(chatRoom, content, profile);

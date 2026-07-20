@@ -52,9 +52,9 @@ spring:
       chroma:
         client:
           host: ${CHROMA_HOST:http://localhost}
-          port: ${CHROMA_PORT:8000}
-        collection-name: ${CHROMA_COLLECTION:bodeum-rag}
-        initialize-schema: ${CHROMA_INITIALIZE_SCHEMA:false}
+          port: 8000
+        collection-name: bodeum-rag
+        initialize-schema: true
 
 bodeum:
   ai:
@@ -69,6 +69,11 @@ bodeum:
       per-minute: ${AI_REQUEST_LIMIT_PER_MINUTE:5}
       per-day: ${AI_REQUEST_LIMIT_PER_DAY:50}
       time-zone: ${AI_REQUEST_LIMIT_TIME_ZONE:Asia/Seoul}
+    indexing:
+      run-once: ${AI_INDEXING_RUN_ONCE:false}
+      chunk-size: ${AI_INDEXING_CHUNK_SIZE:500}
+      write-batch-size: ${AI_INDEXING_WRITE_BATCH_SIZE:50}
+      source-time-zone: ${AI_INDEXING_SOURCE_TIME_ZONE:Asia/Seoul}
   auth:
     jwt-secret: ${JWT_SECRET:}
     access-token-ttl: ${AUTH_ACCESS_TOKEN_TTL:1h}

@@ -11,5 +11,15 @@ services:
     volumes:
       - bodeum-mysql-data:/var/lib/mysql
 
+  chroma:
+    image: chromadb/chroma:1.0.0
+    container_name: bodeum-chroma
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      - bodeum-chroma-data:/data
+
 volumes:
   bodeum-mysql-data:
+  bodeum-chroma-data:

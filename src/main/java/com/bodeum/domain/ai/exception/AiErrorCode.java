@@ -44,6 +44,11 @@ public enum AiErrorCode implements BaseErrorCode {
             "AI_REQUEST_IN_PROGRESS",
             "이미 AI 답변을 생성하고 있습니다. 기존 요청이 끝난 후 다시 시도해 주세요."
     ),
+    AI_INDEXING_FAILED(
+            HttpStatus.SERVICE_UNAVAILABLE,
+            "AI_INDEXING_FAILED",
+            "AI 검색 자료 저장에 실패했습니다."
+    ),
     AI_INVALID_SOURCE_METADATA(
             HttpStatus.SERVICE_UNAVAILABLE,
             "AI_SOURCE_INVALID",

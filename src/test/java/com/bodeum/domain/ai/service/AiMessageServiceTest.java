@@ -16,6 +16,7 @@ import com.bodeum.domain.ai.enums.AiResponseSourceType;
 import com.bodeum.domain.ai.enums.AiSourceReviewStatus;
 import com.bodeum.domain.ai.enums.SenderType;
 import com.bodeum.domain.ai.exception.AiErrorCode;
+import com.bodeum.domain.ai.infrastructure.AiReferenceDocumentResolver;
 import com.bodeum.domain.ai.model.AiReferenceDocument;
 import com.bodeum.domain.ai.model.GeneratedAiAnswer;
 import com.bodeum.domain.ai.model.ExternalAiAnswer;
@@ -48,6 +49,7 @@ class AiMessageServiceTest {
     @Mock AiMessagePersistenceService persistenceService;
     @Mock AiSourceReviewRepository aiSourceReviewRepository;
     @Mock AiRequestGuard requestGuard;
+    @Mock AiReferenceDocumentResolver referenceDocumentResolver;
 
     private AiMessageService service;
     private AiChatRoom chatRoom;
@@ -58,7 +60,8 @@ class AiMessageServiceTest {
         service = new AiMessageService(
                 aiChatRoomRepository, userAgreementRepository, userRepository,
                 documentRetriever, answerGenerator, externalAnswerProvider,
-                persistenceService, aiSourceReviewRepository, requestGuard);
+                persistenceService, aiSourceReviewRepository, requestGuard,
+                referenceDocumentResolver);
         user = User.createSocialUser(SocialProvider.KAKAO, "provider-id", "a@b.com", "보호자");
         chatRoom = AiChatRoom.create(user);
         lenient().when(userAgreementRepository.findByUserId(1L))
@@ -67,6 +70,8 @@ class AiMessageServiceTest {
         lenient().when(userRepository.findAiProfileById(1L)).thenReturn(Optional.of(user));
         lenient().when(externalAnswerProvider.search(any(), any()))
                 .thenReturn(ExternalAiAnswer.empty());
+        lenient().when(referenceDocumentResolver.resolve(any()))
+                .thenAnswer(invocation -> invocation.getArgument(0));
     }
 
     @Test
