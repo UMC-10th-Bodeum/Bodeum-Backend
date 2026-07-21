@@ -24,7 +24,7 @@ public class InfoItemUpsertService {
         if (existingItemOpt.isPresent()) {
             InfoItem existingItem = existingItemOpt.get();
 
-            // 엔티티 내부 엔티티 수정 비즈니스 메서드 호출
+            // 엔티티 내부 수정 비즈니스 메서드 호출 (imageUrl 파라미터 추가)
             existingItem.updateInformation(
                     newItem.getName(),
                     newItem.getInfoCategory(),
@@ -33,7 +33,8 @@ public class InfoItemUpsertService {
                     newItem.getSido(),
                     newItem.getSigungu(),
                     newItem.getPhone(),
-                    newItem.getHomepageUrl()
+                    newItem.getHomepageUrl(),
+                    newItem.getImageUrl() // <- 대표 이미지 URL 추가!
             );
             log.debug("기존 InfoItem 동기화 완료 - ID: {}", existingItem.getExternalId());
         } else {
