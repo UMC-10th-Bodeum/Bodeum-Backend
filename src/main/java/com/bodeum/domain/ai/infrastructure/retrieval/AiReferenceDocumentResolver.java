@@ -8,6 +8,7 @@ import com.bodeum.domain.info.repository.InfoItemRepository;
 import com.bodeum.domain.news.entity.News;
 import com.bodeum.domain.news.repository.NewsRepository;
 import java.time.Instant;
+import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -90,7 +91,7 @@ public class AiReferenceDocumentResolver {
                 info.getName(),
                 info.getHomepageUrl(),
                 sourceUpdatedAt(info.getUpdatedAt(), info.getCreatedAt(),
-                        () -> info.getSyncedAt().atZone(sourceTimeZone).toInstant())
+                        () -> toInstant(info.getSyncedAt()))
         );
     }
 
@@ -106,7 +107,7 @@ public class AiReferenceDocumentResolver {
                 news.getTitle(),
                 news.getOriginalUrl(),
                 sourceUpdatedAt(news.getUpdatedAt(), news.getCreatedAt(),
-                        () -> news.getPublishedAt().atZone(sourceTimeZone).toInstant())
+                        () -> toInstant(news.getPublishedAt()))
         );
     }
 
@@ -161,6 +162,10 @@ public class AiReferenceDocumentResolver {
             return updatedAt;
         }
         return createdAt != null ? createdAt : fallback.get();
+    }
+
+    private Instant toInstant(LocalDateTime value) {
+        return value == null ? null : value.atZone(sourceTimeZone).toInstant();
     }
 
     private String sourceKey(AiReferenceDocument document) {

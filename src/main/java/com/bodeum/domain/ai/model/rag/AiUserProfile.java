@@ -9,4 +9,9 @@ public record AiUserProfile(
         List<String> interests,
         String keywordText
 ) {
+
+    public AiUserProfile {
+        disabilityTypes = disabilityTypes == null ? List.of() : List.copyOf(disabilityTypes);
+        interests = interests == null ? List.of() : List.copyOf(interests);
+    }
 }
