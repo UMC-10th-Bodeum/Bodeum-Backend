@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -14,7 +15,31 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class AiExternalResourcePersistenceService {
 
+    private static final String UPSERT_SQL = """
+            INSERT INTO ai_external_resource (
+                ai_external_source_id,
+                title,
+                source_url,
+                source_url_hash,
+                source_updated_at,
+                created_at,
+                updated_at
+            ) VALUES (?, ?, ?, ?, NULL, NOW(6), NOW(6))
+            ON DUPLICATE KEY UPDATE
+                updated_at = IF(
+                    ai_external_source_id <> VALUES(ai_external_source_id)
+                        OR title <> VALUES(title)
+                        OR source_url <> VALUES(source_url),
+                    NOW(6),
+                    updated_at
+                ),
+                ai_external_source_id = VALUES(ai_external_source_id),
+                title = VALUES(title),
+                source_url = VALUES(source_url)
+            """;
+
     private final AiExternalResourceRepository externalResourceRepository;
+    private final JdbcTemplate jdbcTemplate;
 
     @Transactional
     public List<AiExternalResource> saveAll(Collection<AiExternalResourceCandidate> candidates) {
@@ -22,7 +47,16 @@ public class AiExternalResourcePersistenceService {
             return List.of();
         }
 
-        Map<String, AiExternalResource> existingByHash = externalResourceRepository
+        jdbcTemplate.batchUpdate(UPSERT_SQL, candidates.stream()
+                .map(candidate -> new Object[]{
+                        candidate.externalSource().getId(),
+                        candidate.title(),
+                        candidate.normalizedUrl(),
+                        candidate.urlHash()
+                })
+                .toList());
+
+        Map<String, AiExternalResource> resourcesByHash = externalResourceRepository
                 .findAllBySourceUrlHashIn(candidates.stream()
                         .map(AiExternalResourceCandidate::urlHash)
                         .collect(Collectors.toSet()))
@@ -32,31 +66,20 @@ public class AiExternalResourcePersistenceService {
                         resource -> resource
                 ));
 
-        List<AiExternalResource> resources = candidates.stream()
-                .map(candidate -> updateOrCreate(existingByHash, candidate))
+        return candidates.stream()
+                .map(candidate -> findSavedResource(resourcesByHash, candidate.urlHash()))
                 .toList();
-        return externalResourceRepository.saveAll(resources);
     }
 
-    private AiExternalResource updateOrCreate(
-            Map<String, AiExternalResource> existingByHash,
-            AiExternalResourceCandidate candidate
+    private AiExternalResource findSavedResource(
+            Map<String, AiExternalResource> resourcesByHash,
+            String urlHash
     ) {
-        AiExternalResource existing = existingByHash.get(candidate.urlHash());
-        if (existing != null) {
-            existing.updateReference(
-                    candidate.title(),
-                    candidate.normalizedUrl(),
-                    existing.getSourceUpdatedAt()
-            );
-            return existing;
+        AiExternalResource resource = resourcesByHash.get(urlHash);
+        if (resource == null) {
+            throw new IllegalStateException(
+                    "Upserted external resource could not be found: " + urlHash);
         }
-        return AiExternalResource.create(
-                candidate.externalSource(),
-                candidate.title(),
-                candidate.normalizedUrl(),
-                candidate.urlHash(),
-                null
-        );
+        return resource;
     }
 }

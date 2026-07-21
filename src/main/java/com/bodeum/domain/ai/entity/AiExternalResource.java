@@ -81,9 +81,4 @@ public class AiExternalResource extends BaseCreatedUpdatedEntity {
                 .build();
     }
 
-    public void updateReference(String title, String sourceUrl, Instant sourceUpdatedAt) {
-        this.title = title;
-        this.sourceUrl = sourceUrl;
-        this.sourceUpdatedAt = sourceUpdatedAt;
-    }
 }
