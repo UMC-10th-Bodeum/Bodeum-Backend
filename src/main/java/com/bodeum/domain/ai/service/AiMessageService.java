@@ -127,7 +127,9 @@ public class AiMessageService {
                 validateCitations(generated, retrievedDocuments);
 
         if (citedSources.isEmpty()) {
-            return createNoEvidenceResponse(chatRoom, userMessage);
+            log.info("[AI] 내부 문서 인용 근거 없음, 외부 검색 시작");
+            return createExternalOrNoResultResponse(
+                    chatRoom, userMessage, content, profile);
         }
 
         boolean warning = hasIncorrectFeedback(citedSources);

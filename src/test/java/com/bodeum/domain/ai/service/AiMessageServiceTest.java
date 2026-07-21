@@ -180,7 +180,7 @@ class AiMessageServiceTest {
     }
 
     @Test
-    void returnsNoEvidenceWhenGeneratedAnswerHasNoValidCitation() {
+    void searchesExternalSourcesWhenGeneratedAnswerHasNoValidCitation() {
         String question = "지원 제도를 알려줘";
         AiReferenceDocument retrievedSource = new AiReferenceDocument(
                 "INFO-1-0",
@@ -195,16 +195,35 @@ class AiMessageServiceTest {
                 .thenReturn(List.of(retrievedSource));
         when(answerGenerator.generate(eq(question), any(), eq(List.of(retrievedSource))))
                 .thenReturn(new GeneratedAiAnswer("근거가 검증되지 않은 답변", List.of("UNKNOWN")));
-        AiMessage saved = savedAiMessage("관련 정보를 찾을 수 없습니다.");
+        AiReferenceDocument externalSource = new AiReferenceDocument(
+                "SITE-20",
+                "한국장애인부모회 공공후견지원사업 안내",
+                AiResponseSourceType.SITE,
+                20L,
+                "공공후견지원사업 안내",
+                "https://www.kpat.or.kr/guardianship",
+                null
+        );
+        when(externalAnswerProvider.search(eq(question), any())).thenReturn(
+                new ExternalAiAnswer(
+                        "한국장애인부모회 공공후견지원사업 정보입니다.",
+                        List.of(externalSource)));
+        AiMessage saved = savedAiMessage("한국장애인부모회 공공후견지원사업 정보입니다.");
         when(persistenceService.saveAiMessageAndComplete(
-                11L, chatRoom, "관련 정보를 찾을 수 없습니다.", false, List.of()))
+                11L,
+                chatRoom,
+                "한국장애인부모회 공공후견지원사업 정보입니다.",
+                false,
+                List.of(externalSource)))
                 .thenReturn(saved);
 
         var result = service.createMessage(1L, question);
 
-        assertThat(result.aiMessage().answerStatus()).isEqualTo(AiAnswerStatus.NO_EVIDENCE);
-        assertThat(result.aiMessage().content()).isEqualTo("관련 정보를 찾을 수 없습니다.");
-        assertThat(result.aiMessage().sources()).isEmpty();
+        assertThat(result.aiMessage().answerStatus()).isEqualTo(AiAnswerStatus.ANSWERED);
+        assertThat(result.aiMessage().content())
+                .isEqualTo("한국장애인부모회 공공후견지원사업 정보입니다.");
+        assertThat(result.aiMessage().sources()).hasSize(1);
+        verify(externalAnswerProvider).search(eq(question), any());
         assertThat(result.aiMessage().warning()).isNull();
     }
 

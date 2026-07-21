@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Profile;
 import org.springframework.core.io.Resource;
@@ -39,6 +40,7 @@ import org.springframework.web.client.RestClient;
 
 @Component
 @Profile("!test")
+@Slf4j
 public class OpenAiExternalAnswerProvider implements AiExternalAnswerProvider {
 
     private static final int MAX_ALLOWED_DOMAINS = 100;
@@ -89,7 +91,9 @@ public class OpenAiExternalAnswerProvider implements AiExternalAnswerProvider {
                 .sorted(Comparator.comparing(source -> source.getAuthorityLevel().ordinal()))
                 .toList();
         Map<String, AiExternalSource> sourcesByDomain = indexByDomain(sources);
+        log.info("[AI] 외부 검색 허용 도메인 수: {}", sourcesByDomain.size());
         if (sourcesByDomain.isEmpty()) {
+            log.warn("[AI] 활성화된 외부 검색 허용 도메인이 없습니다.");
             return ExternalAiAnswer.empty();
         }
 
@@ -177,13 +181,18 @@ public class OpenAiExternalAnswerProvider implements AiExternalAnswerProvider {
                 }
                 String answer = content.path("text").asText(null);
                 if (answer == null || answer.isBlank() || isNoEvidenceAnswer(answer)) {
+                    log.info("[AI] 외부 검색에서 상세 근거를 확인하지 못했습니다.");
                     return ExternalAiAnswer.empty();
                 }
                 List<AiReferenceDocument> references = mapCitations(
                         content.path("annotations"), sourcesByDomain);
+                log.info("[AI] 외부 검색 유효 인용 수: {}", references.size());
                 if (references.isEmpty()) {
+                    List<AiReferenceDocument> searchSources = mapSearchSources(
+                            response.path("output"), sourcesByDomain);
+                    log.info("[AI] 외부 검색 fallback URL 수: {}", searchSources.size());
                     return linkGuidance(
-                            mapSearchSources(response.path("output"), sourcesByDomain),
+                            searchSources,
                             sourcesByDomain
                     );
                 }
