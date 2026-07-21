@@ -69,7 +69,7 @@ class AuthControllerTest {
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.result.userId").isNumber())
-                .andExpect(jsonPath("$.result.provider").value("kakao"));
+                .andExpect(jsonPath("$.result.level").isNumber());
     }
 
     @Test
@@ -179,8 +179,7 @@ class AuthControllerTest {
         mockMvc.perform(get("/api/v1/users/me/profile")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.result.joinedAt").isNotEmpty())
-                .andExpect(jsonPath("$.result.updatedAt").isNotEmpty())
+                .andExpect(jsonPath("$.result.userId").isNumber())
                 .andExpect(jsonPath("$.result.childProfile").exists());
 
         mockMvc.perform(patch("/api/v1/users/me/profile")
