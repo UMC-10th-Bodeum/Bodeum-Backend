@@ -13,6 +13,14 @@ public interface HomeUserRepository extends JpaRepository<User, Long> {
             SELECT u FROM User u
             LEFT JOIN FETCH u.guardianProfile gp
             LEFT JOIN FETCH gp.region
+            WHERE u.id = :userId
+            """)
+    Optional<User> findWithRegionById(@Param("userId") Long userId);
+
+    @Query("""
+            SELECT u FROM User u
+            LEFT JOIN FETCH u.guardianProfile gp
+            LEFT JOIN FETCH gp.region
             LEFT JOIN FETCH u.userInterests
             WHERE u.id = :userId
             """)
