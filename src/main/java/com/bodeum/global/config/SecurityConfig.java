@@ -50,7 +50,11 @@ public class SecurityConfig {
             "/api/v1/search",
 
             // Open API 동기화
-            "/api/v1/admin/openapi/**"
+            "/api/v1/admin/openapi/**",
+
+            // 정보 항목 조회 및 지역 필터 API (비회원 허용)
+            "/api/v1/info-items/**",
+            "/api/v1/info-regions/**",
 
     };
 
