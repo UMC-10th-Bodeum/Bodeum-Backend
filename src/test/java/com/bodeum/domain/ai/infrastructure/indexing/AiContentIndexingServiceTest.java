@@ -1,12 +1,14 @@
 package com.bodeum.domain.ai.infrastructure.indexing;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.bodeum.domain.ai.enums.AiResponseSourceType;
 import com.bodeum.domain.info.entity.InfoItem;
 import com.bodeum.domain.info.entity.InfoCategory;
 import com.bodeum.domain.info.entity.enums.MainCategory;
@@ -21,6 +23,8 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
+import java.util.function.Supplier;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.vectorstore.VectorStore;
@@ -30,6 +34,7 @@ class AiContentIndexingServiceTest {
     private final InfoItemRepository infoItemRepository = mock(InfoItemRepository.class);
     private final NewsRepository newsRepository = mock(NewsRepository.class);
     private final VectorStore vectorStore = mock(VectorStore.class);
+    private final AiIndexingCoordinator indexingCoordinator = mock(AiIndexingCoordinator.class);
 
     @Test
     void rebuildsInfoAndNewsWithDeterministicDocumentIdsAndMetadata() {
@@ -42,9 +47,7 @@ class AiContentIndexingServiceTest {
             stored.addAll(invocation.getArgument(0));
             return null;
         }).when(vectorStore).add(anyList());
-
-        AiContentIndexingService service = new AiContentIndexingService(
-                infoItemRepository, newsRepository, vectorStore, 500, 50, "Asia/Seoul");
+        AiContentIndexingService service = coordinatedService();
 
         var result = service.rebuildAll();
 
@@ -70,6 +73,35 @@ class AiContentIndexingServiceTest {
                 .containsEntry("chunkIndex", 0);
         verify(vectorStore).delete("sourceType == 'INFO'");
         verify(vectorStore).delete("sourceType == 'NEWS'");
+    }
+
+    @Test
+    void reloadsLatestInfoAfterAcquiringIndexingLock() {
+        InfoItem latestInfo = infoItem();
+        when(infoItemRepository.findIndexableById(1L))
+                .thenReturn(Optional.of(latestInfo));
+        List<Document> stored = new ArrayList<>();
+        doAnswer(invocation -> {
+            stored.addAll(invocation.getArgument(0));
+            return null;
+        }).when(vectorStore).add(anyList());
+
+        AiContentIndexingService service = coordinatedService();
+
+        service.synchronize(AiResponseSourceType.INFO, 1L);
+
+        verify(indexingCoordinator).execute(any());
+        verify(infoItemRepository).findIndexableById(1L);
+        verify(vectorStore).delete("sourceType == 'INFO' && sourceId == 1");
+        assertThat(stored).extracting(Document::getId).containsExactly("INFO-1-0");
+    }
+
+    private AiContentIndexingService coordinatedService() {
+        doAnswer(invocation -> ((Supplier<?>) invocation.getArgument(0)).get())
+                .when(indexingCoordinator).execute(any());
+        return new AiContentIndexingService(
+                infoItemRepository, newsRepository, vectorStore, indexingCoordinator,
+                500, 50, "Asia/Seoul");
     }
 
     private InfoItem infoItem() {

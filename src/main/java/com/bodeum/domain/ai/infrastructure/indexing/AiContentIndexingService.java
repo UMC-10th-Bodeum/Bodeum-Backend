@@ -31,6 +31,7 @@ public class AiContentIndexingService {
     private final InfoItemRepository infoItemRepository;
     private final NewsRepository newsRepository;
     private final VectorStore vectorStore;
+    private final AiIndexingCoordinator indexingCoordinator;
     private final TokenTextSplitter textSplitter;
     private final int writeBatchSize;
     private final ZoneId sourceTimeZone;
@@ -39,6 +40,7 @@ public class AiContentIndexingService {
             InfoItemRepository infoItemRepository,
             NewsRepository newsRepository,
             VectorStore vectorStore,
+            AiIndexingCoordinator indexingCoordinator,
             @Value("${bodeum.ai.indexing.chunk-size:500}") int chunkSize,
             @Value("${bodeum.ai.indexing.write-batch-size:50}") int writeBatchSize,
             @Value("${bodeum.ai.indexing.source-time-zone:Asia/Seoul}") String sourceTimeZone
@@ -49,6 +51,7 @@ public class AiContentIndexingService {
         this.infoItemRepository = infoItemRepository;
         this.newsRepository = newsRepository;
         this.vectorStore = vectorStore;
+        this.indexingCoordinator = indexingCoordinator;
         this.textSplitter = TokenTextSplitter.builder()
                 .withChunkSize(chunkSize)
                 .withMinChunkSizeChars(200)
@@ -60,6 +63,32 @@ public class AiContentIndexingService {
     }
 
     public AiIndexingResult rebuildAll() {
+        try {
+            return indexingCoordinator.execute(this::doRebuildAll);
+        } catch (ProjectException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new ProjectException(AiErrorCode.AI_INDEXING_FAILED, e);
+        }
+    }
+
+    public void synchronize(AiResponseSourceType sourceType, Long sourceId) {
+        if (sourceId == null) {
+            throw new IllegalArgumentException("Source ID to index must not be null");
+        }
+        try {
+            indexingCoordinator.execute(() -> {
+                synchronizeLatest(sourceType, sourceId);
+                return null;
+            });
+        } catch (ProjectException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new ProjectException(AiErrorCode.AI_INDEXING_FAILED, e);
+        }
+    }
+
+    private AiIndexingResult doRebuildAll() {
         try {
             List<InfoItem> infoItems = infoItemRepository.findAllIndexable();
             List<News> newsItems = newsRepository.findAllIndexable();
@@ -80,20 +109,25 @@ public class AiContentIndexingService {
         }
     }
 
-    public void replaceInfo(InfoItem item) {
-        replace(AiResponseSourceType.INFO, item.getId(), () -> createInfoDocuments(item));
-    }
-
-    public void replaceNews(News news) {
-        replace(AiResponseSourceType.NEWS, news.getId(), () -> createNewsDocuments(news));
-    }
-
-    public void delete(AiResponseSourceType sourceType, Long sourceId) {
-        try {
-            vectorStore.delete(sourceFilter(sourceType, sourceId));
-        } catch (Exception e) {
-            throw new ProjectException(AiErrorCode.AI_INDEXING_FAILED, e);
+    private void synchronizeLatest(AiResponseSourceType sourceType, Long sourceId) {
+        switch (sourceType) {
+            case INFO -> infoItemRepository.findIndexableById(sourceId)
+                    .ifPresentOrElse(
+                            item -> replace(sourceType, sourceId, () -> createInfoDocuments(item)),
+                            () -> delete(sourceType, sourceId)
+                    );
+            case NEWS -> newsRepository.findIndexableById(sourceId)
+                    .ifPresentOrElse(
+                            news -> replace(sourceType, sourceId, () -> createNewsDocuments(news)),
+                            () -> delete(sourceType, sourceId)
+                    );
+            case SITE -> throw new IllegalArgumentException(
+                    "SITE sources are not stored in the vector index");
         }
+    }
+
+    private void delete(AiResponseSourceType sourceType, Long sourceId) {
+        vectorStore.delete(sourceFilter(sourceType, sourceId));
     }
 
     private void replace(
@@ -105,8 +139,9 @@ public class AiContentIndexingService {
             throw new IllegalArgumentException("저장되지 않은 원본 데이터는 색인할 수 없습니다.");
         }
         try {
+            List<Document> documents = documentSupplier.get();
             vectorStore.delete(sourceFilter(sourceType, sourceId));
-            addInBatches(documentSupplier.get());
+            addInBatches(documents);
         } catch (ProjectException e) {
             throw e;
         } catch (Exception e) {
