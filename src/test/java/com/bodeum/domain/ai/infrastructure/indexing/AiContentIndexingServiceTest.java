@@ -70,7 +70,9 @@ class AiContentIndexingServiceTest {
                 .containsEntry("newsCategoryId", 3L)
                 .containsEntry("newsSourceId", 4L)
                 .containsEntry("newsSourceType", "PUBLIC_API")
+                .containsEntry("newsSourceName", "수원시청")
                 .containsEntry("chunkIndex", 0);
+        assertThat(stored.get(1).getText()).contains("제공 기관: 수원시 복지포털");
         verify(vectorStore).delete("sourceType == 'INFO'");
         verify(vectorStore).delete("sourceType == 'NEWS'");
     }
@@ -138,6 +140,7 @@ class AiContentIndexingServiceTest {
         when(news.getTitle()).thenReturn("발달재활서비스 신청 안내");
         when(news.getNewsCategory()).thenReturn(category);
         when(news.getNewsSource()).thenReturn(source);
+        when(news.getSourceName()).thenReturn("수원시 복지포털");
         when(news.getNewsType()).thenReturn(NewsType.LOCAL);
         when(news.getSummary()).thenReturn("신청 대상과 방법을 안내합니다.");
         when(news.getContent()).thenReturn("주민센터에서 신청할 수 있습니다.");

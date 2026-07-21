@@ -187,6 +187,7 @@ public class AiContentIndexingService {
 
     private List<Document> createNewsDocuments(News news) {
         NewsSource newsSource = news.getNewsSource();
+        String providerName = newsSourceName(news);
         Map<String, Object> metadata = baseMetadata(
                 AiResponseSourceType.NEWS,
                 news.getId(),
@@ -199,6 +200,8 @@ public class AiContentIndexingService {
         metadata.put("newsCategory", news.getNewsCategory().getName());
         metadata.put("newsType", news.getNewsType().name());
         if (newsSource != null) {
+            // newsSource metadata는 수집 원천을 나타내며,
+            // 개별 소식의 제공 기관(providerName)과는 별개의 값이다.
             metadata.put("newsSourceId", newsSource.getId());
             metadata.put("newsSourceType", newsSource.getSourceType().name());
             metadata.put("newsSourceName", newsSource.getName());
@@ -213,7 +216,7 @@ public class AiContentIndexingService {
                 line("소식 유형", news.getNewsType().name()),
                 line("요약", news.getSummary()),
                 line("본문", news.getContent()),
-                line("제공 기관", newsSourceName(news)),
+                line("제공 기관", providerName),
                 line("게시일", news.getPublishedAt()),
                 line("대상", news.getTargetAudience()),
                 line("신청 기간", dateRange(news.getApplyStartDate(), news.getApplyEndDate())),
