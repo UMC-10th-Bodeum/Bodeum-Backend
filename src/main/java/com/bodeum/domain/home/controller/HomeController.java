@@ -7,6 +7,8 @@ import com.bodeum.global.apiPayload.ApiResponse;
 import com.bodeum.global.apiPayload.code.GeneralSuccessCode;
 import com.bodeum.global.auth.LoginUser;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -38,8 +40,8 @@ public class HomeController {
     @GetMapping("/api/v1/home/posts/preview")
     @Operation(summary = "인기글/최신글 미리보기 조회")
     public ApiResponse<List<PostPreviewResponse>> getPostsPreview(
-            @RequestParam(defaultValue = "popular") @Pattern(regexp = "popular|latest") String sort,
-            @RequestParam(defaultValue = "3") @Min(1) @Max(10) int limit,
+            @Parameter(description = "정렬 기준", schema = @Schema(allowableValues = {"popular", "latest"})) @RequestParam(defaultValue = "popular") @Pattern(regexp = "popular|latest") String sort,
+            @Parameter(description = "조회 개수 (1~10)") @RequestParam(defaultValue = "3") @Min(1) @Max(10) int limit,
             @LoginUser Long userId
     ) {
         return ApiResponse.of(GeneralSuccessCode.OK, homeService.getPostsPreview(sort, limit, userId));

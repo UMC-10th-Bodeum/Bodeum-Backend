@@ -6,15 +6,17 @@ import com.bodeum.domain.community.enums.PostBoardType;
 public record PostPreviewResponse(
         Long postId,
         String categoryName,
+        String regionName,
         String title,
         long likeCount,
         long commentCount,
         long viewCount
 ) {
-    public static PostPreviewResponse of(Post post) {
+    public static PostPreviewResponse of(Post post, String regionName) {
         return new PostPreviewResponse(
                 post.getId(),
                 toBoardTypeName(post.getBoardType()),
+                regionName,
                 post.getTitle(),
                 post.getLikeCount(),
                 post.getCommentCount(),
