@@ -11,14 +11,14 @@ public record PostPreviewResponse(
         long commentCount,
         long viewCount
 ) {
-    public static PostPreviewResponse of(Post post, long likeCount, long commentCount) {
+    public static PostPreviewResponse of(Post post) {
         return new PostPreviewResponse(
                 post.getId(),
                 toBoardTypeName(post.getBoardType()),
                 post.getTitle(),
-                likeCount,
-                commentCount,
-                0L
+                post.getLikeCount(),
+                post.getCommentCount(),
+                post.getViewCount()
         );
     }
 

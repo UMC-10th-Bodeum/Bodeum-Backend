@@ -24,7 +24,7 @@ public record RecommendedPostResponse(
         }
     }
 
-    public static RecommendedPostResponse of(Post post, List<DisabilityType> disabilityTypes, long likeCount, long commentCount) {
+    public static RecommendedPostResponse of(Post post, List<DisabilityType> disabilityTypes) {
         return new RecommendedPostResponse(
                 post.getId(),
                 disabilityTypes.stream().map(DisabilityTagDto::from).toList(),
@@ -32,9 +32,9 @@ public record RecommendedPostResponse(
                 toAuthorDisplay(post.getAnonymityType()),
                 post.getTitle(),
                 post.getContent(),
-                likeCount,
-                commentCount,
-                0L
+                post.getLikeCount(),
+                post.getCommentCount(),
+                post.getViewCount()
         );
     }
 
