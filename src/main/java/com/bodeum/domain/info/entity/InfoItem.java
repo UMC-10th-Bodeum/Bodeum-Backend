@@ -8,6 +8,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Getter
@@ -49,6 +51,10 @@ public class InfoItem extends BaseCreatedUpdatedEntity {
     @Column(name = "homepage_url", length = 500)
     private String homepageUrl;
 
+    // --- 데모데이 및 기관 대표 이미지용 컬럼 ---
+    @Column(name = "image_url", length = 1000)
+    private String imageUrl;
+
     @Column(name = "view_count", nullable = false)
     private int viewCount = 0;
 
@@ -61,9 +67,14 @@ public class InfoItem extends BaseCreatedUpdatedEntity {
     @Column(name = "synced_at", nullable = false)
     private LocalDateTime syncedAt;
 
+    // --- 태그 연관관계 매핑 ---
+    @OneToMany(mappedBy = "infoItem")
+    private List<InfoItemTag> infoItemTags = new ArrayList<>();
+
     @Builder
-    public InfoItem(String externalId, InfoCategory infoCategory,String name, String introduction,
-                    String address, String sido, String sigungu, String phone, String homepageUrl, LocalDateTime syncedAt) {
+    public InfoItem(String externalId, InfoCategory infoCategory, String name, String introduction,
+                    String address, String sido, String sigungu, String phone, String homepageUrl,
+                    String imageUrl, LocalDateTime syncedAt) {
         this.externalId = externalId;
         this.infoCategory = infoCategory;
         this.name = name;
@@ -73,11 +84,12 @@ public class InfoItem extends BaseCreatedUpdatedEntity {
         this.sigungu = sigungu;
         this.phone = phone;
         this.homepageUrl = homepageUrl;
+        this.imageUrl = imageUrl;
         this.syncedAt = syncedAt;
     }
 
     public void updateInformation(String name, InfoCategory infoCategory, String introduction, String address,
-                                  String sido, String sigungu, String phone, String homepageUrl) {
+                                  String sido, String sigungu, String phone, String homepageUrl, String imageUrl) {
         this.name = name;
         this.infoCategory = infoCategory;
         this.introduction = introduction;
@@ -86,6 +98,7 @@ public class InfoItem extends BaseCreatedUpdatedEntity {
         this.sigungu = sigungu;
         this.phone = phone;
         this.homepageUrl = homepageUrl;
+        this.imageUrl = imageUrl;
 
         // 외부 API일 시 동기화를 위한 수정 메서드
         this.syncedAt = LocalDateTime.now();
@@ -101,5 +114,29 @@ public class InfoItem extends BaseCreatedUpdatedEntity {
 
     public void updateReviewCount(int amount) {
         this.reviewCount += amount;
+    }
+
+    // 1. 카테고리 명칭 반환 (InfoCategory 연관관계 활용)
+    public List<String> getCategoryNames() {
+        if (this.infoCategory == null) return List.of();
+        return List.of(this.infoCategory.getMainCategoryKo(), this.infoCategory.getSubCategoryKo());
+    }
+
+    // 2. 전문 분야 태그 명칭 리스트 반환 (InfoItemTag -> InfoTag 매핑)
+    public List<String> getTags() {
+        if (this.infoItemTags == null || this.infoItemTags.isEmpty()) {
+            return List.of();
+        }
+        return this.infoItemTags.stream()
+                .map(itemTag -> itemTag.getInfoTag().getName())
+                .toList();
+    }
+
+    // 3. 이미지 URL 리스트 반환 (이미지가 있으면 리스트에 담고, 없으면 빈 리스트 반환)
+    public List<String> getImageUrls() {
+        if (this.imageUrl != null && !this.imageUrl.isBlank()) {
+            return List.of(this.imageUrl);
+        }
+        return List.of();
     }
 }
