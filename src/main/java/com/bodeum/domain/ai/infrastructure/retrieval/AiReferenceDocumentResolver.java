@@ -115,7 +115,7 @@ public class AiReferenceDocumentResolver {
         return lines(
                 line("정보명", info.getName()),
                 line("대분류", category.getMainCategoryKo()),
-                line("대분류 코드", category.getMainCategory().name()),
+                line("대분류 코드", category.getMainCategory()),
                 line("세부 분류", category.getSubCategoryKo()),
                 line("세부 분류 코드", category.getSubCategory()),
                 line("소개", info.getIntroduction()),
