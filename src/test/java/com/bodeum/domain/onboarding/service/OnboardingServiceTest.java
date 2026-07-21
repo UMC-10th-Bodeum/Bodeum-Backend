@@ -71,6 +71,36 @@ class OnboardingServiceTest {
     }
 
     @Test
+    void quitOnboardingClearsEnteredDataButStillCompletesSignup() {
+        User user = newUser();
+        Region region = Region.create("서울특별시", "강남구");
+        given(userService.getCurrentUser(1L)).willReturn(user);
+        given(regionService.getById(10L)).willReturn(region);
+
+        // 1·2단계까지 입력해 데이터를 저장한 상태를 만든다.
+        onboardingService.registerChildProfile(1L, new CreateChildProfileRequest(
+                "민준이", "2020-01", List.of(DisabilityType.AUTISM), "소심함"
+        ));
+        onboardingService.registerInterestRegion(1L, new CreateInterestRegionRequest(
+                List.of(InterestCategory.WELFARE_SUBSIDY), 10L
+        ));
+        assertThat(user.isChildProfileRegistered()).isTrue();
+        assertThat(user.getInterestCategories()).isNotEmpty();
+
+        OnboardingStatusResponse response = onboardingService.quitOnboarding(1L);
+
+        // 그만두기: 입력값은 모두 초기화되지만 정식 회원(registeredAt)으로 가입 처리된다.
+        assertThat(user.isChildProfileRegistered()).isFalse();
+        assertThat(user.isGuardianProfileRegistered()).isFalse();
+        assertThat(user.getInterestCategories()).isEmpty();
+        assertThat(user.getRegion()).isNull();
+        assertThat(user.isSignupCompleted()).isTrue();
+        assertThat(user.getRegisteredAt()).isNotNull();
+        assertThat(response.onboardingCompleted()).isFalse();
+        assertThat(response.nextStep()).isEqualTo(AuthNextStep.HOME);
+    }
+
+    @Test
     void completingAllOnboardingStepsMarksUserAsSignupCompleted() {
         User user = newUser();
         Region region = Region.create("서울특별시", "강남구");
