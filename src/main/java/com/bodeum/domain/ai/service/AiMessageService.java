@@ -49,6 +49,7 @@ public class AiMessageService {
     private final AiAnswerGenerator answerGenerator;
     private final AiExternalAnswerProvider externalAnswerProvider;
     private final AiMessagePersistenceService persistenceService;
+    private final AiMessageFailureService failureService;
     private final AiSourceReviewRepository aiSourceReviewRepository;
     private final AiRequestGuard requestGuard;
     private final AiReferenceDocumentResolver referenceDocumentResolver;
@@ -77,7 +78,23 @@ public class AiMessageService {
 
         log.info("[AI] 사용자 프로필 조회 완료");
 
-        persistenceService.saveUserMessage(chatRoom, content);
+        AiMessage userMessage = persistenceService.saveProcessingUserMessage(chatRoom, content);
+
+        try {
+            return generateAndSaveResponse(chatRoom, userMessage, content, user, userWithDisabilities);
+        } catch (Exception e) {
+            markFailedSafely(userMessage.getId(), e);
+            throw e;
+        }
+    }
+
+    private CreateAiMessageResponse generateAndSaveResponse(
+            AiChatRoom chatRoom,
+            AiMessage userMessage,
+            String content,
+            User user,
+            User userWithDisabilities
+    ) {
 
         AiUserProfile profile = toProfile(user, userWithDisabilities);
 
@@ -94,7 +111,7 @@ public class AiMessageService {
 
         if (retrievedDocuments.isEmpty()) {
             log.info("[AI] 내부 문서 없음, 외부 검색 시작");
-            return createExternalOrNoResultResponse(chatRoom, content, profile);
+            return createExternalOrNoResultResponse(chatRoom, userMessage, content, profile);
         }
 
         log.info("[AI] 답변 생성 시작");
@@ -110,12 +127,12 @@ public class AiMessageService {
                 validateCitations(generated, retrievedDocuments);
 
         if (citedSources.isEmpty()) {
-            return createNoEvidenceResponse(chatRoom);
+            return createNoEvidenceResponse(chatRoom, userMessage);
         }
 
         boolean warning = hasIncorrectFeedback(citedSources);
-        AiMessage message = persistenceService.saveAiMessage(
-                chatRoom, generated.answer(), warning, citedSources);
+        AiMessage message = persistenceService.saveAiMessageAndComplete(
+                userMessage.getId(), chatRoom, generated.answer(), warning, citedSources);
 
         return sourceBackedResponse(
                 message, citedSources, warningResponse(warning), AiAnswerStatus.ANSWERED);
@@ -123,17 +140,19 @@ public class AiMessageService {
 
     private CreateAiMessageResponse createExternalOrNoResultResponse(
             AiChatRoom chatRoom,
+            AiMessage userMessage,
             String question,
             AiUserProfile profile
     ) {
         ExternalAiAnswer externalAnswer = externalAnswerProvider.search(question, profile);
         if (!externalAnswer.hasEvidence()) {
-            return createNoEvidenceResponse(chatRoom);
+            return createNoEvidenceResponse(chatRoom, userMessage);
         }
 
         boolean warning = hasIncorrectFeedback(externalAnswer.sources());
-        AiMessage message = persistenceService.saveAiMessage(
-                chatRoom, externalAnswer.answer(), warning, externalAnswer.sources());
+        AiMessage message = persistenceService.saveAiMessageAndComplete(
+                userMessage.getId(), chatRoom, externalAnswer.answer(), warning,
+                externalAnswer.sources());
         return sourceBackedResponse(
                 message,
                 externalAnswer.sources(),
@@ -142,9 +161,12 @@ public class AiMessageService {
         );
     }
 
-    private CreateAiMessageResponse createNoEvidenceResponse(AiChatRoom chatRoom) {
-        AiMessage message = persistenceService.saveAiMessage(
-                chatRoom, NO_RESULT_MESSAGE, false, List.of());
+    private CreateAiMessageResponse createNoEvidenceResponse(
+            AiChatRoom chatRoom,
+            AiMessage userMessage
+    ) {
+        AiMessage message = persistenceService.saveAiMessageAndComplete(
+                userMessage.getId(), chatRoom, NO_RESULT_MESSAGE, false, List.of());
         return new CreateAiMessageResponse(AiMessageResponse.noEvidence(
                 message.getId(),
                 message.getSenderType(),
@@ -238,6 +260,16 @@ public class AiMessageService {
         return warning
                 ? new AiMessageWarningResponse(AiWarningType.INCORRECT_SOURCE, INCORRECT_WARNING)
                 : null;
+    }
+
+    private void markFailedSafely(Long userMessageId, Exception originalException) {
+        try {
+            failureService.markFailed(userMessageId);
+        } catch (Exception failureStatusException) {
+            originalException.addSuppressed(failureStatusException);
+            log.error("Failed to mark AI user message as FAILED: userMessageId={}",
+                    userMessageId, failureStatusException);
+        }
     }
 
     private void validateAiTermsAgreement(Long userId) {

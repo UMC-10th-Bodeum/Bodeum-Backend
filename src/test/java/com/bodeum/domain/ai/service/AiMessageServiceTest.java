@@ -52,6 +52,7 @@ class AiMessageServiceTest {
     @Mock AiAnswerGenerator answerGenerator;
     @Mock AiExternalAnswerProvider externalAnswerProvider;
     @Mock AiMessagePersistenceService persistenceService;
+    @Mock AiMessageFailureService failureService;
     @Mock AiSourceReviewRepository aiSourceReviewRepository;
     @Mock AiRequestGuard requestGuard;
     @Mock AiReferenceDocumentResolver referenceDocumentResolver;
@@ -65,7 +66,7 @@ class AiMessageServiceTest {
         service = new AiMessageService(
                 aiChatRoomRepository, userAgreementRepository, userRepository,
                 documentRetriever, answerGenerator, externalAnswerProvider,
-                persistenceService, aiSourceReviewRepository, requestGuard,
+                persistenceService, failureService, aiSourceReviewRepository, requestGuard,
                 referenceDocumentResolver);
         user = User.createSocialUser(SocialProvider.KAKAO, "provider-id", "a@b.com", "보호자");
         chatRoom = AiChatRoom.create(user);
@@ -79,6 +80,10 @@ class AiMessageServiceTest {
                 .thenReturn(ExternalAiAnswer.empty());
         lenient().when(referenceDocumentResolver.resolve(any()))
                 .thenAnswer(invocation -> invocation.getArgument(0));
+        AiMessage userMessage = mock(AiMessage.class);
+        lenient().when(userMessage.getId()).thenReturn(11L);
+        lenient().when(persistenceService.saveProcessingUserMessage(eq(chatRoom), any()))
+                .thenReturn(userMessage);
     }
 
     @Test
@@ -107,11 +112,26 @@ class AiMessageServiceTest {
     }
 
     @Test
+    void marksUserMessageFailedWhenAnswerGenerationFails() {
+        String question = "AI 실패 테스트 질문";
+        when(documentRetriever.retrieve(eq(question), any()))
+                .thenThrow(new ProjectException(AiErrorCode.AI_RESPONSE_FAILED));
+
+        assertThatThrownBy(() -> service.createMessage(1L, question))
+                .isInstanceOf(ProjectException.class)
+                .extracting(exception -> ((ProjectException) exception).getErrorCode())
+                .isEqualTo(AiErrorCode.AI_RESPONSE_FAILED);
+
+        verify(failureService).markFailed(11L);
+    }
+
+    @Test
     void doesNotCallOpenAiWhenNoReferenceDocumentExists() {
         when(documentRetriever.retrieve(eq("김치찌개 레시피 알려줘"), any())).thenReturn(List.of());
         AiMessage saved = savedAiMessage("관련 정보를 찾을 수 없습니다.");
-        when(persistenceService.saveAiMessage(
-                eq(chatRoom), eq("관련 정보를 찾을 수 없습니다."), eq(false), eq(List.of())))
+        when(persistenceService.saveAiMessageAndComplete(
+                eq(11L), eq(chatRoom), eq("관련 정보를 찾을 수 없습니다."),
+                eq(false), eq(List.of())))
                 .thenReturn(saved);
 
         var result = service.createMessage(1L, "김치찌개 레시피 알려줘");
@@ -140,8 +160,8 @@ class AiMessageServiceTest {
                         "수원시에서 확인 가능한 복지기관 정보입니다.",
                         List.of(externalSource)));
         AiMessage saved = savedAiMessage("수원시에서 확인 가능한 복지기관 정보입니다.");
-        when(persistenceService.saveAiMessage(
-                chatRoom,
+        when(persistenceService.saveAiMessageAndComplete(
+                11L, chatRoom,
                 "수원시에서 확인 가능한 복지기관 정보입니다.",
                 false,
                 List.of(externalSource)
@@ -176,8 +196,8 @@ class AiMessageServiceTest {
         when(answerGenerator.generate(eq(question), any(), eq(List.of(retrievedSource))))
                 .thenReturn(new GeneratedAiAnswer("근거가 검증되지 않은 답변", List.of("UNKNOWN")));
         AiMessage saved = savedAiMessage("관련 정보를 찾을 수 없습니다.");
-        when(persistenceService.saveAiMessage(
-                chatRoom, "관련 정보를 찾을 수 없습니다.", false, List.of()))
+        when(persistenceService.saveAiMessageAndComplete(
+                11L, chatRoom, "관련 정보를 찾을 수 없습니다.", false, List.of()))
                 .thenReturn(saved);
 
         var result = service.createMessage(1L, question);
@@ -202,8 +222,8 @@ class AiMessageServiceTest {
                 java.util.Set.of(new AiSourceKey(AiResponseSourceType.SITE, 10L))
         )).thenReturn(true);
         AiMessage saved = savedAiMessage("복지로에서 확인할 수 있습니다.");
-        when(persistenceService.saveAiMessage(
-                chatRoom, "복지로에서 확인할 수 있습니다.", true, List.of(source)))
+        when(persistenceService.saveAiMessageAndComplete(
+                11L, chatRoom, "복지로에서 확인할 수 있습니다.", true, List.of(source)))
                 .thenReturn(saved);
 
         var result = service.createMessage(1L, "지원금 확인 사이트 알려줘");
