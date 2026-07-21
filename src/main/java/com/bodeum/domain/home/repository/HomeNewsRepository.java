@@ -23,12 +23,13 @@ public interface HomeNewsRepository extends JpaRepository<News, Long> {
             """)
     List<News> findTopRecommendedByRegion(@Param("regionId") Long regionId, Pageable pageable);
 
-    @Query("SELECT n FROM News n WHERE n.newsCategory.newsType = :newsType AND n.active = true AND n.deletedAt IS NULL ORDER BY (n.viewCount + n.scrapCount) DESC")
+    @Query("SELECT n FROM News n JOIN n.newsCategory nc WHERE nc.newsType = :newsType AND n.active = true AND n.deletedAt IS NULL ORDER BY (n.viewCount + n.scrapCount) DESC")
     List<News> findByNewsType(@Param("newsType") NewsType newsType, Pageable pageable);
 
     @Query("""
             SELECT n FROM News n
-            WHERE n.newsCategory.newsType = :newsType
+            JOIN n.newsCategory nc
+            WHERE nc.newsType = :newsType
               AND n.active = true
               AND n.deletedAt IS NULL
               AND (n.regionId = :regionId OR n.regionId IS NULL)
