@@ -12,8 +12,10 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+// 기존 JPA 기능 + QueryDSL 동적 검색 기능 사용 가능
+
 @Repository
-public interface InfoItemRepository extends JpaRepository<InfoItem, Long> {
+public interface InfoItemRepository extends JpaRepository<InfoItem, Long>, InfoItemRepositoryCustom {
 
     // 고유 식별자(externalId)로 기존 데이터를 조회
     Optional<InfoItem> findByExternalId(String externalId);
