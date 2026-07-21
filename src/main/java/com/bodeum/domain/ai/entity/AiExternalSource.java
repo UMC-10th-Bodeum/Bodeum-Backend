@@ -34,7 +34,7 @@ public class AiExternalSource extends BaseCreatedUpdatedEntity {
     @Column(name = "ai_external_source_id")
     private Long id;
 
-    @Column(nullable = false, length = 200)
+    @Column(name = "name", nullable = false, length = 200)
     private String name;
 
     @Enumerated(EnumType.STRING)
@@ -47,7 +47,7 @@ public class AiExternalSource extends BaseCreatedUpdatedEntity {
     @Column(name = "entry_url", length = 1000)
     private String entryUrl;
 
-    @Column(nullable = false, columnDefinition = "TEXT")
+    @Column(name = "description", nullable = false, columnDefinition = "TEXT")
     private String description;
 
     @Enumerated(EnumType.STRING)

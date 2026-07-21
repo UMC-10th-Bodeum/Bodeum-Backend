@@ -38,7 +38,7 @@ public class AiExternalDocument extends BaseCreatedUpdatedEntity {
     @JoinColumn(name = "ai_external_source_id", nullable = false)
     private AiExternalSource externalSource;
 
-    @Column(nullable = false, length = 300)
+    @Column(name = "title", nullable = false, length = 300)
     private String title;
 
     @Column(name = "source_url", nullable = false, length = 1000)
