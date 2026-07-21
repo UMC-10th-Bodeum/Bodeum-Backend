@@ -41,21 +41,30 @@ public class AiRequestGuard {
         Instant now = Instant.now();
         validateDailyLimit(chatRoomId, now);
 
-        RequestState state = states.computeIfAbsent(userId, ignored -> new RequestState());
-        synchronized (state) {
-            removeExpiredRequests(state, now);
-            if (state.inProgress) {
-                throw new ProjectException(AiErrorCode.AI_REQUEST_IN_PROGRESS);
+        RequestState state;
+        while (true) {
+            state = states.computeIfAbsent(userId, ignored -> new RequestState());
+            synchronized (state) {
+                // cleanup이 Map에서 제거하기로 결정한 상태라면 해당 객체를 사용하지 않는다.
+                if (state.removed) {
+                    continue;
+                }
+                removeExpiredRequests(state, now);
+                if (state.inProgress) {
+                    throw new ProjectException(AiErrorCode.AI_REQUEST_IN_PROGRESS);
+                }
+                if (state.acceptedAt.size() >= perMinuteLimit) {
+                    throw new ProjectException(AiErrorCode.AI_RATE_LIMIT_EXCEEDED);
+                }
+                state.acceptedAt.addLast(now);
+                state.inProgress = true;
+                state.lastAccessedAt = now;
+                break;
             }
-            if (state.acceptedAt.size() >= perMinuteLimit) {
-                throw new ProjectException(AiErrorCode.AI_RATE_LIMIT_EXCEEDED);
-            }
-            state.acceptedAt.addLast(now);
-            state.inProgress = true;
-            state.lastAccessedAt = now;
         }
         cleanupInactiveStates(now);
-        return () -> release(state);
+        RequestState acquiredState = state;
+        return () -> release(acquiredState);
     }
 
     private void validateDailyLimit(Long chatRoomId, Instant now) {
@@ -92,7 +101,11 @@ public class AiRequestGuard {
         states.entrySet().removeIf(entry -> {
             RequestState state = entry.getValue();
             synchronized (state) {
-                return !state.inProgress && state.lastAccessedAt.isBefore(cutoff);
+                if (!state.inProgress && state.lastAccessedAt.isBefore(cutoff)) {
+                    state.removed = true;
+                    return true;
+                }
+                return false;
             }
         });
     }
@@ -100,6 +113,7 @@ public class AiRequestGuard {
     private static final class RequestState {
         private final ArrayDeque<Instant> acceptedAt = new ArrayDeque<>();
         private boolean inProgress;
+        private boolean removed;
         private Instant lastAccessedAt = Instant.EPOCH;
     }
 
