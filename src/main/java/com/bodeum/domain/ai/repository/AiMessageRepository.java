@@ -29,9 +29,9 @@ public interface AiMessageRepository extends JpaRepository<AiMessage, Long> {
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("""
             update AiMessage message
-               set message.aiResponseStatus = :failedStatus
+               set message.aiProcessingStatus = :failedStatus
              where message.senderType = :senderType
-               and message.aiResponseStatus = :processingStatus
+               and message.aiProcessingStatus = :processingStatus
                and message.createdAt < :cutoff
             """)
     int markStaleProcessingMessages(

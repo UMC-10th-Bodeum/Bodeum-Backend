@@ -4,6 +4,7 @@ import com.bodeum.domain.ai.dto.response.*;
 import com.bodeum.domain.ai.entity.AiChatRoom;
 import com.bodeum.domain.ai.entity.AiMessage;
 import com.bodeum.domain.ai.enums.AiAnswerStatus;
+import com.bodeum.domain.ai.enums.SenderType;
 import com.bodeum.domain.ai.enums.AiWarningType;
 import com.bodeum.domain.ai.exception.AiErrorCode;
 import com.bodeum.domain.ai.model.rag.AiReferenceDocument;
@@ -147,7 +148,8 @@ public class AiMessageService {
 
         boolean warning = hasIncorrectFeedback(citedSources);
         AiMessage message = persistenceService.saveAiMessageAndComplete(
-                userMessage.getId(), chatRoom, generated.answer(), warning, citedSources);
+                userMessage.getId(), chatRoom, generated.answer(), warning,
+                AiAnswerStatus.ANSWERED, citedSources);
 
         return sourceBackedResponse(
                 message, citedSources, warningResponse(warning), AiAnswerStatus.ANSWERED);
@@ -167,7 +169,7 @@ public class AiMessageService {
         boolean warning = hasIncorrectFeedback(externalAnswer.sources());
         AiMessage message = persistenceService.saveAiMessageAndComplete(
                 userMessage.getId(), chatRoom, externalAnswer.answer(), warning,
-                externalAnswer.sources());
+                externalAnswer.answerStatus(), externalAnswer.sources());
         return sourceBackedResponse(
                 message,
                 externalAnswer.sources(),
@@ -181,7 +183,8 @@ public class AiMessageService {
             AiMessage userMessage
     ) {
         AiMessage message = persistenceService.saveAiMessageAndComplete(
-                userMessage.getId(), chatRoom, NO_RESULT_MESSAGE, false, List.of());
+                userMessage.getId(), chatRoom, NO_RESULT_MESSAGE, false,
+                AiAnswerStatus.NO_EVIDENCE, List.of());
         return new CreateAiMessageResponse(AiMessageResponse.noEvidence(
                 message.getId(),
                 message.getSenderType(),
@@ -322,7 +325,7 @@ public class AiMessageService {
                                 AiResponseSourceProjection::getAiMessageId
                         ));
 
-        List<AiTodayMessageResponse.Message> messageResponses =
+        List<AiMessageResponse> messageResponses =
                 messages.stream()
                         .map(message -> toMessageResponse(
                                 message,
@@ -336,30 +339,53 @@ public class AiMessageService {
         return AiTodayMessageResponse.of(messageResponses);
     }
 
-    private AiTodayMessageResponse.Message toMessageResponse(
+    private AiMessageResponse toMessageResponse(
             AiMessage message,
             List<AiResponseSourceProjection> sources
     ) {
-        List<AiTodayMessageResponse.Source> sourceResponses =
+        if (message.getSenderType() == SenderType.USER) {
+            return AiMessageResponse.user(
+                    message.getId(),
+                    message.getContent(),
+                    message.getCreatedAt()
+            );
+        }
+
+        List<AiMessageSourceResponse> sourceResponses =
                 sources.stream()
-                        .map(source -> AiTodayMessageResponse.Source.of(
+                        .map(source -> new AiMessageSourceResponse(
+                                source.getSourceType(),
+                                source.getSourceId(),
                                 source.getSourceTitle(),
                                 source.getSourceUrl(),
                                 source.getSourceUpdatedAt()
                         ))
                         .toList();
 
-        String warning = message.isWarning()
-                ? INCORRECT_WARNING
-                : null;
+        AiAnswerStatus answerStatus = message.getAiAnswerStatus();
+        if (answerStatus == null) {
+            answerStatus = sourceResponses.isEmpty()
+                    ? AiAnswerStatus.NO_EVIDENCE
+                    : AiAnswerStatus.ANSWERED;
+        }
 
-        return AiTodayMessageResponse.Message.of(
+        if (answerStatus == AiAnswerStatus.NO_EVIDENCE) {
+            return AiMessageResponse.noEvidence(
+                    message.getId(),
+                    message.getSenderType(),
+                    message.getContent(),
+                    message.getCreatedAt()
+            );
+        }
+
+        return AiMessageResponse.sourceBacked(
                 message.getId(),
                 message.getSenderType(),
+                answerStatus,
                 message.getContent(),
                 message.getCreatedAt(),
                 sourceResponses,
-                warning
+                warningResponse(message.isWarning())
         );
     }
 

@@ -13,6 +13,8 @@ public interface AiResponseSourceRepository extends JpaRepository<AiResponseSour
     @Query("""
         SELECT
             s.aiMessage.id AS aiMessageId,
+            s.sourceType AS sourceType,
+            s.sourceId AS sourceId,
             s.sourceTitle AS sourceTitle,
             s.sourceUrl AS sourceUrl,
             s.sourceUpdatedAt AS sourceUpdatedAt
