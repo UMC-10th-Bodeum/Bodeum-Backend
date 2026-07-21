@@ -4,7 +4,6 @@ import com.bodeum.domain.info.entity.InfoReview;
 import com.bodeum.domain.info.entity.InfoReviewImage;
 
 import java.time.Instant;
-import java.time.LocalDateTime;
 import java.util.List;
 
 public record InfoReviewResponse(
