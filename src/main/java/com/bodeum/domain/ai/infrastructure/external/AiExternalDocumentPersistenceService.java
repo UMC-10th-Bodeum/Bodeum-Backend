@@ -1,7 +1,9 @@
 package com.bodeum.domain.ai.infrastructure.external;
 
 import com.bodeum.domain.ai.entity.AiExternalDocument;
+import com.bodeum.domain.ai.exception.AiErrorCode;
 import com.bodeum.domain.ai.repository.AiExternalDocumentRepository;
+import com.bodeum.global.apiPayload.exception.ProjectException;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -79,8 +81,7 @@ public class AiExternalDocumentPersistenceService {
     ) {
         AiExternalDocument document = documentsByHash.get(urlHash);
         if (document == null) {
-            throw new IllegalStateException(
-                    "Upserted external document could not be found: " + urlHash);
+            throw new ProjectException(AiErrorCode.AI_RESPONSE_FAILED);
         }
         return document;
     }

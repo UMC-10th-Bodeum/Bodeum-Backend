@@ -1,6 +1,7 @@
 package com.bodeum.domain.ai.infrastructure.external;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
@@ -10,7 +11,9 @@ import static org.mockito.Mockito.when;
 
 import com.bodeum.domain.ai.entity.AiExternalDocument;
 import com.bodeum.domain.ai.entity.AiExternalSource;
+import com.bodeum.domain.ai.exception.AiErrorCode;
 import com.bodeum.domain.ai.repository.AiExternalDocumentRepository;
+import com.bodeum.global.apiPayload.exception.ProjectException;
 import java.util.Collection;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -89,5 +92,22 @@ class AiExternalDocumentPersistenceServiceTest {
         assertThat(saved)
                 .extracting(AiExternalDocument::getSourceUrlHash)
                 .containsExactly("existing-hash", "new-hash");
+    }
+
+    @Test
+    void throwsProjectExceptionWhenUpsertedDocumentCannotBeLoaded() {
+        AiExternalDocumentCandidate candidate = new AiExternalDocumentCandidate(
+                externalSource,
+                "신규 페이지",
+                "https://www.kpat.or.kr/new",
+                "new-hash"
+        );
+        when(externalDocumentRepository.findAllBySourceUrlHashIn(any()))
+                .thenReturn(List.of());
+
+        assertThatThrownBy(() -> persistenceService.saveAll(List.of(candidate)))
+                .isInstanceOf(ProjectException.class)
+                .extracting(exception -> ((ProjectException) exception).getErrorCode())
+                .isEqualTo(AiErrorCode.AI_RESPONSE_FAILED);
     }
 }
