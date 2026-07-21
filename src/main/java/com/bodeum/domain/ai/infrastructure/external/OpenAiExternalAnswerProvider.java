@@ -345,7 +345,7 @@ public class OpenAiExternalAnswerProvider implements AiExternalAnswerProvider {
                     null
             ).toString();
         } catch (Exception e) {
-            throw new ProjectException(AiErrorCode.AI_RESPONSE_FAILED);
+            throw new ProjectException(AiErrorCode.AI_RESPONSE_FAILED, e);
         }
     }
 
