@@ -33,6 +33,7 @@ public class OnboardingService {
                 request.disabilityTypes(),
                 request.keywordText()
         );
+        user.markRegisteredIfResolved();
 
         return OnboardingStepResponse.of(OnboardingStep.CHILD_PROFILE, user.isOnboardingCompleted());
     }
@@ -45,6 +46,7 @@ public class OnboardingService {
         User user = userService.getCurrentUser(userId);
         Region region = regionService.getById(request.regionId());
         user.updateInterestRegion(request.interestCategories(), region);
+        user.markRegisteredIfResolved();
 
         return OnboardingStepResponse.of(OnboardingStep.INTEREST_REGION, user.isOnboardingCompleted());
     }
@@ -60,6 +62,7 @@ public class OnboardingService {
                 request.guardianType(),
                 request.communityRoleType()
         );
+        user.markRegisteredIfResolved();
 
         return OnboardingStepResponse.of(OnboardingStep.GUARDIAN_PROFILE, user.isOnboardingCompleted());
     }
@@ -68,6 +71,7 @@ public class OnboardingService {
     public OnboardingStatusResponse skipOnboarding(Long userId) {
         User user = userService.getCurrentUser(userId);
         user.skipOnboarding();
+        user.markRegisteredIfResolved();
 
         return OnboardingStatusResponse.from(user);
     }

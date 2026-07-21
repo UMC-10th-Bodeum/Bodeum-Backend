@@ -2,9 +2,10 @@ package com.bodeum.domain.community.entity;
 
 import com.bodeum.domain.community.enums.PostAnonymityType;
 import com.bodeum.domain.community.enums.PostBoardType;
+import com.bodeum.domain.community.enums.PostStatus;
 import com.bodeum.domain.community.exception.CommunityErrorCode;
 import com.bodeum.domain.community.exception.CommunityException;
-import com.bodeum.global.common.entity.BaseCreatedUpdatedEntity;
+import com.bodeum.global.common.entity.BaseCreatedUpdatedDeletedEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -22,7 +23,7 @@ import lombok.NoArgsConstructor;
 @Entity
 @Table(name = "post")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class Post extends BaseCreatedUpdatedEntity {
+public class Post extends BaseCreatedUpdatedDeletedEntity {
 
     public static final int TITLE_MAX_LENGTH = 150;
     public static final int CONTENT_MAX_LENGTH = 2000;
@@ -49,13 +50,33 @@ public class Post extends BaseCreatedUpdatedEntity {
     @Column(name = "content", nullable = false, length = CONTENT_MAX_LENGTH)
     private String content;
 
+    @Column(name = "is_question", nullable = false)
+    private boolean question;
+
+    @Column(name = "view_count", nullable = false)
+    private int viewCount;
+
+    @Column(name = "like_count", nullable = false)
+    private int likeCount;
+
+    @Column(name = "comment_count", nullable = false)
+    private int commentCount;
+
+    @Column(name = "scrap_count", nullable = false)
+    private int scrapCount;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false, length = 20)
+    private PostStatus status = PostStatus.ACTIVE;
+
     @Builder
     private Post(
             Long userId,
             PostBoardType boardType,
             PostAnonymityType anonymityType,
             String title,
-            String content
+            String content,
+            boolean question
     ) {
         validateTitle(title);
         validateContent(content);
@@ -65,6 +86,8 @@ public class Post extends BaseCreatedUpdatedEntity {
         this.anonymityType = anonymityType;
         this.title = title;
         this.content = content;
+        this.question = question;
+        this.status = PostStatus.ACTIVE;
     }
 
     public static Post create(
@@ -72,7 +95,8 @@ public class Post extends BaseCreatedUpdatedEntity {
             PostBoardType boardType,
             PostAnonymityType anonymityType,
             String title,
-            String content
+            String content,
+            boolean question
     ) {
         return Post.builder()
                 .userId(userId)
@@ -80,6 +104,7 @@ public class Post extends BaseCreatedUpdatedEntity {
                 .anonymityType(anonymityType)
                 .title(title)
                 .content(content)
+                .question(question)
                 .build();
     }
 
@@ -87,7 +112,8 @@ public class Post extends BaseCreatedUpdatedEntity {
             PostBoardType boardType,
             PostAnonymityType anonymityType,
             String title,
-            String content
+            String content,
+            boolean question
     ) {
         validateTitle(title);
         validateContent(content);
@@ -96,6 +122,47 @@ public class Post extends BaseCreatedUpdatedEntity {
         this.anonymityType = anonymityType;
         this.title = title;
         this.content = content;
+        this.question = question;
+    }
+
+    public void increaseLikeCount() {
+        this.likeCount++;
+    }
+
+    public void decreaseLikeCount() {
+        this.likeCount = Math.max(0, this.likeCount - 1);
+    }
+
+    public void increaseCommentCount() {
+        this.commentCount++;
+    }
+
+    public void decreaseCommentCount() {
+        this.commentCount = Math.max(0, this.commentCount - 1);
+    }
+
+    public void increaseScrapCount() {
+        this.scrapCount++;
+    }
+
+    public void decreaseScrapCount() {
+        this.scrapCount = Math.max(0, this.scrapCount - 1);
+    }
+
+    public void hide() {
+        this.status = PostStatus.HIDDEN;
+    }
+
+    @Override
+    public void delete() {
+        super.delete();
+        this.status = PostStatus.DELETED;
+    }
+
+    @Override
+    public void restore() {
+        super.restore();
+        this.status = PostStatus.ACTIVE;
     }
 
     private static void validateTitle(String title) {
