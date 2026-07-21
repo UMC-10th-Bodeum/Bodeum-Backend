@@ -1,7 +1,7 @@
 -- AI RAG 및 메시지 처리 상태를 현재 도메인 모델에 맞게 확장한다.
 -- 1) ai_source_review: INFO/NEWS/SITE 출처의 검토 상태를 관리한다.
 -- 2) ai_external_source/document: 등록 외부 출처와 실제 확보·인용 문서를 관리한다.
--- 3) ai_response_source: SITE 출처 및 수정일이 없는 외부 출처를 허용한다.
+-- 3) ai_response_source: SITE 출처, 수정일이 없는 외부 출처 및 긴 제목·URL을 허용한다.
 -- 4) ai_message: 긴 AI 답변 저장과 사용자 질문의 AI 응답 처리 상태를 지원한다.
 
 CREATE TABLE ai_source_review (
@@ -53,6 +53,8 @@ CREATE INDEX idx_ai_external_document_source
 
 ALTER TABLE ai_response_source
     MODIFY COLUMN source_type VARCHAR(20) NOT NULL,
+    MODIFY COLUMN source_title VARCHAR(300) NOT NULL,
+    MODIFY COLUMN source_url VARCHAR(1000) NULL,
     MODIFY COLUMN source_updated_at DATETIME(6) NULL;
 
 ALTER TABLE ai_message
