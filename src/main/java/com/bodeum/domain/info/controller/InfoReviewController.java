@@ -57,9 +57,7 @@ public class InfoReviewController {
             @LoginUser Long userId,
             @Valid @RequestBody CreateInfoReviewRequest request
     ) {
-        Long targetUserId = (userId != null) ? userId : 1L;
-
-        InfoReviewResponse response = infoReviewService.createReview(infoItemId, targetUserId, request);
+        InfoReviewResponse response = infoReviewService.createReview(infoItemId, userId, request);
         return ApiResponse.of(GeneralSuccessCode.CREATED, response);
     }
 
@@ -76,9 +74,7 @@ public class InfoReviewController {
             @LoginUser Long userId,
             @Valid @RequestBody UpdateInfoReviewRequest request
     ) {
-        Long targetUserId = (userId != null) ? userId : 1L; // 권한 테스트용 임시 하드코딩 필요시 유지
-
-        InfoReviewResponse response = infoReviewService.updateReview(infoReviewId, targetUserId, request);
+        InfoReviewResponse response = infoReviewService.updateReview(infoReviewId, userId, request);
         return ApiResponse.of(GeneralSuccessCode.OK, response);
     }
 
@@ -94,18 +90,19 @@ public class InfoReviewController {
             @PathVariable Long infoReviewId,
             @LoginUser Long userId
     ) {
-        Long targetUserId = (userId != null) ? userId : 1L; // 권한 테스트용 임시 하드코딩 필요시 유지
-
-        infoReviewService.deleteReview(infoReviewId, targetUserId);
+        infoReviewService.deleteReview(infoReviewId, userId);
         return ApiResponse.of(GeneralSuccessCode.OK, null);
     }
 
+    /**
+     * JSON 파싱 및 데이터 타입 변환 실패 예외 처리
+     */
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<ApiResponse<String>> handleMessageNotReadableException(
             HttpMessageNotReadableException e
     ) {
         BaseErrorCode errorCode = GeneralErrorCode.BAD_REQUEST;
-        String message = "요청 데이터 형식이 올바르지 않습니다. (별점은 정수로만 입력 가능합니다)";
+        String message = "요청 데이터 형식이 올바르지 않습니다. (입력값의 타입을 확인해주세요)";
         return ResponseEntity.status(errorCode.getStatus())
                 .body(ApiResponse.onFailure(errorCode, message));
     }
