@@ -32,7 +32,7 @@ services:
         max-size: "10m"
         max-file: "3"
 
-  # Run after a direct SQL bulk insert or when a full Chroma rebuild is required:
+  # SQL로 데이터를 일괄 삽입했거나 Chroma 전체 재색인이 필요할 때 실행한다:
   # docker compose --profile indexing run --rm indexer
   indexer:
     image: ghcr.io/umc-10th-bodeum/bodeum-backend:latest

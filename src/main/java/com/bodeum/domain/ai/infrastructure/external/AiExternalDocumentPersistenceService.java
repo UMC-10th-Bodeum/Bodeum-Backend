@@ -47,6 +47,8 @@ public class AiExternalDocumentPersistenceService {
             return List.of();
         }
 
+        // UNIQUE URL hash와 MySQL upsert를 함께 사용해 동시 요청에서도
+        // 같은 외부 문서가 중복 INSERT되어 한 요청이 실패하는 경쟁 조건을 막는다.
         jdbcTemplate.batchUpdate(UPSERT_SQL, candidates.stream()
                 .map(candidate -> new Object[]{
                         candidate.externalSource().getId(),

@@ -105,6 +105,7 @@ public class AiRequestGuard {
 
     @FunctionalInterface
     public interface Permit extends AutoCloseable {
+        // try-with-resources 종료 시 진행 중 상태가 반드시 해제되도록 하는 용도이다.
         @Override
         void close();
     }

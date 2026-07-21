@@ -188,6 +188,8 @@ public class OpenAiExternalAnswerProvider implements AiExternalAnswerProvider {
                         content.path("annotations"), sourcesByDomain);
                 log.info("[AI] 외부 검색 유효 인용 수: {}", references.size());
                 if (references.isEmpty()) {
+                    // 검색 과정에서 방문한 URL은 답변 근거로 확정할 수 없다.
+                    // 실제 citation이 없으면, ANSWERED가 아닌 LINK_GUIDANCE로만 안내한다.
                     List<AiReferenceDocument> searchSources = mapSearchSources(
                             response.path("output"), sourcesByDomain);
                     log.info("[AI] 외부 검색 fallback URL 수: {}", searchSources.size());
@@ -261,6 +263,7 @@ public class OpenAiExternalAnswerProvider implements AiExternalAnswerProvider {
             JsonNode annotations,
             Map<String, AiExternalSource> sourcesByDomain
     ) {
+        // 답변 본문에 연결된 url_citation 중 사전에 등록된 허용 도메인만 보존한다.
         Map<String, AiExternalDocumentCandidate> candidatesByUrl = new LinkedHashMap<>();
         for (JsonNode annotation : annotations) {
             if (!"url_citation".equals(annotation.path("type").asText())) {

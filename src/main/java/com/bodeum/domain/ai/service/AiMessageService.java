@@ -126,6 +126,8 @@ public class AiMessageService {
         List<AiReferenceDocument> citedSources =
                 validateCitations(generated, retrievedDocuments);
 
+        // 검색 결과가 있더라도 LLM이 그 문서를 실제 근거로 인용하지 않았다면,
+        // 내부 답변을 폐기하고 등록된 외부 사이트 범위에서 근거를 다시 찾는다.
         if (citedSources.isEmpty()) {
             log.info("[AI] 내부 문서 인용 근거 없음, 외부 검색 시작");
             return createExternalOrNoResultResponse(
@@ -189,6 +191,8 @@ public class AiMessageService {
                         : generated.citedDocumentKeys()
         );
 
+        // LLM이 임의의 출처를 만들어도 응답에 포함되지 않도록,
+        // 실제 검색 결과에 존재하는 documentKey만 인용으로 인정한다.
         List<AiReferenceDocument> cited = retrievedDocuments.stream()
                 .filter(document -> citedKeys.contains(document.documentKey()))
                 .toList();

@@ -140,6 +140,9 @@ public class AiContentIndexingService {
         }
         try {
             List<Document> documents = documentSupplier.get();
+            // 원본의 chunk 수가 줄어든 경우, 남는 예전 chunk를 제거하기 위해
+            // 동일 sourceType/sourceId 문서를 모두 삭제한 뒤 최신 chunk를 저장한다.
+            // 삭제와 추가의 동시 실행은 AiIndexingCoordinator가 직렬화한다.
             vectorStore.delete(sourceFilter(sourceType, sourceId));
             addInBatches(documents);
         } catch (ProjectException e) {
@@ -241,6 +244,7 @@ public class AiContentIndexingService {
         for (int chunkIndex = 0; chunkIndex < chunks.size(); chunkIndex++) {
             Map<String, Object> chunkMetadata = new LinkedHashMap<>(metadata);
             chunkMetadata.put("chunkIndex", chunkIndex);
+            // 결정적인 ID를 사용해 같은 원본을 다시 색인해도 chunk가 중복 생성되지 않게 한다.
             indexed.add(new Document(
                     documentId(sourceType, sourceId, chunkIndex),
                     chunks.get(chunkIndex).getText(),

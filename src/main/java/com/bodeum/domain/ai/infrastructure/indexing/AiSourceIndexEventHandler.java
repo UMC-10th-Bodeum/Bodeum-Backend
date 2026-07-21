@@ -19,6 +19,7 @@ public class AiSourceIndexEventHandler {
 
     @Async("aiIndexingExecutor")
     @TransactionalEventListener(
+            // 원본 DB 트랜잭션이 롤백된 데이터를 Vector DB에 반영하지 않는다.
             phase = TransactionPhase.AFTER_COMMIT,
             fallbackExecution = true
     )

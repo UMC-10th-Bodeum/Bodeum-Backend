@@ -30,6 +30,8 @@ public class AiIndexingCoordinator {
 
     public <T> T execute(Supplier<T> task) {
         return jdbcTemplate.execute((Connection connection) -> {
+            // MySQL named lock으로 전체 재색인과 증분 색인을 직렬화한다.
+            // 같은 DB를 사용하는 여러 애플리케이션 인스턴스 사이에서도 동일하게 적용된다.
             acquire(connection);
             try {
                 return task.get();

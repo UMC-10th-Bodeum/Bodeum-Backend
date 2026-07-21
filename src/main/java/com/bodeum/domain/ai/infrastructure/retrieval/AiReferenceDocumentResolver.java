@@ -41,6 +41,8 @@ public class AiReferenceDocumentResolver {
 
     @Transactional(readOnly = true)
     public List<AiReferenceDocument> resolve(List<AiReferenceDocument> retrievedDocuments) {
+        // Vector DB는 관련 원본 ID를 찾는 용도로만 사용한다. 답변과 출처에는
+        // MySQL에서 일괄 재조회한 최신 제목, 본문, URL 및 갱신일을 사용한다.
         Set<Long> infoIds = sourceIds(retrievedDocuments, AiResponseSourceType.INFO);
         Set<Long> newsIds = sourceIds(retrievedDocuments, AiResponseSourceType.NEWS);
         Map<Long, InfoItem> infoById = infoIds.isEmpty()
