@@ -1,0 +1,58 @@
+# EC2 운영용 compose. 최초 1회 EC2의 ~/bodeum/docker-compose.yml 로 복사해 둔다.
+# DB는 RDS를 쓰므로 여기엔 앱 컨테이너만 있다. 값은 같은 폴더의 .env 에서 주입된다.
+services:
+  chroma:
+    image: chromadb/chroma:1.0.0
+    container_name: bodeum-chroma
+    restart: unless-stopped
+    volumes:
+      - bodeum-chroma-data:/data
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  app:
+    image: ghcr.io/umc-10th-bodeum/bodeum-backend:latest
+    container_name: bodeum-app
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      SPRING_PROFILES_ACTIVE: "prod"
+      AI_INDEXING_RUN_ONCE: "false"
+    depends_on:
+      - chroma
+    # Nginx(호스트)만 접근하도록 localhost 에만 바인딩한다. 외부에는 노출하지 않는다.
+    ports:
+      - "127.0.0.1:8080:8080"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # SQL로 데이터를 일괄 삽입했거나 Chroma 전체 재색인이 필요할 때 실행한다:
+  # docker compose --profile indexing run --rm indexer
+  indexer:
+    image: ghcr.io/umc-10th-bodeum/bodeum-backend:latest
+    profiles:
+      - indexing
+    restart: "no"
+    env_file:
+      - .env
+    environment:
+      SPRING_PROFILES_ACTIVE: "prod"
+      AI_INDEXING_RUN_ONCE: "true"
+      SPRING_MAIN_WEB_APPLICATION_TYPE: "none"
+    depends_on:
+      - chroma
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  bodeum-chroma-data:

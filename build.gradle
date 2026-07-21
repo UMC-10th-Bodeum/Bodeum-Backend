@@ -19,12 +19,19 @@ repositories {
 }
 
 dependencies {
+    implementation platform('org.springframework.ai:spring-ai-bom:2.0.0')
+    implementation 'org.springframework.ai:spring-ai-starter-model-openai'
+    implementation 'org.springframework.ai:spring-ai-starter-vector-store-chroma'
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
     implementation 'org.springframework.boot:spring-boot-starter-security-oauth2-client'
     implementation 'org.springframework.boot:spring-boot-starter-webmvc'
+    implementation 'com.querydsl:querydsl-jpa:5.1.0:jakarta'
     compileOnly 'org.projectlombok:lombok'
     developmentOnly 'org.springframework.boot:spring-boot-devtools'
     annotationProcessor 'org.projectlombok:lombok'
+    annotationProcessor 'com.querydsl:querydsl-apt:5.1.0:jakarta'
+    annotationProcessor 'jakarta.annotation:jakarta.annotation-api'
+    annotationProcessor 'jakarta.persistence:jakarta.persistence-api'
     testImplementation 'org.springframework.boot:spring-boot-starter-data-jpa-test'
     testImplementation 'org.springframework.boot:spring-boot-starter-security-oauth2-client-test'
     testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
@@ -33,6 +40,7 @@ dependencies {
     testRuntimeOnly 'com.h2database:h2'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
     testAnnotationProcessor 'org.projectlombok:lombok'
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
 
     // validation
     implementation 'org.springframework.boot:spring-boot-starter-validation'
@@ -46,17 +54,18 @@ dependencies {
     implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:3.0.1'
     implementation 'org.springdoc:springdoc-openapi-starter-webmvc-api:3.0.1'
 
+    // AWS S3 (프로필 이미지 업로드)
+    implementation platform('software.amazon.awssdk:bom:2.29.0')
+    implementation 'software.amazon.awssdk:s3'
+
     // Crawling
     implementation 'org.jsoup:jsoup:1.22.2'
     implementation 'org.seleniumhq.selenium:selenium-java:4.44.0'
     implementation 'io.github.bonigarcia:webdrivermanager:6.3.4'
 
-    // MySQL
-    runtimeOnly 'com.mysql:mysql-connector-j'
-
-    // AWS S3 (프로필 이미지 업로드)
-    implementation platform('software.amazon.awssdk:bom:2.29.0')
-    implementation 'software.amazon.awssdk:s3'
+    // Flyway (DB 마이그레이션) - Spring Boot 4는 Flyway starter가 있어야 자동 실행된다.
+    implementation 'org.springframework.boot:spring-boot-starter-flyway'
+    implementation 'org.flywaydb:flyway-mysql'
 }
 
 tasks.named('test') {

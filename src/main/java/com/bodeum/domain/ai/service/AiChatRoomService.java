@@ -12,9 +12,11 @@ import com.bodeum.domain.user.exception.UserErrorCode;
 import com.bodeum.domain.user.repository.UserAgreementRepository;
 import com.bodeum.domain.user.repository.UserRepository;
 import com.bodeum.global.apiPayload.exception.ProjectException;
-import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.time.LocalDate;
@@ -45,12 +47,11 @@ public class AiChatRoomService {
         );
     }
 
-    @Transactional
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public AiChatRoomResponse getOrCreateChatRoom(Long userId) {
         validateAiTermsAgreement(userId);
 
-        AiChatRoom chatRoom = aiChatRoomRepository.findByUserId(userId)
-                .orElseGet(() -> createChatRoom(userId));
+        AiChatRoom chatRoom = getOrCreateChatRoomSafely(userId);
 
         // 한국 시간 기준 오늘 0시를 Instant로 변환
         Instant now = Instant.now();
@@ -100,9 +101,21 @@ public class AiChatRoomService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ProjectException(UserErrorCode.USER_NOT_FOUND));
 
-        return aiChatRoomRepository.save(
+        return aiChatRoomRepository.saveAndFlush(
                 AiChatRoom.create(user)
         );
+    }
+
+    private AiChatRoom getOrCreateChatRoomSafely(Long userId) {
+        return aiChatRoomRepository.findByUserId(userId)
+                .orElseGet(() -> {
+                    try {
+                        return createChatRoom(userId);
+                    } catch (DataIntegrityViolationException e) {
+                        return aiChatRoomRepository.findByUserId(userId)
+                                .orElseThrow(() -> e);
+                    }
+                });
     }
 
     private boolean shouldShowGuideModal(

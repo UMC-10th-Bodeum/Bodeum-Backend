@@ -1,7 +1,6 @@
 package com.bodeum.domain.info.entity;
 
 import com.bodeum.global.common.entity.BaseCreatedUpdatedEntity;
-import com.bodeum.domain.info.entity.enums.InfoCategory;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Builder;
@@ -25,9 +24,9 @@ public class InfoItem extends BaseCreatedUpdatedEntity {
     @Column(name = "external_id", nullable = false, length = 150)
     private String externalId;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    private InfoCategory category;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "info_category_id", nullable = false)
+    private InfoCategory infoCategory;
 
     @Column(nullable = false, length = 100)
     private String name;
@@ -63,10 +62,10 @@ public class InfoItem extends BaseCreatedUpdatedEntity {
     private LocalDateTime syncedAt;
 
     @Builder
-    public InfoItem(String externalId, InfoCategory category, String name, String introduction,
+    public InfoItem(String externalId, InfoCategory infoCategory,String name, String introduction,
                     String address, String sido, String sigungu, String phone, String homepageUrl, LocalDateTime syncedAt) {
         this.externalId = externalId;
-        this.category = category;
+        this.infoCategory = infoCategory;
         this.name = name;
         this.introduction = introduction;
         this.address = address;
@@ -77,9 +76,10 @@ public class InfoItem extends BaseCreatedUpdatedEntity {
         this.syncedAt = syncedAt;
     }
 
-    public void updateInformation(String name, String introduction, String address,
+    public void updateInformation(String name, InfoCategory infoCategory, String introduction, String address,
                                   String sido, String sigungu, String phone, String homepageUrl) {
         this.name = name;
+        this.infoCategory = infoCategory;
         this.introduction = introduction;
         this.address = address;
         this.sido = sido;

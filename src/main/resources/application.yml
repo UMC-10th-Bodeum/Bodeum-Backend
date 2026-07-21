@@ -17,7 +17,9 @@ spring:
   jpa:
     database: mysql
     database-platform: org.hibernate.dialect.MySQLDialect
-    show-sql: true
+    show-sql: false
+    hibernate:
+      ddl-auto: validate
     properties:
       hibernate:
         format_sql: true
@@ -29,7 +31,49 @@ spring:
       max-file-size: 5MB
       max-request-size: 5MB
 
+  # Flyway는 운영(prod)에서만 켠다. 로컬은 ddl-auto=update, 테스트는 H2라 기본 비활성화.
+  flyway:
+    enabled: false
+
+  ai:
+    retry:
+      max-attempts: 1
+    openai:
+      api-key: ${OPENAI_API_KEY}
+      timeout: ${OPENAI_REQUEST_TIMEOUT:20s}
+      max-retries: 0
+      chat:
+        options:
+          model: ${OPENAI_CHAT_MODEL:gpt-5.4-mini}
+      embedding:
+        options:
+          model: ${OPENAI_EMBEDDING_MODEL:text-embedding-3-small}
+    vectorstore:
+      chroma:
+        client:
+          port: 8000
+        collection-name: bodeum-rag
+        initialize-schema: true
+
 bodeum:
+  ai:
+    rag:
+      top-k: ${AI_RAG_TOP_K:5}
+      similarity-threshold: ${AI_RAG_SIMILARITY_THRESHOLD:0.4}
+    web-search:
+      model: ${OPENAI_WEB_SEARCH_MODEL:gpt-5.4-mini}
+      max-output-tokens: ${OPENAI_WEB_SEARCH_MAX_OUTPUT_TOKENS:1200}
+      connect-timeout: ${OPENAI_WEB_SEARCH_CONNECT_TIMEOUT:3s}
+      read-timeout: ${OPENAI_WEB_SEARCH_READ_TIMEOUT:30s}
+    request-limit:
+      per-minute: ${AI_REQUEST_LIMIT_PER_MINUTE:5}
+      per-day: ${AI_REQUEST_LIMIT_PER_DAY:50}
+      time-zone: ${AI_REQUEST_LIMIT_TIME_ZONE:Asia/Seoul}
+    indexing:
+      run-once: ${AI_INDEXING_RUN_ONCE:false}
+      chunk-size: 500
+      write-batch-size: 50
+      source-time-zone: Asia/Seoul
   auth:
     jwt-secret: ${JWT_SECRET:}
     access-token-ttl: ${AUTH_ACCESS_TOKEN_TTL:1h}
@@ -57,23 +101,3 @@ bodeum:
       access-key: ${AWS_ACCESS_KEY:}
       secret-key: ${AWS_SECRET_KEY:}
       public-base-url: ${AWS_S3_PUBLIC_BASE_URL:}
-
----
-spring:
-  config:
-    activate:
-      on-profile: local | test
-
-  jpa:
-    hibernate:
-      ddl-auto: update
-
----
-spring:
-  config:
-    activate:
-      on-profile: dev
-
-  jpa:
-    hibernate:
-      ddl-auto: validate

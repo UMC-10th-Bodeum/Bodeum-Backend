@@ -2,7 +2,6 @@ package com.bodeum.domain.user.service;
 
 import com.bodeum.domain.auth.enums.SocialProvider;
 import com.bodeum.domain.auth.exception.AuthErrorCode;
-import com.bodeum.domain.user.dto.request.AiTermsAgreementRequest;
 import com.bodeum.domain.user.dto.response.AiTermsAgreementResponse;
 import com.bodeum.domain.auth.repository.RefreshTokenSessionRepository;
 import com.bodeum.domain.region.entity.Region;
@@ -188,20 +187,13 @@ public class UserService {
 
     @Transactional(readOnly = true)
     public AiTermsAgreementResponse getAiTermsAgreement(Long userId) {
-        UserAgreement agreement = userAgreementRepository.findByUserId(userId)
-                .orElseThrow(() -> new ProjectException(UserErrorCode.USER_AGREEMENT_NOT_FOUND));
-
-        return AiTermsAgreementResponse.of(
-                agreement.isAiTermsAgreed(),
-                agreement.getAiTermsAgreedAt()
-        );
+        return userAgreementRepository.findByUserId(userId)
+                .map(a -> AiTermsAgreementResponse.of(a.isAiTermsAgreed(), a.getAiTermsAgreedAt()))
+                .orElse(AiTermsAgreementResponse.of(false, null));
     }
 
     @Transactional
-    public AiTermsAgreementResponse agreeAiTerms(
-            Long userId,
-            AiTermsAgreementRequest request
-    ) {
+    public AiTermsAgreementResponse agreeAiTerms(Long userId) {
         UserAgreement agreement = userAgreementRepository.findByUserId(userId)
                 .orElseThrow(() -> new ProjectException(UserErrorCode.USER_AGREEMENT_NOT_FOUND));
 
