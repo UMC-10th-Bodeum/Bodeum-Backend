@@ -21,17 +21,17 @@ import lombok.NoArgsConstructor;
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Table(
-        name = "ai_external_resource",
+        name = "ai_external_document",
         uniqueConstraints = @UniqueConstraint(
-                name = "uk_ai_external_resource_url_hash",
+                name = "uk_ai_external_document_url_hash",
                 columnNames = "source_url_hash"
         )
 )
-public class AiExternalResource extends BaseCreatedUpdatedEntity {
+public class AiExternalDocument extends BaseCreatedUpdatedEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "ai_external_resource_id")
+    @Column(name = "ai_external_document_id")
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -51,7 +51,7 @@ public class AiExternalResource extends BaseCreatedUpdatedEntity {
     private Instant sourceUpdatedAt;
 
     @Builder
-    private AiExternalResource(
+    private AiExternalDocument(
             AiExternalSource externalSource,
             String title,
             String sourceUrl,
@@ -65,14 +65,14 @@ public class AiExternalResource extends BaseCreatedUpdatedEntity {
         this.sourceUpdatedAt = sourceUpdatedAt;
     }
 
-    public static AiExternalResource create(
+    public static AiExternalDocument create(
             AiExternalSource externalSource,
             String title,
             String sourceUrl,
             String sourceUrlHash,
             Instant sourceUpdatedAt
     ) {
-        return AiExternalResource.builder()
+        return AiExternalDocument.builder()
                 .externalSource(externalSource)
                 .title(title)
                 .sourceUrl(sourceUrl)

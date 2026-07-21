@@ -1,7 +1,7 @@
 package com.bodeum.domain.ai.infrastructure.external;
 
-import com.bodeum.domain.ai.entity.AiExternalResource;
-import com.bodeum.domain.ai.repository.AiExternalResourceRepository;
+import com.bodeum.domain.ai.entity.AiExternalDocument;
+import com.bodeum.domain.ai.repository.AiExternalDocumentRepository;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -13,10 +13,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
-public class AiExternalResourcePersistenceService {
+public class AiExternalDocumentPersistenceService {
 
     private static final String UPSERT_SQL = """
-            INSERT INTO ai_external_resource (
+            INSERT INTO ai_external_document (
                 ai_external_source_id,
                 title,
                 source_url,
@@ -38,11 +38,11 @@ public class AiExternalResourcePersistenceService {
                 source_url = VALUES(source_url)
             """;
 
-    private final AiExternalResourceRepository externalResourceRepository;
+    private final AiExternalDocumentRepository externalDocumentRepository;
     private final JdbcTemplate jdbcTemplate;
 
     @Transactional
-    public List<AiExternalResource> saveAll(Collection<AiExternalResourceCandidate> candidates) {
+    public List<AiExternalDocument> saveAll(Collection<AiExternalDocumentCandidate> candidates) {
         if (candidates.isEmpty()) {
             return List.of();
         }
@@ -56,30 +56,30 @@ public class AiExternalResourcePersistenceService {
                 })
                 .toList());
 
-        Map<String, AiExternalResource> resourcesByHash = externalResourceRepository
+        Map<String, AiExternalDocument> documentsByHash = externalDocumentRepository
                 .findAllBySourceUrlHashIn(candidates.stream()
-                        .map(AiExternalResourceCandidate::urlHash)
+                        .map(AiExternalDocumentCandidate::urlHash)
                         .collect(Collectors.toSet()))
                 .stream()
                 .collect(Collectors.toMap(
-                        AiExternalResource::getSourceUrlHash,
-                        resource -> resource
+                        AiExternalDocument::getSourceUrlHash,
+                        document -> document
                 ));
 
         return candidates.stream()
-                .map(candidate -> findSavedResource(resourcesByHash, candidate.urlHash()))
+                .map(candidate -> findSavedDocument(documentsByHash, candidate.urlHash()))
                 .toList();
     }
 
-    private AiExternalResource findSavedResource(
-            Map<String, AiExternalResource> resourcesByHash,
+    private AiExternalDocument findSavedDocument(
+            Map<String, AiExternalDocument> documentsByHash,
             String urlHash
     ) {
-        AiExternalResource resource = resourcesByHash.get(urlHash);
-        if (resource == null) {
+        AiExternalDocument document = documentsByHash.get(urlHash);
+        if (document == null) {
             throw new IllegalStateException(
-                    "Upserted external resource could not be found: " + urlHash);
+                    "Upserted external document could not be found: " + urlHash);
         }
-        return resource;
+        return document;
     }
 }
