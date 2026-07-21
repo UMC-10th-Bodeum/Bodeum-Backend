@@ -20,6 +20,7 @@ services:
     env_file:
       - .env
     environment:
+      SPRING_PROFILES_ACTIVE: "prod"
       AI_INDEXING_RUN_ONCE: "false"
     depends_on:
       - chroma
@@ -42,6 +43,7 @@ services:
     env_file:
       - .env
     environment:
+      SPRING_PROFILES_ACTIVE: "prod"
       AI_INDEXING_RUN_ONCE: "true"
       SPRING_MAIN_WEB_APPLICATION_TYPE: "none"
     depends_on:

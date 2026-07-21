@@ -68,7 +68,7 @@ public class AiMessageService {
             Long userId,
             String content
     ) {
-        log.info("[AI] 사용자 프로필 조회 시작");
+        log.debug("[AI] 사용자 프로필 조회 시작");
 
         User user = userRepository.findAiProfileById(userId)
                 .orElseThrow(() -> new ProjectException(UserErrorCode.USER_NOT_FOUND));
@@ -76,7 +76,7 @@ public class AiMessageService {
         User userWithDisabilities = userRepository.findAiDisabilityProfileById(userId)
                 .orElseThrow(() -> new ProjectException(UserErrorCode.USER_NOT_FOUND));
 
-        log.info("[AI] 사용자 프로필 조회 완료");
+        log.debug("[AI] 사용자 프로필 조회 완료");
 
         AiMessage userMessage = persistenceService.saveProcessingUserMessage(chatRoom, content);
 
@@ -98,13 +98,13 @@ public class AiMessageService {
 
         AiUserProfile profile = toProfile(user, userWithDisabilities);
 
-        log.info("[AI] 문서 검색 시작");
+        log.debug("[AI] 문서 검색 시작");
         List<AiReferenceDocument> retrievedDocuments = referenceDocumentResolver.resolve(
                 documentRetriever.retrieve(content, profile)
         );
 
         log.info("[AI] 검색 문서 수: {}", retrievedDocuments.size());
-        log.info("[AI] 검색 documentKeys: {}",
+        log.debug("[AI] 검색 documentKeys: {}",
                 retrievedDocuments.stream()
                         .map(AiReferenceDocument::documentKey)
                         .toList());
@@ -114,14 +114,14 @@ public class AiMessageService {
             return createExternalOrNoResultResponse(chatRoom, userMessage, content, profile);
         }
 
-        log.info("[AI] 답변 생성 시작");
+        log.debug("[AI] 답변 생성 시작");
 
         GeneratedAiAnswer generated = answerGenerator.generate(
                 content, profile, retrievedDocuments
         );
 
-        log.info("[AI] 답변 생성 완료");
-        log.info("[AI] citedDocumentKeys: {}", generated.citedDocumentKeys());
+        log.debug("[AI] 답변 생성 완료");
+        log.debug("[AI] citedDocumentKeys: {}", generated.citedDocumentKeys());
 
         List<AiReferenceDocument> citedSources =
                 validateCitations(generated, retrievedDocuments);
@@ -183,7 +183,7 @@ public class AiMessageService {
             GeneratedAiAnswer generated,
             List<AiReferenceDocument> retrievedDocuments
     ) {
-        log.info("[AI] citation 검증 시작");
+        log.debug("[AI] citation 검증 시작");
 
         Set<String> citedKeys = new HashSet<>(
                 generated.citedDocumentKeys() == null

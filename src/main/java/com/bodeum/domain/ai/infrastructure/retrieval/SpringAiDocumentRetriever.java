@@ -53,7 +53,7 @@ public class SpringAiDocumentRetriever implements AiDocumentRetriever {
             questionDocuments.forEach(document -> documentsById.merge(
                     document.getId(), document, this::higherScore));
 
-            documentsById.values().forEach(document -> log.info(
+            documentsById.values().forEach(document -> log.debug(
                     "[AI] RAG candidate: id={}, score={}, threshold={}",
                     document.getId(), score(document), similarityThreshold));
 
