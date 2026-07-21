@@ -26,10 +26,7 @@ import com.bodeum.domain.ai.model.rag.AiSourceKey;
 import com.bodeum.domain.ai.model.answer.GeneratedAiAnswer;
 import com.bodeum.domain.ai.model.answer.ExternalAiAnswer;
 import com.bodeum.domain.ai.repository.AiChatRoomRepository;
-import com.bodeum.domain.ai.repository.AiMessageRepository;
-import com.bodeum.domain.ai.repository.AiResponseSourceRepository;
 import com.bodeum.domain.ai.repository.AiSourceReviewRepository;
-import com.bodeum.domain.ai.repository.projection.AiResponseSourceProjection;
 import com.bodeum.domain.auth.enums.SocialProvider;
 import com.bodeum.domain.user.entity.User;
 import com.bodeum.domain.user.entity.UserAgreement;
@@ -59,8 +56,6 @@ class AiMessageServiceTest {
     @Mock AiSourceReviewRepository aiSourceReviewRepository;
     @Mock AiRequestGuard requestGuard;
     @Mock AiReferenceDocumentResolver referenceDocumentResolver;
-    @Mock AiMessageRepository aiMessageRepository;
-    @Mock AiResponseSourceRepository aiResponseSourceRepository;
 
     private AiMessageService service;
     private AiChatRoom chatRoom;
@@ -72,7 +67,7 @@ class AiMessageServiceTest {
                 aiChatRoomRepository, userAgreementRepository, userRepository,
                 documentRetriever, answerGenerator, externalAnswerProvider,
                 persistenceService, failureService, aiSourceReviewRepository, requestGuard,
-                referenceDocumentResolver, aiMessageRepository, aiResponseSourceRepository);
+                referenceDocumentResolver);
         user = User.createSocialUser(SocialProvider.KAKAO, "provider-id", "a@b.com", "보호자");
         chatRoom = AiChatRoom.create(user);
         lenient().when(userAgreementRepository.findByUserId(1L))
@@ -261,47 +256,6 @@ class AiMessageServiceTest {
         assertThat(result.aiMessage().answerStatus()).isEqualTo(AiAnswerStatus.ANSWERED);
         assertThat(result.aiMessage().warning().type()).isEqualTo(AiWarningType.INCORRECT_SOURCE);
         assertThat(result.aiMessage().warning().message()).contains("오류 피드백");
-    }
-
-    @Test
-    void returnsTodayMessagesUsingCommonMessageResponse() {
-        AiChatRoom savedRoom = mock(AiChatRoom.class);
-        when(savedRoom.getId()).thenReturn(7L);
-        when(aiChatRoomRepository.findByUserId(1L)).thenReturn(Optional.of(savedRoom));
-
-        AiMessage userMessage = mock(AiMessage.class);
-        when(userMessage.getId()).thenReturn(21L);
-        when(userMessage.getSenderType()).thenReturn(SenderType.USER);
-        when(userMessage.getContent()).thenReturn("질문");
-        when(userMessage.getCreatedAt()).thenReturn(Instant.parse("2026-07-21T01:00:00Z"));
-
-        AiMessage aiMessage = mock(AiMessage.class);
-        when(aiMessage.getId()).thenReturn(22L);
-        when(aiMessage.getSenderType()).thenReturn(SenderType.AI);
-        when(aiMessage.getAiAnswerStatus()).thenReturn(AiAnswerStatus.LINK_GUIDANCE);
-        when(aiMessage.getContent()).thenReturn("관련 사이트를 확인해 주세요.");
-        when(aiMessage.getCreatedAt()).thenReturn(Instant.parse("2026-07-21T01:00:01Z"));
-
-        when(aiMessageRepository.findTodayMessages(eq(7L), any(), any()))
-                .thenReturn(List.of(userMessage, aiMessage));
-
-        AiResponseSourceProjection source = mock(AiResponseSourceProjection.class);
-        when(source.getAiMessageId()).thenReturn(22L);
-        when(source.getSourceType()).thenReturn(AiResponseSourceType.SITE);
-        when(source.getSourceId()).thenReturn(3L);
-        when(source.getSourceTitle()).thenReturn("복지 사이트");
-        when(source.getSourceUrl()).thenReturn("https://example.com");
-        when(aiResponseSourceRepository.findAllByMessageIds(List.of(21L, 22L)))
-                .thenReturn(List.of(source));
-
-        var result = service.getTodayMessages(1L);
-
-        assertThat(result.messages()).hasSize(2);
-        assertThat(result.messages().getFirst().answerStatus()).isNull();
-        assertThat(result.messages().getFirst().sources()).isEmpty();
-        assertThat(result.messages().getLast().answerStatus())
-                .isEqualTo(AiAnswerStatus.LINK_GUIDANCE);
-        assertThat(result.messages().getLast().sources().getFirst().sourceId()).isEqualTo(3L);
     }
 
     private AiMessage savedAiMessage(String content) {

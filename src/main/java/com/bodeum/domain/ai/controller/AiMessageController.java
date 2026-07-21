@@ -1,7 +1,7 @@
 package com.bodeum.domain.ai.controller;
 
 import com.bodeum.domain.ai.dto.response.AiTodayMessageResponse;
-import com.bodeum.domain.ai.service.AiMessageService;
+import com.bodeum.domain.ai.service.AiMessageQueryService;
 import com.bodeum.global.apiPayload.ApiResponse;
 import com.bodeum.global.apiPayload.code.GeneralSuccessCode;
 import com.bodeum.global.auth.LoginUser;
@@ -16,7 +16,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/ai/messages")
 public class AiMessageController {
 
-    private final AiMessageService aiMessageService;
+    private final AiMessageQueryService aiMessageQueryService;
 
     @Operation(
             summary = "오늘 AI 대화 이력 조회",
@@ -28,7 +28,7 @@ public class AiMessageController {
     ) {
         return ApiResponse.of(
                 GeneralSuccessCode.OK,
-                aiMessageService.getTodayMessages(userId)
+                aiMessageQueryService.getTodayMessages(userId)
         );
     }
 }

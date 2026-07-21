@@ -4,8 +4,6 @@ import com.bodeum.domain.ai.dto.response.*;
 import com.bodeum.domain.ai.entity.AiChatRoom;
 import com.bodeum.domain.ai.entity.AiMessage;
 import com.bodeum.domain.ai.enums.AiAnswerStatus;
-import com.bodeum.domain.ai.enums.SenderType;
-import com.bodeum.domain.ai.enums.AiWarningType;
 import com.bodeum.domain.ai.exception.AiErrorCode;
 import com.bodeum.domain.ai.model.rag.AiReferenceDocument;
 import com.bodeum.domain.ai.model.rag.AiSourceKey;
@@ -13,9 +11,6 @@ import com.bodeum.domain.ai.model.rag.AiUserProfile;
 import com.bodeum.domain.ai.model.answer.GeneratedAiAnswer;
 import com.bodeum.domain.ai.model.answer.ExternalAiAnswer;
 import com.bodeum.domain.ai.infrastructure.retrieval.AiReferenceDocumentResolver;
-import com.bodeum.domain.ai.repository.AiMessageRepository;
-import com.bodeum.domain.ai.repository.AiResponseSourceRepository;
-import com.bodeum.domain.ai.repository.projection.AiResponseSourceProjection;
 import com.bodeum.domain.ai.service.port.AiAnswerGenerator;
 import com.bodeum.domain.ai.service.port.AiDocumentRetriever;
 import com.bodeum.domain.ai.service.port.AiExternalAnswerProvider;
@@ -28,20 +23,13 @@ import com.bodeum.domain.user.repository.UserAgreementRepository;
 import com.bodeum.domain.user.repository.UserRepository;
 import com.bodeum.global.apiPayload.exception.ProjectException;
 
-import java.time.Instant;
-import java.time.LocalDate;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import static com.bodeum.global.common.constant.TimeConstants.SERVICE_ZONE_ID;
 
 @Service
 @RequiredArgsConstructor
@@ -49,9 +37,6 @@ import static com.bodeum.global.common.constant.TimeConstants.SERVICE_ZONE_ID;
 public class AiMessageService {
 
     private static final String NO_RESULT_MESSAGE = "관련 정보를 찾을 수 없습니다.";
-    private static final String INCORRECT_WARNING =
-            "일부 사용자로부터 오류 피드백이 접수된 정보입니다. 정확한 내용은 공식 기관에서 다시 확인해 주세요.";
-
     private final AiChatRoomRepository aiChatRoomRepository;
     private final UserAgreementRepository userAgreementRepository;
     private final UserRepository userRepository;
@@ -63,8 +48,6 @@ public class AiMessageService {
     private final AiSourceReviewRepository aiSourceReviewRepository;
     private final AiRequestGuard requestGuard;
     private final AiReferenceDocumentResolver referenceDocumentResolver;
-    private final AiMessageRepository aiMessageRepository;
-    private final AiResponseSourceRepository aiResponseSourceRepository;
 
     public CreateAiMessageResponse createMessage(Long userId, String content) {
         validateAiTermsAgreement(userId);
@@ -278,115 +261,8 @@ public class AiMessageService {
 
     private AiMessageWarningResponse warningResponse(boolean warning) {
         return warning
-                ? new AiMessageWarningResponse(AiWarningType.INCORRECT_SOURCE, INCORRECT_WARNING)
+                ? AiMessageWarningResponse.incorrectSource()
                 : null;
-    }
-
-    @Transactional(readOnly = true)
-    public AiTodayMessageResponse getTodayMessages(Long userId) {
-        AiChatRoom chatRoom = aiChatRoomRepository.findByUserId(userId)
-                .orElseThrow(() -> new ProjectException(AiErrorCode.AI_CHAT_ROOM_NOT_FOUND));
-
-        // 한국 시간 기준 오늘 0시를 Instant로 변환
-        LocalDate today = LocalDate.now(SERVICE_ZONE_ID);
-        Instant startOfToday = today
-                .atStartOfDay(SERVICE_ZONE_ID)
-                .toInstant();
-
-        // 한국 시간 기준 내일 0시를 Instant로 변환
-        Instant startOfTomorrow = today
-                .plusDays(1)
-                .atStartOfDay(SERVICE_ZONE_ID)
-                .toInstant();
-
-        List<AiMessage> messages =
-                aiMessageRepository.findTodayMessages(
-                        chatRoom.getId(),
-                        startOfToday,
-                        startOfTomorrow
-                );
-
-        if (messages.isEmpty()) {
-            return AiTodayMessageResponse.of(List.of());
-        }
-
-        List<Long> messageIds = messages.stream()
-                .map(AiMessage::getId)
-                .toList();
-
-        // 메시지별 출처 조회로 인한 N+1 문제를 방지하기 위해, 출처를 한 번에 조회
-        List<AiResponseSourceProjection> sources =
-                aiResponseSourceRepository.findAllByMessageIds(messageIds);
-
-        // 메시지와 출처를 매핑하기 위해, 조회한 출처를 메시지 ID별로 그룹화
-        Map<Long, List<AiResponseSourceProjection>> sourceMap =
-                sources.stream()
-                        .collect(Collectors.groupingBy(
-                                AiResponseSourceProjection::getAiMessageId
-                        ));
-
-        List<AiMessageResponse> messageResponses =
-                messages.stream()
-                        .map(message -> toMessageResponse(
-                                message,
-                                sourceMap.getOrDefault(
-                                        message.getId(),
-                                        List.of()
-                                )
-                        ))
-                        .toList();
-
-        return AiTodayMessageResponse.of(messageResponses);
-    }
-
-    private AiMessageResponse toMessageResponse(
-            AiMessage message,
-            List<AiResponseSourceProjection> sources
-    ) {
-        if (message.getSenderType() == SenderType.USER) {
-            return AiMessageResponse.user(
-                    message.getId(),
-                    message.getContent(),
-                    message.getCreatedAt()
-            );
-        }
-
-        List<AiMessageSourceResponse> sourceResponses =
-                sources.stream()
-                        .map(source -> new AiMessageSourceResponse(
-                                source.getSourceType(),
-                                source.getSourceId(),
-                                source.getSourceTitle(),
-                                source.getSourceUrl(),
-                                source.getSourceUpdatedAt()
-                        ))
-                        .toList();
-
-        AiAnswerStatus answerStatus = message.getAiAnswerStatus();
-        if (answerStatus == null) {
-            answerStatus = sourceResponses.isEmpty()
-                    ? AiAnswerStatus.NO_EVIDENCE
-                    : AiAnswerStatus.ANSWERED;
-        }
-
-        if (answerStatus == AiAnswerStatus.NO_EVIDENCE) {
-            return AiMessageResponse.noEvidence(
-                    message.getId(),
-                    message.getSenderType(),
-                    message.getContent(),
-                    message.getCreatedAt()
-            );
-        }
-
-        return AiMessageResponse.sourceBacked(
-                message.getId(),
-                message.getSenderType(),
-                answerStatus,
-                message.getContent(),
-                message.getCreatedAt(),
-                sourceResponses,
-                warningResponse(message.isWarning())
-        );
     }
 
     private void markFailedSafely(Long userMessageId, Exception originalException) {
