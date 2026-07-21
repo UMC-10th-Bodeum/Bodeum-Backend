@@ -65,8 +65,9 @@ public class HomeService {
                             PostStatus.ACTIVE, region.getId(), PageRequest.of(0, limit))
                     : homePostRepository.findTopByPopularity(PostStatus.ACTIVE, PageRequest.of(0, limit));
         }
+        String regionName = region != null ? region.getFullName() : null;
         return posts.stream()
-                .map(PostPreviewResponse::of)
+                .map(post -> PostPreviewResponse.of(post, regionName))
                 .toList();
     }
 
