@@ -19,6 +19,7 @@ public enum AuthErrorCode implements BaseErrorCode {
     INVALID_REFRESH_TOKEN(HttpStatus.UNAUTHORIZED, "AUTH401_3", "유효하지 않은 refreshToken입니다. 다시 로그인해주세요."),
     INACTIVE_USER(HttpStatus.UNAUTHORIZED, "AUTH401_5", "탈퇴했거나 비활성화된 사용자입니다."),
     INVALID_OAUTH_STATE(HttpStatus.UNAUTHORIZED, "AUTH401_6", "유효하지 않은 OAuth state 값입니다."),
+    SIGNUP_NOT_COMPLETED(HttpStatus.FORBIDDEN, "AUTH403_1", "온보딩을 완료해야 이용할 수 있는 기능입니다."),
     PROVIDER_NOT_CONFIGURED(HttpStatus.INTERNAL_SERVER_ERROR, "AUTH500_1", "소셜 로그인 설정이 완료되지 않았습니다.");
 
     private final HttpStatus status;

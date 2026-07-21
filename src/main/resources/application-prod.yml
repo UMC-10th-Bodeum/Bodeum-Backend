@@ -17,6 +17,12 @@ spring:
     # 검증 실패로 부팅을 막는다. 타임스탬프 방식에는 out-of-order 실행 허용이 필수다.
     out-of-order: true
 
+  ai:
+    vectorstore:
+      chroma:
+        client:
+          host: http://chroma
+
 bodeum:
   cors:
     # 프론트(Vercel) 운영 도메인 + 프리뷰 배포 + 통합 초기 로컬 개발용
