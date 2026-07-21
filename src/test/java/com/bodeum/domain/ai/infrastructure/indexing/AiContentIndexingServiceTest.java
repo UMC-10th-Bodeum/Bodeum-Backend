@@ -1,14 +1,18 @@
 package com.bodeum.domain.ai.infrastructure.indexing;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.bodeum.domain.ai.enums.AiResponseSourceType;
+import com.bodeum.domain.ai.exception.AiErrorCode;
 import com.bodeum.domain.info.entity.InfoItem;
 import com.bodeum.domain.info.entity.InfoCategory;
 import com.bodeum.domain.info.entity.enums.MainCategory;
@@ -19,11 +23,13 @@ import com.bodeum.domain.news.entity.NewsSource;
 import com.bodeum.domain.news.entity.NewsSourceType;
 import com.bodeum.domain.news.entity.NewsType;
 import com.bodeum.domain.news.repository.NewsRepository;
+import com.bodeum.global.apiPayload.exception.ProjectException;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Supplier;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.document.Document;
@@ -34,6 +40,8 @@ class AiContentIndexingServiceTest {
     private final InfoItemRepository infoItemRepository = mock(InfoItemRepository.class);
     private final NewsRepository newsRepository = mock(NewsRepository.class);
     private final VectorStore vectorStore = mock(VectorStore.class);
+    private final AiIndexedDocumentReader indexedDocumentReader =
+            mock(AiIndexedDocumentReader.class);
     private final AiIndexingCoordinator indexingCoordinator = mock(AiIndexingCoordinator.class);
 
     @Test
@@ -42,6 +50,10 @@ class AiContentIndexingServiceTest {
         News news = news();
         when(infoItemRepository.findAllIndexable()).thenReturn(List.of(info));
         when(newsRepository.findAllIndexable()).thenReturn(List.of(news));
+        when(indexedDocumentReader.findIds(AiResponseSourceType.INFO, null))
+                .thenReturn(Set.of("INFO-1-0", "INFO-99-0"));
+        when(indexedDocumentReader.findIds(AiResponseSourceType.NEWS, null))
+                .thenReturn(Set.of("NEWS-2-0", "NEWS-99-0"));
         List<Document> stored = new ArrayList<>();
         doAnswer(invocation -> {
             stored.addAll(invocation.getArgument(0));
@@ -73,8 +85,8 @@ class AiContentIndexingServiceTest {
                 .containsEntry("newsSourceName", "수원시청")
                 .containsEntry("chunkIndex", 0);
         assertThat(stored.get(1).getText()).contains("제공 기관: 수원시 복지포털");
-        verify(vectorStore).delete("sourceType == 'INFO'");
-        verify(vectorStore).delete("sourceType == 'NEWS'");
+        verify(vectorStore).delete(List.of("INFO-99-0"));
+        verify(vectorStore).delete(List.of("NEWS-99-0"));
     }
 
     @Test
@@ -82,6 +94,8 @@ class AiContentIndexingServiceTest {
         InfoItem latestInfo = infoItem();
         when(infoItemRepository.findIndexableById(1L))
                 .thenReturn(Optional.of(latestInfo));
+        when(indexedDocumentReader.findIds(AiResponseSourceType.INFO, 1L))
+                .thenReturn(Set.of("INFO-1-0", "INFO-1-1"));
         List<Document> stored = new ArrayList<>();
         doAnswer(invocation -> {
             stored.addAll(invocation.getArgument(0));
@@ -94,15 +108,34 @@ class AiContentIndexingServiceTest {
 
         verify(indexingCoordinator).execute(any());
         verify(infoItemRepository).findIndexableById(1L);
-        verify(vectorStore).delete("sourceType == 'INFO' && sourceId == 1");
+        verify(vectorStore).delete(List.of("INFO-1-1"));
         assertThat(stored).extracting(Document::getId).containsExactly("INFO-1-0");
+    }
+
+    @Test
+    void keepsExistingIndexWhenNewDocumentsCannotBeStored() {
+        InfoItem info = infoItem();
+        when(infoItemRepository.findAllIndexable()).thenReturn(List.of(info));
+        when(newsRepository.findAllIndexable()).thenReturn(List.of());
+        doThrow(new IllegalStateException("Chroma unavailable"))
+                .when(vectorStore).add(anyList());
+        AiContentIndexingService service = coordinatedService();
+
+        assertThatThrownBy(service::rebuildAll)
+                .isInstanceOf(ProjectException.class)
+                .extracting(exception -> ((ProjectException) exception).getErrorCode())
+                .isEqualTo(AiErrorCode.AI_INDEXING_FAILED);
+
+        verify(indexedDocumentReader, never()).findIds(any(), any());
+        verify(vectorStore, never()).delete(anyList());
     }
 
     private AiContentIndexingService coordinatedService() {
         doAnswer(invocation -> ((Supplier<?>) invocation.getArgument(0)).get())
                 .when(indexingCoordinator).execute(any());
         return new AiContentIndexingService(
-                infoItemRepository, newsRepository, vectorStore, indexingCoordinator,
+                infoItemRepository, newsRepository, vectorStore, indexedDocumentReader,
+                indexingCoordinator,
                 500, 50, "Asia/Seoul");
     }
 

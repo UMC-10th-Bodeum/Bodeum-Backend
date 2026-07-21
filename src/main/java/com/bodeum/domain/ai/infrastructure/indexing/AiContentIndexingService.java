@@ -16,7 +16,9 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.transformer.splitter.TokenTextSplitter;
 import org.springframework.ai.vectorstore.VectorStore;
@@ -31,6 +33,7 @@ public class AiContentIndexingService {
     private final InfoItemRepository infoItemRepository;
     private final NewsRepository newsRepository;
     private final VectorStore vectorStore;
+    private final AiIndexedDocumentReader indexedDocumentReader;
     private final AiIndexingCoordinator indexingCoordinator;
     private final TokenTextSplitter textSplitter;
     private final int writeBatchSize;
@@ -40,6 +43,7 @@ public class AiContentIndexingService {
             InfoItemRepository infoItemRepository,
             NewsRepository newsRepository,
             VectorStore vectorStore,
+            AiIndexedDocumentReader indexedDocumentReader,
             AiIndexingCoordinator indexingCoordinator,
             @Value("${bodeum.ai.indexing.chunk-size:500}") int chunkSize,
             @Value("${bodeum.ai.indexing.write-batch-size:50}") int writeBatchSize,
@@ -51,6 +55,7 @@ public class AiContentIndexingService {
         this.infoItemRepository = infoItemRepository;
         this.newsRepository = newsRepository;
         this.vectorStore = vectorStore;
+        this.indexedDocumentReader = indexedDocumentReader;
         this.indexingCoordinator = indexingCoordinator;
         this.textSplitter = TokenTextSplitter.builder()
                 .withChunkSize(chunkSize)
@@ -97,9 +102,13 @@ public class AiContentIndexingService {
             infoItems.forEach(item -> documents.addAll(createInfoDocuments(item)));
             newsItems.forEach(item -> documents.addAll(createNewsDocuments(item)));
 
-            vectorStore.delete("sourceType == 'INFO'");
-            vectorStore.delete("sourceType == 'NEWS'");
+            // Chroma add는 결정적 Document ID를 기준으로 upsert한다. 새 문서를 모두 저장한 뒤
+            // 더 이상 존재하지 않는 ID만 삭제해 적재 실패 시 기존 색인 전체가 사라지지 않게 한다.
             addInBatches(documents);
+            deleteStaleDocuments(AiResponseSourceType.INFO, null, documentIds(
+                    documents, AiResponseSourceType.INFO));
+            deleteStaleDocuments(AiResponseSourceType.NEWS, null, documentIds(
+                    documents, AiResponseSourceType.NEWS));
 
             return new AiIndexingResult(infoItems.size(), newsItems.size(), documents.size());
         } catch (ProjectException e) {
@@ -140,11 +149,10 @@ public class AiContentIndexingService {
         }
         try {
             List<Document> documents = documentSupplier.get();
-            // 원본의 chunk 수가 줄어든 경우, 남는 예전 chunk를 제거하기 위해
-            // 동일 sourceType/sourceId 문서를 모두 삭제한 뒤 최신 chunk를 저장한다.
-            // 삭제와 추가의 동시 실행은 AiIndexingCoordinator가 직렬화한다.
-            vectorStore.delete(sourceFilter(sourceType, sourceId));
             addInBatches(documents);
+            deleteStaleDocuments(sourceType, sourceId, documents.stream()
+                    .map(Document::getId)
+                    .collect(Collectors.toSet()));
         } catch (ProjectException e) {
             throw e;
         } catch (Exception e) {
@@ -293,6 +301,35 @@ public class AiContentIndexingService {
         for (int start = 0; start < documents.size(); start += writeBatchSize) {
             int end = Math.min(start + writeBatchSize, documents.size());
             vectorStore.add(documents.subList(start, end));
+        }
+    }
+
+    private Set<String> documentIds(
+            List<Document> documents,
+            AiResponseSourceType sourceType
+    ) {
+        return documents.stream()
+                .filter(document -> sourceType.name().equals(
+                        document.getMetadata().get("sourceType")))
+                .map(Document::getId)
+                .collect(Collectors.toSet());
+    }
+
+    private void deleteStaleDocuments(
+            AiResponseSourceType sourceType,
+            Long sourceId,
+            Set<String> currentIds
+    ) {
+        Set<String> staleIds = new java.util.LinkedHashSet<>(
+                indexedDocumentReader.findIds(sourceType, sourceId));
+        staleIds.removeAll(currentIds);
+        deleteIdsInBatches(staleIds.stream().toList());
+    }
+
+    private void deleteIdsInBatches(List<String> ids) {
+        for (int start = 0; start < ids.size(); start += writeBatchSize) {
+            int end = Math.min(start + writeBatchSize, ids.size());
+            vectorStore.delete(ids.subList(start, end));
         }
     }
 
