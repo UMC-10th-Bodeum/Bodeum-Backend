@@ -27,6 +27,7 @@ spring:
         format_sql: true
         jdbc:
           time_zone: UTC
+        default_batch_fetch_size: 100
 
   servlet:
     multipart:
