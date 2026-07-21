@@ -55,6 +55,35 @@ public interface HomePostRepository extends JpaRepository<Post, Long> {
             Pageable pageable
     );
 
+    @Query("""
+            SELECT DISTINCT p FROM Post p
+            WHERE p.status = :status
+              AND p.deletedAt IS NULL
+              AND EXISTS (
+                SELECT pdt FROM PostDisabilityTag pdt
+                WHERE pdt.post = p AND pdt.disabilityType IN :disabilityTypes
+              )
+            ORDER BY p.likeCount DESC, p.createdAt DESC
+            """)
+    List<Post> findTopByDisabilityTypes(
+            @Param("status") PostStatus status,
+            @Param("disabilityTypes") List<DisabilityType> disabilityTypes,
+            Pageable pageable
+    );
+
+    @Query("""
+            SELECT p FROM Post p
+            WHERE p.status = :status
+              AND p.deletedAt IS NULL
+              AND p.boardType IN :boardTypes
+            ORDER BY p.likeCount DESC, p.createdAt DESC
+            """)
+    List<Post> findTopByBoardTypes(
+            @Param("status") PostStatus status,
+            @Param("boardTypes") List<PostBoardType> boardTypes,
+            Pageable pageable
+    );
+
     List<Post> findAllByStatusAndDeletedAtIsNullOrderByCreatedAtDesc(
             PostStatus status,
             Pageable pageable

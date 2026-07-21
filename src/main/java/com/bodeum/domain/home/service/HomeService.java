@@ -83,9 +83,15 @@ public class HomeService {
                             .toList())
                     .orElse(List.of());
 
-            if (!disabilityTypes.isEmpty() || !boardTypes.isEmpty()) {
+            if (!disabilityTypes.isEmpty() && !boardTypes.isEmpty()) {
                 posts = homePostRepository.findTopByPersonalization(
                         PostStatus.ACTIVE, disabilityTypes, boardTypes, PageRequest.of(0, limit));
+            } else if (!disabilityTypes.isEmpty()) {
+                posts = homePostRepository.findTopByDisabilityTypes(
+                        PostStatus.ACTIVE, disabilityTypes, PageRequest.of(0, limit));
+            } else if (!boardTypes.isEmpty()) {
+                posts = homePostRepository.findTopByBoardTypes(
+                        PostStatus.ACTIVE, boardTypes, PageRequest.of(0, limit));
             } else {
                 posts = homePostRepository.findTopByPopularity(PostStatus.ACTIVE, PageRequest.of(0, limit));
             }
@@ -127,7 +133,7 @@ public class HomeService {
     }
 
     private Region getUserRegion(Long userId) {
-        return homeUserRepository.findWithRegionAndInterestsById(userId)
+        return homeUserRepository.findWithRegionById(userId)
                 .map(User::getRegion)
                 .orElse(null);
     }
