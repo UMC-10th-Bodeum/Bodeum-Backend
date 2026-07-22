@@ -76,6 +76,15 @@ public class OnboardingService {
         return OnboardingStatusResponse.from(user);
     }
 
+    @Transactional
+    public OnboardingStatusResponse quitOnboarding(Long userId) {
+        User user = userService.getCurrentUser(userId);
+        user.quitOnboarding();
+        user.markRegisteredIfResolved();
+
+        return OnboardingStatusResponse.from(user);
+    }
+
     @Transactional(readOnly = true)
     public OnboardingStatusResponse getStatus(Long userId) {
         return OnboardingStatusResponse.from(userService.getCurrentUser(userId));

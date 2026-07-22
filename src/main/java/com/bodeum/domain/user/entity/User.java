@@ -164,6 +164,18 @@ public class User extends BaseCreatedUpdatedDeletedEntity {
         this.onboardingSkipped = true;
     }
 
+    /**
+     * 온보딩 그만두기: 입력한 값(자녀/관심사/보호자·지역)을 모두 버리고 온보딩을 종료한다.
+     * orphanRemoval로 연관 행이 삭제되어, 입력값이 없는 회원 상태로 되돌아간다.
+     * 건너뛰기(skipOnboarding)는 입력값을 유지하지만, 그만두기는 초기화한다는 점이 다르다.
+     */
+    public void quitOnboarding() {
+        this.childProfile = null;
+        this.guardianProfile = null;
+        this.userInterests.clear();
+        this.onboardingSkipped = true;
+    }
+
     public void updateProfileImage(String profileImageUrl) {
         this.profileImageUrl = profileImageUrl;
     }
