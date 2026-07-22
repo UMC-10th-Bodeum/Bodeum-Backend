@@ -6,9 +6,12 @@
 --
 -- 런칭 전(실유저 없음) 전제로 기존 데이터를 비우고 재시드한다.
 -- regions를 참조하는 guardian_profiles.region_id FK 데이터가 없어 안전하다.
+--
+-- DELETE와 INSERT 사이에 DDL(ALTER TABLE)을 두지 않는다. MySQL에서 DDL은 암묵적 커밋을
+-- 일으켜 앞선 DELETE를 확정하므로, 이후 INSERT가 실패하면 regions가 빈 채로 남는다.
+-- Region은 IDENTITY라 ID 재시작이 불필요하고, 참조 데이터도 없어 ID 값은 무의미하다.
 
 DELETE FROM regions;
-ALTER TABLE regions AUTO_INCREMENT = 1;
 
 INSERT INTO regions (region_level_1, region_level_2, full_name) VALUES
     ('서울특별시', '종로구', '서울특별시 종로구'),
