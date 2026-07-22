@@ -9,3 +9,6 @@ CREATE TABLE auth_login_codes (
     expires_at  DATETIME(6) NOT NULL,
     PRIMARY KEY (code)
 );
+
+-- 만료분 정리 쿼리(deleteExpired: WHERE expires_at <= now)의 풀스캔을 피하기 위한 인덱스.
+CREATE INDEX idx_auth_login_codes_expires_at ON auth_login_codes (expires_at);

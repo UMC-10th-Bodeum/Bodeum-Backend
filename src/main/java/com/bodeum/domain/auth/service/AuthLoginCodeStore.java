@@ -8,6 +8,7 @@ import java.time.Instant;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
@@ -33,7 +34,9 @@ public class AuthLoginCodeStore {
         return code;
     }
 
-    @Transactional
+    // 소비(삭제)를 별도 트랜잭션으로 먼저 커밋한다. 호출자(exchange)의 토큰 발급이 이후 실패해도
+    // code 삭제가 롤백되지 않도록 해 1회용을 보장한다.
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public Consumed consume(String code) {
         if (!StringUtils.hasText(code)) {
             throw new ProjectException(AuthErrorCode.INVALID_LOGIN_CODE);
