@@ -77,10 +77,16 @@ bodeum:
       chunk-size: 500
       write-batch-size: 50
       source-time-zone: Asia/Seoul
+  front:
+    # 소셜 로그인 완료 후 일회용 code를 붙여 리다이렉트할 프론트 콜백 URL.
+    # 운영 값은 application-prod.yml에서 오버라이드한다.
+    callback-url: ${FRONT_CALLBACK_URL:http://localhost:3000/auth/callback}
   auth:
     jwt-secret: ${JWT_SECRET:}
     access-token-ttl: ${AUTH_ACCESS_TOKEN_TTL:1h}
     refresh-token-ttl: ${AUTH_REFRESH_TOKEN_TTL:14d}
+    # 프론트가 콜백 code를 교환할 때까지의 짧은 핸드오프 창.
+    login-code-ttl: ${AUTH_LOGIN_CODE_TTL:60s}
   oauth:
     base-url: ${BODEUM_BASE_URL:http://localhost:8080}
     mock-enabled: ${OAUTH_MOCK_ENABLED:false}

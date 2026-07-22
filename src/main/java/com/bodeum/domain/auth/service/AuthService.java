@@ -8,6 +8,7 @@ import com.bodeum.domain.auth.exception.AuthErrorCode;
 import com.bodeum.domain.user.entity.User;
 import com.bodeum.domain.user.service.UserService;
 import com.bodeum.global.apiPayload.exception.ProjectException;
+import com.bodeum.global.config.FrontProperties;
 import java.net.URI;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -26,6 +27,8 @@ public class AuthService {
     private final AuthTokenService authTokenService;
     private final SocialOAuthClient socialOAuthClient;
     private final OAuthStateStore oAuthStateStore;
+    private final AuthLoginCodeStore authLoginCodeStore;
+    private final FrontProperties frontProperties;
 
     public URI createLoginRedirectUri(SocialProvider provider) {
         OAuthProperties.ProviderRegistration registration = oAuthProperties.getRegistration(provider);
@@ -52,7 +55,7 @@ public class AuthService {
     }
 
     @Transactional
-    public AuthLoginResponse loginWithCallback(SocialProvider provider, String code, String state) {
+    public URI loginWithCallback(SocialProvider provider, String code, String state) {
         if (!StringUtils.hasText(code)) {
             throw new ProjectException(AuthErrorCode.MISSING_AUTH_CODE);
         }
@@ -67,15 +70,26 @@ public class AuthService {
                 socialUserProfile.nickname()
         );
 
-        // getOrCreateSocialUser는 트랜잭션 밖에서 식별자만 반환한다.
-        // 응답 생성 시 LAZY 필드를 읽어야 하므로 이 트랜잭션 안에서 managed 상태로 다시 조회한다.
-        User user = userService.getUserById(userCreationResult.userId());
+        // 콜백은 브라우저 전체 리다이렉트라 응답 body를 프론트가 받을 수 없다.
+        // 따라서 토큰을 여기서 발급하지 않고 일회용 code만 발급해 프론트 콜백 URL로 넘긴다.
+        // 실제 토큰은 프론트가 code를 교환(exchange)할 때 발급한다(토큰이 URL/로그/히스토리에 남지 않도록).
+        String loginCode = authLoginCodeStore.issue(userCreationResult.userId(), userCreationResult.created());
+
+        return buildFrontRedirectUri(loginCode);
+    }
+
+    @Transactional
+    public AuthLoginResponse exchange(String oneTimeCode) {
+        AuthLoginCodeStore.Consumed consumed = authLoginCodeStore.consume(oneTimeCode);
+
+        // 응답 생성 시 LAZY 필드를 읽어야 하므로 이 트랜잭션 안에서 managed 상태로 조회한다.
+        User user = userService.getUserById(consumed.userId());
         AuthTokenService.AuthTokenPair tokenPair = authTokenService.issueTokens(user.getId());
 
         return AuthLoginResponse.of(
                 user,
                 tokenPair,
-                userCreationResult.created(),
+                consumed.isNewUser(),
                 resolveNextStep(user)
         );
     }
@@ -87,6 +101,15 @@ public class AuthService {
     public void logout(Long userId, String refreshToken) {
         userService.getCurrentUser(userId);
         authTokenService.revoke(userId, refreshToken);
+    }
+
+    private URI buildFrontRedirectUri(String loginCode) {
+        // code는 60초·1회용이라 교환 즉시 폐기되므로 쿼리 파라미터로 전달해도 안전하다.
+        return UriComponentsBuilder.fromUriString(frontProperties.getCallbackUrl())
+                .queryParam("code", loginCode)
+                .encode()
+                .build()
+                .toUri();
     }
 
     private void validateState(SocialProvider provider, String state) {
