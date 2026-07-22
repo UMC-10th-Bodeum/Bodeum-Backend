@@ -5,6 +5,7 @@ import com.bodeum.domain.ai.enums.AiResponseProcessingStatus;
 import com.bodeum.domain.ai.enums.SenderType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -53,5 +54,22 @@ public interface AiMessageRepository extends JpaRepository<AiMessage, Long> {
             @Param("chatRoomId") Long chatRoomId,
             @Param("startAt") Instant startAt,
             @Param("endAt") Instant endAt
+    );
+
+    @Query("""
+        SELECT m
+        FROM AiMessage m
+        WHERE m.chatRoom.id = :chatRoomId
+          AND m.createdAt >= :startAt
+          AND m.createdAt < :endAt
+          AND (:cursorId IS NULL OR m.id < :cursorId)
+        ORDER BY m.createdAt DESC, m.id DESC
+        """)
+    List<AiMessage> findHistoryMessages(
+            @Param("chatRoomId") Long chatRoomId,
+            @Param("startAt") Instant startAt,
+            @Param("endAt") Instant endAt,
+            @Param("cursorId") Long cursorId,
+            Pageable pageable
     );
 }

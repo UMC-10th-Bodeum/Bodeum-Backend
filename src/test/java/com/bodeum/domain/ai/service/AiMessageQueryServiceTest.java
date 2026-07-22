@@ -23,6 +23,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Pageable;
 
 @ExtendWith(MockitoExtension.class)
 class AiMessageQueryServiceTest {
@@ -81,5 +82,71 @@ class AiMessageQueryServiceTest {
         assertThat(result.messages().getLast().answerStatus())
                 .isEqualTo(AiAnswerStatus.LINK_GUIDANCE);
         assertThat(result.messages().getLast().sources().getFirst().sourceId()).isEqualTo(3L);
+    }
+
+    @Test
+    void returnsPreviousMessagesGroupedByDateWithCursor() {
+        AiChatRoom chatRoom = mock(AiChatRoom.class);
+        when(chatRoom.getId()).thenReturn(7L);
+        when(aiChatRoomRepository.findByUserId(1L)).thenReturn(Optional.of(chatRoom));
+
+        AiMessage latestAi = mock(AiMessage.class);
+        when(latestAi.getId()).thenReturn(31L);
+        when(latestAi.getSenderType()).thenReturn(SenderType.AI);
+        when(latestAi.getAiAnswerStatus()).thenReturn(AiAnswerStatus.ANSWERED);
+        when(latestAi.getContent()).thenReturn("07-06 AI");
+        when(latestAi.getCreatedAt()).thenReturn(Instant.parse("2026-07-06T07:10:05Z"));
+        when(latestAi.isWarning()).thenReturn(false);
+
+        AiMessage latestUser = mock(AiMessage.class);
+        when(latestUser.getId()).thenReturn(30L);
+        when(latestUser.getSenderType()).thenReturn(SenderType.USER);
+        when(latestUser.getContent()).thenReturn("07-06 USER");
+        when(latestUser.getCreatedAt()).thenReturn(Instant.parse("2026-07-06T07:10:00Z"));
+
+        AiMessage olderAi = mock(AiMessage.class);
+        when(olderAi.getId()).thenReturn(27L);
+        when(olderAi.getSenderType()).thenReturn(SenderType.AI);
+        when(olderAi.getAiAnswerStatus()).thenReturn(AiAnswerStatus.LINK_GUIDANCE);
+        when(olderAi.getContent()).thenReturn("07-05 AI");
+        when(olderAi.getCreatedAt()).thenReturn(Instant.parse("2026-07-05T05:20:05Z"));
+        when(olderAi.isWarning()).thenReturn(false);
+
+        AiMessage olderUser = mock(AiMessage.class);
+        when(olderUser.getId()).thenReturn(26L);
+        when(olderUser.getSenderType()).thenReturn(SenderType.USER);
+        when(olderUser.getContent()).thenReturn("07-05 USER");
+        when(olderUser.getCreatedAt()).thenReturn(Instant.parse("2026-07-05T05:20:00Z"));
+
+        when(aiMessageRepository.findHistoryMessages(eq(7L), any(), any(), eq(null), any(Pageable.class)))
+                .thenReturn(List.of(latestAi, latestUser, olderAi, olderUser));
+
+        AiResponseSourceProjection latestSource = mock(AiResponseSourceProjection.class);
+        when(latestSource.getAiMessageId()).thenReturn(31L);
+        when(latestSource.getSourceType()).thenReturn(AiResponseSourceType.INFO);
+        when(latestSource.getSourceId()).thenReturn(101L);
+        when(latestSource.getSourceTitle()).thenReturn("07-06 source");
+        when(latestSource.getSourceUrl()).thenReturn("https://example.com/info");
+
+        AiResponseSourceProjection olderSource = mock(AiResponseSourceProjection.class);
+        when(olderSource.getAiMessageId()).thenReturn(27L);
+        when(olderSource.getSourceType()).thenReturn(AiResponseSourceType.SITE);
+        when(olderSource.getSourceId()).thenReturn(6L);
+        when(olderSource.getSourceTitle()).thenReturn("07-05 source");
+        when(olderSource.getSourceUrl()).thenReturn("https://example.com/site");
+
+        when(aiResponseSourceRepository.findAllByMessageIds(List.of(31L, 30L, 27L, 26L)))
+                .thenReturn(List.of(latestSource, olderSource));
+
+        var result = service.getHistoryMessages(1L, null);
+
+        assertThat(result.messages()).hasSize(2);
+        assertThat(result.messages().getFirst().date().toString()).isEqualTo("2026-07-06");
+        assertThat(result.messages().getFirst().items()).hasSize(2);
+        assertThat(result.messages().getFirst().items().getFirst().senderType()).isEqualTo(SenderType.USER);
+        assertThat(result.messages().getFirst().items().getLast().senderType()).isEqualTo(SenderType.AI);
+        assertThat(result.messages().get(1).date().toString()).isEqualTo("2026-07-05");
+        assertThat(result.nextCursor()).isEqualTo(26L);
+        assertThat(result.hasNext()).isFalse();
     }
 }

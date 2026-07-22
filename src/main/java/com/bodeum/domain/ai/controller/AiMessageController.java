@@ -1,5 +1,6 @@
 package com.bodeum.domain.ai.controller;
 
+import com.bodeum.domain.ai.dto.response.AiMessageHistoryResponse;
 import com.bodeum.domain.ai.dto.response.AiTodayMessageResponse;
 import com.bodeum.domain.ai.service.AiMessageQueryService;
 import com.bodeum.global.apiPayload.ApiResponse;
@@ -9,6 +10,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -31,6 +33,21 @@ public class AiMessageController {
         return ApiResponse.of(
                 GeneralSuccessCode.OK,
                 aiMessageQueryService.getTodayMessages(userId)
+        );
+    }
+
+    @Operation(
+            summary = "이전 AI 대화 이력 조회",
+            description = "현재 로그인한 사용자의 오늘 이전 AI 대화 이력을 커서 기반으로 조회합니다."
+    )
+    @GetMapping("/history")
+    public ApiResponse<AiMessageHistoryResponse> getHistoryMessages(
+            @LoginUser Long userId,
+            @RequestParam(required = false) Long cursor
+    ) {
+        return ApiResponse.of(
+                GeneralSuccessCode.OK,
+                aiMessageQueryService.getHistoryMessages(userId, cursor)
         );
     }
 }
