@@ -131,7 +131,7 @@ class AiMessageServiceTest {
         AiMessage saved = savedAiMessage("관련 정보를 찾을 수 없습니다.");
         when(persistenceService.saveAiMessageAndComplete(
                 eq(11L), eq(chatRoom), eq("관련 정보를 찾을 수 없습니다."),
-                eq(false), eq(List.of())))
+                eq(false), eq(AiAnswerStatus.NO_EVIDENCE), eq(List.of())))
                 .thenReturn(saved);
 
         var result = service.createMessage(1L, "김치찌개 레시피 알려줘");
@@ -164,6 +164,7 @@ class AiMessageServiceTest {
                 11L, chatRoom,
                 "수원시에서 확인 가능한 복지기관 정보입니다.",
                 false,
+                AiAnswerStatus.LINK_GUIDANCE,
                 List.of(externalSource)
         )).thenReturn(saved);
 
@@ -214,6 +215,7 @@ class AiMessageServiceTest {
                 chatRoom,
                 "한국장애인부모회 공공후견지원사업 정보입니다.",
                 false,
+                AiAnswerStatus.ANSWERED,
                 List.of(externalSource)))
                 .thenReturn(saved);
 
@@ -242,7 +244,8 @@ class AiMessageServiceTest {
         )).thenReturn(true);
         AiMessage saved = savedAiMessage("복지로에서 확인할 수 있습니다.");
         when(persistenceService.saveAiMessageAndComplete(
-                11L, chatRoom, "복지로에서 확인할 수 있습니다.", true, List.of(source)))
+                11L, chatRoom, "복지로에서 확인할 수 있습니다.", true,
+                AiAnswerStatus.ANSWERED, List.of(source)))
                 .thenReturn(saved);
 
         var result = service.createMessage(1L, "지원금 확인 사이트 알려줘");

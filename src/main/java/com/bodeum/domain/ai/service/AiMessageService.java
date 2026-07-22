@@ -1,13 +1,9 @@
 package com.bodeum.domain.ai.service;
 
-import com.bodeum.domain.ai.dto.response.AiMessageResponse;
-import com.bodeum.domain.ai.dto.response.AiMessageSourceResponse;
-import com.bodeum.domain.ai.dto.response.AiMessageWarningResponse;
-import com.bodeum.domain.ai.dto.response.CreateAiMessageResponse;
+import com.bodeum.domain.ai.dto.response.*;
 import com.bodeum.domain.ai.entity.AiChatRoom;
 import com.bodeum.domain.ai.entity.AiMessage;
 import com.bodeum.domain.ai.enums.AiAnswerStatus;
-import com.bodeum.domain.ai.enums.AiWarningType;
 import com.bodeum.domain.ai.exception.AiErrorCode;
 import com.bodeum.domain.ai.model.rag.AiReferenceDocument;
 import com.bodeum.domain.ai.model.rag.AiSourceKey;
@@ -26,9 +22,11 @@ import com.bodeum.domain.user.exception.UserErrorCode;
 import com.bodeum.domain.user.repository.UserAgreementRepository;
 import com.bodeum.domain.user.repository.UserRepository;
 import com.bodeum.global.apiPayload.exception.ProjectException;
+
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -39,9 +37,6 @@ import org.springframework.stereotype.Service;
 public class AiMessageService {
 
     private static final String NO_RESULT_MESSAGE = "관련 정보를 찾을 수 없습니다.";
-    private static final String INCORRECT_WARNING =
-            "일부 사용자로부터 오류 피드백이 접수된 정보입니다. 정확한 내용은 공식 기관에서 다시 확인해 주세요.";
-
     private final AiChatRoomRepository aiChatRoomRepository;
     private final UserAgreementRepository userAgreementRepository;
     private final UserRepository userRepository;
@@ -136,7 +131,8 @@ public class AiMessageService {
 
         boolean warning = hasIncorrectFeedback(citedSources);
         AiMessage message = persistenceService.saveAiMessageAndComplete(
-                userMessage.getId(), chatRoom, generated.answer(), warning, citedSources);
+                userMessage.getId(), chatRoom, generated.answer(), warning,
+                AiAnswerStatus.ANSWERED, citedSources);
 
         return sourceBackedResponse(
                 message, citedSources, warningResponse(warning), AiAnswerStatus.ANSWERED);
@@ -156,7 +152,7 @@ public class AiMessageService {
         boolean warning = hasIncorrectFeedback(externalAnswer.sources());
         AiMessage message = persistenceService.saveAiMessageAndComplete(
                 userMessage.getId(), chatRoom, externalAnswer.answer(), warning,
-                externalAnswer.sources());
+                externalAnswer.answerStatus(), externalAnswer.sources());
         return sourceBackedResponse(
                 message,
                 externalAnswer.sources(),
@@ -170,7 +166,8 @@ public class AiMessageService {
             AiMessage userMessage
     ) {
         AiMessage message = persistenceService.saveAiMessageAndComplete(
-                userMessage.getId(), chatRoom, NO_RESULT_MESSAGE, false, List.of());
+                userMessage.getId(), chatRoom, NO_RESULT_MESSAGE, false,
+                AiAnswerStatus.NO_EVIDENCE, List.of());
         return new CreateAiMessageResponse(AiMessageResponse.noEvidence(
                 message.getId(),
                 message.getSenderType(),
@@ -264,7 +261,7 @@ public class AiMessageService {
 
     private AiMessageWarningResponse warningResponse(boolean warning) {
         return warning
-                ? new AiMessageWarningResponse(AiWarningType.INCORRECT_SOURCE, INCORRECT_WARNING)
+                ? AiMessageWarningResponse.incorrectSource()
                 : null;
     }
 

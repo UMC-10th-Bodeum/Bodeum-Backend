@@ -17,16 +17,40 @@ public record AiMessageResponse(
 ) {
 
     public AiMessageResponse {
-        Objects.requireNonNull(answerStatus, "answerStatus must not be null");
+        Objects.requireNonNull(senderType, "senderType must not be null");
         sources = sources == null ? List.of() : List.copyOf(sources);
-        if ((answerStatus == AiAnswerStatus.ANSWERED
-                || answerStatus == AiAnswerStatus.LINK_GUIDANCE) && sources.isEmpty()) {
-            throw new IllegalArgumentException(
-                    "ANSWERED or LINK_GUIDANCE message must have at least one source");
+        if (senderType == SenderType.USER) {
+            if (answerStatus != null || !sources.isEmpty() || warning != null) {
+                throw new IllegalArgumentException(
+                        "USER message must not have answerStatus, sources, or warning");
+            }
+        } else {
+            Objects.requireNonNull(answerStatus, "AI message answerStatus must not be null");
+            if ((answerStatus == AiAnswerStatus.ANSWERED
+                    || answerStatus == AiAnswerStatus.LINK_GUIDANCE) && sources.isEmpty()) {
+                throw new IllegalArgumentException(
+                        "ANSWERED or LINK_GUIDANCE message must have at least one source");
+            }
+            if (answerStatus == AiAnswerStatus.NO_EVIDENCE && !sources.isEmpty()) {
+                throw new IllegalArgumentException("NO_EVIDENCE message must not have sources");
+            }
         }
-        if (answerStatus == AiAnswerStatus.NO_EVIDENCE && !sources.isEmpty()) {
-            throw new IllegalArgumentException("NO_EVIDENCE message must not have sources");
-        }
+    }
+
+    public static AiMessageResponse user(
+            Long aiMessageId,
+            String content,
+            Instant createdAt
+    ) {
+        return new AiMessageResponse(
+                aiMessageId,
+                SenderType.USER,
+                null,
+                content,
+                createdAt,
+                List.of(),
+                null
+        );
     }
 
     public static AiMessageResponse sourceBacked(
