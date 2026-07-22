@@ -7,6 +7,7 @@ import com.bodeum.domain.auth.enums.SocialProvider;
 import com.bodeum.domain.auth.exception.AuthErrorCode;
 import com.bodeum.domain.user.entity.User;
 import com.bodeum.domain.user.service.UserService;
+import com.bodeum.global.apiPayload.code.BaseErrorCode;
 import com.bodeum.global.apiPayload.exception.ProjectException;
 import com.bodeum.global.config.FrontProperties;
 import java.net.URI;
@@ -105,8 +106,20 @@ public class AuthService {
 
     private URI buildFrontRedirectUri(String loginCode) {
         // code는 60초·1회용이라 교환 즉시 폐기되므로 쿼리 파라미터로 전달해도 안전하다.
+        return buildFrontRedirectUri("code", loginCode);
+    }
+
+    /**
+     * 콜백 실패 시에도 브라우저 전체 네비게이션이라 JSON 대신 프론트 콜백 URL로 리다이렉트한다.
+     * 프론트는 code 없이 error가 오면 로그인 화면으로 안내한다.
+     */
+    public URI buildFrontErrorRedirectUri(BaseErrorCode errorCode) {
+        return buildFrontRedirectUri("error", errorCode.getCode());
+    }
+
+    private URI buildFrontRedirectUri(String paramName, String paramValue) {
         return UriComponentsBuilder.fromUriString(frontProperties.getCallbackUrl())
-                .queryParam("code", loginCode)
+                .queryParam(paramName, paramValue)
                 .encode()
                 .build()
                 .toUri();

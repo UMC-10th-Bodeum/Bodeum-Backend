@@ -157,17 +157,26 @@ class AuthControllerTest {
     }
 
     @Test
-    void configuredProviderCallbackWithoutStateIsUnauthorized() throws Exception {
-        mockMvc.perform(get("/api/v1/auth/callback/naver")
+    void configuredProviderCallbackWithoutStateRedirectsWithError() throws Exception {
+        MvcResult result = mockMvc.perform(get("/api/v1/auth/callback/naver")
                         .param("code", "provider-code"))
-                .andExpect(status().isUnauthorized());
+                .andExpect(status().isFound())
+                .andReturn();
+
+        assertThat(result.getResponse().getHeader(HttpHeaders.LOCATION))
+                .startsWith(FRONT_CALLBACK_URL)
+                .contains("error=AUTH401_6");
     }
 
     @Test
-    void callbackWithoutCodeReturnsMissingAuthCodeError() throws Exception {
-        mockMvc.perform(get("/api/v1/auth/callback/kakao"))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("AUTH400_2"));
+    void callbackWithoutCodeRedirectsWithError() throws Exception {
+        MvcResult result = mockMvc.perform(get("/api/v1/auth/callback/kakao"))
+                .andExpect(status().isFound())
+                .andReturn();
+
+        assertThat(result.getResponse().getHeader(HttpHeaders.LOCATION))
+                .startsWith(FRONT_CALLBACK_URL)
+                .contains("error=AUTH400_2");
     }
 
     @Test
@@ -298,10 +307,15 @@ class AuthControllerTest {
     }
 
     @Test
-    void invalidProviderIsBadRequest() throws Exception {
-        mockMvc.perform(get("/api/v1/auth/callback/google")
+    void invalidProviderCallbackRedirectsWithError() throws Exception {
+        MvcResult result = mockMvc.perform(get("/api/v1/auth/callback/google")
                         .param("code", "provider-code"))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isFound())
+                .andReturn();
+
+        assertThat(result.getResponse().getHeader(HttpHeaders.LOCATION))
+                .startsWith(FRONT_CALLBACK_URL)
+                .contains("error=AUTH400_1");
     }
 
     @Test

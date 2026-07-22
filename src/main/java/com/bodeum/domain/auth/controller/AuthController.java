@@ -9,6 +9,7 @@ import com.bodeum.domain.auth.enums.SocialProvider;
 import com.bodeum.domain.auth.service.AuthService;
 import com.bodeum.global.apiPayload.ApiResponse;
 import com.bodeum.global.apiPayload.code.GeneralSuccessCode;
+import com.bodeum.global.apiPayload.exception.ProjectException;
 import com.bodeum.global.auth.LoginUser;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -62,21 +63,18 @@ public class AuthController {
     }
 
     @Operation(summary = "소셜 로그인 콜백",
-            description = "소셜 인증 후 로그인/회원가입을 처리하고, 일회용 code를 붙여 프론트 콜백 URL로 리다이렉트(302)한다.")
+            description = "소셜 인증 후 로그인/회원가입을 처리하고 프론트 콜백 URL로 리다이렉트(302)한다. "
+                    + "성공 시 일회용 code(?code=), 실패 시 에러 코드(?error=)를 붙인다. "
+                    + "브라우저 전체 네비게이션이라 성공/실패 모두 JSON이 아닌 리다이렉트로 응답한다.")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "302", description = "프론트 콜백 URL로 리다이렉트(?code=일회용code)"),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "400",
-                    description = "AUTH400_1: 지원하지 않는 제공자 / AUTH400_2: 유효하지 않은 인가 코드 / AUTH400_5: 소셜 토큰 교환 실패"
-            ),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "401",
-                    description = "AUTH401_2: 소셜 인증 실패 / AUTH401_5: 비활성 사용자 / AUTH401_6: 유효하지 않은 state"
+                    responseCode = "302",
+                    description = "성공: 프론트 콜백 URL로 리다이렉트(?code=일회용code) / "
+                            + "실패: 프론트 콜백 URL로 리다이렉트(?error=에러코드, 예: AUTH401_6/AUTH400_2/AUTH500_1)"
             ),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "500",
-                    description = "AUTH500_1: 소셜 로그인 설정 미완료"
+                    description = "COMMON500_1: 예기치 않은 서버 오류(도메인 예외가 아닌 경우에만 JSON 응답)"
             )
     })
     @SecurityRequirements
@@ -88,7 +86,13 @@ public class AuthController {
             @RequestParam(required = false) String code,
             @RequestParam(required = false) String state
     ) {
-        URI redirectUri = authService.loginWithCallback(SocialProvider.from(provider), code, state);
+        URI redirectUri;
+        try {
+            redirectUri = authService.loginWithCallback(SocialProvider.from(provider), code, state);
+        } catch (ProjectException e) {
+            // 콜백은 브라우저 전체 네비게이션이라 실패도 JSON 대신 프론트로 에러 리다이렉트한다.
+            redirectUri = authService.buildFrontErrorRedirectUri(e.getErrorCode());
+        }
 
         return ResponseEntity.status(302)
                 .header(HttpHeaders.LOCATION, redirectUri.toString())
