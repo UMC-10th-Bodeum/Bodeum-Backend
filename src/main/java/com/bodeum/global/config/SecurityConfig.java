@@ -37,6 +37,7 @@ public class SecurityConfig {
             "/v3/api-docs/**",
             "/api/v1/auth/login/**",
             "/api/v1/auth/callback/**",
+            "/api/v1/auth/exchange",
             "/api/v1/auth/refresh",
             "/api/v1/terms/**",
             // 헤더/사이드바 공통 조회는 비로그인 상태에서도 200으로 응답해야 한다.

@@ -20,4 +20,10 @@ public class AuthTokenProperties {
 
     private Duration accessTokenTtl = Duration.ofHours(1);
     private Duration refreshTokenTtl = Duration.ofDays(14);
+
+    /**
+     * 소셜 로그인 콜백이 프론트로 넘기는 일회용 로그인 code의 유효 시간.
+     * 프론트가 code를 교환(exchange)할 때까지의 짧은 핸드오프 창이라 기본값은 60초다.
+     */
+    private Duration loginCodeTtl = Duration.ofSeconds(60);
 }
