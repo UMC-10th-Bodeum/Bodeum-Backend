@@ -3,9 +3,12 @@ package com.bodeum.domain.user.dto.response;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.bodeum.domain.auth.enums.SocialProvider;
+import com.bodeum.domain.onboarding.enums.CommunityRoleType;
+import com.bodeum.domain.onboarding.enums.GuardianType;
 import com.bodeum.domain.region.entity.Region;
 import com.bodeum.domain.user.entity.User;
 import com.bodeum.domain.user.enums.DisabilityType;
+import com.bodeum.domain.user.enums.InterestCategory;
 import java.util.Collections;
 import java.time.LocalDate;
 import java.util.List;
@@ -18,6 +21,7 @@ class UserHeaderResponseTest {
         UserHeaderResponse response = UserHeaderResponse.loggedOut();
 
         assertThat(response.isLoggedIn()).isFalse();
+        assertThat(response.onboardingCompleted()).isFalse();
         assertThat(response.nickname()).isNull();
         assertThat(response.level()).isNull();
         assertThat(response.badgeName()).isNull();
@@ -32,9 +36,34 @@ class UserHeaderResponseTest {
         UserHeaderResponse response = UserHeaderResponse.from(newUser());
 
         assertThat(response.isLoggedIn()).isTrue();
+        assertThat(response.onboardingCompleted()).isFalse();
         assertThat(response.nickname()).isEqualTo("민준맘");
         assertThat(response.level()).isEqualTo(1);
         assertThat(response.badgeName()).isEqualTo("새싹");
+    }
+
+    @Test
+    void exposesOnboardingCompletedWhenAllProfilesAreRegistered() {
+        User user = newUser();
+        user.updateChildProfile(
+                "민준이",
+                "2020-03",
+                List.of(DisabilityType.AUTISM),
+                null
+        );
+        user.updateInterestRegion(
+                List.of(InterestCategory.WELFARE_SUBSIDY),
+                Region.create("서울특별시", "강남구")
+        );
+        user.updateGuardianProfile(
+                "민준맘",
+                GuardianType.PARENT,
+                CommunityRoleType.INFO_SEEKER
+        );
+
+        UserHeaderResponse response = UserHeaderResponse.from(user);
+
+        assertThat(response.onboardingCompleted()).isTrue();
     }
 
     @Test

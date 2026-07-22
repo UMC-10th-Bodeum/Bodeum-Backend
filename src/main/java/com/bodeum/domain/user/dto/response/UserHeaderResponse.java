@@ -5,6 +5,7 @@ import java.util.List;
 
 public record UserHeaderResponse(
         boolean isLoggedIn,
+        boolean onboardingCompleted,
         String nickname,
         String profileImageUrl,
         Integer level,
@@ -15,12 +16,13 @@ public record UserHeaderResponse(
 ) {
 
     public static UserHeaderResponse loggedOut() {
-        return new UserHeaderResponse(false, null, null, null, null, null, null, null);
+        return new UserHeaderResponse(false, false, null, null, null, null, null, null, null);
     }
 
     public static UserHeaderResponse from(User user) {
         return new UserHeaderResponse(
                 true,
+                user.isOnboardingCompleted(),
                 user.getNickname(),
                 user.getProfileImageUrl(),
                 user.getGuardianLevel().getLevelNumber(),
