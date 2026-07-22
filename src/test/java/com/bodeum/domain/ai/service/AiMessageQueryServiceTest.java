@@ -3,6 +3,7 @@ package com.bodeum.domain.ai.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -16,6 +17,7 @@ import com.bodeum.domain.ai.repository.AiMessageRepository;
 import com.bodeum.domain.ai.repository.AiResponseSourceRepository;
 import com.bodeum.domain.ai.repository.projection.AiResponseSourceProjection;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -148,5 +150,44 @@ class AiMessageQueryServiceTest {
         assertThat(result.messages().get(1).date().toString()).isEqualTo("2026-07-05");
         assertThat(result.nextCursor()).isEqualTo(26L);
         assertThat(result.hasNext()).isFalse();
+    }
+
+    @Test
+    void returnsHasNextTrueAndPassesCursorToRepository() {
+        AiChatRoom chatRoom = mock(AiChatRoom.class);
+        when(chatRoom.getId()).thenReturn(7L);
+        when(aiChatRoomRepository.findByUserId(1L)).thenReturn(Optional.of(chatRoom));
+
+        Long cursor = 120L;
+        List<AiMessage> fetchedMessages = new ArrayList<>();
+        List<Long> expectedMessageIds = new ArrayList<>();
+
+        for (long id = 200L; id >= 180L; id--) {
+            AiMessage message = mock(AiMessage.class);
+            if (id >= 181L) {
+                when(message.getId()).thenReturn(id);
+                when(message.getSenderType()).thenReturn(SenderType.USER);
+                when(message.getContent()).thenReturn("message-" + id);
+                when(message.getCreatedAt()).thenReturn(Instant.parse("2026-07-06T01:00:00Z"));
+            }
+            fetchedMessages.add(message);
+            if (id >= 181L) {
+                expectedMessageIds.add(id);
+            }
+        }
+
+        when(aiMessageRepository.findHistoryMessages(eq(7L), any(), any(), eq(cursor), any(Pageable.class)))
+                .thenReturn(fetchedMessages);
+        when(aiResponseSourceRepository.findAllByMessageIds(any()))
+                .thenReturn(List.of());
+
+        var result = service.getHistoryMessages(1L, cursor);
+
+        verify(aiMessageRepository).findHistoryMessages(eq(7L), any(), any(), eq(cursor), any(Pageable.class));
+        verify(aiResponseSourceRepository).findAllByMessageIds(expectedMessageIds);
+        assertThat(result.hasNext()).isTrue();
+        assertThat(result.nextCursor()).isEqualTo(181L);
+        assertThat(result.messages()).hasSize(1);
+        assertThat(result.messages().getFirst().items()).hasSize(20);
     }
 }
