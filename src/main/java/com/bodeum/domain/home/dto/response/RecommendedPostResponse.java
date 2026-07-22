@@ -5,6 +5,7 @@ import com.bodeum.domain.community.enums.DisabilityType;
 import com.bodeum.domain.community.enums.PostAnonymityType;
 import com.bodeum.domain.community.enums.PostBoardType;
 
+import java.time.Instant;
 import java.util.List;
 
 public record RecommendedPostResponse(
@@ -16,7 +17,8 @@ public record RecommendedPostResponse(
         String content,
         long likeCount,
         long commentCount,
-        long viewCount
+        long viewCount,
+        Instant createdAt
 ) {
     public record DisabilityTagDto(String code, String label) {
         public static DisabilityTagDto from(DisabilityType type) {
@@ -34,7 +36,8 @@ public record RecommendedPostResponse(
                 post.getContent(),
                 post.getLikeCount(),
                 post.getCommentCount(),
-                post.getViewCount()
+                post.getViewCount(),
+                post.getCreatedAt()
         );
     }
 
