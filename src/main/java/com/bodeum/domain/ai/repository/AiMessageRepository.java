@@ -54,4 +54,8 @@ public interface AiMessageRepository extends JpaRepository<AiMessage, Long> {
             @Param("startAt") Instant startAt,
             @Param("endAt") Instant endAt
     );
+
+    @Modifying
+    @Query("delete from AiMessage m where m.chatRoom.id = :chatRoomId")
+    int deleteByChatRoomId(@Param("chatRoomId") Long chatRoomId);
 }

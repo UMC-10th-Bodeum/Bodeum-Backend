@@ -6,17 +6,22 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 import software.amazon.awssdk.core.exception.SdkException;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
 @Component
 @RequiredArgsConstructor
 public class S3ImageStorage {
+
+    private static final Logger log = LoggerFactory.getLogger(S3ImageStorage.class);
 
     private static final Map<String, String> ALLOWED_CONTENT_TYPES = Map.of(
             "image/jpeg", ".jpg",
@@ -50,6 +55,47 @@ public class S3ImageStorage {
         }
 
         return resolvePublicUrl(key);
+    }
+
+    /**
+     * 공개 URL로 저장된 이미지를 S3에서 삭제한다. 회원 탈퇴 흐름에서 호출되며,
+     * 삭제 실패가 탈퇴 자체를 막지 않도록 예외를 던지지 않고 경고 로그만 남긴다.
+     * (실패 시 후속 정리 배치로 회수하는 것을 권장한다.)
+     */
+    public void deleteQuietly(String imageUrl) {
+        if (!StringUtils.hasText(imageUrl)) {
+            return;
+        }
+
+        String key = extractKey(imageUrl);
+        if (key == null) {
+            log.warn("[S3] 이미지 key를 추출하지 못해 삭제를 건너뜁니다. url={}", imageUrl);
+            return;
+        }
+
+        try {
+            s3Client.deleteObject(
+                    DeleteObjectRequest.builder()
+                            .bucket(s3Properties.getBucket())
+                            .key(key)
+                            .build()
+            );
+        } catch (SdkException e) {
+            log.warn("[S3] 이미지 삭제 실패 url={} : {}", imageUrl, e.getMessage());
+        }
+    }
+
+    // 공개 URL에서 버킷 뒤의 객체 key(예: "profile-images/uuid.jpg")를 추출한다.
+    private String extractKey(String imageUrl) {
+        int schemeIndex = imageUrl.indexOf("://");
+        if (schemeIndex < 0) {
+            return null;
+        }
+        int pathIndex = imageUrl.indexOf('/', schemeIndex + 3);
+        if (pathIndex < 0 || pathIndex + 1 >= imageUrl.length()) {
+            return null;
+        }
+        return imageUrl.substring(pathIndex + 1);
     }
 
     private String validateAndResolveExtension(MultipartFile file) {

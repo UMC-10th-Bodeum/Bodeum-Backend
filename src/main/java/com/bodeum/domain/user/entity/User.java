@@ -43,7 +43,7 @@ import lombok.Getter;
 )
 public class User extends BaseCreatedUpdatedDeletedEntity {
 
-    private static final String WITHDRAWN_IDENTIFIER_PREFIX = "withdrawn-";
+    private static final String WITHDRAWN_IDENTIFIER_PREFIX = "withdrawn:";
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -249,7 +249,8 @@ public class User extends BaseCreatedUpdatedDeletedEntity {
 
     public void withdraw(String reason) {
         this.status = UserStatus.DELETED;
-        this.withdrawalReason = blankToNull(reason);
+        // 탈퇴 사유는 자유 입력이라 개인정보가 포함될 수 있어 원문을 저장하지 않는다.
+        this.withdrawalReason = null;
         anonymizePersonalData();
         delete();
     }
@@ -259,19 +260,34 @@ public class User extends BaseCreatedUpdatedDeletedEntity {
      * 소셜 식별자(provider_user_id, auth_subject)를 유니크한 묘비값으로 교체해,
      * 같은 소셜 계정으로 재로그인해도 기존 회원을 찾지 못하고 신규 가입되게 한다.
      * 공개 콘텐츠(글·댓글·리뷰 등)는 FK 무결성·스레드 보존을 위해 삭제하지 않고 작성자만 익명 처리한다.
+     * 기존 방식(소프트 삭제)으로 탈퇴한 레거시 회원을 로그인 시 발견했을 때도 재사용한다.
      */
-    private void anonymizePersonalData() {
+    public void anonymizePersonalData() {
         this.nickname = null;
         this.email = null;
         this.profileImageUrl = null;
-        // 소셜 식별자(provider_user_id)만 유니크 묘비값으로 해제한다.
-        // auth_subject는 JWT 내부 식별자라 그대로 두어, 발급됐던 토큰이 여전히 이 회원(DELETED)으로
-        // 해석되어 비활성 사용자로 거부되게 한다.
+        // provider_user_id: "withdrawn:{uuid}" (VARCHAR(128) 이내), auth_subject: 새 UUID(정확히 36자).
+        // 기존 소셜 식별자·이메일 등은 묘비값에 포함하지 않는다.
         this.providerUserId = WITHDRAWN_IDENTIFIER_PREFIX + UUID.randomUUID();
-        this.userAgreement = null;
+        this.authSubject = UUID.randomUUID().toString();
+        // 개인정보성 연관 데이터 파기(orphanRemoval). 약관 동의 기록(userAgreement)은 개인정보가 없고
+        // 동의 증빙으로 보존하므로 파기하지 않는다.
         this.childProfile = null;
         this.guardianProfile = null;
         this.userInterests.clear();
+    }
+
+    /**
+     * 기존 방식(소프트 삭제)으로 탈퇴한 레거시 회원을 로그인 시 발견했을 때, 소셜 식별자와 스칼라 개인정보만
+     * 해제한다. 로그인 처리는 트랜잭션(NOT_SUPPORTED) 밖에서 detached 상태로 동작하므로 LAZY 연관을
+     * 건드리지 않는다. 신규 가입이 같은 소셜 식별자로 가능하도록 유니크 키를 비우는 것이 목적이다.
+     */
+    public void releaseSocialIdentityForLegacyWithdrawal() {
+        this.nickname = null;
+        this.email = null;
+        this.profileImageUrl = null;
+        this.providerUserId = WITHDRAWN_IDENTIFIER_PREFIX + UUID.randomUUID();
+        this.authSubject = UUID.randomUUID().toString();
     }
 
     public void hideByAdmin() {

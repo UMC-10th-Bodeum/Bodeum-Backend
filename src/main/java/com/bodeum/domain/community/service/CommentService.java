@@ -15,6 +15,8 @@ import com.bodeum.domain.community.exception.CommunityException;
 import com.bodeum.domain.community.repository.CommentLikeRepository;
 import com.bodeum.domain.community.repository.CommentRepository;
 import com.bodeum.domain.community.repository.PostRepository;
+import com.bodeum.domain.user.enums.UserStatus;
+import com.bodeum.domain.user.repository.UserRepository;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -39,6 +41,7 @@ public class CommentService {
     private final CommentRepository commentRepository;
     private final CommentLikeRepository commentLikeRepository;
     private final PostRepository postRepository;
+    private final UserRepository userRepository;
 
     @Transactional
     public CommentResponse createComment(Long userId, Long postId, CreateCommentRequest request) {
@@ -46,7 +49,7 @@ public class CommentService {
         Post post = findPostForUpdate(postId);
         Comment comment = commentRepository.save(Comment.create(post, userId, request.content()));
 
-        return CommentResponse.of(comment, userId, false, List.of());
+        return CommentResponse.of(comment, userId, false, false, List.of());
     }
 
     @Transactional
@@ -56,7 +59,7 @@ public class CommentService {
         lockPost(parent.getPost().getId());
         Comment reply = commentRepository.save(Comment.createReply(parent, userId, request.content()));
 
-        return CommentResponse.of(reply, userId, false, List.of());
+        return CommentResponse.of(reply, userId, false, false, List.of());
     }
 
     public CommentListResponse getComments(Long userId, Long postId) {
@@ -66,11 +69,24 @@ public class CommentService {
                 CommentStatus.ACTIVE
         );
         Set<Long> likedCommentIds = findLikedCommentIds(userId, comments);
+        Set<Long> withdrawnAuthorIds = findWithdrawnAuthorIds(comments);
 
         return new CommentListResponse(
                 post.getCommentCount(),
-                buildCommentTree(comments, userId, likedCommentIds)
+                buildCommentTree(comments, userId, likedCommentIds, withdrawnAuthorIds)
         );
+    }
+
+    // 댓글 작성자 중 탈퇴(DELETED) 상태인 id만 배치 조회한다(작성자 익명화용, N+1 방지).
+    private Set<Long> findWithdrawnAuthorIds(List<Comment> comments) {
+        List<Long> authorIds = comments.stream()
+                .map(Comment::getUserId)
+                .distinct()
+                .toList();
+        if (authorIds.isEmpty()) {
+            return Set.of();
+        }
+        return userRepository.findIdsByIdInAndStatus(authorIds, UserStatus.DELETED);
     }
 
     @Transactional
@@ -84,7 +100,7 @@ public class CommentService {
         commentRepository.flush();
         boolean liked = commentLikeRepository.existsByComment_IdAndUserId(commentId, userId);
 
-        return CommentResponse.of(comment, userId, liked, List.of());
+        return CommentResponse.of(comment, userId, false, liked, List.of());
     }
 
     @Transactional
@@ -173,7 +189,8 @@ public class CommentService {
     private List<CommentResponse> buildCommentTree(
             List<Comment> comments,
             Long viewerId,
-            Set<Long> likedCommentIds
+            Set<Long> likedCommentIds,
+            Set<Long> withdrawnAuthorIds
     ) {
         List<Comment> orderedComments = comments.stream()
                 .sorted(Comparator.comparing(Comment::getId))
@@ -192,6 +209,7 @@ public class CommentService {
                     comment,
                     visibleParentId,
                     viewerId,
+                    withdrawnAuthorIds.contains(comment.getUserId()),
                     likedCommentIds.contains(comment.getId()),
                     replies
             );

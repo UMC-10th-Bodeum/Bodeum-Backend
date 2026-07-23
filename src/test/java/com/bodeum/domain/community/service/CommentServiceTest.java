@@ -40,6 +40,8 @@ class CommentServiceTest {
     private CommentLikeRepository commentLikeRepository;
     @Mock
     private PostRepository postRepository;
+    @Mock
+    private com.bodeum.domain.user.repository.UserRepository userRepository;
     @InjectMocks
     private CommentService commentService;
 

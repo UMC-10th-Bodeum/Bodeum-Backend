@@ -25,11 +25,12 @@ public record InfoReviewResponse(
                 .toList();
 
         User author = entity.getUser();
+        boolean withdrawn = author.isWithdrawn();
 
         return new InfoReviewResponse(
                 entity.getId(),
-                author.getId(),
-                author.isWithdrawn() ? WITHDRAWN_AUTHOR_NAME : author.getNickname(),
+                withdrawn ? null : author.getId(),
+                withdrawn ? WITHDRAWN_AUTHOR_NAME : author.getNickname(),
                 entity.getRating(),
                 entity.getContent(),
                 imageUrls,

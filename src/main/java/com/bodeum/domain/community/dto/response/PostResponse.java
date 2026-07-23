@@ -53,15 +53,18 @@ public record PostResponse(
     public static PostResponse of(
             Post post,
             Long viewerId,
+            boolean authorWithdrawn,
             boolean liked,
             boolean scrapped,
             List<DisabilityType> disabilityTypes,
             List<String> hashtags,
             List<String> imageUrls
     ) {
+        // 완전 익명 글이거나 작성자가 탈퇴한 경우 작성자 ID를 노출하지 않는다.
+        boolean hideAuthor = post.getAnonymityType() == PostAnonymityType.FULLY_ANONYMOUS || authorWithdrawn;
         return new PostResponse(
                 post.getId(),
-                post.getAnonymityType() == PostAnonymityType.FULLY_ANONYMOUS ? null : post.getUserId(),
+                hideAuthor ? null : post.getUserId(),
                 post.getUserId().equals(viewerId),
                 post.getBoardType(),
                 post.getAnonymityType(),
