@@ -2,6 +2,7 @@ package com.bodeum.domain.user.service;
 
 import com.bodeum.domain.auth.enums.SocialProvider;
 import com.bodeum.domain.auth.exception.AuthErrorCode;
+import com.bodeum.domain.auth.repository.AuthLoginCodeRepository;
 import com.bodeum.domain.user.dto.response.AiTermsAgreementResponse;
 import com.bodeum.domain.auth.repository.RefreshTokenSessionRepository;
 import com.bodeum.domain.region.entity.Region;
@@ -38,6 +39,7 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final RefreshTokenSessionRepository refreshTokenSessionRepository;
+    private final AuthLoginCodeRepository authLoginCodeRepository;
     private final S3ImageStorage s3ImageStorage;
     private final UserProfileImageUpdater userProfileImageUpdater;
     private final RegionService regionService;
@@ -113,8 +115,11 @@ public class UserService {
             throw new ProjectException(AuthErrorCode.ALREADY_WITHDRAWN);
         }
 
+        // User 개인정보와 소셜 식별자를 파기하고 Auth 인증 수단을 폐기한다.
+        // 다른 도메인의 탈퇴 후속 처리는 각 도메인 정책이 확정된 뒤 별도로 연결한다.
         user.withdraw(request == null ? null : request.reason());
         refreshTokenSessionRepository.deleteByUserId(userId);
+        authLoginCodeRepository.deleteByUserId(userId);
 
         return UserWithdrawResponse.ofSuccess();
     }
@@ -148,7 +153,14 @@ public class UserService {
                 providerUserId
         );
         if (existingUser.isPresent()) {
-            return restoreOrRequireActive(existingUser.get());
+            User user = existingUser.get();
+            if (user.isWithdrawn()) {
+                // 레거시(기존 소프트 삭제) 탈퇴 회원: 소셜 식별자를 해제해 유니크 키를 비우고 신규 가입으로 진행한다.
+                user.releaseSocialIdentityForLegacyWithdrawal();
+                userRepository.saveAndFlush(user);
+            } else {
+                return existingUserResult(user);
+            }
         }
 
         try {
@@ -156,7 +168,7 @@ public class UserService {
             return new UserCreationResult(userRepository.saveAndFlush(user).getId(), true);
         } catch (DataIntegrityViolationException e) {
             return userRepository.findByProviderAndProviderUserId(provider, providerUserId)
-                    .map(this::restoreOrRequireActive)
+                    .map(this::existingUserResult)
                     .orElseThrow(() -> e);
         }
     }
@@ -213,12 +225,9 @@ public class UserService {
         return user;
     }
 
-    private UserCreationResult restoreOrRequireActive(User user) {
-        if (user.isWithdrawn()) {
-            user.reactivate();
-            return new UserCreationResult(userRepository.saveAndFlush(user).getId(), false);
-        }
-
+    // 탈퇴 회원은 소셜 식별자를 해제(묘비값)하므로 findByProviderAndProviderUserId로 조회되지 않는다.
+    // 따라서 여기 도달하는 기존 회원은 활성 회원이어야 하며, 그렇지 않으면(정지 등) INACTIVE_USER로 막는다.
+    private UserCreationResult existingUserResult(User user) {
         return new UserCreationResult(requireActive(user).getId(), false);
     }
 

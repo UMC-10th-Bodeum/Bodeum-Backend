@@ -19,4 +19,8 @@ public interface AuthLoginCodeRepository extends JpaRepository<AuthLoginCode, St
     @Modifying
     @Query("delete from AuthLoginCode loginCode where loginCode.expiresAt <= :now")
     int deleteExpired(@Param("now") Instant now);
+
+    @Modifying
+    @Query("delete from AuthLoginCode loginCode where loginCode.userId = :userId")
+    int deleteByUserId(@Param("userId") Long userId);
 }
