@@ -255,16 +255,11 @@ public class User extends BaseCreatedUpdatedDeletedEntity {
      * 탈퇴 시 개인정보를 파기하고 소셜 식별자를 해제한다.
      * 소셜 식별자(provider_user_id, auth_subject)를 유니크한 묘비값으로 교체해,
      * 같은 소셜 계정으로 재로그인해도 기존 회원을 찾지 못하고 신규 가입되게 한다.
-     * 기존 방식(소프트 삭제)으로 탈퇴한 레거시 회원을 로그인 시 발견했을 때도 재사용한다.
+     * withdraw()에서만 호출한다. 레거시(소프트 삭제) 회원은 연관 데이터를 건드리지 않는
+     * releaseSocialIdentityForLegacyWithdrawal()가 식별자만 해제한다.
      */
-    public void anonymizePersonalData() {
-        this.nickname = null;
-        this.email = null;
-        this.profileImageUrl = null;
-        // provider_user_id: "withdrawn:{uuid}" (VARCHAR(128) 이내), auth_subject: 새 UUID(정확히 36자).
-        // 기존 소셜 식별자·이메일 등은 묘비값에 포함하지 않는다.
-        this.providerUserId = WITHDRAWN_IDENTIFIER_PREFIX + UUID.randomUUID();
-        this.authSubject = UUID.randomUUID().toString();
+    private void anonymizePersonalData() {
+        resetPersonalScalarsAndSocialIdentity();
         // 개인정보성 연관 데이터 파기(orphanRemoval). 약관 동의 기록(userAgreement)은 개인정보가 없고
         // 동의 증빙으로 보존하므로 파기하지 않는다.
         this.childProfile = null;
@@ -278,6 +273,14 @@ public class User extends BaseCreatedUpdatedDeletedEntity {
      * 건드리지 않는다. 신규 가입이 같은 소셜 식별자로 가능하도록 유니크 키를 비우는 것이 목적이다.
      */
     public void releaseSocialIdentityForLegacyWithdrawal() {
+        resetPersonalScalarsAndSocialIdentity();
+    }
+
+    // 스칼라 개인정보(닉네임·이메일·프로필 이미지)를 지우고 소셜 식별자를 묘비값으로 교체한다.
+    // provider_user_id: "withdrawn:{uuid}" (VARCHAR(128) 이내), auth_subject: 새 UUID(정확히 36자).
+    // 기존 소셜 식별자·이메일 등은 묘비값에 포함하지 않는다. LAZY 연관은 건드리지 않아
+    // detached 상태(레거시 경로)에서도 안전하다.
+    private void resetPersonalScalarsAndSocialIdentity() {
         this.nickname = null;
         this.email = null;
         this.profileImageUrl = null;
