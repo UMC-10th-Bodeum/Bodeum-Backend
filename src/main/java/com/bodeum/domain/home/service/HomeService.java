@@ -38,10 +38,12 @@ public class HomeService {
         if (userId != null) {
             Region region = getUserRegion(userId);
             if (region != null) {
-                return homeNewsRepository.findTopRecommendedByRegion(region.getId(), PageRequest.of(0, 5))
+                List<RecommendedNewsResponse> result = homeNewsRepository
+                        .findTopRecommendedByRegion(region.getId(), PageRequest.of(0, 5))
                         .stream()
                         .map(RecommendedNewsResponse::from)
                         .toList();
+                if (!result.isEmpty()) return result;
             }
         }
         return homeNewsRepository.findTopRecommended(PageRequest.of(0, 5))
@@ -57,13 +59,21 @@ public class HomeService {
             posts = region != null
                     ? homePostRepository.findAllByStatusAndRegionOrderByCreatedAtDesc(
                             PostStatus.ACTIVE, region.getId(), PageRequest.of(0, limit))
-                    : homePostRepository.findAllByStatusAndDeletedAtIsNullOrderByCreatedAtDesc(
-                            PostStatus.ACTIVE, PageRequest.of(0, limit));
+                    : List.of();
+            if (posts.isEmpty()) {
+                posts = homePostRepository.findAllByStatusAndDeletedAtIsNullOrderByCreatedAtDesc(
+                        PostStatus.ACTIVE, PageRequest.of(0, limit));
+                region = null;
+            }
         } else {
             posts = region != null
                     ? homePostRepository.findTopByPopularityAndRegion(
                             PostStatus.ACTIVE, region.getId(), PageRequest.of(0, limit))
-                    : homePostRepository.findTopByPopularity(PostStatus.ACTIVE, PageRequest.of(0, limit));
+                    : List.of();
+            if (posts.isEmpty()) {
+                posts = homePostRepository.findTopByPopularity(PostStatus.ACTIVE, PageRequest.of(0, limit));
+                region = null;
+            }
         }
         String regionName = region != null ? region.getFullName() : null;
         return posts.stream()
@@ -93,6 +103,9 @@ public class HomeService {
                 posts = homePostRepository.findTopByBoardTypes(
                         PostStatus.ACTIVE, boardTypes, PageRequest.of(0, limit));
             } else {
+                posts = List.of();
+            }
+            if (posts.isEmpty()) {
                 posts = homePostRepository.findTopByPopularity(PostStatus.ACTIVE, PageRequest.of(0, limit));
             }
         } else {
@@ -116,10 +129,12 @@ public class HomeService {
         if (userId != null) {
             Region region = getUserRegion(userId);
             if (region != null) {
-                return homeNewsRepository.findByNewsTypeAndRegion(newsType, region.getId(), PageRequest.of(0, limit))
+                List<NewsPreviewResponse> result = homeNewsRepository
+                        .findByNewsTypeAndRegion(newsType, region.getId(), PageRequest.of(0, limit))
                         .stream()
                         .map(NewsPreviewResponse::from)
                         .toList();
+                if (!result.isEmpty()) return result;
             }
         }
         return homeNewsRepository.findByNewsType(newsType, PageRequest.of(0, limit))
