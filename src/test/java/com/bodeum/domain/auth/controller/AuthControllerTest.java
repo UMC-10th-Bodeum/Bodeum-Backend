@@ -11,6 +11,7 @@ import com.bodeum.domain.auth.repository.AuthLoginCodeRepository;
 import com.bodeum.domain.auth.repository.OAuthStateRepository;
 import com.bodeum.domain.auth.repository.RefreshTokenSessionRepository;
 import com.bodeum.domain.user.repository.UserRepository;
+import com.bodeum.domain.user.service.UserService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.Map;
@@ -52,6 +53,9 @@ class AuthControllerTest {
 
     @Autowired
     private AuthLoginCodeRepository authLoginCodeRepository;
+
+    @Autowired
+    private UserService userService;
 
     @BeforeEach
     void setUp() {
@@ -252,9 +256,7 @@ class AuthControllerTest {
     void protectedEndpointRejectsWithdrawnUserTokenAsInvalidAccessToken() throws Exception {
         String accessToken = login("withdrawn-token-code").at("/result/accessToken").asText();
 
-        var user = userRepository.findAll().getFirst();
-        user.withdraw(null);
-        userRepository.saveAndFlush(user);
+        userService.withdraw(userRepository.findAll().getFirst().getId(), null);
 
         mockMvc.perform(get("/api/v1/users/me/profile")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
@@ -263,20 +265,19 @@ class AuthControllerTest {
     }
 
     @Test
-    void withdrawnUserIsReactivatedOnSocialRelogin() throws Exception {
+    void withdrawnUserGetsFreshAccountOnSocialRelogin() throws Exception {
         JsonNode firstLogin = login("withdrawn-user-code");
-        long userId = firstLogin.at("/result/userId").asLong();
+        long firstUserId = firstLogin.at("/result/userId").asLong();
 
-        var user = userRepository.findAll().getFirst();
-        user.withdraw(null);
-        userRepository.saveAndFlush(user);
-        assertThat(userRepository.findById(userId).orElseThrow().isWithdrawn()).isTrue();
+        userService.withdraw(firstUserId, null);
+        assertThat(userRepository.findById(firstUserId).orElseThrow().isWithdrawn()).isTrue();
 
-        // 같은 소셜 계정으로 다시 로그인하면 새 회원이 아니라 기존 회원이 복구된다.
+        // 탈퇴 후 같은 소셜 계정으로 다시 로그인하면 복구가 아니라 새 회원으로 가입된다.
         JsonNode secondLogin = login("withdrawn-user-code");
-        assertThat(secondLogin.at("/result/isNewUser").asBoolean()).isFalse();
-        assertThat(secondLogin.at("/result/userId").asLong()).isEqualTo(userId);
-        assertThat(userRepository.findById(userId).orElseThrow().isActive()).isTrue();
+        assertThat(secondLogin.at("/result/isNewUser").asBoolean()).isTrue();
+        assertThat(secondLogin.at("/result/userId").asLong()).isNotEqualTo(firstUserId);
+        // 기존 탈퇴 회원은 그대로 탈퇴 상태로 남는다.
+        assertThat(userRepository.findById(firstUserId).orElseThrow().isWithdrawn()).isTrue();
     }
 
     @Test

@@ -148,7 +148,7 @@ public class UserService {
                 providerUserId
         );
         if (existingUser.isPresent()) {
-            return restoreOrRequireActive(existingUser.get());
+            return existingUserResult(existingUser.get());
         }
 
         try {
@@ -156,7 +156,7 @@ public class UserService {
             return new UserCreationResult(userRepository.saveAndFlush(user).getId(), true);
         } catch (DataIntegrityViolationException e) {
             return userRepository.findByProviderAndProviderUserId(provider, providerUserId)
-                    .map(this::restoreOrRequireActive)
+                    .map(this::existingUserResult)
                     .orElseThrow(() -> e);
         }
     }
@@ -213,12 +213,9 @@ public class UserService {
         return user;
     }
 
-    private UserCreationResult restoreOrRequireActive(User user) {
-        if (user.isWithdrawn()) {
-            user.reactivate();
-            return new UserCreationResult(userRepository.saveAndFlush(user).getId(), false);
-        }
-
+    // 탈퇴 회원은 소셜 식별자를 해제(묘비값)하므로 findByProviderAndProviderUserId로 조회되지 않는다.
+    // 따라서 여기 도달하는 기존 회원은 활성 회원이어야 하며, 그렇지 않으면(정지 등) INACTIVE_USER로 막는다.
+    private UserCreationResult existingUserResult(User user) {
         return new UserCreationResult(requireActive(user).getId(), false);
     }
 

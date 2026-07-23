@@ -43,6 +43,8 @@ import lombok.Getter;
 )
 public class User extends BaseCreatedUpdatedDeletedEntity {
 
+    private static final String WITHDRAWN_IDENTIFIER_PREFIX = "withdrawn-";
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -248,13 +250,28 @@ public class User extends BaseCreatedUpdatedDeletedEntity {
     public void withdraw(String reason) {
         this.status = UserStatus.DELETED;
         this.withdrawalReason = blankToNull(reason);
+        anonymizePersonalData();
         delete();
     }
 
-    public void reactivate() {
-        this.status = UserStatus.ACTIVE;
-        this.withdrawalReason = null;
-        restore();
+    /**
+     * 탈퇴 시 개인정보를 파기하고 소셜 식별자를 해제한다.
+     * 소셜 식별자(provider_user_id, auth_subject)를 유니크한 묘비값으로 교체해,
+     * 같은 소셜 계정으로 재로그인해도 기존 회원을 찾지 못하고 신규 가입되게 한다.
+     * 공개 콘텐츠(글·댓글·리뷰 등)는 FK 무결성·스레드 보존을 위해 삭제하지 않고 작성자만 익명 처리한다.
+     */
+    private void anonymizePersonalData() {
+        this.nickname = null;
+        this.email = null;
+        this.profileImageUrl = null;
+        // 소셜 식별자(provider_user_id)만 유니크 묘비값으로 해제한다.
+        // auth_subject는 JWT 내부 식별자라 그대로 두어, 발급됐던 토큰이 여전히 이 회원(DELETED)으로
+        // 해석되어 비활성 사용자로 거부되게 한다.
+        this.providerUserId = WITHDRAWN_IDENTIFIER_PREFIX + UUID.randomUUID();
+        this.userAgreement = null;
+        this.childProfile = null;
+        this.guardianProfile = null;
+        this.userInterests.clear();
     }
 
     public void hideByAdmin() {

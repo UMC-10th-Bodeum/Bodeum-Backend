@@ -193,14 +193,31 @@ class UserServiceTest {
     }
 
     @Test
-    void socialLoginRestoresWithdrawnUser() {
+    void withdrawAnonymizesPersonalDataAndReleasesSocialIdentity() {
         User user = User.createSocialUser(
                 SocialProvider.KAKAO, "kakao-1", "parent@example.com", "민준맘");
         ReflectionTestUtils.setField(user, "id", 1L);
-        user.withdraw("다시 가입 테스트");
+
+        user.withdraw("탈퇴 사유");
+
+        assertThat(user.isWithdrawn()).isTrue();
+        assertThat(user.getNickname()).isNull();
+        assertThat(user.getEmail()).isNull();
+        assertThat(user.getProviderUserId())
+                .isNotEqualTo("kakao-1")
+                .startsWith("withdrawn-");
+    }
+
+    @Test
+    void socialLoginCreatesFreshUserAfterWithdrawal() {
+        // 탈퇴 회원은 소셜 식별자가 해제(묘비값)되어 원래 providerUserId로 조회되지 않으므로 신규 가입된다.
         given(userRepository.findByProviderAndProviderUserId(SocialProvider.KAKAO, "kakao-1"))
-                .willReturn(Optional.of(user));
-        given(userRepository.saveAndFlush(any(User.class))).willAnswer(invocation -> invocation.getArgument(0));
+                .willReturn(Optional.empty());
+        given(userRepository.saveAndFlush(any(User.class))).willAnswer(invocation -> {
+            User created = invocation.getArgument(0);
+            ReflectionTestUtils.setField(created, "id", 2L);
+            return created;
+        });
 
         UserService.UserCreationResult result = userService.getOrCreateSocialUser(
                 SocialProvider.KAKAO,
@@ -209,11 +226,8 @@ class UserServiceTest {
                 "민준맘"
         );
 
-        assertThat(result.userId()).isEqualTo(1L);
-        assertThat(result.created()).isFalse();
-        assertThat(user.isActive()).isTrue();
-        assertThat(user.getDeletedAt()).isNull();
-        assertThat(user.getWithdrawalReason()).isNull();
+        assertThat(result.created()).isTrue();
+        assertThat(result.userId()).isEqualTo(2L);
     }
 
     @Test
