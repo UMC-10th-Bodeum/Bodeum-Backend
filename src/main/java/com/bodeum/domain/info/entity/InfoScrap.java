@@ -1,5 +1,6 @@
 package com.bodeum.domain.info.entity;
 
+import com.bodeum.domain.user.entity.User;
 import com.bodeum.global.common.entity.BaseCreatedEntity;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
@@ -23,24 +24,17 @@ public class InfoScrap extends BaseCreatedEntity {
     @Column(name = "info_scrap_id")
     private Long id;
 
-    @Column(name = "user_id", nullable = false)
-    private Long userId;
-
-//    # User 엔티티 구현 이후 FK 연결 예정
-//    @ManyToOne(fetch = FetchType.LAZY)
-//    @JoinColumn(name = "user_id", nullable = false)
-//    private User user;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", nullable = false)
+    private User user;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "info_item_id", nullable = false)
     private InfoItem infoItem;
 
     @Builder
-    public InfoScrap(Long userId, InfoItem infoItem) {
-
-        // User 엔티티 연결 이후 수정 예정
-        this.userId = userId;
-
+    public InfoScrap(User user, InfoItem infoItem) {
+        this.user = user;
         this.infoItem = infoItem;
     }
 }

@@ -57,6 +57,92 @@ class OnboardingServiceTest {
     }
 
     @Test
+    void skipOnboardingMarksUserAsSignupCompleted() {
+        User user = newUser();
+        given(userService.getCurrentUser(1L)).willReturn(user);
+
+        // 건너뛰기도 가입 확정 기준이므로 정식 회원(registeredAt 기록)으로 전환된다.
+        assertThat(user.isSignupCompleted()).isFalse();
+
+        onboardingService.skipOnboarding(1L);
+
+        assertThat(user.isSignupCompleted()).isTrue();
+        assertThat(user.getRegisteredAt()).isNotNull();
+    }
+
+    @Test
+    void quitOnboardingClearsEnteredDataButStillCompletesSignup() {
+        User user = newUser();
+        Region region = Region.create("서울특별시", "강남구");
+        given(userService.getCurrentUser(1L)).willReturn(user);
+        given(regionService.getById(10L)).willReturn(region);
+
+        // 1·2단계까지 입력해 데이터를 저장한 상태를 만든다.
+        onboardingService.registerChildProfile(1L, new CreateChildProfileRequest(
+                "민준이", "2020-01", List.of(DisabilityType.AUTISM), "소심함"
+        ));
+        onboardingService.registerInterestRegion(1L, new CreateInterestRegionRequest(
+                List.of(InterestCategory.WELFARE_SUBSIDY), 10L
+        ));
+        assertThat(user.isChildProfileRegistered()).isTrue();
+        assertThat(user.getInterestCategories()).isNotEmpty();
+
+        OnboardingStatusResponse response = onboardingService.quitOnboarding(1L);
+
+        // 그만두기: 입력값은 모두 초기화되지만 정식 회원(registeredAt)으로 가입 처리된다.
+        assertThat(user.isChildProfileRegistered()).isFalse();
+        assertThat(user.isGuardianProfileRegistered()).isFalse();
+        assertThat(user.getInterestCategories()).isEmpty();
+        assertThat(user.getRegion()).isNull();
+        assertThat(user.isSignupCompleted()).isTrue();
+        assertThat(user.getRegisteredAt()).isNotNull();
+        assertThat(response.onboardingCompleted()).isFalse();
+        assertThat(response.nextStep()).isEqualTo(AuthNextStep.HOME);
+    }
+
+    @Test
+    void completingAllOnboardingStepsMarksUserAsSignupCompleted() {
+        User user = newUser();
+        Region region = Region.create("서울특별시", "강남구");
+        given(userService.getCurrentUser(1L)).willReturn(user);
+        given(regionService.getById(10L)).willReturn(region);
+
+        // 1·2단계까지는 온보딩이 확정되지 않아 가입 진행중 상태를 유지한다.
+        onboardingService.registerChildProfile(1L, new CreateChildProfileRequest(
+                "민준이", "2020-01", List.of(DisabilityType.AUTISM), "소심함"
+        ));
+        onboardingService.registerInterestRegion(1L, new CreateInterestRegionRequest(
+                List.of(InterestCategory.WELFARE_SUBSIDY), 10L
+        ));
+        assertThat(user.isSignupCompleted()).isFalse();
+
+        // 3단계(보호자 프로필)로 온보딩이 완료되면 가입이 확정된다.
+        onboardingService.registerGuardianProfile(1L, new CreateGuardianProfileRequest(
+                "민준맘", GuardianType.PARENT, CommunityRoleType.INFO_SEEKER
+        ));
+
+        assertThat(user.isOnboardingCompleted()).isTrue();
+        assertThat(user.isSignupCompleted()).isTrue();
+        assertThat(user.getRegisteredAt()).isNotNull();
+    }
+
+    @Test
+    void registeredAtIsFixedAtFirstResolutionAndNotOverwritten() {
+        User user = newUser();
+        given(userService.getCurrentUser(1L)).willReturn(user);
+
+        onboardingService.skipOnboarding(1L);
+        java.time.Instant firstRegisteredAt = user.getRegisteredAt();
+
+        // 이미 확정된 뒤 추가 단계를 입력해도 최초 확정 시각은 덮어쓰지 않는다(멱등).
+        onboardingService.registerChildProfile(1L, new CreateChildProfileRequest(
+                "민준이", "2020-01", List.of(DisabilityType.AUTISM), "소심함"
+        ));
+
+        assertThat(user.getRegisteredAt()).isEqualTo(firstRegisteredAt);
+    }
+
+    @Test
     void registerGuardianProfileStoresGuardianTypeAndCommunityRoleAsEnum() {
         User user = newUser();
         given(userService.getCurrentUser(1L)).willReturn(user);

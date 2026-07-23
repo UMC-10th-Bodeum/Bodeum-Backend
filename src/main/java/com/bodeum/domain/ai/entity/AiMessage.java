@@ -1,5 +1,7 @@
 package com.bodeum.domain.ai.entity;
 
+import com.bodeum.domain.ai.enums.AiResponseProcessingStatus;
+import com.bodeum.domain.ai.enums.AiAnswerStatus;
 import com.bodeum.domain.ai.enums.SenderType;
 import com.bodeum.global.common.entity.BaseCreatedEntity;
 import jakarta.persistence.*;
@@ -27,22 +29,35 @@ public class AiMessage extends BaseCreatedEntity {
     @Column(name = "sender_type", nullable = false)
     private SenderType senderType;
 
-    @Lob
-    @Column(name = "content", nullable = false)
+    @Column(name = "content", nullable = false, columnDefinition = "TEXT")
     private String content;
 
     @Column(name = "is_warning", nullable = false)
     private boolean warning = false;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "ai_processing_status", length = 20)
+    private AiResponseProcessingStatus aiProcessingStatus;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "ai_answer_status", length = 20)
+    private AiAnswerStatus aiAnswerStatus;
+
     @Builder
     private AiMessage(
             AiChatRoom chatRoom,
             SenderType senderType,
-            String content
+            String content,
+            boolean warning,
+            AiResponseProcessingStatus aiProcessingStatus,
+            AiAnswerStatus aiAnswerStatus
     ) {
         this.chatRoom = chatRoom;
         this.senderType = senderType;
         this.content = content;
+        this.warning = warning;
+        this.aiProcessingStatus = aiProcessingStatus;
+        this.aiAnswerStatus = aiAnswerStatus;
     }
 
     public static AiMessage createUserMessage(
@@ -53,17 +68,43 @@ public class AiMessage extends BaseCreatedEntity {
                 .chatRoom(chatRoom)
                 .senderType(SenderType.USER)
                 .content(content)
+                .aiProcessingStatus(AiResponseProcessingStatus.PROCESSING)
                 .build();
     }
 
     public static AiMessage createAiMessage(
             AiChatRoom chatRoom,
-            String content
+            String content,
+            boolean warning,
+            AiAnswerStatus answerStatus
     ) {
         return AiMessage.builder()
                 .chatRoom(chatRoom)
                 .senderType(SenderType.AI)
                 .content(content)
+                .warning(warning)
+                .aiProcessingStatus(null)
+                .aiAnswerStatus(answerStatus)
                 .build();
+    }
+
+    public void completeAiResponse() {
+        validateUserMessage();
+        if (aiProcessingStatus == AiResponseProcessingStatus.PROCESSING) {
+            aiProcessingStatus = AiResponseProcessingStatus.COMPLETED;
+        }
+    }
+
+    public void failAiResponse() {
+        validateUserMessage();
+        if (aiProcessingStatus == AiResponseProcessingStatus.PROCESSING) {
+            aiProcessingStatus = AiResponseProcessingStatus.FAILED;
+        }
+    }
+
+    private void validateUserMessage() {
+        if (senderType != SenderType.USER) {
+            throw new IllegalStateException("AI response status belongs only to USER messages");
+        }
     }
 }

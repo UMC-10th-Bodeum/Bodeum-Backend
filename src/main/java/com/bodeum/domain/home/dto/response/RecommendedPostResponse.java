@@ -38,6 +38,7 @@ public record RecommendedPostResponse(
                 post.getCommentCount(),
                 post.getViewCount(),
                 post.getCreatedAt()
+
         );
     }
 

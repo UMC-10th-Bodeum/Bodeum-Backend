@@ -37,9 +37,7 @@ public class AiChatRoom extends BaseCreatedEntity {
     }
 
     public static AiChatRoom create(User user) {
-        return AiChatRoom.builder()
-                .user(user)
-                .build();
+        return new AiChatRoom(user);
     }
 
     public void updateLastMessageAt(Instant lastMessageAt) {

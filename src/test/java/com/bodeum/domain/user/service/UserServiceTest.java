@@ -8,6 +8,7 @@ import static org.mockito.ArgumentMatchers.any;
 
 import com.bodeum.domain.auth.enums.SocialProvider;
 import com.bodeum.domain.auth.exception.AuthErrorCode;
+import com.bodeum.domain.auth.repository.AuthLoginCodeRepository;
 import com.bodeum.domain.auth.repository.RefreshTokenSessionRepository;
 import com.bodeum.domain.region.service.RegionService;
 import com.bodeum.domain.user.dto.request.CreateUserAgreementRequest;
@@ -16,6 +17,7 @@ import com.bodeum.domain.user.dto.response.UserAgreementResponse;
 import com.bodeum.domain.user.dto.response.UserHeaderResponse;
 import com.bodeum.domain.user.dto.response.UserWithdrawResponse;
 import com.bodeum.domain.user.entity.User;
+import com.bodeum.domain.user.enums.UserStatus;
 import com.bodeum.domain.user.repository.UserRepository;
 import com.bodeum.global.apiPayload.exception.ProjectException;
 import com.bodeum.global.infrastructure.storage.S3ImageStorage;
@@ -44,6 +46,9 @@ class UserServiceTest {
 
     @Mock
     private RegionService regionService;
+
+    @Mock
+    private AuthLoginCodeRepository authLoginCodeRepository;
 
     @InjectMocks
     private UserService userService;
@@ -96,7 +101,7 @@ class UserServiceTest {
     }
 
     @Test
-    void withdrawStoresReasonAndRevokesRefreshTokenSessions() {
+    void withdrawPurgesPersonalDataAndRevokesRefreshTokenSessions() {
         User user = User.createSocialUser(
                 SocialProvider.KAKAO, "kakao-1", "parent@example.com", "민준맘");
         ReflectionTestUtils.setField(user, "id", 1L);
@@ -110,8 +115,11 @@ class UserServiceTest {
         assertThat(response.success()).isTrue();
         assertThat(user.isWithdrawn()).isTrue();
         assertThat(user.getDeletedAt()).isNotNull();
-        assertThat(user.getWithdrawalReason()).isEqualTo("더 이상 서비스를 이용하지 않습니다.");
+        // 탈퇴 사유(자유 입력)는 개인정보 보호를 위해 저장하지 않는다.
+        assertThat(user.getWithdrawalReason()).isNull();
+        // 개인정보 파기와 세션 폐기가 수행된다.
         then(refreshTokenSessionRepository).should().deleteByUserId(1L);
+        then(authLoginCodeRepository).should().deleteByUserId(1L);
     }
 
     @Test
@@ -193,14 +201,32 @@ class UserServiceTest {
     }
 
     @Test
-    void socialLoginRestoresWithdrawnUser() {
+    void withdrawAnonymizesPersonalDataAndReleasesSocialIdentity() {
         User user = User.createSocialUser(
                 SocialProvider.KAKAO, "kakao-1", "parent@example.com", "민준맘");
         ReflectionTestUtils.setField(user, "id", 1L);
-        user.withdraw("다시 가입 테스트");
+
+        user.withdraw("탈퇴 사유");
+
+        assertThat(user.isWithdrawn()).isTrue();
+        assertThat(user.getNickname()).isNull();
+        assertThat(user.getEmail()).isNull();
+        assertThat(user.getProviderUserId())
+                .isNotEqualTo("kakao-1")
+                .startsWith("withdrawn:");
+        assertThat(user.getAuthSubject()).hasSize(36);
+    }
+
+    @Test
+    void socialLoginCreatesFreshUserAfterWithdrawal() {
+        // 탈퇴 회원은 소셜 식별자가 해제(묘비값)되어 원래 providerUserId로 조회되지 않으므로 신규 가입된다.
         given(userRepository.findByProviderAndProviderUserId(SocialProvider.KAKAO, "kakao-1"))
-                .willReturn(Optional.of(user));
-        given(userRepository.saveAndFlush(any(User.class))).willAnswer(invocation -> invocation.getArgument(0));
+                .willReturn(Optional.empty());
+        given(userRepository.saveAndFlush(any(User.class))).willAnswer(invocation -> {
+            User created = invocation.getArgument(0);
+            ReflectionTestUtils.setField(created, "id", 2L);
+            return created;
+        });
 
         UserService.UserCreationResult result = userService.getOrCreateSocialUser(
                 SocialProvider.KAKAO,
@@ -209,11 +235,34 @@ class UserServiceTest {
                 "민준맘"
         );
 
-        assertThat(result.userId()).isEqualTo(1L);
-        assertThat(result.created()).isFalse();
-        assertThat(user.isActive()).isTrue();
-        assertThat(user.getDeletedAt()).isNull();
-        assertThat(user.getWithdrawalReason()).isNull();
+        assertThat(result.created()).isTrue();
+        assertThat(result.userId()).isEqualTo(2L);
+    }
+
+    @Test
+    void socialLoginCreatesFreshUserFromLegacyWithdrawnAccount() {
+        // 기존 방식(소프트 삭제)으로 탈퇴해 소셜 식별자가 그대로 남아있는 레거시 회원.
+        User legacy = User.createSocialUser(
+                SocialProvider.KAKAO, "kakao-1", "old@example.com", "옛닉네임");
+        ReflectionTestUtils.setField(legacy, "id", 1L);
+        ReflectionTestUtils.setField(legacy, "status", UserStatus.DELETED);
+        given(userRepository.findByProviderAndProviderUserId(SocialProvider.KAKAO, "kakao-1"))
+                .willReturn(Optional.of(legacy));
+        given(userRepository.saveAndFlush(any(User.class))).willAnswer(invocation -> {
+            User saved = invocation.getArgument(0);
+            if (saved.getId() == null) {
+                ReflectionTestUtils.setField(saved, "id", 2L);
+            }
+            return saved;
+        });
+
+        UserService.UserCreationResult result = userService.getOrCreateSocialUser(
+                SocialProvider.KAKAO, "kakao-1", "new@example.com", "새닉네임");
+
+        // 레거시 회원의 소셜 식별자가 해제되고, 같은 소셜 계정으로 새 회원이 생성된다.
+        assertThat(legacy.getProviderUserId()).startsWith("withdrawn:");
+        assertThat(result.created()).isTrue();
+        assertThat(result.userId()).isEqualTo(2L);
     }
 
     @Test

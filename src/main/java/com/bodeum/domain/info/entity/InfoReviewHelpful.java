@@ -1,5 +1,6 @@
 package com.bodeum.domain.info.entity;
 
+import com.bodeum.domain.user.entity.User;
 import com.bodeum.global.common.entity.BaseCreatedEntity;
 import jakarta.persistence.*;
 import lombok.Builder;
@@ -22,24 +23,17 @@ public class InfoReviewHelpful extends BaseCreatedEntity {
     @Column(name = "info_review_helpful_id")
     private Long id;
 
-//    # User 엔티티 구현 이후 FK 연결 예정
-//    @ManyToOne(fetch = FetchType.LAZY)
-//    @JoinColumn(name = "user_id", nullable = false)
-//    private User user;
-
-    @Column(name = "user_id", nullable = false)
-    private Long userId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", nullable = false)
+    private User user;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "info_review_id", nullable = false)
     private InfoReview infoReview;
 
     @Builder
-    public InfoReviewHelpful(Long userId, InfoReview infoReview) {
-
-        // User 엔티티 연결 이후 수정 예정
-        this.userId = userId;
-
+    public InfoReviewHelpful(User user, InfoReview infoReview) {
+        this.user = user;
         this.infoReview = infoReview;
     }
 }

@@ -1,6 +1,8 @@
 package com.bodeum.domain.community.entity;
 
 import com.bodeum.domain.community.enums.CommentStatus;
+import com.bodeum.domain.community.exception.CommunityErrorCode;
+import com.bodeum.domain.community.exception.CommunityException;
 import com.bodeum.global.common.entity.BaseCreatedUpdatedDeletedEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -25,6 +27,8 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Comment extends BaseCreatedUpdatedDeletedEntity {
 
+    public static final int CONTENT_MAX_LENGTH = 1000;
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "comment_id")
@@ -42,7 +46,7 @@ public class Comment extends BaseCreatedUpdatedDeletedEntity {
     private Comment parent;
 
     @Lob
-    @Column(name = "content", nullable = false, columnDefinition = "TEXT")
+    @Column(name = "content", nullable = false, length = CONTENT_MAX_LENGTH, columnDefinition = "TEXT")
     private String content;
 
     @Column(name = "is_accepted", nullable = false)
@@ -57,6 +61,8 @@ public class Comment extends BaseCreatedUpdatedDeletedEntity {
 
     @Builder
     private Comment(Post post, Long userId, Comment parent, String content) {
+        validateContent(content);
+
         this.post = post;
         this.userId = userId;
         this.parent = parent;
@@ -83,6 +89,7 @@ public class Comment extends BaseCreatedUpdatedDeletedEntity {
     }
 
     public void updateContent(String content) {
+        validateContent(content);
         this.content = content;
     }
 
@@ -96,15 +103,6 @@ public class Comment extends BaseCreatedUpdatedDeletedEntity {
 
     public void decreaseLikeCount() {
         this.likeCount = Math.max(0, this.likeCount - 1);
-    }
-
-    public void hide() {
-        if (this.status != CommentStatus.ACTIVE) {
-            return;
-        }
-
-        this.status = CommentStatus.HIDDEN;
-        this.post.decreaseCommentCount();
     }
 
     @Override
@@ -130,5 +128,14 @@ public class Comment extends BaseCreatedUpdatedDeletedEntity {
         super.restore();
         this.status = CommentStatus.ACTIVE;
         this.post.increaseCommentCount();
+    }
+
+    private static void validateContent(String content) {
+        if (content == null || content.isBlank()) {
+            throw new CommunityException(CommunityErrorCode.COMMENT_CONTENT_REQUIRED);
+        }
+        if (content.length() > CONTENT_MAX_LENGTH) {
+            throw new CommunityException(CommunityErrorCode.COMMENT_CONTENT_TOO_LONG);
+        }
     }
 }

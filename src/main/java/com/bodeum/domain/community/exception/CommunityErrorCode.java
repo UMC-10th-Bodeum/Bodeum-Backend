@@ -29,6 +29,16 @@ public enum CommunityErrorCode implements BaseErrorCode {
             "COMMUNITY400_4",
             "게시글 내용은 비어 있을 수 없습니다."
     ),
+    COMMENT_CONTENT_TOO_LONG(
+            HttpStatus.BAD_REQUEST,
+            "COMMUNITY400_5",
+            "댓글 내용은 1,000자를 초과할 수 없습니다."
+    ),
+    COMMENT_CONTENT_REQUIRED(
+            HttpStatus.BAD_REQUEST,
+            "COMMUNITY400_6",
+            "댓글 내용은 비어 있을 수 없습니다."
+    ),
     AUTHENTICATION_REQUIRED(
             HttpStatus.UNAUTHORIZED,
             "COMMUNITY401_1",
@@ -39,10 +49,20 @@ public enum CommunityErrorCode implements BaseErrorCode {
             "COMMUNITY403_1",
             "게시글을 수정하거나 삭제할 권한이 없습니다."
     ),
+    COMMENT_FORBIDDEN(
+            HttpStatus.FORBIDDEN,
+            "COMMUNITY403_2",
+            "댓글을 수정하거나 삭제할 권한이 없습니다."
+    ),
     POST_NOT_FOUND(
             HttpStatus.NOT_FOUND,
             "COMMUNITY404_1",
             "게시글을 찾을 수 없습니다."
+    ),
+    COMMENT_NOT_FOUND(
+            HttpStatus.NOT_FOUND,
+            "COMMUNITY404_2",
+            "댓글을 찾을 수 없습니다."
     );
 
     private final HttpStatus status;

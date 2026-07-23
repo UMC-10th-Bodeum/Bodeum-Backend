@@ -22,6 +22,7 @@ import com.bodeum.domain.community.enums.PostAnonymityType;
 import com.bodeum.domain.community.enums.PostBoardType;
 import com.bodeum.domain.community.exception.CommunityErrorCode;
 import com.bodeum.domain.community.exception.CommunityException;
+import com.bodeum.domain.community.service.PostQueryFacade;
 import com.bodeum.domain.community.service.PostService;
 import com.bodeum.global.apiPayload.handler.GeneralExceptionAdvice;
 import com.bodeum.global.auth.LoginUser;
@@ -49,6 +50,8 @@ class PostControllerTest {
 
     @Mock
     private PostService postService;
+    @Mock
+    private PostQueryFacade postQueryFacade;
 
     private MockMvc mockMvc;
     private ObjectMapper objectMapper;
@@ -58,7 +61,7 @@ class PostControllerTest {
         LocalValidatorFactoryBean validator = new LocalValidatorFactoryBean();
         validator.afterPropertiesSet();
         objectMapper = new ObjectMapper().findAndRegisterModules();
-        mockMvc = MockMvcBuilders.standaloneSetup(new PostController(postService))
+        mockMvc = MockMvcBuilders.standaloneSetup(new PostController(postService, postQueryFacade))
                 .setControllerAdvice(new GeneralExceptionAdvice())
                 .setCustomArgumentResolvers(loginUserArgumentResolver())
                 .setValidator(validator)
@@ -180,7 +183,7 @@ class PostControllerTest {
 
     @Test
     void getPostReturnsDetailResponse() throws Exception {
-        given(postService.getPost(10L, 1L)).willReturn(postResponse());
+        given(postQueryFacade.getPost(10L, 1L)).willReturn(postResponse());
 
         mockMvc.perform(get("/api/community/posts/1"))
                 .andExpect(status().isOk())
@@ -197,7 +200,7 @@ class PostControllerTest {
 
     @Test
     void getPostReturnsCommunityNotFoundError() throws Exception {
-        given(postService.getPost(10L, 99L))
+        given(postQueryFacade.getPost(10L, 99L))
                 .willThrow(new CommunityException(CommunityErrorCode.POST_NOT_FOUND));
 
         mockMvc.perform(get("/api/community/posts/99"))
