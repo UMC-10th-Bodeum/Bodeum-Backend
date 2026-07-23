@@ -7,8 +7,6 @@ import com.bodeum.domain.community.dto.response.PostResponse;
 import com.bodeum.domain.community.dto.response.PostScrapResponse;
 import com.bodeum.domain.community.entity.Hashtag;
 import com.bodeum.domain.community.entity.Post;
-import com.bodeum.domain.user.enums.UserStatus;
-import com.bodeum.domain.user.repository.UserRepository;
 import com.bodeum.domain.community.entity.PostDisabilityTag;
 import com.bodeum.domain.community.entity.PostHashtag;
 import com.bodeum.domain.community.entity.PostImage;
@@ -43,7 +41,6 @@ public class PostService {
     private final PostDisabilityTagRepository postDisabilityTagRepository;
     private final PostLikeRepository postLikeRepository;
     private final PostScrapRepository postScrapRepository;
-    private final UserRepository userRepository;
 
     @Transactional
     public PostResponse createPost(Long userId, CreatePostRequest request) {
@@ -195,11 +192,7 @@ public class PostService {
                 .map(PostImage::getImageUrl)
                 .toList();
 
-        boolean authorWithdrawn = !userRepository
-                .findIdsByIdInAndStatus(List.of(post.getUserId()), UserStatus.DELETED)
-                .isEmpty();
-
-        return PostResponse.of(post, viewerId, authorWithdrawn, liked, scrapped, disabilityTypes, hashtags, imageUrls);
+        return PostResponse.of(post, viewerId, liked, scrapped, disabilityTypes, hashtags, imageUrls);
     }
 
     private void replaceDisabilityTags(Post post, List<DisabilityType> disabilityTypes) {

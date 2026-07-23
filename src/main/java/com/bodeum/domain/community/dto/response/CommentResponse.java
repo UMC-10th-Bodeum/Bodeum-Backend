@@ -27,19 +27,17 @@ public record CommentResponse(
     public static CommentResponse of(
             Comment comment,
             Long viewerId,
-            boolean authorWithdrawn,
             boolean liked,
             List<CommentResponse> replies
     ) {
         Long parentCommentId = comment.getParent() == null ? null : comment.getParent().getId();
-        return of(comment, parentCommentId, viewerId, authorWithdrawn, liked, replies);
+        return of(comment, parentCommentId, viewerId, liked, replies);
     }
 
     public static CommentResponse of(
             Comment comment,
             Long parentCommentId,
             Long viewerId,
-            boolean authorWithdrawn,
             boolean liked,
             List<CommentResponse> replies
     ) {
@@ -47,8 +45,7 @@ public record CommentResponse(
         return new CommentResponse(
                 comment.getId(),
                 parentCommentId,
-                // 작성자가 탈퇴한 경우 작성자 ID를 노출하지 않는다.
-                authorWithdrawn ? null : comment.getUserId(),
+                comment.getUserId(),
                 Objects.equals(comment.getUserId(), viewerId),
                 comment.getContent(),
                 comment.isAccepted(),

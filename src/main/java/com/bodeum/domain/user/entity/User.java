@@ -243,10 +243,6 @@ public class User extends BaseCreatedUpdatedDeletedEntity {
         );
     }
 
-    private String blankToNull(String value) {
-        return value == null || value.isBlank() ? null : value;
-    }
-
     public void withdraw(String reason) {
         this.status = UserStatus.DELETED;
         // 탈퇴 사유는 자유 입력이라 개인정보가 포함될 수 있어 원문을 저장하지 않는다.
@@ -259,7 +255,6 @@ public class User extends BaseCreatedUpdatedDeletedEntity {
      * 탈퇴 시 개인정보를 파기하고 소셜 식별자를 해제한다.
      * 소셜 식별자(provider_user_id, auth_subject)를 유니크한 묘비값으로 교체해,
      * 같은 소셜 계정으로 재로그인해도 기존 회원을 찾지 못하고 신규 가입되게 한다.
-     * 공개 콘텐츠(글·댓글·리뷰 등)는 FK 무결성·스레드 보존을 위해 삭제하지 않고 작성자만 익명 처리한다.
      * 기존 방식(소프트 삭제)으로 탈퇴한 레거시 회원을 로그인 시 발견했을 때도 재사용한다.
      */
     public void anonymizePersonalData() {

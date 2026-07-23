@@ -2,6 +2,7 @@ package com.bodeum.domain.user.service;
 
 import com.bodeum.domain.auth.enums.SocialProvider;
 import com.bodeum.domain.auth.exception.AuthErrorCode;
+import com.bodeum.domain.auth.repository.AuthLoginCodeRepository;
 import com.bodeum.domain.user.dto.response.AiTermsAgreementResponse;
 import com.bodeum.domain.auth.repository.RefreshTokenSessionRepository;
 import com.bodeum.domain.region.entity.Region;
@@ -38,11 +39,11 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final RefreshTokenSessionRepository refreshTokenSessionRepository;
+    private final AuthLoginCodeRepository authLoginCodeRepository;
     private final S3ImageStorage s3ImageStorage;
     private final UserProfileImageUpdater userProfileImageUpdater;
     private final RegionService regionService;
     private final UserAgreementRepository userAgreementRepository;
-    private final WithdrawalDataPurger withdrawalDataPurger;
 
     @Transactional(readOnly = true)
     public UserProfileResponse getProfile(Long userId) {
@@ -114,16 +115,11 @@ public class UserService {
             throw new ProjectException(AuthErrorCode.ALREADY_WITHDRAWN);
         }
 
-        // 익명화 전에 삭제할 프로필 이미지 URL을 확보한다.
-        String profileImageUrl = user.getProfileImageUrl();
-
-        // 개인정보성 연관 데이터 파기 → 회원 익명화(연관 정리) → 세션 폐기 순서로 처리한다.
-        withdrawalDataPurger.purge(userId);
+        // User 개인정보와 소셜 식별자를 파기하고 Auth 인증 수단을 폐기한다.
+        // 다른 도메인의 탈퇴 후속 처리는 각 도메인 정책이 확정된 뒤 별도로 연결한다.
         user.withdraw(request == null ? null : request.reason());
         refreshTokenSessionRepository.deleteByUserId(userId);
-
-        // 프로필 이미지 S3 객체 삭제(실패해도 탈퇴는 진행).
-        s3ImageStorage.deleteQuietly(profileImageUrl);
+        authLoginCodeRepository.deleteByUserId(userId);
 
         return UserWithdrawResponse.ofSuccess();
     }

@@ -3,17 +3,12 @@ package com.bodeum.domain.ai.repository;
 import com.bodeum.domain.ai.entity.AiResponseSource;
 import com.bodeum.domain.ai.repository.projection.AiResponseSourceProjection;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 
 public interface AiResponseSourceRepository extends JpaRepository<AiResponseSource, Long> {
-
-    @Modifying
-    @Query("delete from AiResponseSource s where s.aiMessage.id in (select m.id from AiMessage m where m.chatRoom.id = :chatRoomId)")
-    int deleteByChatRoomId(@Param("chatRoomId") Long chatRoomId);
 
     @Query("""
         SELECT

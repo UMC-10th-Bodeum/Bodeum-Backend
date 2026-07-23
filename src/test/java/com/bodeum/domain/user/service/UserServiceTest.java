@@ -8,6 +8,7 @@ import static org.mockito.ArgumentMatchers.any;
 
 import com.bodeum.domain.auth.enums.SocialProvider;
 import com.bodeum.domain.auth.exception.AuthErrorCode;
+import com.bodeum.domain.auth.repository.AuthLoginCodeRepository;
 import com.bodeum.domain.auth.repository.RefreshTokenSessionRepository;
 import com.bodeum.domain.region.service.RegionService;
 import com.bodeum.domain.user.dto.request.CreateUserAgreementRequest;
@@ -16,6 +17,7 @@ import com.bodeum.domain.user.dto.response.UserAgreementResponse;
 import com.bodeum.domain.user.dto.response.UserHeaderResponse;
 import com.bodeum.domain.user.dto.response.UserWithdrawResponse;
 import com.bodeum.domain.user.entity.User;
+import com.bodeum.domain.user.enums.UserStatus;
 import com.bodeum.domain.user.repository.UserRepository;
 import com.bodeum.global.apiPayload.exception.ProjectException;
 import com.bodeum.global.infrastructure.storage.S3ImageStorage;
@@ -25,7 +27,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import com.bodeum.domain.user.enums.UserStatus;
 import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
@@ -47,7 +48,7 @@ class UserServiceTest {
     private RegionService regionService;
 
     @Mock
-    private WithdrawalDataPurger withdrawalDataPurger;
+    private AuthLoginCodeRepository authLoginCodeRepository;
 
     @InjectMocks
     private UserService userService;
@@ -117,8 +118,8 @@ class UserServiceTest {
         // 탈퇴 사유(자유 입력)는 개인정보 보호를 위해 저장하지 않는다.
         assertThat(user.getWithdrawalReason()).isNull();
         // 개인정보 파기와 세션 폐기가 수행된다.
-        then(withdrawalDataPurger).should().purge(1L);
         then(refreshTokenSessionRepository).should().deleteByUserId(1L);
+        then(authLoginCodeRepository).should().deleteByUserId(1L);
     }
 
     @Test

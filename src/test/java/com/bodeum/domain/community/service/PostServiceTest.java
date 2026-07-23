@@ -53,8 +53,6 @@ class PostServiceTest {
     private PostLikeRepository postLikeRepository;
     @Mock
     private PostScrapRepository postScrapRepository;
-    @Mock
-    private com.bodeum.domain.user.repository.UserRepository userRepository;
     @InjectMocks
     private PostService postService;
 
