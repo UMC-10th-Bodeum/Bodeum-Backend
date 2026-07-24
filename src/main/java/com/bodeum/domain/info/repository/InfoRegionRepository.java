@@ -13,7 +13,7 @@ public interface InfoRegionRepository extends JpaRepository<InfoRegion, Long> {
     @Query("SELECT DISTINCT r.sido FROM InfoRegion r ORDER BY r.sido ASC")
     List<String> findDistinctSido();
 
-    // 2. 선택한 시/도에 속한 시/군/구 목록 조회
-    @Query("SELECT r.sigungu FROM InfoRegion r WHERE r.sido = :sido ORDER BY r.sigungu ASC")
+    // 2. 선택한 시/도에 속한 시/군/구 목록 조회 (DISTINCT 추가)
+    @Query("SELECT DISTINCT r.sigungu FROM InfoRegion r WHERE r.sido = :sido ORDER BY r.sigungu ASC")
     List<String> findSigunguBySido(@Param("sido") String sido);
 }
