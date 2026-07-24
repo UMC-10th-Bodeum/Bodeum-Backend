@@ -74,6 +74,11 @@ public class EmergencyClinicMapper implements OpenApiMapper {
         String address = item.path("dutyAddr").asText();
         String phone = item.path("dutyTel1").asText();
 
+        // 기관명 길이 제한 (최대 80자)
+        if (name != null && name.length() > 80) {
+            name = name.substring(0, 77) + "...";
+        }
+
         // 시도, 시군구 텍스트 파싱 처리 (예: "서울특별시 강남구..." -> "서울특별시", "강남구")
         String[] addrTokens = address.split(" ");
         String sido = addrTokens.length > 0 ? addrTokens[0] : "미분류";
@@ -81,9 +86,15 @@ public class EmergencyClinicMapper implements OpenApiMapper {
 
         // 실시간 가용 병상 등 상세 텍스트 정보는 소개글(introduction) 공간에 정규화하여 보존
         String introduction = String.format("[실시간 가용 병상 정보]\n%s", item.toString());
+        if (introduction.length() > 250) {
+            introduction = introduction.substring(0, 247) + "...";
+        }
 
         // externalId 부재 시 sourceSpec 이름과 기관명 조합으로 유니크 키 생성
         String externalId = hpid.isEmpty() ? (sourceSpec.name() + "_" + name).replaceAll(" ", "") : hpid;
+        if (externalId.length() > 100) {
+            externalId = externalId.substring(0, 100);
+        }
 
         return InfoItem.builder()
                 .externalId(externalId)
