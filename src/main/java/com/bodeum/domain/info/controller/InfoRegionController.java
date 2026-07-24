@@ -1,6 +1,6 @@
 package com.bodeum.domain.info.controller;
 
-import com.bodeum.domain.info.repository.InfoRegionRepository;
+import com.bodeum.domain.info.service.InfoRegionQueryService;
 import com.bodeum.global.apiPayload.ApiResponse;
 import com.bodeum.global.apiPayload.code.GeneralSuccessCode;
 import io.swagger.v3.oas.annotations.Operation;
@@ -18,7 +18,8 @@ import java.util.List;
 @RequiredArgsConstructor
 public class InfoRegionController {
 
-    private final InfoRegionRepository infoRegionRepository;
+    // Repository 직접 참조 대신 Service 주입
+    private final InfoRegionQueryService infoRegionQueryService;
 
     @Operation(
             summary = "시/도 목록 조회",
@@ -27,7 +28,7 @@ public class InfoRegionController {
     @SecurityRequirements
     @GetMapping("/sido")
     public ApiResponse<List<String>> getSidoList() {
-        List<String> result = infoRegionRepository.findDistinctSido();
+        List<String> result = infoRegionQueryService.getSidoList();
         return ApiResponse.of(GeneralSuccessCode.OK, result);
     }
 
@@ -41,7 +42,7 @@ public class InfoRegionController {
             @Parameter(description = "시/도 명칭", example = "서울특별시")
             @RequestParam("sido") String sido
     ) {
-        List<String> result = infoRegionRepository.findSigunguBySido(sido);
+        List<String> result = infoRegionQueryService.getSigunguList(sido);
         return ApiResponse.of(GeneralSuccessCode.OK, result);
     }
 }
