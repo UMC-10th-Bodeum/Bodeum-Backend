@@ -5,6 +5,7 @@ import com.bodeum.domain.community.dto.request.UpdatePostRequest;
 import com.bodeum.domain.community.dto.response.PostLikeResponse;
 import com.bodeum.domain.community.dto.response.PostResponse;
 import com.bodeum.domain.community.dto.response.PostScrapResponse;
+import com.bodeum.domain.community.service.PostQueryFacade;
 import com.bodeum.domain.community.service.PostService;
 import com.bodeum.global.apiPayload.ApiResponse;
 import com.bodeum.global.apiPayload.code.GeneralSuccessCode;
@@ -32,6 +33,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class PostController {
 
     private final PostService postService;
+    private final PostQueryFacade postQueryFacade;
 
     @Operation(summary = "게시글 작성", description = "커뮤니티 게시글과 장애 유형·해시태그·이미지를 등록한다.")
     @PostMapping
@@ -69,7 +71,7 @@ public class PostController {
             @LoginUser Long userId,
             @PathVariable Long postId
     ) {
-        return ApiResponse.of(GeneralSuccessCode.OK, postService.getPost(userId, postId));
+        return ApiResponse.of(GeneralSuccessCode.OK, postQueryFacade.getPost(userId, postId));
     }
 
     @Operation(summary = "게시글 좋아요 등록")

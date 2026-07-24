@@ -3,6 +3,7 @@ package com.bodeum.domain.ai.entity;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.bodeum.domain.ai.enums.AiResponseProcessingStatus;
+import com.bodeum.domain.ai.enums.AiAnswerStatus;
 import org.junit.jupiter.api.Test;
 
 class AiMessageTest {
@@ -11,12 +12,12 @@ class AiMessageTest {
     void completesProcessingStatusOnlyForUserMessage() {
         AiMessage userMessage = AiMessage.createUserMessage(null, "질문");
 
-        assertThat(userMessage.getAiResponseStatus())
+        assertThat(userMessage.getAiProcessingStatus())
                 .isEqualTo(AiResponseProcessingStatus.PROCESSING);
 
         userMessage.completeAiResponse();
 
-        assertThat(userMessage.getAiResponseStatus())
+        assertThat(userMessage.getAiProcessingStatus())
                 .isEqualTo(AiResponseProcessingStatus.COMPLETED);
     }
 
@@ -26,14 +27,16 @@ class AiMessageTest {
 
         userMessage.failAiResponse();
 
-        assertThat(userMessage.getAiResponseStatus())
+        assertThat(userMessage.getAiProcessingStatus())
                 .isEqualTo(AiResponseProcessingStatus.FAILED);
     }
 
     @Test
     void keepsAiMessageProcessingStatusNull() {
-        AiMessage aiMessage = AiMessage.createAiMessage(null, "답변", false);
+        AiMessage aiMessage = AiMessage.createAiMessage(
+                null, "답변", false, AiAnswerStatus.ANSWERED);
 
-        assertThat(aiMessage.getAiResponseStatus()).isNull();
+        assertThat(aiMessage.getAiProcessingStatus()).isNull();
+        assertThat(aiMessage.getAiAnswerStatus()).isEqualTo(AiAnswerStatus.ANSWERED);
     }
 }

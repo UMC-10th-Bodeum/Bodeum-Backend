@@ -9,7 +9,6 @@ import com.bodeum.domain.community.entity.Comment;
 import com.bodeum.domain.community.entity.CommentLike;
 import com.bodeum.domain.community.entity.Post;
 import com.bodeum.domain.community.entity.PostLike;
-import com.bodeum.domain.community.entity.PostReport;
 import com.bodeum.domain.community.entity.PostScrap;
 import com.bodeum.domain.community.enums.CommentStatus;
 import com.bodeum.domain.community.enums.DisabilityType;
@@ -24,14 +23,16 @@ import com.bodeum.domain.community.repository.PostDisabilityTagRepository;
 import com.bodeum.domain.community.repository.PostHashtagRepository;
 import com.bodeum.domain.community.repository.PostImageRepository;
 import com.bodeum.domain.community.repository.PostLikeRepository;
-import com.bodeum.domain.community.repository.PostReportRepository;
 import com.bodeum.domain.community.repository.PostRepository;
 import com.bodeum.domain.community.repository.PostScrapRepository;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 @SpringBootTest(properties = "bodeum.auth.jwt-secret=test-jwt-secret-32-bytes-minimum-value")
 @Transactional
@@ -39,6 +40,8 @@ class PostServiceIntegrationTest {
 
     @Autowired
     private PostService postService;
+    @Autowired
+    private PostQueryFacade postQueryFacade;
     @Autowired
     private PostRepository postRepository;
     @Autowired
@@ -52,42 +55,49 @@ class PostServiceIntegrationTest {
     @Autowired
     private PostScrapRepository postScrapRepository;
     @Autowired
-    private PostReportRepository postReportRepository;
-    @Autowired
     private CommentRepository commentRepository;
     @Autowired
     private CommentLikeRepository commentLikeRepository;
+    @Autowired
+    private PlatformTransactionManager transactionManager;
 
     @Test
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     void createAndReadAnonymousPostWithRelatedData() {
-        PostResponse created = postService.createPost(
-                10L,
-                new CreatePostRequest(
-                        PostBoardType.FREE_COMMUNICATION,
-                        PostAnonymityType.FULLY_ANONYMOUS,
-                        "익명 게시글",
-                        "익명 게시글 내용",
-                        List.of(DisabilityType.AUTISM, DisabilityType.AUTISM, DisabilityType.ADHD),
-                        List.of("육아", "정보공유"),
-                        List.of("https://example.com/1.jpg", "https://example.com/2.jpg"),
-                        true
-                )
-        );
+        Long postId = null;
+        try {
+            PostResponse created = postService.createPost(
+                    10L,
+                    new CreatePostRequest(
+                            PostBoardType.FREE_COMMUNICATION,
+                            PostAnonymityType.FULLY_ANONYMOUS,
+                            "익명 게시글",
+                            "익명 게시글 내용",
+                            List.of(DisabilityType.AUTISM, DisabilityType.AUTISM, DisabilityType.ADHD),
+                            List.of("육아", "정보공유"),
+                            List.of("https://example.com/1.jpg", "https://example.com/2.jpg"),
+                            true
+                    )
+            );
+            postId = created.postId();
 
-        PostResponse viewed = postService.getPost(20L, created.postId());
+            PostResponse viewed = postQueryFacade.getPost(20L, postId);
 
-        assertThat(created.authorId()).isNull();
-        assertThat(created.isMine()).isTrue();
-        assertThat(created.isQuestion()).isTrue();
-        assertThat(viewed.authorId()).isNull();
-        assertThat(viewed.isMine()).isFalse();
-        assertThat(viewed.viewCount()).isEqualTo(1);
-        assertThat(viewed.disabilityTypes()).containsExactly(DisabilityType.AUTISM, DisabilityType.ADHD);
-        assertThat(viewed.hashtags()).containsExactly("육아", "정보공유");
-        assertThat(viewed.imageUrls()).containsExactly(
-                "https://example.com/1.jpg",
-                "https://example.com/2.jpg"
-        );
+            assertThat(created.authorId()).isNull();
+            assertThat(created.isMine()).isTrue();
+            assertThat(created.isQuestion()).isTrue();
+            assertThat(viewed.authorId()).isNull();
+            assertThat(viewed.isMine()).isFalse();
+            assertThat(viewed.viewCount()).isEqualTo(1);
+            assertThat(viewed.disabilityTypes()).containsExactly(DisabilityType.AUTISM, DisabilityType.ADHD);
+            assertThat(viewed.hashtags()).containsExactly("육아", "정보공유");
+            assertThat(viewed.imageUrls()).containsExactly(
+                    "https://example.com/1.jpg",
+                    "https://example.com/2.jpg"
+            );
+        } finally {
+            deleteCommittedPostData(postId);
+        }
     }
 
     @Test
@@ -105,7 +115,6 @@ class PostServiceIntegrationTest {
         commentLikeRepository.saveAndFlush(CommentLike.create(reply, 40L));
         postLikeRepository.saveAndFlush(PostLike.create(post, 20L));
         postScrapRepository.saveAndFlush(PostScrap.create(post, 20L));
-        postReportRepository.saveAndFlush(PostReport.create(post, 30L, "신고 사유"));
 
         postService.deletePost(10L, post.getId());
 
@@ -116,47 +125,53 @@ class PostServiceIntegrationTest {
         assertThat(commentLikeRepository.count()).isOne();
         assertThat(postLikeRepository.count()).isOne();
         assertThat(postScrapRepository.count()).isOne();
-        assertThat(postReportRepository.count()).isOne();
         assertThat(postDisabilityTagRepository.count()).isZero();
         assertThat(postHashtagRepository.count()).isZero();
         assertThat(postImageRepository.count()).isZero();
     }
 
     @Test
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     void likeAndScrapRequestsAreIdempotentAndReflectedInPostDetail() {
-        Post post = postRepository.saveAndFlush(Post.create(
-                10L,
-                PostBoardType.FREE_COMMUNICATION,
-                PostAnonymityType.PROFILE_TAG_VISIBLE,
-                "반응 테스트 게시글",
-                "좋아요와 스크랩을 테스트합니다.",
-                false
-        ));
+        Long postId = null;
+        try {
+            Post post = postRepository.saveAndFlush(Post.create(
+                    10L,
+                    PostBoardType.FREE_COMMUNICATION,
+                    PostAnonymityType.PROFILE_TAG_VISIBLE,
+                    "반응 테스트 게시글",
+                    "좋아요와 스크랩을 테스트합니다.",
+                    false
+            ));
+            postId = post.getId();
 
-        postService.likePost(20L, post.getId());
-        postService.likePost(20L, post.getId());
-        postService.scrapPost(20L, post.getId());
-        postService.scrapPost(20L, post.getId());
+            postService.likePost(20L, postId);
+            postService.likePost(20L, postId);
+            postService.scrapPost(20L, postId);
+            postService.scrapPost(20L, postId);
 
-        PostResponse reacted = postService.getPost(20L, post.getId());
+            PostResponse reacted = postQueryFacade.getPost(20L, postId);
 
-        assertThat(postLikeRepository.count()).isOne();
-        assertThat(postScrapRepository.count()).isOne();
-        assertThat(reacted.likeCount()).isOne();
-        assertThat(reacted.scrapCount()).isOne();
-        assertThat(reacted.isLiked()).isTrue();
-        assertThat(reacted.isScrapped()).isTrue();
+            assertThat(postLikeRepository.count()).isOne();
+            assertThat(postScrapRepository.count()).isOne();
+            assertThat(reacted.likeCount()).isOne();
+            assertThat(reacted.scrapCount()).isOne();
+            assertThat(reacted.isLiked()).isTrue();
+            assertThat(reacted.isScrapped()).isTrue();
 
-        postService.unlikePost(20L, post.getId());
-        postService.unlikePost(20L, post.getId());
-        postService.unscrapPost(20L, post.getId());
-        postService.unscrapPost(20L, post.getId());
+            postService.unlikePost(20L, postId);
+            postService.unlikePost(20L, postId);
+            postService.unscrapPost(20L, postId);
+            postService.unscrapPost(20L, postId);
 
-        Post updatedPost = postRepository.findById(post.getId()).orElseThrow();
-        assertThat(postLikeRepository.count()).isZero();
-        assertThat(postScrapRepository.count()).isZero();
-        assertThat(updatedPost.getLikeCount()).isZero();
-        assertThat(updatedPost.getScrapCount()).isZero();
+            Post updatedPost = postRepository.findById(postId).orElseThrow();
+            assertThat(postLikeRepository.count()).isZero();
+            assertThat(postScrapRepository.count()).isZero();
+            assertThat(updatedPost.getLikeCount()).isZero();
+            assertThat(updatedPost.getScrapCount()).isZero();
+        } finally {
+            deleteCommittedPostData(postId);
+        }
     }
 
     @Test
@@ -196,20 +211,6 @@ class PostServiceIntegrationTest {
 
         assertThat(post.getCommentCount()).isOne();
 
-        comment.hide();
-        assertThat(comment.getStatus()).isEqualTo(CommentStatus.HIDDEN);
-        assertThat(post.getCommentCount()).isZero();
-
-        comment.hide();
-        assertThat(post.getCommentCount()).isZero();
-
-        comment.restore();
-        assertThat(comment.getStatus()).isEqualTo(CommentStatus.ACTIVE);
-        assertThat(post.getCommentCount()).isOne();
-
-        comment.restore();
-        assertThat(post.getCommentCount()).isOne();
-
         comment.delete();
         commentRepository.flush();
 
@@ -226,5 +227,21 @@ class PostServiceIntegrationTest {
         assertThat(comment.getStatus()).isEqualTo(CommentStatus.ACTIVE);
         assertThat(comment.getDeletedAt()).isNull();
         assertThat(post.getCommentCount()).isOne();
+    }
+
+    private void deleteCommittedPostData(Long postId) {
+        if (postId == null) {
+            return;
+        }
+
+        new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
+            postLikeRepository.deleteAllByPost_Id(postId);
+            postScrapRepository.deleteAllByPost_Id(postId);
+            postDisabilityTagRepository.deleteAllByPost_Id(postId);
+            postHashtagRepository.deleteAllByPost_Id(postId);
+            postImageRepository.deleteAllByPost_Id(postId);
+            postRepository.flush();
+            postRepository.deleteById(postId);
+        });
     }
 }

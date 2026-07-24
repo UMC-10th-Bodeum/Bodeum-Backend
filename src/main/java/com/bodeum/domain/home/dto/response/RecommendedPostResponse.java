@@ -5,6 +5,7 @@ import com.bodeum.domain.community.enums.DisabilityType;
 import com.bodeum.domain.community.enums.PostAnonymityType;
 import com.bodeum.domain.community.enums.PostBoardType;
 
+import java.time.Instant;
 import java.util.List;
 
 public record RecommendedPostResponse(
@@ -16,7 +17,8 @@ public record RecommendedPostResponse(
         String content,
         long likeCount,
         long commentCount,
-        long viewCount
+        long viewCount,
+        Instant createdAt
 ) {
     public record DisabilityTagDto(String code, String label) {
         public static DisabilityTagDto from(DisabilityType type) {
@@ -24,7 +26,7 @@ public record RecommendedPostResponse(
         }
     }
 
-    public static RecommendedPostResponse of(Post post, List<DisabilityType> disabilityTypes, long likeCount, long commentCount) {
+    public static RecommendedPostResponse of(Post post, List<DisabilityType> disabilityTypes) {
         return new RecommendedPostResponse(
                 post.getId(),
                 disabilityTypes.stream().map(DisabilityTagDto::from).toList(),
@@ -32,9 +34,11 @@ public record RecommendedPostResponse(
                 toAuthorDisplay(post.getAnonymityType()),
                 post.getTitle(),
                 post.getContent(),
-                likeCount,
-                commentCount,
-                0L
+                post.getLikeCount(),
+                post.getCommentCount(),
+                post.getViewCount(),
+                post.getCreatedAt()
+
         );
     }
 

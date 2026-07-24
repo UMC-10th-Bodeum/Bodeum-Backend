@@ -43,6 +43,8 @@ import lombok.Getter;
 )
 public class User extends BaseCreatedUpdatedDeletedEntity {
 
+    private static final String WITHDRAWN_IDENTIFIER_PREFIX = "withdrawn:";
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -164,6 +166,18 @@ public class User extends BaseCreatedUpdatedDeletedEntity {
         this.onboardingSkipped = true;
     }
 
+    /**
+     * 온보딩 그만두기: 입력한 값(자녀/관심사/보호자·지역)을 모두 버리고 온보딩을 종료한다.
+     * orphanRemoval로 연관 행이 삭제되어, 입력값이 없는 회원 상태로 되돌아간다.
+     * 건너뛰기(skipOnboarding)는 입력값을 유지하지만, 그만두기는 초기화한다는 점이 다르다.
+     */
+    public void quitOnboarding() {
+        this.childProfile = null;
+        this.guardianProfile = null;
+        this.userInterests.clear();
+        this.onboardingSkipped = true;
+    }
+
     public void updateProfileImage(String profileImageUrl) {
         this.profileImageUrl = profileImageUrl;
     }
@@ -229,20 +243,49 @@ public class User extends BaseCreatedUpdatedDeletedEntity {
         );
     }
 
-    private String blankToNull(String value) {
-        return value == null || value.isBlank() ? null : value;
-    }
-
     public void withdraw(String reason) {
         this.status = UserStatus.DELETED;
-        this.withdrawalReason = blankToNull(reason);
+        // 탈퇴 사유는 자유 입력이라 개인정보가 포함될 수 있어 원문을 저장하지 않는다.
+        this.withdrawalReason = null;
+        anonymizePersonalData();
         delete();
     }
 
-    public void reactivate() {
-        this.status = UserStatus.ACTIVE;
-        this.withdrawalReason = null;
-        restore();
+    /**
+     * 탈퇴 시 개인정보를 파기하고 소셜 식별자를 해제한다.
+     * 소셜 식별자(provider_user_id, auth_subject)를 유니크한 묘비값으로 교체해,
+     * 같은 소셜 계정으로 재로그인해도 기존 회원을 찾지 못하고 신규 가입되게 한다.
+     * withdraw()에서만 호출한다. 레거시(소프트 삭제) 회원은 연관 데이터를 건드리지 않는
+     * releaseSocialIdentityForLegacyWithdrawal()가 식별자만 해제한다.
+     */
+    private void anonymizePersonalData() {
+        resetPersonalScalarsAndSocialIdentity();
+        // 개인정보성 연관 데이터 파기(orphanRemoval). 약관 동의 기록(userAgreement)은 개인정보가 없고
+        // 동의 증빙으로 보존하므로 파기하지 않는다.
+        this.childProfile = null;
+        this.guardianProfile = null;
+        this.userInterests.clear();
+    }
+
+    /**
+     * 기존 방식(소프트 삭제)으로 탈퇴한 레거시 회원을 로그인 시 발견했을 때, 소셜 식별자와 스칼라 개인정보만
+     * 해제한다. 로그인 처리는 트랜잭션(NOT_SUPPORTED) 밖에서 detached 상태로 동작하므로 LAZY 연관을
+     * 건드리지 않는다. 신규 가입이 같은 소셜 식별자로 가능하도록 유니크 키를 비우는 것이 목적이다.
+     */
+    public void releaseSocialIdentityForLegacyWithdrawal() {
+        resetPersonalScalarsAndSocialIdentity();
+    }
+
+    // 스칼라 개인정보(닉네임·이메일·프로필 이미지)를 지우고 소셜 식별자를 묘비값으로 교체한다.
+    // provider_user_id: "withdrawn:{uuid}" (VARCHAR(128) 이내), auth_subject: 새 UUID(정확히 36자).
+    // 기존 소셜 식별자·이메일 등은 묘비값에 포함하지 않는다. LAZY 연관은 건드리지 않아
+    // detached 상태(레거시 경로)에서도 안전하다.
+    private void resetPersonalScalarsAndSocialIdentity() {
+        this.nickname = null;
+        this.email = null;
+        this.profileImageUrl = null;
+        this.providerUserId = WITHDRAWN_IDENTIFIER_PREFIX + UUID.randomUUID();
+        this.authSubject = UUID.randomUUID().toString();
     }
 
     public void hideByAdmin() {

@@ -21,6 +21,8 @@ spring:
       api-key: sk-test-not-used
 
 bodeum:
+  front:
+    callback-url: http://localhost:3000/auth/callback
   aws:
     s3:
       bucket: test-bucket

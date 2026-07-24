@@ -66,4 +66,13 @@ public class OnboardingController {
     public ApiResponse<OnboardingStatusResponse> skipOnboarding(@LoginUser Long userId) {
         return ApiResponse.of(GeneralSuccessCode.OK, onboardingService.skipOnboarding(userId));
     }
+
+    @Operation(
+            summary = "온보딩 그만두기",
+            description = "입력한 정보를 모두 삭제하고 온보딩을 종료한다. 정식 회원으로 가입 처리되며 홈으로 이동한다."
+    )
+    @PostMapping("/quit")
+    public ApiResponse<OnboardingStatusResponse> quitOnboarding(@LoginUser Long userId) {
+        return ApiResponse.of(GeneralSuccessCode.OK, onboardingService.quitOnboarding(userId));
+    }
 }

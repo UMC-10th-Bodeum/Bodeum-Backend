@@ -55,15 +55,13 @@ class HomeCommunityRepositoryIntegrationTest {
     }
 
     @Test
-    void commentCountExcludesHiddenAndDeletedComments() {
+    void commentCountExcludesDeletedComments() {
         Post post = homePostRepository.save(post("댓글 수 게시글"));
         Comment activeComment = Comment.create(post, 20L, "활성 댓글");
-        Comment hiddenComment = Comment.create(post, 21L, "숨김 댓글");
-        Comment deletedComment = Comment.create(post, 22L, "삭제 댓글");
-        hiddenComment.hide();
+        Comment deletedComment = Comment.create(post, 21L, "삭제 댓글");
         deletedComment.delete();
 
-        homeCommentRepository.saveAllAndFlush(List.of(activeComment, hiddenComment, deletedComment));
+        homeCommentRepository.saveAllAndFlush(List.of(activeComment, deletedComment));
 
         List<Object[]> counts = homeCommentRepository.countGroupByPostIdIn(
                 List.of(post.getId()),
