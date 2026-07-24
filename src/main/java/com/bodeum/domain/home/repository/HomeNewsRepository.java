@@ -63,6 +63,7 @@ public interface HomeNewsRepository extends JpaRepository<News, Long> {
             WHERE n.active = true
               AND n.deletedAt IS NULL
               AND n.recruitmentStatus != :excluded
+              AND n.applyEndDate >= CURRENT_DATE
             ORDER BY n.scrapCount DESC
             """)
     List<News> findBannerForAnonymous(
