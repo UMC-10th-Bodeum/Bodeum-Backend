@@ -10,7 +10,7 @@ import java.util.List;
 
 public record CreateAiFeedbackRequest(
         @NotNull AiFeedbackType feedbackType,
-        List<AiFeedbackReasonType> reasons
+        List<@NotNull AiFeedbackReasonType> reasons
 ) {
 
     @JsonIgnore

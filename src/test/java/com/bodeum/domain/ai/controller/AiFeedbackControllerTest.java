@@ -102,6 +102,19 @@ class AiFeedbackControllerTest {
     }
 
     @Test
+    void rejectsIncorrectFeedbackWithNullReason() throws Exception {
+        mockMvc.perform(post("/api/v1/ai/messages/12/feedback")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"feedbackType":"INCORRECT","reasons":[null]}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("COMMON400_1"));
+
+        verify(aiFeedbackService, never()).createFeedback(any(), any(), any());
+    }
+
+    @Test
     void rejectsHelpfulFeedbackWithReasons() throws Exception {
         mockMvc.perform(post("/api/v1/ai/messages/12/feedback")
                         .contentType(MediaType.APPLICATION_JSON)
