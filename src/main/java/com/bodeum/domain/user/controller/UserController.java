@@ -12,6 +12,8 @@ import com.bodeum.domain.user.dto.response.UserProfileResponse;
 import com.bodeum.domain.user.dto.response.UserProfileUpdateResponse;
 import com.bodeum.domain.user.dto.response.UserWithdrawResponse;
 import com.bodeum.domain.user.service.UserService;
+import com.bodeum.domain.mypage.dto.response.MyPageProfileResponse;
+import com.bodeum.domain.mypage.service.MyPageService;
 import com.bodeum.global.apiPayload.ApiResponse;
 import com.bodeum.global.apiPayload.code.GeneralSuccessCode;
 import com.bodeum.global.auth.LoginUser;
@@ -39,6 +41,7 @@ public class UserController {
 
     private final UserService userService;
     private final OnboardingService onboardingService;
+    private final MyPageService myPageService;
 
     @Operation(
             summary = "헤더/사이드바용 내 정보 조회",
@@ -51,10 +54,10 @@ public class UserController {
         return ApiResponse.of(GeneralSuccessCode.OK, userService.getHeaderInfo(userId));
     }
 
-    @Operation(summary = "내 프로필 조회", description = "현재 로그인한 사용자의 상세 프로필을 조회한다.")
+    @Operation(summary = "내 프로필 대시보드 조회", description = "현재 로그인한 사용자의 상세 프로필과 저장한 정보, 작성 게시글, 작성 댓글 수를 조회한다.")
     @GetMapping("/me/profile")
-    public ApiResponse<UserProfileResponse> getProfile(@LoginUser Long userId) {
-        return ApiResponse.of(GeneralSuccessCode.OK, userService.getProfile(userId));
+    public ApiResponse<MyPageProfileResponse> getProfile(@LoginUser Long userId) {
+        return ApiResponse.of(GeneralSuccessCode.OK, myPageService.getProfile(userId));
     }
 
     @Operation(summary = "내 프로필 수정", description = "닉네임, 자녀 정보(이름/생년월/케어 영역/특징 키워드), 관심사, 지역, 보호자 유형, 커뮤니티 성향 등 온보딩에서 입력한 프로필 정보를 수정한다.")
