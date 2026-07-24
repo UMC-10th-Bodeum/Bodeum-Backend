@@ -217,7 +217,7 @@ public class AiMessageService {
         Set<AiSourceKey> sourceKeys = sources.stream()
                 .map(source -> new AiSourceKey(source.sourceType(), source.sourceId()))
                 .collect(java.util.stream.Collectors.toSet());
-        return aiSourceReviewRepository.existsConfirmedIncorrectBySources(sourceKeys);
+        return aiSourceReviewRepository.existsWarningRequiredBySources(sourceKeys);
     }
 
     private AiUserProfile toProfile(

@@ -18,7 +18,7 @@ public class AiSourceReviewQueryRepositoryImpl implements AiSourceReviewQueryRep
     }
 
     @Override
-    public boolean existsConfirmedIncorrectBySources(Collection<AiSourceKey> sourceKeys) {
+    public boolean existsWarningRequiredBySources(Collection<AiSourceKey> sourceKeys) {
         if (sourceKeys.isEmpty()) {
             return false;
         }
@@ -33,8 +33,10 @@ public class AiSourceReviewQueryRepositoryImpl implements AiSourceReviewQueryRep
                 .selectOne()
                 .from(aiSourceReview)
                 .where(
-                        aiSourceReview.reviewStatus.eq(
-                                AiSourceReviewStatus.CONFIRMED_INCORRECT),
+                        aiSourceReview.reviewStatus.in(
+                                AiSourceReviewStatus.REVIEW_REQUIRED,
+                                AiSourceReviewStatus.CONFIRMED_INCORRECT
+                        ),
                         sourceCondition
                 )
                 .fetchFirst() != null;
