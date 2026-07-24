@@ -21,8 +21,16 @@ public class OdcloudApiParser implements ApiParser {
 
     @Override
     public ExtractedDataResult parse(Map<String, Object> rawResponse, String apiKey) {
+        if (rawResponse == null) {
+            return new ExtractedDataResult(0, List.of());
+        }
+
         // 원본 Map 데이터를 정의한 불변 레코드 객체로 변환.
         OdcloudApiResponse response = objectMapper.convertValue(rawResponse, OdcloudApiResponse.class);
+
+        if (response == null) {
+            return new ExtractedDataResult(0, List.of());
+        }
 
         int totalCount = response.totalCount();
         List<Map<String, Object>> records = response.data();
