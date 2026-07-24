@@ -100,8 +100,7 @@ public class CommonJsonMapper implements OpenApiMapper {
             throw new IllegalArgumentException("유효한 JSON item 노드를 찾을 수 없습니다.");
         }
 
-        // 💡 [디버깅 로그] null 값이 나오는 API의 실제 키 구조를 확인하기 위해 콘솔에 출력
-        log.info("[JSON 구조 확인 - API: {}] {}", sourceSpec.name(), item.toString());
+        log.debug("[JSON 구조 확인 - API: {}] {}", sourceSpec.name(), item.toString());
 
         // 1. 시설/기관명 추출 키 후보군
         String name = findFirstValidField(item, List.of(
@@ -211,7 +210,7 @@ public class CommonJsonMapper implements OpenApiMapper {
     }
 
     /**
-     * OpenApiSourceSpec의 urlType 규칙에 따라 JSON 루트 노드에서 데이터 배열/객체 노드를 찾습니다.
+     * OpenApiSourceSpec의 urlType 규칙에 따라 JSON 루트 노드에서 데이터 배열/객체 노드를 찾음.
      */
     private JsonNode extractItemNode(JsonNode root, OpenApiSourceSpec sourceSpec) {
         String urlType = sourceSpec.getUrlType();
@@ -239,7 +238,7 @@ public class CommonJsonMapper implements OpenApiMapper {
     }
 
     /**
-     * 필드 후보군을 순회하며 JSON 노드에서 유효한 문자열 값을 반환합니다.
+     * 필드 후보군을 순회하며 JSON 노드에서 유효한 문자열 값을 반환.
      */
     private String findFirstValidField(JsonNode item, List<String> fieldCandidates) {
         for (String candidate : fieldCandidates) {
