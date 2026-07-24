@@ -32,13 +32,12 @@ public class InfoItemBulkUpsertService {
         String sql = """
             INSERT INTO info_item (
                 external_id, info_category_id, name, introduction, 
-                address, sido, sigungu, phone, homepage_url, 
+                address, sido, sigungu, phone, homepage_url, image_url,
                 view_count, scrap_count, review_count, synced_at, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, 0, ?, NOW(), NOW())
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, 0, ?, NOW(), NOW())
             
             -- 매퍼가 생성한 고유 키(external_id)가 DB에 이미 있으면 핵심 정보만 Update하고, 없으면 신규 Insert를 단 한 번의 쿼리 묶음(Bulk)으로 끝.
             ON DUPLICATE KEY UPDATE
-                
                 name = VALUES(name),
                 info_category_id = VALUES(info_category_id),
                 introduction = VALUES(introduction),
@@ -47,6 +46,7 @@ public class InfoItemBulkUpsertService {
                 sigungu = VALUES(sigungu),
                 phone = VALUES(phone),
                 homepage_url = VALUES(homepage_url),
+                image_url = VALUES(image_url),
                 synced_at = VALUES(synced_at),
                 updated_at = NOW()
         """;
@@ -62,7 +62,8 @@ public class InfoItemBulkUpsertService {
                 ps.setString(7, item.getSigungu());
                 ps.setString(8, item.getPhone());
                 ps.setString(9, item.getHomepageUrl());
-                ps.setTimestamp(10, Timestamp.valueOf(item.getSyncedAt()));
+                ps.setString(10, item.getImageUrl());
+                ps.setTimestamp(11, Timestamp.valueOf(item.getSyncedAt()));
             });
             log.info("성공적으로 {}건의 InfoItem 데이터를 벌크 동기화(Upsert) 했습니다.", items.size());
         } catch (Exception e) {
