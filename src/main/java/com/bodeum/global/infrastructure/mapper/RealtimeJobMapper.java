@@ -83,14 +83,30 @@ public class RealtimeJobMapper implements OpenApiMapper {
         String address = item.path("workAddr").asText(); // 근무지 주소
         String phone = item.path("contTel").asText(); // 담당자 연락처
 
+        // 회사명 길이 제한 (최대 80자)
+        if (companyName != null && companyName.length() > 80) {
+            companyName = companyName.substring(0, 77) + "...";
+        }
+
         String[] addrTokens = address.split(" ");
         String sido = addrTokens.length > 0 ? addrTokens[0] : "미분류";
         String sigungu = addrTokens.length > 1 ? addrTokens[1] : "미분류";
 
         // 구인공고명과 상세 자격요건을 introduction 필드에 정합
         String introduction = String.format("공고명: %s\n상세 요강: %s", jobTitle, item.path("reqSpec").asText());
+        if (introduction.length() > 250) {
+            introduction = introduction.substring(0, 247) + "...";
+        }
 
-        String externalId = jobId.isEmpty() ? (sourceSpec.name() + "_" + companyName) : jobId;
+        String externalId = jobId.isEmpty() ? (sourceSpec.name() + "_" + companyName).replaceAll(" ", "") : jobId;
+        if (externalId.length() > 100) {
+            externalId = externalId.substring(0, 100);
+        }
+
+        String homepageUrl = item.path("homepage").asText();
+        if (homepageUrl.isBlank()) {
+            homepageUrl = null;
+        }
 
         return InfoItem.builder()
                 .externalId(externalId)
@@ -101,7 +117,7 @@ public class RealtimeJobMapper implements OpenApiMapper {
                 .sido(sido)
                 .sigungu(sigungu)
                 .phone(phone)
-                .homepageUrl(item.path("homepage").asText(null))
+                .homepageUrl(homepageUrl)
                 .syncedAt(LocalDateTime.now())
                 .build();
     }
