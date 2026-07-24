@@ -79,7 +79,6 @@ public class HomeController {
     public ResponseEntity<ApiResponse<BannerResponse>> getBanner(@LoginUser Long userId) {
         return homeService.getBanner(userId)
                 .map(banner -> ResponseEntity.ok(ApiResponse.of(GeneralSuccessCode.OK, banner)))
-                .orElseGet(() -> ResponseEntity.status(HttpStatus.NO_CONTENT)
-                        .body(ApiResponse.of(GeneralSuccessCode.NO_CONTENT, null)));
+                .orElseGet(() -> ResponseEntity.status(HttpStatus.NO_CONTENT).build());
     }
 }
