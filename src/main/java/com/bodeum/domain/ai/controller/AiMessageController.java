@@ -2,6 +2,7 @@ package com.bodeum.domain.ai.controller;
 
 import com.bodeum.domain.ai.dto.response.AiMessageHistoryResponse;
 import com.bodeum.domain.ai.dto.response.AiTodayMessageResponse;
+import com.bodeum.domain.ai.exception.AiErrorCode;
 import com.bodeum.domain.ai.service.AiMessageQueryService;
 import com.bodeum.global.apiPayload.ApiResponse;
 import com.bodeum.global.apiPayload.code.GeneralSuccessCode;
@@ -47,9 +48,21 @@ public class AiMessageController {
             @RequestParam(required = false) Long cursorId,
             @RequestParam(required = false) Instant cursorCreatedAt
     ) {
+        validateHistoryCursor(cursorId, cursorCreatedAt);
         return ApiResponse.of(
                 GeneralSuccessCode.OK,
                 aiMessageQueryService.getHistoryMessages(userId, cursorId, cursorCreatedAt)
         );
+    }
+
+    private void validateHistoryCursor(Long cursorId, Instant cursorCreatedAt) {
+        boolean hasCursorId = cursorId != null;
+        boolean hasCursorCreatedAt = cursorCreatedAt != null;
+
+        if (hasCursorId != hasCursorCreatedAt) {
+            throw new com.bodeum.global.apiPayload.exception.ProjectException(
+                    AiErrorCode.AI_INVALID_HISTORY_CURSOR
+            );
+        }
     }
 }
