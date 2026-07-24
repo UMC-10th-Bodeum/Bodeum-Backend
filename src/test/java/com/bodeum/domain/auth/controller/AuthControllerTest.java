@@ -228,7 +228,10 @@ class AuthControllerTest {
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.result.userId").isNumber())
-                .andExpect(jsonPath("$.result.childProfile").exists());
+                .andExpect(jsonPath("$.result.childProfile").exists())
+                .andExpect(jsonPath("$.result.activitySummary.savedInfoCount").value(0))
+                .andExpect(jsonPath("$.result.activitySummary.myPostCount").value(0))
+                .andExpect(jsonPath("$.result.activitySummary.myCommentCount").value(0));
 
         mockMvc.perform(patch("/api/v1/users/me/profile")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
