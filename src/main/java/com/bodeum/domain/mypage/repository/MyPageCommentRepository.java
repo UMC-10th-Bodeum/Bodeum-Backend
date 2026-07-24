@@ -3,6 +3,8 @@ package com.bodeum.domain.mypage.repository;
 import com.bodeum.domain.community.entity.Comment;
 import com.bodeum.domain.community.enums.CommentStatus;
 import com.bodeum.domain.community.enums.PostStatus;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -23,5 +25,35 @@ public interface MyPageCommentRepository
             @Param("userId") Long userId,
             @Param("commentStatus") CommentStatus commentStatus,
             @Param("postStatus") PostStatus postStatus
+    );
+
+    @Query(
+            value = """
+                    select comment
+                    from Comment comment
+                    join fetch comment.post post
+                    left join fetch comment.parent parent
+                    where comment.userId = :userId
+                      and comment.status = :commentStatus
+                      and comment.deletedAt is null
+                      and post.status = :postStatus
+                      and post.deletedAt is null
+                    order by comment.createdAt desc
+                    """,
+            countQuery = """
+                    select count(comment)
+                    from Comment comment
+                    where comment.userId = :userId
+                      and comment.status = :commentStatus
+                      and comment.deletedAt is null
+                      and comment.post.status = :postStatus
+                      and comment.post.deletedAt is null
+                    """
+    )
+    Page<Comment> findAllVisibleByUserIdOrderByCreatedAtDesc(
+            @Param("userId") Long userId,
+            @Param("commentStatus") CommentStatus commentStatus,
+            @Param("postStatus") PostStatus postStatus,
+            Pageable pageable
     );
 }
