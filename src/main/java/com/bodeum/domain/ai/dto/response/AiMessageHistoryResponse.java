@@ -1,11 +1,12 @@
 package com.bodeum.domain.ai.dto.response;
 
 import java.time.LocalDate;
+import java.time.Instant;
 import java.util.List;
 
 public record AiMessageHistoryResponse(
         List<HistoryDateGroup> messages,
-        Long nextCursor,
+        Cursor nextCursor,
         boolean hasNext
 ) {
 
@@ -15,10 +16,16 @@ public record AiMessageHistoryResponse(
 
     public static AiMessageHistoryResponse of(
             List<HistoryDateGroup> messages,
-            Long nextCursor,
+            Cursor nextCursor,
             boolean hasNext
     ) {
         return new AiMessageHistoryResponse(messages, nextCursor, hasNext);
+    }
+
+    public record Cursor(
+            Long id,
+            Instant createdAt
+    ) {
     }
 
     public record HistoryDateGroup(

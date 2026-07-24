@@ -8,6 +8,7 @@ import com.bodeum.global.apiPayload.code.GeneralSuccessCode;
 import com.bodeum.global.auth.LoginUser;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import java.time.Instant;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -43,11 +44,12 @@ public class AiMessageController {
     @GetMapping("/history")
     public ApiResponse<AiMessageHistoryResponse> getHistoryMessages(
             @LoginUser Long userId,
-            @RequestParam(required = false) Long cursor
+            @RequestParam(required = false) Long cursorId,
+            @RequestParam(required = false) Instant cursorCreatedAt
     ) {
         return ApiResponse.of(
                 GeneralSuccessCode.OK,
-                aiMessageQueryService.getHistoryMessages(userId, cursor)
+                aiMessageQueryService.getHistoryMessages(userId, cursorId, cursorCreatedAt)
         );
     }
 }

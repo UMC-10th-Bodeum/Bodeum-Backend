@@ -5,7 +5,6 @@ import com.bodeum.domain.ai.enums.AiResponseProcessingStatus;
 import com.bodeum.domain.ai.enums.SenderType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
-import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -62,7 +61,11 @@ public interface AiMessageRepository extends JpaRepository<AiMessage, Long> {
         WHERE m.chatRoom.id = :chatRoomId
           AND m.createdAt >= :startAt
           AND m.createdAt < :endAt
-          AND (:cursorId IS NULL OR m.id < :cursorId)
+          AND (
+                :cursorCreatedAt IS NULL
+                OR m.createdAt < :cursorCreatedAt
+                OR (m.createdAt = :cursorCreatedAt AND m.id < :cursorId)
+          )
         ORDER BY m.createdAt DESC, m.id DESC
         """)
     List<AiMessage> findHistoryMessages(
@@ -70,6 +73,6 @@ public interface AiMessageRepository extends JpaRepository<AiMessage, Long> {
             @Param("startAt") Instant startAt,
             @Param("endAt") Instant endAt,
             @Param("cursorId") Long cursorId,
-            Pageable pageable
+            @Param("cursorCreatedAt") Instant cursorCreatedAt
     );
 }
