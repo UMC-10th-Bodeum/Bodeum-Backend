@@ -239,7 +239,7 @@ class AiMessageServiceTest {
                 .thenReturn(List.of(source));
         when(answerGenerator.generate(eq("지원금 확인 사이트 알려줘"), any(), eq(List.of(source))))
                 .thenReturn(new GeneratedAiAnswer("복지로에서 확인할 수 있습니다.", List.of("DOC-1")));
-        when(aiSourceReviewRepository.existsConfirmedIncorrectBySources(
+        when(aiSourceReviewRepository.existsWarningRequiredBySources(
                 java.util.Set.of(new AiSourceKey(AiResponseSourceType.SITE, 10L))
         )).thenReturn(true);
         AiMessage saved = savedAiMessage("복지로에서 확인할 수 있습니다.");

@@ -3,9 +3,13 @@ package com.bodeum.domain.ai.repository;
 import com.bodeum.domain.ai.entity.AiMessage;
 import com.bodeum.domain.ai.enums.AiResponseProcessingStatus;
 import com.bodeum.domain.ai.enums.SenderType;
+import jakarta.persistence.LockModeType;
+import jakarta.persistence.QueryHint;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.jpa.repository.QueryHints;
 import org.springframework.data.repository.query.Param;
 
 import java.time.Instant;
@@ -74,5 +78,16 @@ public interface AiMessageRepository extends JpaRepository<AiMessage, Long> {
             @Param("endAt") Instant endAt,
             @Param("cursorId") Long cursorId,
             @Param("cursorCreatedAt") Instant cursorCreatedAt
+    );
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @QueryHints(@QueryHint(name = "jakarta.persistence.lock.timeout", value = "3000"))
+    @Query("""
+        SELECT m
+        FROM AiMessage m
+        WHERE m.id = :messageId
+        """)
+    java.util.Optional<AiMessage> findByIdForFeedback(
+            @Param("messageId") Long messageId
     );
 }

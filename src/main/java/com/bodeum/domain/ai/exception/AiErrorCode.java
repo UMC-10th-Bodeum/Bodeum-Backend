@@ -24,6 +24,31 @@ public enum AiErrorCode implements BaseErrorCode {
             "AI400_1",
             "이전 대화 조회 커서 값이 올바르지 않습니다."
     ),
+    AI_FEEDBACK_AI_MESSAGE_ONLY(
+            HttpStatus.BAD_REQUEST,
+            "AI400_2",
+            "AI 메시지에만 피드백을 등록할 수 있습니다."
+    ),
+    AI_MESSAGE_FORBIDDEN(
+            HttpStatus.FORBIDDEN,
+            "AI403_2",
+            "해당 AI 메시지에 접근할 수 없습니다."
+    ),
+    AI_MESSAGE_NOT_FOUND(
+            HttpStatus.NOT_FOUND,
+            "AI404_2",
+            "AI 메시지를 찾을 수 없습니다."
+    ),
+    ALREADY_FEEDBACK(
+            HttpStatus.CONFLICT,
+            "ALREADY_FEEDBACK",
+            "이미 피드백한 메시지입니다."
+    ),
+    AI_FEEDBACK_TEMPORARILY_UNAVAILABLE(
+            HttpStatus.SERVICE_UNAVAILABLE,
+            "AI_FEEDBACK_TEMPORARILY_UNAVAILABLE",
+            "피드백 요청이 처리 중입니다. 잠시 후 다시 시도해 주세요."
+    ),
     AI_RESPONSE_FAILED(
             HttpStatus.SERVICE_UNAVAILABLE,
             "AI_RESPONSE_FAILED",
