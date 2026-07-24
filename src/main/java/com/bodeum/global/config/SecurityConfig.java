@@ -48,6 +48,7 @@ public class SecurityConfig {
             "/api/v1/community/posts/recommended",
             "/api/v1/home/news/preview",
             "/api/v1/info-items/counts",
+            "/api/v1/home/banner",
             // 검색 API
             "/api/v1/search"
     };
