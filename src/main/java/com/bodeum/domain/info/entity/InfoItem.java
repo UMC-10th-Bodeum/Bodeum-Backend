@@ -10,6 +10,8 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
+import java.util.stream.Stream;
 
 @Entity
 @Getter
@@ -116,10 +118,12 @@ public class InfoItem extends BaseCreatedUpdatedEntity {
         this.reviewCount += amount;
     }
 
-    // 1. 카테고리 명칭 반환 (InfoCategory 연관관계 활용)
+    // 1. 카테고리 명칭 반환 (List.of 대신 Stream을 활용해 null 예방)
     public List<String> getCategoryNames() {
         if (this.infoCategory == null) return List.of();
-        return List.of(this.infoCategory.getMainCategoryKo(), this.infoCategory.getSubCategoryKo());
+        return Stream.of(this.infoCategory.getMainCategoryKo(), this.infoCategory.getSubCategoryKo())
+                .filter(Objects::nonNull)
+                .toList();
     }
 
     // 2. 전문 분야 태그 명칭 리스트 반환 (InfoItemTag -> InfoTag 매핑)
