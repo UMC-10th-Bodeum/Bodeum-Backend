@@ -54,4 +54,25 @@ public interface AiMessageRepository extends JpaRepository<AiMessage, Long> {
             @Param("startAt") Instant startAt,
             @Param("endAt") Instant endAt
     );
+
+    @Query("""
+        SELECT m
+        FROM AiMessage m
+        WHERE m.chatRoom.id = :chatRoomId
+          AND m.createdAt >= :startAt
+          AND m.createdAt < :endAt
+          AND (
+                :cursorCreatedAt IS NULL
+                OR m.createdAt < :cursorCreatedAt
+                OR (m.createdAt = :cursorCreatedAt AND m.id < :cursorId)
+          )
+        ORDER BY m.createdAt DESC, m.id DESC
+        """)
+    List<AiMessage> findHistoryMessages(
+            @Param("chatRoomId") Long chatRoomId,
+            @Param("startAt") Instant startAt,
+            @Param("endAt") Instant endAt,
+            @Param("cursorId") Long cursorId,
+            @Param("cursorCreatedAt") Instant cursorCreatedAt
+    );
 }

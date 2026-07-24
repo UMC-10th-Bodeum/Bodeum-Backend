@@ -2,6 +2,7 @@ package com.bodeum.domain.ai.service;
 
 import static com.bodeum.global.common.constant.TimeConstants.SERVICE_ZONE_ID;
 
+import com.bodeum.domain.ai.dto.response.AiMessageHistoryResponse;
 import com.bodeum.domain.ai.dto.response.AiMessageResponse;
 import com.bodeum.domain.ai.dto.response.AiMessageSourceResponse;
 import com.bodeum.domain.ai.dto.response.AiMessageWarningResponse;
@@ -18,6 +19,9 @@ import com.bodeum.domain.ai.repository.projection.AiResponseSourceProjection;
 import com.bodeum.global.apiPayload.exception.ProjectException;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -28,6 +32,9 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 public class AiMessageQueryService {
+
+    private static final int HISTORY_MESSAGE_LIMIT = 20;
+    private static final int HISTORY_LOOKBACK_DAYS = 7;
 
     private final AiChatRoomRepository aiChatRoomRepository;
     private final AiMessageRepository aiMessageRepository;
@@ -50,20 +57,72 @@ public class AiMessageQueryService {
             return AiTodayMessageResponse.of(List.of());
         }
 
-        List<Long> messageIds = messages.stream()
-                .map(AiMessage::getId)
-                .toList();
-        Map<Long, List<AiResponseSourceProjection>> sourceMap =
-                aiResponseSourceRepository.findAllByMessageIds(messageIds).stream()
-                        .collect(Collectors.groupingBy(
-                                AiResponseSourceProjection::getAiMessageId));
-
+        Map<Long, List<AiResponseSourceProjection>> sourceMap = loadSourceMap(messages);
         List<AiMessageResponse> messageResponses = messages.stream()
                 .map(message -> toMessageResponse(
                         message,
                         sourceMap.getOrDefault(message.getId(), List.of())))
                 .toList();
         return AiTodayMessageResponse.of(messageResponses);
+    }
+
+    @Transactional(readOnly = true)
+    public AiMessageHistoryResponse getHistoryMessages(
+            Long userId,
+            Long cursorId,
+            Instant cursorCreatedAt
+    ) {
+        AiChatRoom chatRoom = aiChatRoomRepository.findByUserId(userId)
+                .orElseThrow(() -> new ProjectException(AiErrorCode.AI_CHAT_ROOM_NOT_FOUND));
+
+        LocalDate today = LocalDate.now(SERVICE_ZONE_ID);
+        Instant startOfToday = today.atStartOfDay(SERVICE_ZONE_ID).toInstant();
+        Instant historyStart = today.minusDays(HISTORY_LOOKBACK_DAYS)
+                .atStartOfDay(SERVICE_ZONE_ID)
+                .toInstant();
+
+        List<AiMessage> fetchedMessages = aiMessageRepository.findHistoryMessages(
+                chatRoom.getId(),
+                historyStart,
+                startOfToday,
+                cursorId,
+                cursorCreatedAt
+        );
+
+        if (fetchedMessages.isEmpty()) {
+            return AiMessageHistoryResponse.of(List.of(), null, false);
+        }
+
+        List<AiMessage> pageMessages = selectPageMessages(fetchedMessages);
+        boolean hasNext = pageMessages.size() < fetchedMessages.size();
+
+        Map<Long, List<AiResponseSourceProjection>> sourceMap = loadSourceMap(pageMessages);
+        LinkedHashMap<LocalDate, List<AiMessageResponse>> groupedMessages = new LinkedHashMap<>();
+
+        for (AiMessage message : pageMessages) {
+            LocalDate messageDate = message.getCreatedAt()
+                    .atZone(SERVICE_ZONE_ID)
+                    .toLocalDate();
+            groupedMessages.computeIfAbsent(messageDate, ignored -> new ArrayList<>())
+                    .add(toMessageResponse(
+                            message,
+                            sourceMap.getOrDefault(message.getId(), List.of())));
+        }
+
+        List<AiMessageHistoryResponse.HistoryDateGroup> dateGroups = groupedMessages.entrySet()
+                .stream()
+                .map(entry -> AiMessageHistoryResponse.HistoryDateGroup.of(
+                        entry.getKey(),
+                        reverseCopy(entry.getValue())))
+                .toList();
+
+        Long nextCursor = pageMessages.getLast().getId();
+        Instant nextCursorCreatedAt = pageMessages.getLast().getCreatedAt();
+        return AiMessageHistoryResponse.of(
+                dateGroups,
+                new AiMessageHistoryResponse.Cursor(nextCursor, nextCursorCreatedAt),
+                hasNext
+        );
     }
 
     private AiMessageResponse toMessageResponse(
@@ -107,5 +166,48 @@ public class AiMessageQueryService {
                 message.getCreatedAt(),
                 sourceResponses,
                 message.isWarning() ? AiMessageWarningResponse.incorrectSource() : null);
+    }
+
+    // N+1 방지를 위해 메시지별 출처를 한 번에 조회한 후 메시지 ID별로 그룹화
+    private Map<Long, List<AiResponseSourceProjection>> loadSourceMap(
+            List<AiMessage> messages
+    ) {
+        List<Long> messageIds = messages.stream()
+                .map(AiMessage::getId)
+                .toList();
+        return aiResponseSourceRepository.findAllByMessageIds(messageIds).stream()
+                .collect(Collectors.groupingBy(AiResponseSourceProjection::getAiMessageId));
+    }
+
+    // 같은 날짜 그룹이 페이지 사이에서 분리되지 않도록 최소 20개 이후 날짜 경계에서 자른다.
+    private List<AiMessage> selectPageMessages(
+            List<AiMessage> fetchedMessages
+    ) {
+        List<AiMessage> selectedMessages = new ArrayList<>();
+        LocalDate currentDate = null;
+
+        for (AiMessage message : fetchedMessages) {
+            LocalDate messageDate = message.getCreatedAt()
+                    .atZone(SERVICE_ZONE_ID)
+                    .toLocalDate();
+
+            if (selectedMessages.size() >= HISTORY_MESSAGE_LIMIT
+                    && !messageDate.equals(currentDate)) {
+                break;
+            }
+
+            selectedMessages.add(message);
+            currentDate = messageDate;
+        }
+
+        return List.copyOf(selectedMessages);
+    }
+
+    private List<AiMessageResponse> reverseCopy(
+            List<AiMessageResponse> messages
+    ) {
+        List<AiMessageResponse> reversedMessages = new ArrayList<>(messages);
+        Collections.reverse(reversedMessages);
+        return List.copyOf(reversedMessages);
     }
 }

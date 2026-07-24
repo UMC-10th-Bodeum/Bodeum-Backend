@@ -19,6 +19,11 @@ public enum AiErrorCode implements BaseErrorCode {
             "AI404_1",
             "AI 채팅방을 찾을 수 없습니다."
     ),
+    AI_INVALID_HISTORY_CURSOR(
+            HttpStatus.BAD_REQUEST,
+            "AI400_1",
+            "이전 대화 조회 커서 값이 올바르지 않습니다."
+    ),
     AI_RESPONSE_FAILED(
             HttpStatus.SERVICE_UNAVAILABLE,
             "AI_RESPONSE_FAILED",
@@ -32,7 +37,7 @@ public enum AiErrorCode implements BaseErrorCode {
     AI_RATE_LIMIT_EXCEEDED(
             HttpStatus.TOO_MANY_REQUESTS,
             "AI_RATE_LIMIT_EXCEEDED",
-            "AI 질문을 너무 자주 요청했습니다. 잠시 후 다시 시도해 주세요."
+            "AI 질문은 너무 자주 요청할 수 없습니다. 잠시 후 다시 시도해 주세요."
     ),
     AI_DAILY_LIMIT_EXCEEDED(
             HttpStatus.TOO_MANY_REQUESTS,
@@ -42,12 +47,12 @@ public enum AiErrorCode implements BaseErrorCode {
     AI_REQUEST_IN_PROGRESS(
             HttpStatus.CONFLICT,
             "AI_REQUEST_IN_PROGRESS",
-            "이미 AI 답변을 생성하고 있습니다. 기존 요청이 끝난 후 다시 시도해 주세요."
+            "이미 AI 응답을 생성하고 있습니다. 기존 요청이 끝난 뒤 다시 시도해 주세요."
     ),
     AI_INDEXING_FAILED(
             HttpStatus.SERVICE_UNAVAILABLE,
             "AI_INDEXING_FAILED",
-            "AI 검색 자료 저장에 실패했습니다."
+            "AI 색인 작업에 실패했습니다."
     ),
     AI_INVALID_SOURCE_METADATA(
             HttpStatus.SERVICE_UNAVAILABLE,
