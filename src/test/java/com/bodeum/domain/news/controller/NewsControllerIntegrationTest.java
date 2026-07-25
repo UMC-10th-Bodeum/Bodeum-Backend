@@ -1,7 +1,9 @@
 package com.bodeum.domain.news.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -14,17 +16,23 @@ import com.bodeum.domain.news.entity.NewsType;
 import com.bodeum.domain.news.entity.RecruitmentStatus;
 import com.bodeum.domain.news.repository.NewsCategoryRepository;
 import com.bodeum.domain.news.repository.NewsRepository;
+import com.bodeum.domain.news.repository.NewsScrapRepository;
 import com.bodeum.domain.news.repository.NewsSourceRepository;
 import com.bodeum.domain.region.entity.Region;
 import com.bodeum.domain.region.repository.RegionRepository;
+import com.bodeum.global.auth.AuthUserPrincipal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 @SpringBootTest(properties = "bodeum.auth.jwt-secret=test-jwt-secret-32-bytes-minimum-value")
 @AutoConfigureMockMvc
@@ -42,6 +50,9 @@ class NewsControllerIntegrationTest {
 
     @Autowired
     private NewsSourceRepository newsSourceRepository;
+
+    @Autowired
+    private NewsScrapRepository newsScrapRepository;
 
     @Autowired
     private RegionRepository regionRepository;
@@ -283,6 +294,67 @@ class NewsControllerIntegrationTest {
         mockMvc.perform(get("/api/news/search").param("keyword", "   "))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("COMMON400_1"));
+    }
+
+    @Test
+    void toggleNewsScrapAddsAndRemovesScrap() throws Exception {
+        NewsCategory category = newsCategoryRepository.save(
+                NewsCategory.create(NewsType.LOCAL, "SUPPORT_SERVICE", 1)
+        );
+        NewsSource source = newsSourceRepository.save(source());
+        News news = newsRepository.saveAndFlush(news(
+                category,
+                source,
+                null,
+                "scrap-toggle",
+                "스크랩 토글 소식",
+                LocalDateTime.of(2026, 7, 2, 10, 0),
+                RecruitmentStatus.OPEN
+        ));
+
+        mockMvc.perform(post("/api/news/{newsId}/scrap", news.getId())
+                        .with(authenticatedUser(10L)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("COMMON200_1"))
+                .andExpect(jsonPath("$.result.newsId").value(news.getId()))
+                .andExpect(jsonPath("$.result.scrapped").value(true))
+                .andExpect(jsonPath("$.result.scrapCount").value(1));
+
+        assertThat(newsScrapRepository.existsByNewsIdAndUserId(news.getId(), 10L)).isTrue();
+        assertThat(newsRepository.findById(news.getId()).orElseThrow().getScrapCount()).isOne();
+
+        mockMvc.perform(post("/api/news/{newsId}/scrap", news.getId())
+                        .with(authenticatedUser(10L)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.newsId").value(news.getId()))
+                .andExpect(jsonPath("$.result.scrapped").value(false))
+                .andExpect(jsonPath("$.result.scrapCount").value(0));
+
+        assertThat(newsScrapRepository.existsByNewsIdAndUserId(news.getId(), 10L)).isFalse();
+        assertThat(newsRepository.findById(news.getId()).orElseThrow().getScrapCount()).isZero();
+    }
+
+    @Test
+    void toggleNewsScrapRequiresAuthentication() throws Exception {
+        mockMvc.perform(post("/api/news/{newsId}/scrap", 1L))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void toggleNewsScrapReturnsCommonNotFoundResponse() throws Exception {
+        mockMvc.perform(post("/api/news/{newsId}/scrap", 999999L)
+                        .with(authenticatedUser(10L)))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("COMMON404_1"));
+    }
+
+    private RequestPostProcessor authenticatedUser(Long userId) {
+        AuthUserPrincipal principal = new AuthUserPrincipal(userId, null, null, null);
+        return authentication(new UsernamePasswordAuthenticationToken(
+                principal,
+                null,
+                List.of(new SimpleGrantedAuthority("ROLE_USER"))
+        ));
     }
 
     private NewsSource source() {

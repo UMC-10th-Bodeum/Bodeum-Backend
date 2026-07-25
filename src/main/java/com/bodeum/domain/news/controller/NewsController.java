@@ -3,13 +3,16 @@ package com.bodeum.domain.news.controller;
 import com.bodeum.domain.news.dto.NewsStatus;
 import com.bodeum.domain.news.dto.response.NewsDetailResponse;
 import com.bodeum.domain.news.dto.response.NewsListResponse;
+import com.bodeum.domain.news.dto.response.NewsScrapResponse;
 import com.bodeum.domain.news.service.NewsQueryService;
+import com.bodeum.domain.news.service.NewsScrapService;
 import com.bodeum.global.apiPayload.ApiResponse;
 import com.bodeum.global.apiPayload.code.GeneralSuccessCode;
 import com.bodeum.global.auth.LoginUser;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.constraints.Max;
@@ -22,6 +25,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -35,6 +39,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class NewsController {
 
     private final NewsQueryService newsQueryService;
+    private final NewsScrapService newsScrapService;
 
     @GetMapping
     @Operation(summary = "소식 목록 조회", description = "최신 소식과 모집 상태별 소식을 조회한다.")
@@ -95,6 +100,20 @@ public class NewsController {
         return ApiResponse.of(
                 GeneralSuccessCode.OK,
                 newsQueryService.getNewsDetail(userId, newsId)
+        );
+    }
+
+    @PostMapping("/{newsId}/scrap")
+    @Operation(summary = "소식 스크랩 토글", description = "로그인 사용자의 소식 스크랩 상태를 전환한다.")
+    @SecurityRequirement(name = "JWT TOKEN")
+    public ApiResponse<NewsScrapResponse> toggleNewsScrap(
+            @Parameter(description = "소식 ID", example = "1")
+            @PathVariable @Positive Long newsId,
+            @LoginUser Long userId
+    ) {
+        return ApiResponse.of(
+                GeneralSuccessCode.OK,
+                newsScrapService.toggleScrap(userId, newsId)
         );
     }
 }
