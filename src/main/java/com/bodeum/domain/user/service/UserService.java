@@ -9,7 +9,6 @@ import com.bodeum.domain.region.entity.Region;
 import com.bodeum.domain.region.service.RegionService;
 import com.bodeum.domain.user.dto.request.CreateUserAgreementRequest;
 import com.bodeum.domain.user.dto.request.UpdateUserProfileRequest;
-import com.bodeum.domain.user.dto.request.WithdrawUserRequest;
 import com.bodeum.domain.user.dto.response.UserAgreementResponse;
 import com.bodeum.domain.user.dto.response.UserHeaderResponse;
 import com.bodeum.domain.user.dto.response.UserProfileResponse;
@@ -108,7 +107,7 @@ public class UserService {
     }
 
     @Transactional
-    public UserWithdrawResponse withdraw(Long userId, WithdrawUserRequest request) {
+    public UserWithdrawResponse withdraw(Long userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ProjectException(GeneralErrorCode.UNAUTHORIZED));
         if (user.isWithdrawn()) {
@@ -117,7 +116,7 @@ public class UserService {
 
         // User 개인정보와 소셜 식별자를 파기하고 Auth 인증 수단을 폐기한다.
         // 다른 도메인의 탈퇴 후속 처리는 각 도메인 정책이 확정된 뒤 별도로 연결한다.
-        user.withdraw(request == null ? null : request.reason());
+        user.withdraw();
         refreshTokenSessionRepository.deleteByUserId(userId);
         authLoginCodeRepository.deleteByUserId(userId);
 

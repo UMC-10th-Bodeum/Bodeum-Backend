@@ -184,7 +184,7 @@ class AuthTokenServiceTest {
         User user = createUser();
         AuthTokenService.AuthTokenPair tokenPair = authTokenService.issueTokens(user.getId());
 
-        userService.withdraw(user.getId(), null);
+        userService.withdraw(user.getId());
 
         assertThatThrownBy(() -> authTokenService.refresh(tokenPair.refreshToken()))
                 .isInstanceOf(ProjectException.class);
@@ -195,7 +195,7 @@ class AuthTokenServiceTest {
         User user = createUser();
         AuthTokenService.AuthTokenPair tokenPair = authTokenService.issueTokens(user.getId());
 
-        userService.withdraw(user.getId(), null);
+        userService.withdraw(user.getId());
 
         assertThat(authTokenService.authenticate(tokenPair.accessToken())).isEmpty();
     }

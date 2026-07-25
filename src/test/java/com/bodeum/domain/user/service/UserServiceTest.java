@@ -12,7 +12,6 @@ import com.bodeum.domain.auth.repository.AuthLoginCodeRepository;
 import com.bodeum.domain.auth.repository.RefreshTokenSessionRepository;
 import com.bodeum.domain.region.service.RegionService;
 import com.bodeum.domain.user.dto.request.CreateUserAgreementRequest;
-import com.bodeum.domain.user.dto.request.WithdrawUserRequest;
 import com.bodeum.domain.user.dto.response.UserAgreementResponse;
 import com.bodeum.domain.user.dto.response.UserHeaderResponse;
 import com.bodeum.domain.user.dto.response.UserWithdrawResponse;
@@ -79,7 +78,7 @@ class UserServiceTest {
     void headerInfoFallsBackToLoggedOutWhenUserWithdrawn() {
         User user = User.createSocialUser(
                 SocialProvider.KAKAO, "kakao-1", "parent@example.com", "민준맘");
-        user.withdraw(null);
+        user.withdraw();
         given(userRepository.findById(1L)).willReturn(Optional.of(user));
 
         UserHeaderResponse response = userService.getHeaderInfo(1L);
@@ -107,16 +106,11 @@ class UserServiceTest {
         ReflectionTestUtils.setField(user, "id", 1L);
         given(userRepository.findById(1L)).willReturn(Optional.of(user));
 
-        UserWithdrawResponse response = userService.withdraw(
-                1L,
-                new WithdrawUserRequest("더 이상 서비스를 이용하지 않습니다.")
-        );
+        UserWithdrawResponse response = userService.withdraw(1L);
 
         assertThat(response.success()).isTrue();
         assertThat(user.isWithdrawn()).isTrue();
         assertThat(user.getDeletedAt()).isNotNull();
-        // 탈퇴 사유(자유 입력)는 개인정보 보호를 위해 저장하지 않는다.
-        assertThat(user.getWithdrawalReason()).isNull();
         // 개인정보 파기와 세션 폐기가 수행된다.
         then(refreshTokenSessionRepository).should().deleteByUserId(1L);
         then(authLoginCodeRepository).should().deleteByUserId(1L);
@@ -191,10 +185,10 @@ class UserServiceTest {
     void withdrawRejectsAlreadyWithdrawnUser() {
         User user = User.createSocialUser(
                 SocialProvider.KAKAO, "kakao-1", "parent@example.com", "민준맘");
-        user.withdraw(null);
+        user.withdraw();
         given(userRepository.findById(1L)).willReturn(Optional.of(user));
 
-        assertThatThrownBy(() -> userService.withdraw(1L, null))
+        assertThatThrownBy(() -> userService.withdraw(1L))
                 .isInstanceOf(ProjectException.class)
                 .extracting(exception -> ((ProjectException) exception).getErrorCode())
                 .isEqualTo(AuthErrorCode.ALREADY_WITHDRAWN);
@@ -206,7 +200,7 @@ class UserServiceTest {
                 SocialProvider.KAKAO, "kakao-1", "parent@example.com", "민준맘");
         ReflectionTestUtils.setField(user, "id", 1L);
 
-        user.withdraw("탈퇴 사유");
+        user.withdraw();
 
         assertThat(user.isWithdrawn()).isTrue();
         assertThat(user.getNickname()).isNull();

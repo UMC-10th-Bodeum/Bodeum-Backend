@@ -259,7 +259,7 @@ class AuthControllerTest {
     void protectedEndpointRejectsWithdrawnUserTokenAsInvalidAccessToken() throws Exception {
         String accessToken = login("withdrawn-token-code").at("/result/accessToken").asText();
 
-        userService.withdraw(userRepository.findAll().getFirst().getId(), null);
+        userService.withdraw(userRepository.findAll().getFirst().getId());
 
         mockMvc.perform(get("/api/v1/users/me/profile")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
@@ -272,7 +272,7 @@ class AuthControllerTest {
         JsonNode firstLogin = login("withdrawn-user-code");
         long firstUserId = firstLogin.at("/result/userId").asLong();
 
-        userService.withdraw(firstUserId, null);
+        userService.withdraw(firstUserId);
         assertThat(userRepository.findById(firstUserId).orElseThrow().isWithdrawn()).isTrue();
 
         // 탈퇴 후 같은 소셜 계정으로 다시 로그인하면 복구가 아니라 새 회원으로 가입된다.

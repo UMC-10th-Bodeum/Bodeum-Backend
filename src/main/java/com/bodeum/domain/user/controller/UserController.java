@@ -5,7 +5,6 @@ import com.bodeum.domain.onboarding.dto.response.OnboardingStatusResponse;
 import com.bodeum.domain.onboarding.service.OnboardingService;
 import com.bodeum.domain.user.dto.request.CreateUserAgreementRequest;
 import com.bodeum.domain.user.dto.request.UpdateUserProfileRequest;
-import com.bodeum.domain.user.dto.request.WithdrawUserRequest;
 import com.bodeum.domain.user.dto.response.UserAgreementResponse;
 import com.bodeum.domain.user.dto.response.UserHeaderResponse;
 import com.bodeum.domain.user.dto.response.UserProfileResponse;
@@ -99,10 +98,9 @@ public class UserController {
     @Operation(summary = "회원 탈퇴", description = "현재 로그인한 사용자를 탈퇴 처리한다.")
     @DeleteMapping("/me")
     public ApiResponse<UserWithdrawResponse> withdraw(
-            @LoginUser Long userId,
-            @Valid @RequestBody(required = false) WithdrawUserRequest request
+            @LoginUser Long userId
     ) {
-        return ApiResponse.of(GeneralSuccessCode.OK, userService.withdraw(userId, request));
+        return ApiResponse.of(GeneralSuccessCode.OK, userService.withdraw(userId));
     }
 
     @Operation(
