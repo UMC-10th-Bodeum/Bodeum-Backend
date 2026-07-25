@@ -13,6 +13,7 @@ import com.bodeum.global.apiPayload.code.GeneralErrorCode;
 import com.bodeum.global.apiPayload.exception.ProjectException;
 import java.util.Collection;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
@@ -60,6 +61,47 @@ public class NewsQueryService {
                 regionIds.isEmpty() ? NO_REGION_IDS : regionIds,
                 pageable
         );
+
+        return toListResponse(result);
+    }
+
+    @Transactional(readOnly = true)
+    public NewsListResponse searchNews(
+            String keyword,
+            int page,
+            int size,
+            String region,
+            String category,
+            NewsStatus status
+    ) {
+        List<Long> regionIds = resolveRegionIds(region);
+        boolean filterByRegion = StringUtils.hasText(region);
+        if (filterByRegion && regionIds.isEmpty()) {
+            return NewsListResponse.empty(page, size);
+        }
+
+        String normalizedKeyword = keyword.trim().toLowerCase(Locale.ROOT);
+        List<Long> keywordRegionIds = resolveRegionIds(normalizedKeyword);
+        PageRequest pageable = PageRequest.of(
+                page,
+                size,
+                Sort.by(Sort.Order.desc("publishedAt"), Sort.Order.desc("id"))
+        );
+        Page<News> result = newsRepository.searchVisibleNews(
+                "%" + normalizedKeyword + "%",
+                !keywordRegionIds.isEmpty(),
+                keywordRegionIds.isEmpty() ? NO_REGION_IDS : keywordRegionIds,
+                normalize(category),
+                status == null ? null : status.toEntity(),
+                filterByRegion,
+                regionIds.isEmpty() ? NO_REGION_IDS : regionIds,
+                pageable
+        );
+
+        return toListResponse(result);
+    }
+
+    private NewsListResponse toListResponse(Page<News> result) {
         Map<Long, String> regionNames = resolveRegionNames(result.getContent());
         List<NewsListItemResponse> items = result.getContent().stream()
                 .map(news -> NewsListItemResponse.of(news, regionNames.get(news.getRegionId())))
@@ -99,7 +141,7 @@ public class NewsQueryService {
             return List.of();
         }
 
-        String keyword = region.trim().toLowerCase();
+        String keyword = region.trim().toLowerCase(Locale.ROOT);
         return regionRepository.findAllByOrderByRegionLevel1AscRegionLevel2Asc().stream()
                 .filter(candidate -> contains(candidate.getRegionLevel1(), keyword)
                         || contains(candidate.getRegionLevel2(), keyword)
@@ -119,7 +161,7 @@ public class NewsQueryService {
     }
 
     private boolean contains(String value, String keyword) {
-        return value != null && value.toLowerCase().contains(keyword);
+        return value != null && value.toLowerCase(Locale.ROOT).contains(keyword);
     }
 
     private String normalize(String value) {

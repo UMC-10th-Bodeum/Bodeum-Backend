@@ -38,6 +38,34 @@ public interface NewsRepository extends JpaRepository<News, Long> {
     @Query("""
             select news
             from News news
+            where news.active = true
+              and news.deletedAt is null
+              and (
+                    lower(news.title) like :keyword
+                    or (news.summary is not null and lower(news.summary) like :keyword)
+                    or (news.content is not null and lower(cast(news.content as String)) like :keyword)
+                    or (news.sourceName is not null and lower(news.sourceName) like :keyword)
+                    or (:filterByKeywordRegion = true and news.regionId in :keywordRegionIds)
+              )
+              and (:category is null or lower(news.newsCategory.name) = lower(:category))
+              and (:status is null or news.recruitmentStatus = :status)
+              and (:filterByRegion = false or news.regionId in :regionIds)
+            """)
+    Page<News> searchVisibleNews(
+            @Param("keyword") String keyword,
+            @Param("filterByKeywordRegion") boolean filterByKeywordRegion,
+            @Param("keywordRegionIds") Collection<Long> keywordRegionIds,
+            @Param("category") String category,
+            @Param("status") RecruitmentStatus status,
+            @Param("filterByRegion") boolean filterByRegion,
+            @Param("regionIds") Collection<Long> regionIds,
+            Pageable pageable
+    );
+
+    @EntityGraph(attributePaths = {"newsCategory", "newsSource"})
+    @Query("""
+            select news
+            from News news
             where news.id = :id
               and news.active = true
               and news.deletedAt is null

@@ -14,6 +14,7 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
@@ -59,6 +60,28 @@ public class NewsController {
         return ApiResponse.of(
                 GeneralSuccessCode.OK,
                 newsQueryService.getNews(page, size, region, category, status)
+        );
+    }
+
+    @GetMapping("/search")
+    @Operation(summary = "소식 검색", description = "검색어와 필터를 기준으로 소식 목록을 조회한다.")
+    public ApiResponse<NewsListResponse> searchNews(
+            @Parameter(description = "검색어", example = "봉사")
+            @RequestParam @NotBlank @Size(max = 100) String keyword,
+            @Parameter(description = "페이지 번호(0부터 시작)", example = "0")
+            @RequestParam(defaultValue = "0") @Min(0) int page,
+            @Parameter(description = "페이지 크기", example = "10")
+            @RequestParam(defaultValue = "10") @Min(1) @Max(100) int size,
+            @Parameter(description = "지역", example = "서울")
+            @RequestParam(required = false) @Size(max = 50) String region,
+            @Parameter(description = "카테고리", example = "VOLUNTEER")
+            @RequestParam(required = false) @Size(max = 50) String category,
+            @Parameter(description = "모집 상태", example = "RECRUITING")
+            @RequestParam(required = false) NewsStatus status
+    ) {
+        return ApiResponse.of(
+                GeneralSuccessCode.OK,
+                newsQueryService.searchNews(keyword, page, size, region, category, status)
         );
     }
 
