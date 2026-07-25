@@ -59,6 +59,13 @@ spring:
         initialize-schema: true
 
 bodeum:
+  public-data:
+    odcloud:
+      base-url: ${ODCLOUD_BASE_URL:https://api.odcloud.kr/api}
+      service-key: ${OPENAPI_SECRET_ODCLOUD:}
+  news:
+    public-data:
+      sync-on-startup: ${NEWS_PUBLIC_DATA_SYNC_ON_STARTUP:false}
   ai:
     rag:
       top-k: ${AI_RAG_TOP_K:5}
