@@ -1,6 +1,7 @@
 package com.bodeum.domain.auth.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -265,6 +266,34 @@ class AuthControllerTest {
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("AUTH401_1"));
+    }
+
+    @Test
+    void withdrawSucceedsWithoutRequestBody() throws Exception {
+        String accessToken = login("withdraw-no-body-code").at("/result/accessToken").asText();
+
+        mockMvc.perform(delete("/api/v1/users/me")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.success").value(true));
+
+        assertThat(userRepository.findAll().getFirst().isWithdrawn()).isTrue();
+    }
+
+    @Test
+    void withdrawStillSucceedsWhenLegacyReasonBodyProvided() throws Exception {
+        // 탈퇴 사유 필드는 폐지됐지만, 구버전 클라이언트가 보내던 {"reason":...} 바디가 와도
+        // 무시하고 정상 탈퇴되어야 한다(하위 호환).
+        String accessToken = login("withdraw-legacy-body-code").at("/result/accessToken").asText();
+
+        mockMvc.perform(delete("/api/v1/users/me")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\":\"더 이상 이용하지 않습니다\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.success").value(true));
+
+        assertThat(userRepository.findAll().getFirst().isWithdrawn()).isTrue();
     }
 
     @Test
