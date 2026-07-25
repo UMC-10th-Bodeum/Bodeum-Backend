@@ -2,6 +2,7 @@ package com.bodeum.domain.mypage.repository;
 
 import com.bodeum.domain.news.entity.NewsScrap;
 import java.util.List;
+import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -30,6 +31,18 @@ public interface MyPageNewsScrapRepository
             order by scrap.createdAt desc
             """)
     List<NewsScrap> findAllVisibleByUserIdOrderByCreatedAtDesc(
+            @Param("userId") Long userId
+    );
+
+    @Query("""
+            select scrap
+            from NewsScrap scrap
+            join fetch scrap.news news
+            where scrap.id = :scrapId
+              and scrap.userId = :userId
+            """)
+    Optional<NewsScrap> findOwnedById(
+            @Param("scrapId") Long scrapId,
             @Param("userId") Long userId
     );
 }

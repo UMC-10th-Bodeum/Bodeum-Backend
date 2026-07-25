@@ -1,6 +1,7 @@
 package com.bodeum.domain.mypage.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -19,6 +20,7 @@ import com.bodeum.domain.mypage.dto.response.MyCommentListResponse;
 import com.bodeum.domain.mypage.dto.response.MyPageProfileResponse;
 import com.bodeum.domain.mypage.dto.response.MyPostListResponse;
 import com.bodeum.domain.mypage.dto.response.MyScrapListResponse;
+import com.bodeum.domain.mypage.entity.enums.ScrapType;
 import com.bodeum.domain.mypage.repository.MyPageCommentRepository;
 import com.bodeum.domain.mypage.repository.MyPageInfoScrapRepository;
 import com.bodeum.domain.mypage.repository.MyPageNewsScrapRepository;
@@ -30,9 +32,12 @@ import com.bodeum.domain.news.entity.RecruitmentStatus;
 import com.bodeum.domain.user.dto.response.UserProfileResponse;
 import com.bodeum.domain.user.entity.User;
 import com.bodeum.domain.user.service.UserService;
+import com.bodeum.global.apiPayload.code.GeneralErrorCode;
+import com.bodeum.global.apiPayload.exception.ProjectException;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -657,6 +662,75 @@ class MyPageServiceTest {
 
         assertThat(response.comments())
                 .isEmpty();
+
+        verify(userService).getCurrentUser(1L);
+    }
+
+    @Test
+    void deleteScrapDeletesOwnedInfoScrapAndDecreasesCount() {
+        User user = mock(User.class);
+        InfoScrap scrap = mock(InfoScrap.class);
+        InfoItem infoItem = mock(InfoItem.class);
+
+        given(userService.getCurrentUser(1L))
+                .willReturn(user);
+
+        given(infoScrapRepository.findOwnedById(10L, 1L))
+                .willReturn(Optional.of(scrap));
+
+        given(scrap.getInfoItem())
+                .willReturn(infoItem);
+
+        myPageService.deleteScrap(1L, 10L, ScrapType.INFO);
+
+        verify(infoItem).updateScrapCount(-1);
+        verify(infoScrapRepository).delete(scrap);
+        verify(userService).getCurrentUser(1L);
+    }
+
+    @Test
+    void deleteScrapDeletesOwnedNewsScrapAndDecreasesCount() {
+        User user = mock(User.class);
+        NewsScrap scrap = mock(NewsScrap.class);
+        News news = mock(News.class);
+
+        given(userService.getCurrentUser(1L))
+                .willReturn(user);
+
+        given(newsScrapRepository.findOwnedById(20L, 1L))
+                .willReturn(Optional.of(scrap));
+
+        given(scrap.getNews())
+                .willReturn(news);
+
+        myPageService.deleteScrap(1L, 20L, ScrapType.NEWS);
+
+        verify(news).decreaseScrapCount();
+        verify(newsScrapRepository).delete(scrap);
+        verify(userService).getCurrentUser(1L);
+    }
+
+    @Test
+    void deleteScrapThrowsNotFoundWhenScrapIsMissingOrNotOwned() {
+        User user = mock(User.class);
+
+        given(userService.getCurrentUser(1L))
+                .willReturn(user);
+
+        given(infoScrapRepository.findOwnedById(99L, 1L))
+                .willReturn(Optional.empty());
+
+        assertThatThrownBy(
+                () -> myPageService.deleteScrap(
+                        1L,
+                        99L,
+                        ScrapType.INFO
+                )
+        ).isInstanceOfSatisfying(
+                ProjectException.class,
+                exception -> assertThat(exception.getErrorCode())
+                        .isEqualTo(GeneralErrorCode.NOT_FOUND)
+        );
 
         verify(userService).getCurrentUser(1L);
     }

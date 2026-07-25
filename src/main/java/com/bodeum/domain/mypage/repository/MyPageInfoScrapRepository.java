@@ -2,6 +2,7 @@ package com.bodeum.domain.mypage.repository;
 
 import com.bodeum.domain.info.entity.InfoScrap;
 import java.util.List;
+import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -27,6 +28,18 @@ public interface MyPageInfoScrapRepository
             order by scrap.createdAt desc
             """)
     List<InfoScrap> findAllByUserIdOrderByCreatedAtDesc(
+            @Param("userId") Long userId
+    );
+
+    @Query("""
+            select scrap
+            from InfoScrap scrap
+            join fetch scrap.infoItem infoItem
+            where scrap.id = :scrapId
+              and scrap.user.id = :userId
+            """)
+    Optional<InfoScrap> findOwnedById(
+            @Param("scrapId") Long scrapId,
             @Param("userId") Long userId
     );
 }
