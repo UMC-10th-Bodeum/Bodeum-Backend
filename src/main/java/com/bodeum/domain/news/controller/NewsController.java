@@ -1,0 +1,77 @@
+package com.bodeum.domain.news.controller;
+
+import com.bodeum.domain.news.dto.NewsStatus;
+import com.bodeum.domain.news.dto.response.NewsDetailResponse;
+import com.bodeum.domain.news.dto.response.NewsListResponse;
+import com.bodeum.domain.news.service.NewsQueryService;
+import com.bodeum.global.apiPayload.ApiResponse;
+import com.bodeum.global.apiPayload.code.GeneralSuccessCode;
+import com.bodeum.global.auth.LoginUser;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.security.SecurityRequirements;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.Size;
+import lombok.RequiredArgsConstructor;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+@Validated
+@RestController
+@RequestMapping("/api/news")
+@RequiredArgsConstructor
+@Tag(name = "News", description = "소식 조회 API")
+@SecurityRequirements
+public class NewsController {
+
+    private final NewsQueryService newsQueryService;
+
+    @GetMapping
+    @Operation(summary = "소식 목록 조회", description = "최신 소식과 모집 상태별 소식을 조회한다.")
+    public ApiResponse<NewsListResponse> getNews(
+            @Parameter(description = "페이지 번호(0부터 시작)", example = "0")
+            @RequestParam(defaultValue = "0") @Min(0) int page,
+            @Parameter(description = "페이지 크기", example = "10")
+            @RequestParam(defaultValue = "10") @Min(1) @Max(100) int size,
+            @Parameter(
+                    description = "정렬 기준",
+                    example = "latest",
+                    schema = @Schema(allowableValues = "latest")
+            )
+            @RequestParam(defaultValue = "latest")
+            @Pattern(regexp = "latest") String sort,
+            @Parameter(description = "지역", example = "서울")
+            @RequestParam(required = false) @Size(max = 50) String region,
+            @Parameter(description = "카테고리", example = "VOLUNTEER")
+            @RequestParam(required = false) @Size(max = 50) String category,
+            @Parameter(description = "모집 상태", example = "RECRUITING")
+            @RequestParam(required = false) NewsStatus status
+    ) {
+        return ApiResponse.of(
+                GeneralSuccessCode.OK,
+                newsQueryService.getNews(page, size, region, category, status)
+        );
+    }
+
+    @GetMapping("/{newsId}")
+    @Operation(summary = "소식 상세 조회", description = "특정 소식의 상세 정보를 조회한다.")
+    public ApiResponse<NewsDetailResponse> getNewsDetail(
+            @Parameter(description = "소식 ID", example = "1")
+            @PathVariable @Positive Long newsId,
+            @LoginUser Long userId
+    ) {
+        return ApiResponse.of(
+                GeneralSuccessCode.OK,
+                newsQueryService.getNewsDetail(userId, newsId)
+        );
+    }
+}

@@ -1,5 +1,7 @@
 package com.bodeum.domain.news.collector;
 
+import com.bodeum.domain.news.entity.NewsType;
+import com.bodeum.domain.news.entity.RecruitmentStatus;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
@@ -19,6 +21,9 @@ public record NewsCandidate(
         LocalDate programStartDate,
         LocalDate programEndDate,
         LocalDate applyStartDate,
-        LocalDate applyEndDate
+        LocalDate applyEndDate,
+        String categoryName,
+        NewsType newsType,
+        RecruitmentStatus recruitmentStatus
 ) {
 }
