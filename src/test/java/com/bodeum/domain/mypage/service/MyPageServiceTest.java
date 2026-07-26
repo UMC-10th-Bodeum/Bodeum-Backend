@@ -5,6 +5,9 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
+import com.bodeum.domain.community.entity.Post;
+import com.bodeum.domain.community.enums.PostAnonymityType;
+import com.bodeum.domain.community.enums.PostBoardType;
 import com.bodeum.domain.community.enums.CommentStatus;
 import com.bodeum.domain.community.enums.PostStatus;
 import com.bodeum.domain.info.entity.InfoCategory;
@@ -12,6 +15,7 @@ import com.bodeum.domain.info.entity.InfoItem;
 import com.bodeum.domain.info.entity.InfoScrap;
 import com.bodeum.domain.info.entity.enums.MainCategory;
 import com.bodeum.domain.mypage.dto.response.MyPageProfileResponse;
+import com.bodeum.domain.mypage.dto.response.MyPostListResponse;
 import com.bodeum.domain.mypage.dto.response.MyScrapListResponse;
 import com.bodeum.domain.mypage.repository.MyPageCommentRepository;
 import com.bodeum.domain.mypage.repository.MyPageInfoScrapRepository;
@@ -32,6 +36,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 
 @ExtendWith(MockitoExtension.class)
 class MyPageServiceTest {
@@ -343,6 +350,153 @@ class MyPageServiceTest {
                 .isEmpty();
 
         assertThat(response.newsScraps())
+                .isEmpty();
+
+        verify(userService).getCurrentUser(1L);
+    }
+
+    @Test
+    void getPostsReturnsPagedPosts() {
+        User user = mock(User.class);
+        Post post = mock(Post.class);
+        PageRequest pageable = PageRequest.of(0, 10);
+        Instant createdAt = Instant.parse("2026-07-18T00:00:00Z");
+        Instant updatedAt = Instant.parse("2026-07-19T00:00:00Z");
+        Page<Post> postPage = new PageImpl<>(
+                List.of(post),
+                pageable,
+                11
+        );
+
+        given(userService.getCurrentUser(1L))
+                .willReturn(user);
+
+        given(
+                postRepository
+                        .findAllVisibleByUserIdOrderByCreatedAtDesc(
+                                1L,
+                                PostStatus.ACTIVE,
+                                pageable
+                        )
+        ).willReturn(postPage);
+
+        given(post.getId())
+                .willReturn(100L);
+
+        given(post.getBoardType())
+                .willReturn(PostBoardType.FREE_COMMUNICATION);
+
+        given(post.getAnonymityType())
+                .willReturn(PostAnonymityType.PROFILE_TAG_VISIBLE);
+
+        given(post.getTitle())
+                .willReturn("게시글 제목");
+
+        given(post.getContent())
+                .willReturn("게시글 내용");
+
+        given(post.isQuestion())
+                .willReturn(true);
+
+        given(post.getViewCount())
+                .willReturn(3);
+
+        given(post.getLikeCount())
+                .willReturn(4);
+
+        given(post.getCommentCount())
+                .willReturn(5);
+
+        given(post.getScrapCount())
+                .willReturn(6);
+
+        given(post.getCreatedAt())
+                .willReturn(createdAt);
+
+        given(post.getUpdatedAt())
+                .willReturn(updatedAt);
+
+        MyPostListResponse response =
+                myPageService.getPosts(1L, 0, 10);
+
+        assertThat(response.totalCount())
+                .isEqualTo(11L);
+
+        assertThat(response.page())
+                .isZero();
+
+        assertThat(response.size())
+                .isEqualTo(10);
+
+        assertThat(response.totalPages())
+                .isEqualTo(2);
+
+        assertThat(response.hasNext())
+                .isTrue();
+
+        assertThat(response.posts())
+                .hasSize(1);
+
+        MyPostListResponse.MyPostItem postResponse =
+                response.posts().getFirst();
+
+        assertThat(postResponse.postId())
+                .isEqualTo(100L);
+
+        assertThat(postResponse.boardType())
+                .isEqualTo(PostBoardType.FREE_COMMUNICATION);
+
+        assertThat(postResponse.anonymityType())
+                .isEqualTo(PostAnonymityType.PROFILE_TAG_VISIBLE);
+
+        assertThat(postResponse.title())
+                .isEqualTo("게시글 제목");
+
+        assertThat(postResponse.isQuestion())
+                .isTrue();
+
+        assertThat(postResponse.createdAt())
+                .isEqualTo(createdAt);
+
+        verify(userService).getCurrentUser(1L);
+    }
+
+    @Test
+    void getPostsReturnsEmptyPageWhenUserHasNoPosts() {
+        User user = mock(User.class);
+        PageRequest pageable = PageRequest.of(1, 5);
+
+        given(userService.getCurrentUser(1L))
+                .willReturn(user);
+
+        given(
+                postRepository
+                        .findAllVisibleByUserIdOrderByCreatedAtDesc(
+                                1L,
+                                PostStatus.ACTIVE,
+                                pageable
+                        )
+        ).willReturn(Page.empty(pageable));
+
+        MyPostListResponse response =
+                myPageService.getPosts(1L, 1, 5);
+
+        assertThat(response.totalCount())
+                .isZero();
+
+        assertThat(response.page())
+                .isEqualTo(1);
+
+        assertThat(response.size())
+                .isEqualTo(5);
+
+        assertThat(response.totalPages())
+                .isZero();
+
+        assertThat(response.hasNext())
+                .isFalse();
+
+        assertThat(response.posts())
                 .isEmpty();
 
         verify(userService).getCurrentUser(1L);

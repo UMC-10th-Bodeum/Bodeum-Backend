@@ -1,10 +1,12 @@
 package com.bodeum.domain.mypage.service;
 
+import com.bodeum.domain.community.entity.Post;
 import com.bodeum.domain.community.enums.CommentStatus;
 import com.bodeum.domain.community.enums.PostStatus;
 import com.bodeum.domain.info.entity.InfoScrap;
 import com.bodeum.domain.mypage.dto.response.MyPageProfileResponse;
 import com.bodeum.domain.mypage.dto.response.MyPageProfileResponse.ActivitySummary;
+import com.bodeum.domain.mypage.dto.response.MyPostListResponse;
 import com.bodeum.domain.mypage.dto.response.MyScrapListResponse;
 import com.bodeum.domain.mypage.repository.MyPageCommentRepository;
 import com.bodeum.domain.mypage.repository.MyPageInfoScrapRepository;
@@ -15,6 +17,8 @@ import com.bodeum.domain.user.dto.response.UserProfileResponse;
 import com.bodeum.domain.user.service.UserService;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -79,5 +83,24 @@ public class MyPageService {
                 infoScraps,
                 newsScraps
         );
+    }
+
+    @Transactional(readOnly = true)
+    public MyPostListResponse getPosts(
+            Long userId,
+            int page,
+            int size
+    ) {
+        userService.getCurrentUser(userId);
+
+        Page<Post> posts =
+                postRepository
+                        .findAllVisibleByUserIdOrderByCreatedAtDesc(
+                                userId,
+                                PostStatus.ACTIVE,
+                                PageRequest.of(page, size)
+                        );
+
+        return MyPostListResponse.from(posts);
     }
 }

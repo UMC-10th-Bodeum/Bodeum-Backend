@@ -1,6 +1,7 @@
 package com.bodeum.domain.user.controller;
 
 import com.bodeum.domain.mypage.dto.response.MyPageProfileResponse;
+import com.bodeum.domain.mypage.dto.response.MyPostListResponse;
 import com.bodeum.domain.mypage.dto.response.MyScrapListResponse;
 import com.bodeum.domain.mypage.service.MyPageService;
 import com.bodeum.domain.onboarding.dto.response.OnboardingStatusResponse;
@@ -22,8 +23,10 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -35,6 +38,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 @Tag(name = "User", description = "사용자 프로필 및 약관 동의 관리 API")
+@Validated
 @RestController
 @RequestMapping("/api/v1/users")
 @RequiredArgsConstructor
@@ -87,6 +91,22 @@ public class UserController {
         return ApiResponse.of(
                 GeneralSuccessCode.OK,
                 myPageService.getScraps(userId)
+        );
+    }
+
+    @Operation(
+            summary = "내 게시글 목록 조회",
+            description = "현재 로그인한 사용자가 작성한 게시글을 최신순으로 조회한다."
+    )
+    @GetMapping("/me/posts")
+    public ApiResponse<MyPostListResponse> getPosts(
+            @LoginUser Long userId,
+            @RequestParam(defaultValue = "0") @Min(0) int page,
+            @RequestParam(defaultValue = "10") @Min(1) int size
+    ) {
+        return ApiResponse.of(
+                GeneralSuccessCode.OK,
+                myPageService.getPosts(userId, page, size)
         );
     }
 
