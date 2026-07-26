@@ -55,12 +55,20 @@ public class SearchService {
     }
 
     public AutocompleteResponse getAutocomplete(String keyword) {
+        // 1. 공백/null 검증 -> 예외 발생
         if (keyword == null || keyword.trim().isEmpty()) {
-            return new AutocompleteResponse(List.of());
+            throw new SearchException(SearchErrorCode.SEARCH_KEYWORD_BLANK);
+        }
+
+        String trimmedKeyword = keyword.trim();
+
+        // 2. 최대 길이 검증 -> 예외 발생
+        if (trimmedKeyword.length() > 50) {
+            throw new SearchException(SearchErrorCode.SEARCH_KEYWORD_TOO_LONG);
         }
 
         List<InfoItem> items = searchInfoItemRepository.findAutocompleteByKeyword(
-                keyword.trim(),
+                trimmedKeyword,
                 PageRequest.of(0, AUTOCOMPLETE_LIMIT)
         );
 
