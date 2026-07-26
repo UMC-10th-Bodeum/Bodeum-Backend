@@ -16,6 +16,7 @@ public interface CommentLikeRepository extends JpaRepository<CommentLike, Long> 
 
     // 회원 탈퇴 시: 해당 회원이 공감한 댓글·답글의 likeCount를 1 감소시킨다.
     // 유니크 제약(user_id, comment_id)으로 댓글당 공감은 최대 1건이므로 정확히 1씩 감소한다.
+    // 삭제(deleteByUserId)보다 먼저 호출해야 대상 comment_id를 조회할 수 있다.
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("""
             UPDATE Comment c SET c.likeCount = c.likeCount - 1

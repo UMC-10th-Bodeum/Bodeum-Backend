@@ -150,9 +150,10 @@ class AccountWithdrawalPersistenceIntegrationTest {
     @Test
     @DisplayName("정보 스크랩 삭제: InfoItem.scrapCount가 1만 감소한다")
     void infoScrapWithdrawal() {
-        Long withdrawer = persistUser("kakao-1").getId();
+        User withdrawerUser = persistUser("kakao-1");
         User other = persistUser("kakao-2");
-        User withdrawerUser = em.find(User.class, withdrawer);
+        Long withdrawer = withdrawerUser.getId();
+        Long otherId = other.getId();
         InfoItem item = persistInfoItem();
         em.persist(InfoScrap.builder().user(withdrawerUser).infoItem(item).build());
         em.persist(InfoScrap.builder().user(other).infoItem(item).build());
@@ -167,6 +168,8 @@ class AccountWithdrawalPersistenceIntegrationTest {
 
         InfoItem reloaded = em.find(InfoItem.class, itemId);
         assertThat(reloaded.getScrapCount()).isEqualTo(1);
+        assertThat(countInfoScrapsByUser(withdrawer)).isZero();             // 탈퇴자 스크랩 삭제
+        assertThat(countInfoScrapsByUser(otherId)).isEqualTo(1);            // 타 사용자 스크랩 보존
     }
 
     @Test
@@ -189,6 +192,8 @@ class AccountWithdrawalPersistenceIntegrationTest {
 
         News reloaded = em.find(News.class, newsId);
         assertThat(reloaded.getScrapCount()).isEqualTo(1L);
+        assertThat(countNewsScrapsByUser(withdrawer)).isZero();             // 탈퇴자 스크랩 삭제
+        assertThat(countNewsScrapsByUser(other)).isEqualTo(1);             // 타 사용자 스크랩 보존
     }
 
     @Test
@@ -296,6 +301,20 @@ class AccountWithdrawalPersistenceIntegrationTest {
     private long countGuardianProfiles() {
         return em.getEntityManager()
                 .createQuery("SELECT COUNT(g) FROM GuardianProfile g", Long.class)
+                .getSingleResult();
+    }
+
+    private long countInfoScrapsByUser(Long userId) {
+        return em.getEntityManager()
+                .createQuery("SELECT COUNT(s) FROM InfoScrap s WHERE s.user.id = :userId", Long.class)
+                .setParameter("userId", userId)
+                .getSingleResult();
+    }
+
+    private long countNewsScrapsByUser(Long userId) {
+        return em.getEntityManager()
+                .createQuery("SELECT COUNT(s) FROM NewsScrap s WHERE s.userId = :userId", Long.class)
+                .setParameter("userId", userId)
                 .getSingleResult();
     }
 }

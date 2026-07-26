@@ -6,6 +6,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
@@ -15,6 +16,7 @@ import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class S3ImageStorage {
@@ -60,6 +62,11 @@ public class S3ImageStorage {
     public void delete(String imageUrl) {
         String key = extractKey(imageUrl);
         if (key == null) {
+            // URL이 이 스토리지가 관리하는 형식과 다르면 S3 삭제를 건너뛴다. publicBaseUrl 설정 변경 등으로
+            // 과거 URL이 인식되지 않아 삭제가 누락될 수 있으므로, 운영 중 감지할 수 있게 로그를 남긴다.
+            if (StringUtils.hasText(imageUrl)) {
+                log.warn("S3 삭제 스킵: 인식할 수 없는 이미지 URL 형식 - {}", imageUrl);
+            }
             return;
         }
 

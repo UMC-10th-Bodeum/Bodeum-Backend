@@ -102,6 +102,9 @@ class AccountWithdrawalServiceTest {
 
         then(searchService).shouldHaveNoInteractions();
         then(postService).shouldHaveNoInteractions();
+        then(commentService).shouldHaveNoInteractions();
+        then(infoScrapService).shouldHaveNoInteractions();
+        then(newsScrapService).shouldHaveNoInteractions();
         then(userService).shouldHaveNoInteractions();
         then(s3ImageStorage).shouldHaveNoInteractions();
     }

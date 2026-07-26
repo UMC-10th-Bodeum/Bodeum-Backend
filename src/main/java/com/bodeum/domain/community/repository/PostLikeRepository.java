@@ -17,6 +17,7 @@ public interface PostLikeRepository extends JpaRepository<PostLike, Long> {
 
     // 회원 탈퇴 시: 해당 회원이 좋아요한 게시글의 likeCount를 1 감소시킨다.
     // 유니크 제약(user_id, post_id)으로 게시글당 좋아요는 최대 1건이므로 정확히 1씩 감소한다.
+    // 삭제(deleteByUserId)보다 먼저 호출해야 대상 post_id를 조회할 수 있다.
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("""
             UPDATE Post p SET p.likeCount = p.likeCount - 1
