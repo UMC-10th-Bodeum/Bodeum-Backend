@@ -1,6 +1,6 @@
-package com.bodeum.domain.mypage.entity;
+package com.bodeum.domain.point.entity;
 
-import com.bodeum.domain.mypage.entity.enums.PointType;
+import com.bodeum.domain.point.enums.PointType;
 import com.bodeum.global.common.entity.BaseCreatedEntity;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
