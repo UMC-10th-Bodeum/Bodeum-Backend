@@ -1,7 +1,7 @@
 package com.bodeum.domain.ai.enums;
 
 public enum AiSourceReviewStatus {
-    NORMAL,
+    CONFIRMED_VALID,
     REVIEW_REQUIRED,
     CONFIRMED_INCORRECT
 }
