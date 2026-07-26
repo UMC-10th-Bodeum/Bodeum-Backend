@@ -5,5 +5,5 @@ import java.util.Collection;
 
 public interface AiSourceReviewQueryRepository {
 
-    boolean existsConfirmedIncorrectBySources(Collection<AiSourceKey> sourceKeys);
+    boolean existsWarningRequiredBySources(Collection<AiSourceKey> sourceKeys);
 }

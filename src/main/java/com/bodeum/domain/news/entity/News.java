@@ -1,8 +1,10 @@
 package com.bodeum.domain.news.entity;
 
+import com.bodeum.domain.news.collector.NewsCandidate;
 import com.bodeum.global.common.entity.BaseCreatedUpdatedDeletedEntity;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
@@ -113,6 +115,50 @@ public class News extends BaseCreatedUpdatedDeletedEntity {
     @Column(name = "apply_end_date")
     private LocalDate applyEndDate;
 
+    @Builder(access = AccessLevel.PRIVATE)
+    private News(
+            NewsCategory newsCategory,
+            NewsSource newsSource,
+            Long regionId,
+            NewsCandidate candidate
+    ) {
+        this.newsCategory = newsCategory;
+        this.newsSource = newsSource;
+        this.regionId = regionId;
+        this.viewCount = 0L;
+        this.scrapCount = 0L;
+        this.active = true;
+        apply(candidate);
+    }
+
+    public static News create(
+            NewsCategory newsCategory,
+            NewsSource newsSource,
+            Long regionId,
+            NewsCandidate candidate
+    ) {
+        return News.builder()
+                .newsCategory(newsCategory)
+                .newsSource(newsSource)
+                .regionId(regionId)
+                .candidate(candidate)
+                .build();
+    }
+
+    public void updateCollectedData(
+            NewsCategory newsCategory,
+            NewsSource newsSource,
+            Long regionId,
+            NewsCandidate candidate
+    ) {
+        this.newsCategory = newsCategory;
+        this.newsSource = newsSource;
+        this.regionId = regionId;
+        this.active = true;
+        restore();
+        apply(candidate);
+    }
+
     public void increaseViewCount() {
         this.viewCount++;
     }
@@ -129,5 +175,25 @@ public class News extends BaseCreatedUpdatedDeletedEntity {
 
     public boolean isVisible() {
         return Boolean.TRUE.equals(this.active) && !isDeleted();
+    }
+
+    private void apply(NewsCandidate candidate) {
+        this.externalItemId = candidate.externalItemId();
+        this.title = candidate.title();
+        this.summary = candidate.summary();
+        this.content = candidate.content();
+        this.sourceName = candidate.sourceName();
+        this.publishedAt = candidate.publishedAt();
+        this.originalUrl = candidate.originalUrl();
+        this.thumbnailUrl = candidate.thumbnailUrl();
+        this.newsType = candidate.newsType();
+        this.recruitmentStatus = candidate.recruitmentStatus();
+        this.targetAudience = candidate.targetAudience();
+        this.contact = candidate.contact();
+        this.manager = candidate.manager();
+        this.programStartDate = candidate.programStartDate();
+        this.programEndDate = candidate.programEndDate();
+        this.applyStartDate = candidate.applyStartDate();
+        this.applyEndDate = candidate.applyEndDate();
     }
 }

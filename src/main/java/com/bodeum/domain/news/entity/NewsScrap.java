@@ -32,11 +32,12 @@ public class NewsScrap extends BaseCreatedEntity {
     @Column(name = "user_id", nullable = false)
     private Long userId;
 
-    /*
-     * TODO: User 엔터티 연동 시 아래 연관관계로 변경 예정
-     *
-     * @ManyToOne(fetch = FetchType.LAZY)
-     * @JoinColumn(name = "user_id", nullable = false)
-     * private User user;
-     */
+    private NewsScrap(News news, Long userId) {
+        this.news = news;
+        this.userId = userId;
+    }
+
+    public static NewsScrap create(News news, Long userId) {
+        return new NewsScrap(news, userId);
+    }
 }
