@@ -1,5 +1,6 @@
 package com.bodeum.domain.search.controller;
 
+import com.bodeum.domain.search.dto.response.AutocompleteResponse;
 import com.bodeum.domain.search.dto.response.InfoSearchResponse;
 import com.bodeum.domain.search.dto.response.SearchHistoryResponse;
 import com.bodeum.domain.search.service.SearchService;
@@ -42,5 +43,13 @@ public class SearchController {
     ) {
         searchService.deleteSearchHistory(userId, keyword);
         return ApiResponse.of(GeneralSuccessCode.OK, null);
+    }
+
+    @GetMapping("/info-items/search")
+    @Operation(summary = "정보 검색어 자동완성 조회", description = "입력한 키워드에 매칭되는 정보(기관/병원 등) 이름 및 추천 태그 목록을 반환합니다.")
+    public ApiResponse<AutocompleteResponse> getAutocomplete(
+            @RequestParam String keyword
+    ) {
+        return ApiResponse.of(GeneralSuccessCode.OK, searchService.getAutocomplete(keyword));
     }
 }

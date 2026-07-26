@@ -1,6 +1,7 @@
 package com.bodeum.domain.search.service;
 
 import com.bodeum.domain.info.entity.InfoItem;
+import com.bodeum.domain.search.dto.response.AutocompleteResponse;
 import com.bodeum.domain.search.dto.response.InfoSearchResponse;
 import com.bodeum.domain.search.dto.response.SearchHistoryResponse;
 import com.bodeum.domain.search.entity.SearchLog;
@@ -23,6 +24,7 @@ public class SearchService {
 
     private static final int HISTORY_LIMIT = 10;
     private static final int SEARCH_RESULT_LIMIT = 50;
+    private static final int AUTOCOMPLETE_LIMIT = 10; // 자동완성 추천 최대 개수
 
     private final SearchInfoItemRepository searchInfoItemRepository;
     private final SearchLogRepository searchLogRepository;
@@ -50,5 +52,18 @@ public class SearchService {
         if (deleted == 0) {
             throw new SearchException(SearchErrorCode.SEARCH_HISTORY_NOT_FOUND);
         }
+    }
+
+    public AutocompleteResponse getAutocomplete(String keyword) {
+        if (keyword == null || keyword.trim().isEmpty()) {
+            return new AutocompleteResponse(List.of());
+        }
+
+        List<InfoItem> items = searchInfoItemRepository.findAutocompleteByKeyword(
+                keyword.trim(),
+                PageRequest.of(0, AUTOCOMPLETE_LIMIT)
+        );
+
+        return AutocompleteResponse.from(items);
     }
 }
