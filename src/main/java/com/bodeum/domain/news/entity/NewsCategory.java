@@ -28,4 +28,15 @@ public class NewsCategory {
 
     @Column(name = "is_active", nullable = false)
     private Boolean active = true;
+
+    private NewsCategory(NewsType newsType, String name, Integer sortOrder) {
+        this.newsType = newsType;
+        this.name = name;
+        this.sortOrder = sortOrder;
+        this.active = true;
+    }
+
+    public static NewsCategory create(NewsType newsType, String name, Integer sortOrder) {
+        return new NewsCategory(newsType, name, sortOrder);
+    }
 }

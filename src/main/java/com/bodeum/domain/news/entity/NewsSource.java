@@ -38,6 +38,23 @@ public class NewsSource extends BaseCreatedUpdatedEntity {
     @Column(name = "last_synced_at")
     private Instant lastSyncedAt;
 
+    private NewsSource(NewsSourceType sourceType, String name, String baseUrl, String listUrl) {
+        this.sourceType = sourceType;
+        this.name = name;
+        this.baseUrl = baseUrl;
+        this.listUrl = listUrl;
+        this.active = true;
+    }
+
+    public static NewsSource create(
+            NewsSourceType sourceType,
+            String name,
+            String baseUrl,
+            String listUrl
+    ) {
+        return new NewsSource(sourceType, name, baseUrl, listUrl);
+    }
+
     public void updateLastSyncedAt(Instant lastSyncedAt) {
         this.lastSyncedAt = lastSyncedAt;
     }
