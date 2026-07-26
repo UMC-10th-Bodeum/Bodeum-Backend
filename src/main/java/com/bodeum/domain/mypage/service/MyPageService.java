@@ -10,6 +10,7 @@ import com.bodeum.domain.mypage.dto.response.MyPageProfileResponse;
 import com.bodeum.domain.mypage.dto.response.MyPageProfileResponse.ActivitySummary;
 import com.bodeum.domain.mypage.dto.response.MyPostListResponse;
 import com.bodeum.domain.mypage.dto.response.MyScrapListResponse;
+import com.bodeum.domain.mypage.entity.enums.ScrapType;
 import com.bodeum.domain.mypage.repository.MyPageCommentRepository;
 import com.bodeum.domain.mypage.repository.MyPageInfoScrapRepository;
 import com.bodeum.domain.mypage.repository.MyPageNewsScrapRepository;
@@ -17,6 +18,8 @@ import com.bodeum.domain.mypage.repository.MyPagePostRepository;
 import com.bodeum.domain.news.entity.NewsScrap;
 import com.bodeum.domain.user.dto.response.UserProfileResponse;
 import com.bodeum.domain.user.service.UserService;
+import com.bodeum.global.apiPayload.code.GeneralErrorCode;
+import com.bodeum.global.apiPayload.exception.ProjectException;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -87,6 +90,20 @@ public class MyPageService {
         );
     }
 
+    @Transactional
+    public void deleteScrap(
+            Long userId,
+            Long scrapId,
+            ScrapType scrapType
+    ) {
+        userService.getCurrentUser(userId);
+
+        switch (scrapType) {
+            case INFO -> deleteInfoScrap(userId, scrapId);
+            case NEWS -> deleteNewsScrap(userId, scrapId);
+        }
+    }
+
     @Transactional(readOnly = true)
     public MyPostListResponse getPosts(
             Long userId,
@@ -124,5 +141,27 @@ public class MyPageService {
                         );
 
         return MyCommentListResponse.from(comments);
+    }
+
+    private void deleteInfoScrap(Long userId, Long scrapId) {
+        InfoScrap scrap = infoScrapRepository
+                .findOwnedById(scrapId, userId)
+                .orElseThrow(MyPageService::scrapNotFound);
+
+        scrap.getInfoItem().updateScrapCount(-1);
+        infoScrapRepository.delete(scrap);
+    }
+
+    private void deleteNewsScrap(Long userId, Long scrapId) {
+        NewsScrap scrap = newsScrapRepository
+                .findOwnedById(scrapId, userId)
+                .orElseThrow(MyPageService::scrapNotFound);
+
+        scrap.getNews().decreaseScrapCount();
+        newsScrapRepository.delete(scrap);
+    }
+
+    private static ProjectException scrapNotFound() {
+        return new ProjectException(GeneralErrorCode.NOT_FOUND);
     }
 }

@@ -4,6 +4,7 @@ import com.bodeum.domain.mypage.dto.response.MyCommentListResponse;
 import com.bodeum.domain.mypage.dto.response.MyPageProfileResponse;
 import com.bodeum.domain.mypage.dto.response.MyPostListResponse;
 import com.bodeum.domain.mypage.dto.response.MyScrapListResponse;
+import com.bodeum.domain.mypage.entity.enums.ScrapType;
 import com.bodeum.domain.mypage.service.MyPageService;
 import com.bodeum.domain.onboarding.dto.response.OnboardingStatusResponse;
 import com.bodeum.domain.onboarding.service.OnboardingService;
@@ -25,16 +26,20 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.Positive;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -94,6 +99,22 @@ public class UserController {
                 GeneralSuccessCode.OK,
                 myPageService.getScraps(userId)
         );
+    }
+
+    @Operation(
+            summary = "저장한 정보 개별 삭제",
+            description = "현재 로그인한 사용자가 저장한 복지·시설 정보 또는 뉴스·활동 스크랩을 해제한다. "
+                    + "scrapType은 INFO 또는 NEWS를 사용한다."
+    )
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @DeleteMapping("/me/scraps/{scrapId}")
+    public ApiResponse<Void> deleteScrap(
+            @LoginUser Long userId,
+            @PathVariable @Positive Long scrapId,
+            @RequestParam ScrapType scrapType
+    ) {
+        myPageService.deleteScrap(userId, scrapId, scrapType);
+        return ApiResponse.of(GeneralSuccessCode.NO_CONTENT, null);
     }
 
     @Operation(
