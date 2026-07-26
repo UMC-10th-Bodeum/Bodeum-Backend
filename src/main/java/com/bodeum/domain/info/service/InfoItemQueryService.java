@@ -1,12 +1,16 @@
 package com.bodeum.domain.info.service;
 
 import com.bodeum.domain.info.dto.request.InfoItemSearchCondition;
+import com.bodeum.domain.info.dto.request.KakaoMapUrlRequest;
 import com.bodeum.domain.info.dto.response.InfoItemDetailResponse;
 import com.bodeum.domain.info.dto.response.InfoItemPageResponse;
 import com.bodeum.domain.info.dto.response.InfoItemResponse;
+import com.bodeum.domain.info.dto.response.KakaoMapUrlResponse;
 import com.bodeum.domain.info.entity.InfoCategory;
 import com.bodeum.domain.info.entity.InfoItem;
 import com.bodeum.domain.info.entity.enums.MainCategory;
+import com.bodeum.domain.info.exception.InfoErrorCode;
+import com.bodeum.domain.info.exception.InfoException;
 import com.bodeum.domain.info.repository.InfoCategoryRepository;
 import com.bodeum.domain.info.repository.InfoItemRepository;
 import com.bodeum.domain.region.entity.Region;
@@ -21,6 +25,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 @Service
@@ -106,5 +112,24 @@ public class InfoItemQueryService {
         List<InfoItemDetailResponse.BusinessHourDto> businessHours = List.of();
 
         return InfoItemDetailResponse.of(infoItem, isScrapped, businessHours);
+    }
+
+    /**
+     * 4. 카카오지도 URL 생성 API
+     */
+    public KakaoMapUrlResponse createKakaoMapUrl(KakaoMapUrlRequest request) {
+        // 도메인 예외 InfoException(INFO_ITEM_NOT_FOUND) 적용
+        InfoItem infoItem = infoItemRepository.findById(request.infoItemId())
+                .orElseThrow(() -> new InfoException(InfoErrorCode.INFO_ITEM_NOT_FOUND));
+
+        // 장소명이 존재하면 장소명, 없으면 주소 기반 키워드 인코딩
+        String searchQuery = (infoItem.getName() != null && !infoItem.getName().isBlank())
+                ? infoItem.getName()
+                : infoItem.getAddress();
+
+        String encodedQuery = URLEncoder.encode(searchQuery, StandardCharsets.UTF_8);
+        String kakaoMapUrl = "https://map.kakao.com/link/search/" + encodedQuery;
+
+        return KakaoMapUrlResponse.from(kakaoMapUrl);
     }
 }
