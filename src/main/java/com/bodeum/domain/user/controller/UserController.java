@@ -1,5 +1,6 @@
 package com.bodeum.domain.user.controller;
 
+import com.bodeum.domain.mypage.dto.response.MyCommentListResponse;
 import com.bodeum.domain.mypage.dto.response.MyPageProfileResponse;
 import com.bodeum.domain.mypage.dto.response.MyPostListResponse;
 import com.bodeum.domain.mypage.dto.response.MyScrapListResponse;
@@ -107,6 +108,22 @@ public class UserController {
         return ApiResponse.of(
                 GeneralSuccessCode.OK,
                 myPageService.getPosts(userId, page, size)
+        );
+    }
+
+    @Operation(
+            summary = "내 댓글 목록 조회",
+            description = "현재 로그인한 사용자가 작성한 댓글과 해당 게시글 정보를 최신순으로 조회한다."
+    )
+    @GetMapping("/me/comments")
+    public ApiResponse<MyCommentListResponse> getComments(
+            @LoginUser Long userId,
+            @RequestParam(defaultValue = "0") @Min(0) int page,
+            @RequestParam(defaultValue = "10") @Min(1) int size
+    ) {
+        return ApiResponse.of(
+                GeneralSuccessCode.OK,
+                myPageService.getComments(userId, page, size)
         );
     }
 

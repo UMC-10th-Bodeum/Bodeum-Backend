@@ -5,15 +5,17 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
+import com.bodeum.domain.community.entity.Comment;
 import com.bodeum.domain.community.entity.Post;
+import com.bodeum.domain.community.enums.CommentStatus;
 import com.bodeum.domain.community.enums.PostAnonymityType;
 import com.bodeum.domain.community.enums.PostBoardType;
-import com.bodeum.domain.community.enums.CommentStatus;
 import com.bodeum.domain.community.enums.PostStatus;
 import com.bodeum.domain.info.entity.InfoCategory;
 import com.bodeum.domain.info.entity.InfoItem;
 import com.bodeum.domain.info.entity.InfoScrap;
 import com.bodeum.domain.info.entity.enums.MainCategory;
+import com.bodeum.domain.mypage.dto.response.MyCommentListResponse;
 import com.bodeum.domain.mypage.dto.response.MyPageProfileResponse;
 import com.bodeum.domain.mypage.dto.response.MyPostListResponse;
 import com.bodeum.domain.mypage.dto.response.MyScrapListResponse;
@@ -497,6 +499,163 @@ class MyPageServiceTest {
                 .isFalse();
 
         assertThat(response.posts())
+                .isEmpty();
+
+        verify(userService).getCurrentUser(1L);
+    }
+
+    @Test
+    void getCommentsReturnsPagedCommentsWithPostInformation() {
+        User user = mock(User.class);
+        Comment comment = mock(Comment.class);
+        Comment parent = mock(Comment.class);
+        Post post = mock(Post.class);
+        PageRequest pageable = PageRequest.of(0, 10);
+        Instant createdAt = Instant.parse("2026-07-20T00:00:00Z");
+        Instant updatedAt = Instant.parse("2026-07-21T00:00:00Z");
+        Page<Comment> commentPage = new PageImpl<>(
+                List.of(comment),
+                pageable,
+                11
+        );
+
+        given(userService.getCurrentUser(1L))
+                .willReturn(user);
+
+        given(
+                commentRepository
+                        .findAllVisibleByUserIdOrderByCreatedAtDesc(
+                                1L,
+                                CommentStatus.ACTIVE,
+                                PostStatus.ACTIVE,
+                                pageable
+                        )
+        ).willReturn(commentPage);
+
+        given(comment.getId())
+                .willReturn(200L);
+
+        given(comment.getParent())
+                .willReturn(parent);
+
+        given(parent.getId())
+                .willReturn(199L);
+
+        given(comment.getContent())
+                .willReturn("내가 작성한 댓글");
+
+        given(comment.isAccepted())
+                .willReturn(true);
+
+        given(comment.getLikeCount())
+                .willReturn(3);
+
+        given(comment.getCreatedAt())
+                .willReturn(createdAt);
+
+        given(comment.getUpdatedAt())
+                .willReturn(updatedAt);
+
+        given(comment.getPost())
+                .willReturn(post);
+
+        given(post.getId())
+                .willReturn(100L);
+
+        given(post.getBoardType())
+                .willReturn(PostBoardType.FREE_COMMUNICATION);
+
+        given(post.getTitle())
+                .willReturn("댓글이 달린 게시글");
+
+        MyCommentListResponse response =
+                myPageService.getComments(1L, 0, 10);
+
+        assertThat(response.totalCount())
+                .isEqualTo(11L);
+
+        assertThat(response.page())
+                .isZero();
+
+        assertThat(response.size())
+                .isEqualTo(10);
+
+        assertThat(response.totalPages())
+                .isEqualTo(2);
+
+        assertThat(response.hasNext())
+                .isTrue();
+
+        assertThat(response.comments())
+                .hasSize(1);
+
+        MyCommentListResponse.MyCommentItem commentResponse =
+                response.comments().getFirst();
+
+        assertThat(commentResponse.commentId())
+                .isEqualTo(200L);
+
+        assertThat(commentResponse.parentCommentId())
+                .isEqualTo(199L);
+
+        assertThat(commentResponse.content())
+                .isEqualTo("내가 작성한 댓글");
+
+        assertThat(commentResponse.isAccepted())
+                .isTrue();
+
+        assertThat(commentResponse.postId())
+                .isEqualTo(100L);
+
+        assertThat(commentResponse.postBoardType())
+                .isEqualTo(PostBoardType.FREE_COMMUNICATION);
+
+        assertThat(commentResponse.postTitle())
+                .isEqualTo("댓글이 달린 게시글");
+
+        assertThat(commentResponse.createdAt())
+                .isEqualTo(createdAt);
+
+        verify(userService).getCurrentUser(1L);
+    }
+
+    @Test
+    void getCommentsReturnsEmptyPageWhenUserHasNoComments() {
+        User user = mock(User.class);
+        PageRequest pageable = PageRequest.of(1, 5);
+
+        given(userService.getCurrentUser(1L))
+                .willReturn(user);
+
+        given(
+                commentRepository
+                        .findAllVisibleByUserIdOrderByCreatedAtDesc(
+                                1L,
+                                CommentStatus.ACTIVE,
+                                PostStatus.ACTIVE,
+                                pageable
+                        )
+        ).willReturn(Page.empty(pageable));
+
+        MyCommentListResponse response =
+                myPageService.getComments(1L, 1, 5);
+
+        assertThat(response.totalCount())
+                .isZero();
+
+        assertThat(response.page())
+                .isEqualTo(1);
+
+        assertThat(response.size())
+                .isEqualTo(5);
+
+        assertThat(response.totalPages())
+                .isZero();
+
+        assertThat(response.hasNext())
+                .isFalse();
+
+        assertThat(response.comments())
                 .isEmpty();
 
         verify(userService).getCurrentUser(1L);

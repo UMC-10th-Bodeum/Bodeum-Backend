@@ -1,9 +1,11 @@
 package com.bodeum.domain.mypage.service;
 
+import com.bodeum.domain.community.entity.Comment;
 import com.bodeum.domain.community.entity.Post;
 import com.bodeum.domain.community.enums.CommentStatus;
 import com.bodeum.domain.community.enums.PostStatus;
 import com.bodeum.domain.info.entity.InfoScrap;
+import com.bodeum.domain.mypage.dto.response.MyCommentListResponse;
 import com.bodeum.domain.mypage.dto.response.MyPageProfileResponse;
 import com.bodeum.domain.mypage.dto.response.MyPageProfileResponse.ActivitySummary;
 import com.bodeum.domain.mypage.dto.response.MyPostListResponse;
@@ -102,5 +104,25 @@ public class MyPageService {
                         );
 
         return MyPostListResponse.from(posts);
+    }
+
+    @Transactional(readOnly = true)
+    public MyCommentListResponse getComments(
+            Long userId,
+            int page,
+            int size
+    ) {
+        userService.getCurrentUser(userId);
+
+        Page<Comment> comments =
+                commentRepository
+                        .findAllVisibleByUserIdOrderByCreatedAtDesc(
+                                userId,
+                                CommentStatus.ACTIVE,
+                                PostStatus.ACTIVE,
+                                PageRequest.of(page, size)
+                        );
+
+        return MyCommentListResponse.from(comments);
     }
 }

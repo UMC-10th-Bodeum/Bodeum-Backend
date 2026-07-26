@@ -297,6 +297,38 @@ class AuthControllerTest {
     }
 
     @Test
+    void commentsCanBeReadThroughMyCommentsPath() throws Exception {
+        String accessToken = login("my-comments-path-code").at("/result/accessToken").asText();
+
+        mockMvc.perform(get("/api/v1/users/me/comments")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                        .param("page", "0")
+                        .param("size", "10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.isSuccess").value(true))
+                .andExpect(jsonPath("$.code").value("COMMON200_1"))
+                .andExpect(jsonPath("$.result.totalCount").value(0))
+                .andExpect(jsonPath("$.result.page").value(0))
+                .andExpect(jsonPath("$.result.size").value(10))
+                .andExpect(jsonPath("$.result.totalPages").value(0))
+                .andExpect(jsonPath("$.result.hasNext").value(false))
+                .andExpect(jsonPath("$.result.comments").isArray())
+                .andExpect(jsonPath("$.result.comments").isEmpty());
+    }
+
+    @Test
+    void commentsRejectNonPositiveSize() throws Exception {
+        String accessToken = login("my-comments-invalid-size-code").at("/result/accessToken").asText();
+
+        mockMvc.perform(get("/api/v1/users/me/comments")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                        .param("page", "0")
+                        .param("size", "0"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("COMMON400_1"));
+    }
+
+    @Test
     void briefReturnsLoggedOutWhenAnonymous() throws Exception {
         mockMvc.perform(get("/api/v1/users/me/brief"))
                 .andExpect(status().isOk())
