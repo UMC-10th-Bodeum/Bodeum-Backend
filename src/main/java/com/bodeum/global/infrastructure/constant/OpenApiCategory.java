@@ -1,0 +1,48 @@
+package com.bodeum.global.infrastructure.constant;
+
+import lombok.Getter;
+
+// 21개 고정 카테고리 정의 엔터티/Enum
+
+@Getter
+public enum OpenApiCategory {
+
+    // HOSPITAL 계열 (1~4)
+    HOSPITAL_ETC(1L, "HOSPITAL_ETC"),
+    GENERAL_HOSPITAL(2L, "GENERAL_HOSPITAL"),
+    PRIMARY_CARE(3L, "PRIMARY_CARE"),
+    EMERGENCY_CLINIC(4L, "EMERGENCY_CLINIC"),
+
+    // INSTITUTION 계열 (5~9)
+    INSTITUTION_ETC(5L, "INSTITUTION_ETC"),
+    THERAPY_REHAB(6L, "THERAPY_REHAB"),
+    WELFARE_CENTER(7L, "WELFARE_CENTER"),
+    YOUTH_CENTER(8L, "YOUTH_CENTER"),
+    FAMILY_SUPPORT(9L, "FAMILY_SUPPORT"),
+
+    // WELFARE 계열 (10~13)
+    WELFARE_ETC(10L, "WELFARE_ETC"),
+    PRIVATE_WELFARE(11L, "PRIVATE_WELFARE"),
+    NATIONAL_WELFARE(12L, "NATIONAL_WELFARE"),
+    LOCAL_WELFARE(13L, "LOCAL_WELFARE"),
+
+    // EDUCATION 계열 (14~17)
+    EDUCATION_ETC(14L, "EDUCATION_ETC"),
+    SPECIAL_SCHOOL(15L, "SPECIAL_SCHOOL"),
+    SPECIAL_EDU_SUPPORT(16L, "SPECIAL_EDU_SUPPORT"),
+    LIFELONG_EDU(17L, "LIFELONG_EDU"),
+
+    // EMPLOYMENT 계열 (18~21)
+    EMPLOYMENT_ETC(18L, "EMPLOYMENT_ETC"),
+    REALTIME_JOB(19L, "REALTIME_JOB"),
+    KEAD_JOB(20L, "KEAD_JOB"),
+    STANDARD_WORKPLACE(21L, "STANDARD_WORKPLACE");
+
+    private final Long id;
+    private final String name;
+
+    OpenApiCategory(Long id, String name) {
+        this.id = id;
+        this.name = name;
+    }
+}

@@ -12,7 +12,9 @@ import lombok.NoArgsConstructor;
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Table(
+        name = "ai_feedback_reason",
         uniqueConstraints = @UniqueConstraint(
+                name = "uk_ai_feedback_reason_feedback_reason",
                 columnNames = {"ai_feedback_id", "reason"}
         )
 )

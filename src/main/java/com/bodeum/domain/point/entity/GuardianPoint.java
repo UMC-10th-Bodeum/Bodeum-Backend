@@ -1,6 +1,6 @@
-package com.bodeum.domain.mypage.entity;
+package com.bodeum.domain.point.entity;
 
-import com.bodeum.domain.mypage.entity.enums.BadgeLevel;
+import com.bodeum.domain.point.enums.BadgeLevel;
 import com.bodeum.global.common.entity.BaseCreatedUpdatedEntity;
 import jakarta.persistence.*;
 import lombok.AccessLevel;

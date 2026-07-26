@@ -1,4 +1,4 @@
-package com.bodeum.domain.mypage.entity.enums;
+package com.bodeum.domain.point.enums;
 
 public enum PointType {
     POST_CREATED,

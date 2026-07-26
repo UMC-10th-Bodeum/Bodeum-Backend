@@ -249,6 +249,86 @@ class AuthControllerTest {
     }
 
     @Test
+    void scrapsCanBeReadThroughMyScrapsPath() throws Exception {
+        String accessToken = login("my-scraps-path-code").at("/result/accessToken").asText();
+
+        mockMvc.perform(get("/api/v1/users/me/scraps")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.isSuccess").value(true))
+                .andExpect(jsonPath("$.code").value("COMMON200_1"))
+                .andExpect(jsonPath("$.result.totalCount").value(0))
+                .andExpect(jsonPath("$.result.infoScraps").isArray())
+                .andExpect(jsonPath("$.result.infoScraps").isEmpty())
+                .andExpect(jsonPath("$.result.newsScraps").isArray())
+                .andExpect(jsonPath("$.result.newsScraps").isEmpty());
+    }
+
+    @Test
+    void postsCanBeReadThroughMyPostsPath() throws Exception {
+        String accessToken = login("my-posts-path-code").at("/result/accessToken").asText();
+
+        mockMvc.perform(get("/api/v1/users/me/posts")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                        .param("page", "0")
+                        .param("size", "10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.isSuccess").value(true))
+                .andExpect(jsonPath("$.code").value("COMMON200_1"))
+                .andExpect(jsonPath("$.result.totalCount").value(0))
+                .andExpect(jsonPath("$.result.page").value(0))
+                .andExpect(jsonPath("$.result.size").value(10))
+                .andExpect(jsonPath("$.result.totalPages").value(0))
+                .andExpect(jsonPath("$.result.hasNext").value(false))
+                .andExpect(jsonPath("$.result.posts").isArray())
+                .andExpect(jsonPath("$.result.posts").isEmpty());
+    }
+
+    @Test
+    void postsRejectNegativePage() throws Exception {
+        String accessToken = login("my-posts-invalid-page-code").at("/result/accessToken").asText();
+
+        mockMvc.perform(get("/api/v1/users/me/posts")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                        .param("page", "-1")
+                        .param("size", "10"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("COMMON400_1"));
+    }
+
+    @Test
+    void commentsCanBeReadThroughMyCommentsPath() throws Exception {
+        String accessToken = login("my-comments-path-code").at("/result/accessToken").asText();
+
+        mockMvc.perform(get("/api/v1/users/me/comments")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                        .param("page", "0")
+                        .param("size", "10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.isSuccess").value(true))
+                .andExpect(jsonPath("$.code").value("COMMON200_1"))
+                .andExpect(jsonPath("$.result.totalCount").value(0))
+                .andExpect(jsonPath("$.result.page").value(0))
+                .andExpect(jsonPath("$.result.size").value(10))
+                .andExpect(jsonPath("$.result.totalPages").value(0))
+                .andExpect(jsonPath("$.result.hasNext").value(false))
+                .andExpect(jsonPath("$.result.comments").isArray())
+                .andExpect(jsonPath("$.result.comments").isEmpty());
+    }
+
+    @Test
+    void commentsRejectNonPositiveSize() throws Exception {
+        String accessToken = login("my-comments-invalid-size-code").at("/result/accessToken").asText();
+
+        mockMvc.perform(get("/api/v1/users/me/comments")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                        .param("page", "0")
+                        .param("size", "0"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("COMMON400_1"));
+    }
+
+    @Test
     void briefReturnsLoggedOutWhenAnonymous() throws Exception {
         mockMvc.perform(get("/api/v1/users/me/brief"))
                 .andExpect(status().isOk())

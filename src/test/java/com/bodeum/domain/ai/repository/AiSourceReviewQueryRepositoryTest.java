@@ -28,10 +28,10 @@ class AiSourceReviewQueryRepositoryTest {
                 "정보 출처 오류"
         ));
 
-        assertThat(repository.existsConfirmedIncorrectBySources(Set.of(
+        assertThat(repository.existsWarningRequiredBySources(Set.of(
                 new AiSourceKey(AiResponseSourceType.INFO, 1L)
         ))).isTrue();
-        assertThat(repository.existsConfirmedIncorrectBySources(Set.of(
+        assertThat(repository.existsWarningRequiredBySources(Set.of(
                 new AiSourceKey(AiResponseSourceType.NEWS, 1L),
                 new AiSourceKey(AiResponseSourceType.SITE, 1L)
         ))).isFalse();
@@ -46,9 +46,23 @@ class AiSourceReviewQueryRepositoryTest {
                 "사이트 출처 오류"
         ));
 
-        assertThat(repository.existsConfirmedIncorrectBySources(Set.of(
+        assertThat(repository.existsWarningRequiredBySources(Set.of(
                 new AiSourceKey(AiResponseSourceType.INFO, 3L),
                 new AiSourceKey(AiResponseSourceType.SITE, 7L)
+        ))).isTrue();
+    }
+
+    @Test
+    void returnsTrueWhenSourceReviewIsRequired() {
+        repository.save(AiSourceReview.create(
+                AiResponseSourceType.NEWS,
+                11L,
+                AiSourceReviewStatus.REVIEW_REQUIRED,
+                null
+        ));
+
+        assertThat(repository.existsWarningRequiredBySources(Set.of(
+                new AiSourceKey(AiResponseSourceType.NEWS, 11L)
         ))).isTrue();
     }
 }
