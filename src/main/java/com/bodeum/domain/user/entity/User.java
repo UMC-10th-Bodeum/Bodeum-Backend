@@ -94,9 +94,6 @@ public class User extends BaseCreatedUpdatedDeletedEntity {
     @Column(nullable = false, length = 20)
     private UserStatus status;
 
-    @Column(name = "withdrawal_reason", length = 255)
-    private String withdrawalReason;
-
     protected User() {
     }
 
@@ -243,10 +240,8 @@ public class User extends BaseCreatedUpdatedDeletedEntity {
         );
     }
 
-    public void withdraw(String reason) {
+    public void withdraw() {
         this.status = UserStatus.DELETED;
-        // 탈퇴 사유는 자유 입력이라 개인정보가 포함될 수 있어 원문을 저장하지 않는다.
-        this.withdrawalReason = null;
         anonymizePersonalData();
         delete();
     }

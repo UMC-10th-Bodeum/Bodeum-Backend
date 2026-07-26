@@ -10,7 +10,6 @@ import com.bodeum.domain.onboarding.dto.response.OnboardingStatusResponse;
 import com.bodeum.domain.onboarding.service.OnboardingService;
 import com.bodeum.domain.user.dto.request.CreateUserAgreementRequest;
 import com.bodeum.domain.user.dto.request.UpdateUserProfileRequest;
-import com.bodeum.domain.user.dto.request.WithdrawUserRequest;
 import com.bodeum.domain.user.dto.response.AiTermsAgreementResponse;
 import com.bodeum.domain.user.dto.response.UserAgreementResponse;
 import com.bodeum.domain.user.dto.response.UserHeaderResponse;
@@ -219,14 +218,9 @@ public class UserController {
     )
     @DeleteMapping("/me")
     public ApiResponse<UserWithdrawResponse> withdraw(
-            @LoginUser Long userId,
-            @Valid @RequestBody(required = false)
-            WithdrawUserRequest request
+            @LoginUser Long userId
     ) {
-        return ApiResponse.of(
-                GeneralSuccessCode.OK,
-                userService.withdraw(userId, request)
-        );
+        return ApiResponse.of(GeneralSuccessCode.OK, userService.withdraw(userId));
     }
 
     @Operation(
