@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.bodeum.domain.mypage.entity.enums.ScrapType;
 import com.bodeum.domain.mypage.service.MyPageService;
 import com.bodeum.domain.onboarding.service.OnboardingService;
+import com.bodeum.domain.user.service.AccountWithdrawalService;
 import com.bodeum.domain.user.service.UserService;
 import com.bodeum.global.apiPayload.handler.GeneralExceptionAdvice;
 import com.bodeum.global.auth.LoginUser;
@@ -33,6 +34,9 @@ class UserControllerTest {
     private UserService userService;
 
     @Mock
+    private AccountWithdrawalService accountWithdrawalService;
+
+    @Mock
     private OnboardingService onboardingService;
 
     @Mock
@@ -49,6 +53,7 @@ class UserControllerTest {
                 .standaloneSetup(
                         new UserController(
                                 userService,
+                                accountWithdrawalService,
                                 onboardingService,
                                 myPageService
                         )
