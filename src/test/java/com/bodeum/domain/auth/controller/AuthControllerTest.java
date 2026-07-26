@@ -249,6 +249,22 @@ class AuthControllerTest {
     }
 
     @Test
+    void scrapsCanBeReadThroughMyScrapsPath() throws Exception {
+        String accessToken = login("my-scraps-path-code").at("/result/accessToken").asText();
+
+        mockMvc.perform(get("/api/v1/users/me/scraps")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.isSuccess").value(true))
+                .andExpect(jsonPath("$.code").value("COMMON200_1"))
+                .andExpect(jsonPath("$.result.totalCount").value(0))
+                .andExpect(jsonPath("$.result.infoScraps").isArray())
+                .andExpect(jsonPath("$.result.infoScraps").isEmpty())
+                .andExpect(jsonPath("$.result.newsScraps").isArray())
+                .andExpect(jsonPath("$.result.newsScraps").isEmpty());
+    }
+
+    @Test
     void briefReturnsLoggedOutWhenAnonymous() throws Exception {
         mockMvc.perform(get("/api/v1/users/me/brief"))
                 .andExpect(status().isOk())
