@@ -22,6 +22,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
+import org.springframework.web.util.UriComponentsBuilder;
 
 import java.util.List;
 
@@ -109,10 +110,15 @@ public class InfoItemQueryService {
      * 3. 정보 공유 링크 조회 API
      */
     public InfoItemShareResponse getInfoItemShareUrl(Long infoItemId) {
+        // 1) 공유 전용 예외 처리
         InfoItem infoItem = infoItemRepository.findById(infoItemId)
-                .orElseThrow(() -> new InfoException(InfoErrorCode.INFO_ITEM_NOT_FOUND));
+                .orElseThrow(() -> new InfoException(InfoErrorCode.INFO_SHARE_LINK_NOT_FOUND));
 
-        String shareUrl = String.format("%s/info/%d", shareBaseUrl, infoItem.getId());
+        // 2) UriComponentsBuilder로 URL 정규화 (fromUriString 사용)
+        String shareUrl = UriComponentsBuilder.fromUriString(shareBaseUrl)
+                .pathSegment("info", String.valueOf(infoItem.getId()))
+                .build()
+                .toUriString();
 
         return InfoItemShareResponse.of(infoItem.getId(), shareUrl);
     }
