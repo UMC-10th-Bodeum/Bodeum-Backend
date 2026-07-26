@@ -12,6 +12,7 @@ import org.springframework.web.multipart.MultipartFile;
 import software.amazon.awssdk.core.exception.SdkException;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
 @Component
@@ -50,6 +51,64 @@ public class S3ImageStorage {
         }
 
         return resolvePublicUrl(key);
+    }
+
+    /**
+     * 공개 URL로 저장된 이미지의 S3 실제 객체를 삭제한다. 회원 탈퇴 시 프로필 이미지(개인정보)를 파기하는 데 사용한다.
+     * URL이 비어 있거나 이 스토리지가 관리하는 형식(공개 base URL 또는 표준 S3 URL)이 아니면 조용히 무시한다.
+     */
+    public void delete(String imageUrl) {
+        String key = extractKey(imageUrl);
+        if (key == null) {
+            return;
+        }
+
+        s3Client.deleteObject(
+                DeleteObjectRequest.builder()
+                        .bucket(s3Properties.getBucket())
+                        .key(key)
+                        .build()
+        );
+    }
+
+    // 업로드 시 resolvePublicUrl이 만든 공개 URL에서 S3 object key를 역산한다.
+    private String extractKey(String imageUrl) {
+        if (!StringUtils.hasText(imageUrl)) {
+            return null;
+        }
+
+        String prefix = publicUrlPrefix();
+        if (imageUrl.startsWith(prefix)) {
+            return stripLeadingSlash(imageUrl.substring(prefix.length()));
+        }
+
+        String standardPrefix = standardS3UrlPrefix();
+        if (imageUrl.startsWith(standardPrefix)) {
+            return stripLeadingSlash(imageUrl.substring(standardPrefix.length()));
+        }
+
+        return null;
+    }
+
+    private String publicUrlPrefix() {
+        if (StringUtils.hasText(s3Properties.getPublicBaseUrl())) {
+            String baseUrl = s3Properties.getPublicBaseUrl();
+            if (baseUrl.endsWith("/")) {
+                baseUrl = baseUrl.substring(0, baseUrl.length() - 1);
+            }
+            return baseUrl + "/";
+        }
+        return standardS3UrlPrefix();
+    }
+
+    private String standardS3UrlPrefix() {
+        return "https://" + s3Properties.getBucket()
+                + ".s3." + s3Properties.getRegion() + ".amazonaws.com/";
+    }
+
+    private String stripLeadingSlash(String value) {
+        String key = value.startsWith("/") ? value.substring(1) : value;
+        return key.isBlank() ? null : key;
     }
 
     private String validateAndResolveExtension(MultipartFile file) {

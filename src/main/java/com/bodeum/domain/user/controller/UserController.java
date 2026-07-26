@@ -15,6 +15,7 @@ import com.bodeum.domain.user.dto.response.UserHeaderResponse;
 import com.bodeum.domain.user.dto.response.UserProfileResponse;
 import com.bodeum.domain.user.dto.response.UserProfileUpdateResponse;
 import com.bodeum.domain.user.dto.response.UserWithdrawResponse;
+import com.bodeum.domain.user.service.AccountWithdrawalService;
 import com.bodeum.domain.user.service.UserService;
 import com.bodeum.global.apiPayload.ApiResponse;
 import com.bodeum.global.apiPayload.code.GeneralSuccessCode;
@@ -45,6 +46,7 @@ import org.springframework.web.multipart.MultipartFile;
 public class UserController {
 
     private final UserService userService;
+    private final AccountWithdrawalService accountWithdrawalService;
     private final OnboardingService onboardingService;
     private final MyPageService myPageService;
 
@@ -199,7 +201,7 @@ public class UserController {
     public ApiResponse<UserWithdrawResponse> withdraw(
             @LoginUser Long userId
     ) {
-        return ApiResponse.of(GeneralSuccessCode.OK, userService.withdraw(userId));
+        return ApiResponse.of(GeneralSuccessCode.OK, accountWithdrawalService.withdraw(userId));
     }
 
     @Operation(
