@@ -4,8 +4,8 @@ import com.bodeum.domain.news.entity.News;
 import com.bodeum.domain.news.entity.NewsSource;
 import com.bodeum.domain.news.entity.RecruitmentStatus;
 import jakarta.persistence.LockModeType;
-import java.util.List;
 import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -84,9 +84,9 @@ public interface NewsRepository extends JpaRepository<News, Long> {
             """)
     Optional<News> findVisibleByIdForUpdate(@Param("id") Long id);
 
-    Optional<News> findByNewsSourceAndExternalItemId(
+    List<News> findAllByNewsSourceAndExternalItemIdIn(
             NewsSource newsSource,
-            String externalItemId
+            Collection<String> externalItemIds
     );
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)

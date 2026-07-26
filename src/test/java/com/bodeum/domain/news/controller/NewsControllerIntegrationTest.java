@@ -93,7 +93,7 @@ class NewsControllerIntegrationTest {
                 RecruitmentStatus.OPEN
         ));
 
-        mockMvc.perform(get("/api/news")
+        mockMvc.perform(get("/api/v1/news")
                         .param("page", "0")
                         .param("size", "10")
                         .param("sort", "latest")
@@ -127,7 +127,7 @@ class NewsControllerIntegrationTest {
                 RecruitmentStatus.OPEN
         ));
 
-        mockMvc.perform(get("/api/news/{newsId}", news.getId()))
+        mockMvc.perform(get("/api/v1/news/{newsId}", news.getId()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.result.newsId").value(news.getId()))
                 .andExpect(jsonPath("$.result.title").value("상세 소식"))
@@ -140,7 +140,7 @@ class NewsControllerIntegrationTest {
 
     @Test
     void getNewsDetailReturnsCommonNotFoundResponse() throws Exception {
-        mockMvc.perform(get("/api/news/{newsId}", 999999L))
+        mockMvc.perform(get("/api/v1/news/{newsId}", 999999L))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.isSuccess").value(false))
                 .andExpect(jsonPath("$.code").value("COMMON404_1"))
@@ -149,7 +149,7 @@ class NewsControllerIntegrationTest {
 
     @Test
     void getNewsRejectsInvalidPageSize() throws Exception {
-        mockMvc.perform(get("/api/news").param("size", "0"))
+        mockMvc.perform(get("/api/v1/news").param("size", "0"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("COMMON400_1"));
     }
@@ -211,7 +211,7 @@ class NewsControllerIntegrationTest {
                 RecruitmentStatus.OPEN
         ));
 
-        mockMvc.perform(get("/api/news/search")
+        mockMvc.perform(get("/api/v1/news/search")
                         .param("keyword", "봉사")
                         .param("page", "0")
                         .param("size", "10"))
@@ -221,7 +221,7 @@ class NewsControllerIntegrationTest {
                 .andExpect(jsonPath("$.result.items[1].newsId").value(contentMatch.getId()))
                 .andExpect(jsonPath("$.result.items[2].newsId").value(titleMatch.getId()));
 
-        mockMvc.perform(get("/api/news/search")
+        mockMvc.perform(get("/api/v1/news/search")
                         .param("keyword", "수원")
                         .param("page", "0")
                         .param("size", "10"))
@@ -279,7 +279,7 @@ class NewsControllerIntegrationTest {
                 RecruitmentStatus.CLOSED
         ));
 
-        mockMvc.perform(get("/api/news/search")
+        mockMvc.perform(get("/api/v1/news/search")
                         .param("keyword", "봉사")
                         .param("region", "서울")
                         .param("category", "VOLUNTEER")
@@ -291,7 +291,7 @@ class NewsControllerIntegrationTest {
 
     @Test
     void searchNewsRejectsBlankKeyword() throws Exception {
-        mockMvc.perform(get("/api/news/search").param("keyword", "   "))
+        mockMvc.perform(get("/api/v1/news/search").param("keyword", "   "))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("COMMON400_1"));
     }
@@ -312,7 +312,7 @@ class NewsControllerIntegrationTest {
                 RecruitmentStatus.OPEN
         ));
 
-        mockMvc.perform(post("/api/news/{newsId}/scrap", news.getId())
+        mockMvc.perform(post("/api/v1/news/{newsId}/scrap", news.getId())
                         .with(authenticatedUser(10L)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("COMMON200_1"))
@@ -323,7 +323,7 @@ class NewsControllerIntegrationTest {
         assertThat(newsScrapRepository.existsByNewsIdAndUserId(news.getId(), 10L)).isTrue();
         assertThat(newsRepository.findById(news.getId()).orElseThrow().getScrapCount()).isOne();
 
-        mockMvc.perform(post("/api/news/{newsId}/scrap", news.getId())
+        mockMvc.perform(post("/api/v1/news/{newsId}/scrap", news.getId())
                         .with(authenticatedUser(10L)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.result.newsId").value(news.getId()))
@@ -336,13 +336,13 @@ class NewsControllerIntegrationTest {
 
     @Test
     void toggleNewsScrapRequiresAuthentication() throws Exception {
-        mockMvc.perform(post("/api/news/{newsId}/scrap", 1L))
+        mockMvc.perform(post("/api/v1/news/{newsId}/scrap", 1L))
                 .andExpect(status().isUnauthorized());
     }
 
     @Test
     void toggleNewsScrapReturnsCommonNotFoundResponse() throws Exception {
-        mockMvc.perform(post("/api/news/{newsId}/scrap", 999999L)
+        mockMvc.perform(post("/api/v1/news/{newsId}/scrap", 999999L)
                         .with(authenticatedUser(10L)))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("COMMON404_1"));

@@ -2,6 +2,7 @@ package com.bodeum.domain.mypage.service;
 
 import com.bodeum.domain.community.entity.Comment;
 import com.bodeum.domain.community.entity.Post;
+import com.bodeum.domain.community.entity.PostScrap;
 import com.bodeum.domain.community.enums.CommentStatus;
 import com.bodeum.domain.community.enums.PostStatus;
 import com.bodeum.domain.info.entity.InfoScrap;
@@ -15,6 +16,7 @@ import com.bodeum.domain.mypage.repository.MyPageCommentRepository;
 import com.bodeum.domain.mypage.repository.MyPageInfoScrapRepository;
 import com.bodeum.domain.mypage.repository.MyPageNewsScrapRepository;
 import com.bodeum.domain.mypage.repository.MyPagePostRepository;
+import com.bodeum.domain.mypage.repository.MyPagePostScrapRepository;
 import com.bodeum.domain.news.entity.NewsScrap;
 import com.bodeum.domain.user.dto.response.UserProfileResponse;
 import com.bodeum.domain.user.service.UserService;
@@ -34,6 +36,7 @@ public class MyPageService {
     private final UserService userService;
     private final MyPageInfoScrapRepository infoScrapRepository;
     private final MyPageNewsScrapRepository newsScrapRepository;
+    private final MyPagePostScrapRepository postScrapRepository;
     private final MyPagePostRepository postRepository;
     private final MyPageCommentRepository commentRepository;
 
@@ -44,7 +47,8 @@ public class MyPageService {
 
         long savedInfoCount =
                 infoScrapRepository.countByUserId(userId)
-                        + newsScrapRepository.countVisibleByUserId(userId);
+                        + newsScrapRepository.countVisibleByUserId(userId)
+                        + postScrapRepository.countVisibleByUserId(userId, PostStatus.ACTIVE);
 
         long myPostCount =
                 postRepository.countVisibleByUserId(
@@ -84,9 +88,17 @@ public class MyPageService {
                 newsScrapRepository
                         .findAllVisibleByUserIdOrderByCreatedAtDesc(userId);
 
+        List<PostScrap> postScraps =
+                postScrapRepository
+                        .findAllVisibleByUserIdOrderByCreatedAtDesc(
+                                userId,
+                                PostStatus.ACTIVE
+                        );
+
         return MyScrapListResponse.of(
                 infoScraps,
-                newsScraps
+                newsScraps,
+                postScraps
         );
     }
 
