@@ -62,7 +62,7 @@ class CommentControllerTest {
         given(commentService.createComment(any(), any(), any(CreateCommentRequest.class)))
                 .willReturn(commentResponse(1L, null, List.of()));
 
-        mockMvc.perform(post("/api/community/posts/1/comments")
+        mockMvc.perform(post("/api/v1/community/posts/1/comments")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -79,7 +79,7 @@ class CommentControllerTest {
         given(commentService.createReply(any(), any(), any(CreateCommentRequest.class)))
                 .willReturn(commentResponse(3L, 2L, List.of()));
 
-        mockMvc.perform(post("/api/community/comments/2/replies")
+        mockMvc.perform(post("/api/v1/community/comments/2/replies")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -99,7 +99,7 @@ class CommentControllerTest {
         given(commentService.getComments(10L, 1L))
                 .willReturn(new CommentListResponse(3, List.of(root)));
 
-        mockMvc.perform(get("/api/community/posts/1/comments"))
+        mockMvc.perform(get("/api/v1/community/posts/1/comments"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.result.totalCount").value(3))
                 .andExpect(jsonPath("$.result.comments[0].commentId").value(1))
@@ -112,7 +112,7 @@ class CommentControllerTest {
         given(commentService.updateComment(any(), any(), any(UpdateCommentRequest.class)))
                 .willReturn(commentResponse(1L, null, List.of()));
 
-        mockMvc.perform(patch("/api/community/comments/1")
+        mockMvc.perform(patch("/api/v1/community/comments/1")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -122,7 +122,7 @@ class CommentControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.result.commentId").value(1));
 
-        mockMvc.perform(delete("/api/community/comments/1"))
+        mockMvc.perform(delete("/api/v1/community/comments/1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.isSuccess").value(true));
 
@@ -134,12 +134,12 @@ class CommentControllerTest {
         given(commentService.likeComment(10L, 1L)).willReturn(new CommentLikeResponse(true, 2));
         given(commentService.unlikeComment(10L, 1L)).willReturn(new CommentLikeResponse(false, 1));
 
-        mockMvc.perform(put("/api/community/comments/1/likes"))
+        mockMvc.perform(put("/api/v1/community/comments/1/likes"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.result.isLiked").value(true))
                 .andExpect(jsonPath("$.result.likeCount").value(2));
 
-        mockMvc.perform(delete("/api/community/comments/1/likes"))
+        mockMvc.perform(delete("/api/v1/community/comments/1/likes"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.result.isLiked").value(false))
                 .andExpect(jsonPath("$.result.likeCount").value(1));
@@ -147,7 +147,7 @@ class CommentControllerTest {
 
     @Test
     void createCommentRejectsBlankContent() throws Exception {
-        mockMvc.perform(post("/api/community/posts/1/comments")
+        mockMvc.perform(post("/api/v1/community/posts/1/comments")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -164,7 +164,7 @@ class CommentControllerTest {
     void createCommentRejectsContentLongerThanLimit() throws Exception {
         String content = "a".repeat(1001);
 
-        mockMvc.perform(post("/api/community/posts/1/comments")
+        mockMvc.perform(post("/api/v1/community/posts/1/comments")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {

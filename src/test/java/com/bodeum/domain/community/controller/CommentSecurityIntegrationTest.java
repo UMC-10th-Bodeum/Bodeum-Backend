@@ -39,12 +39,12 @@ class CommentSecurityIntegrationTest {
                 false
         ));
 
-        mockMvc.perform(get("/api/community/posts/{postId}/comments", post.getId()))
+        mockMvc.perform(get("/api/v1/community/posts/{postId}/comments", post.getId()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.result.totalCount").value(0))
                 .andExpect(jsonPath("$.result.comments").isEmpty());
 
-        mockMvc.perform(post("/api/community/posts/{postId}/comments", post.getId())
+        mockMvc.perform(post("/api/v1/community/posts/{postId}/comments", post.getId())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {

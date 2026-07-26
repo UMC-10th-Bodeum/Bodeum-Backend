@@ -63,7 +63,7 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(requests -> requests
                         .requestMatchers(allowUris).permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/community/posts/*/comments").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/community/posts/*/comments").permitAll()
                         .anyRequest().authenticated()
                 )
                 .exceptionHandling(exception -> exception

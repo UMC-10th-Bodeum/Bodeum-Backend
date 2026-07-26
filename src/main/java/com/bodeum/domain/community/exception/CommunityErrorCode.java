@@ -39,6 +39,11 @@ public enum CommunityErrorCode implements BaseErrorCode {
             "COMMUNITY400_6",
             "댓글 내용은 비어 있을 수 없습니다."
     ),
+    INVALID_POST_LIST_SORT(
+            HttpStatus.BAD_REQUEST,
+            "COMMUNITY400_7",
+            "게시글 정렬 기준은 view, scrap, comment 중 하나여야 합니다."
+    ),
     AUTHENTICATION_REQUIRED(
             HttpStatus.UNAUTHORIZED,
             "COMMUNITY401_1",
