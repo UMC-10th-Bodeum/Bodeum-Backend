@@ -353,6 +353,35 @@ class AuthControllerTest {
     }
 
     @Test
+    void pointsCanBeReadThroughMyPointsPath() throws Exception {
+        String accessToken = login("my-points-path-code").at("/result/accessToken").asText();
+
+        mockMvc.perform(get("/api/v1/users/me/points")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.isSuccess").value(true))
+                .andExpect(jsonPath("$.code").value("COMMON200_1"))
+                .andExpect(jsonPath("$.result.totalPoint").value(0))
+                .andExpect(jsonPath("$.result.activities.length()")
+                        .value(4))
+                .andExpect(jsonPath("$.result.activities[0].pointType")
+                        .value("POST_CREATED"))
+                .andExpect(jsonPath("$.result.activities[0].pointPerAction")
+                        .value(5))
+                .andExpect(jsonPath("$.result.activities[0].earnedPoint")
+                        .value(0))
+                .andExpect(jsonPath("$.result.activities[0].activityCount")
+                        .value(0));
+    }
+
+    @Test
+    void pointsRequireAccessToken() throws Exception {
+        mockMvc.perform(get("/api/v1/users/me/points"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("AUTH401_1"));
+    }
+
+    @Test
     void briefReturnsLoggedOutWhenAnonymous() throws Exception {
         mockMvc.perform(get("/api/v1/users/me/brief"))
                 .andExpect(status().isOk())
