@@ -6,6 +6,7 @@ import com.bodeum.domain.ai.service.AiFeedbackService;
 import com.bodeum.global.apiPayload.ApiResponse;
 import com.bodeum.global.apiPayload.code.GeneralSuccessCode;
 import com.bodeum.global.auth.LoginUser;
+import com.bodeum.global.auth.RequireAiTermsAgreed;
 import com.bodeum.global.auth.RequireSignupCompleted;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -19,6 +20,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @Tag(name = "AI feedback", description = "AI 메시지 피드백 API")
 @RequireSignupCompleted
+@RequireAiTermsAgreed
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/v1/ai/messages")

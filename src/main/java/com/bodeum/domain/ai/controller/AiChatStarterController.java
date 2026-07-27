@@ -5,6 +5,7 @@ import com.bodeum.domain.ai.service.AiChatStarterService;
 import com.bodeum.global.apiPayload.ApiResponse;
 import com.bodeum.global.apiPayload.code.GeneralSuccessCode;
 import com.bodeum.global.auth.LoginUser;
+import com.bodeum.global.auth.RequireAiTermsAgreed;
 import com.bodeum.global.auth.RequireSignupCompleted;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -15,6 +16,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @Tag(name = "AI chat starter", description = "AI 챗봇 초기 대화 콘텐츠 API")
 @RequireSignupCompleted
+@RequireAiTermsAgreed
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/v1/ai/chat-room/starter")
