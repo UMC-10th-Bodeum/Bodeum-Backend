@@ -44,6 +44,13 @@ public class PointService {
         return new MyPointResponse(totalPoint, activities);
     }
 
+    @Transactional(readOnly = true)
+    public int getTotalPoint(Long userId) {
+        return guardianPointRepository.findByUserId(userId)
+                .map(GuardianPoint::getTotalPoint)
+                .orElse(0);
+    }
+
     private Map<PointType, PointActivitySummary> getActivitySummaries(
             GuardianPoint guardianPoint
     ) {

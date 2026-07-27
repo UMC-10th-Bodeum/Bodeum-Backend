@@ -82,4 +82,22 @@ class PointServiceTest {
                 });
         verifyNoInteractions(pointHistoryRepository);
     }
+
+    @Test
+    void getTotalPointReturnsGuardianPointTotal() {
+        GuardianPoint guardianPoint = org.mockito.Mockito.mock(GuardianPoint.class);
+        given(guardianPointRepository.findByUserId(1L))
+                .willReturn(Optional.of(guardianPoint));
+        given(guardianPoint.getTotalPoint()).willReturn(42);
+
+        assertThat(pointService.getTotalPoint(1L)).isEqualTo(42);
+    }
+
+    @Test
+    void getTotalPointReturnsZeroWhenPointAggregateDoesNotExist() {
+        given(guardianPointRepository.findByUserId(1L))
+                .willReturn(Optional.empty());
+
+        assertThat(pointService.getTotalPoint(1L)).isZero();
+    }
 }

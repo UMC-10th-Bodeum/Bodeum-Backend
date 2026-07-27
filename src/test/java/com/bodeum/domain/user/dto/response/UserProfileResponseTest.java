@@ -28,7 +28,7 @@ class UserProfileResponseTest {
                 "언어치료"
         );
 
-        UserProfileResponse response = UserProfileResponse.from(user);
+        UserProfileResponse response = UserProfileResponse.from(user, 0);
 
         assertThat(response.childProfile().nickname()).isEqualTo("민준");
         assertThat(response.childProfile().birth()).isEqualTo("2020-03");
@@ -50,7 +50,7 @@ class UserProfileResponseTest {
         ReflectionTestUtils.setField(region, "id", 10L);
         user.updateInterestRegion(List.of(InterestCategory.WELFARE_SUBSIDY), region);
 
-        UserProfileResponse response = UserProfileResponse.from(user);
+        UserProfileResponse response = UserProfileResponse.from(user, 0);
 
         assertThat(response.regionId()).isEqualTo(10L);
         assertThat(response.regionLevel1()).isEqualTo("서울특별시");
