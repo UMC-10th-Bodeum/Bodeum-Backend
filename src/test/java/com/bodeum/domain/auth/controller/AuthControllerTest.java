@@ -11,6 +11,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.bodeum.domain.auth.repository.AuthLoginCodeRepository;
 import com.bodeum.domain.auth.repository.OAuthStateRepository;
 import com.bodeum.domain.auth.repository.RefreshTokenSessionRepository;
+import com.bodeum.domain.user.entity.User;
 import com.bodeum.domain.user.repository.UserRepository;
 import com.bodeum.domain.user.service.UserService;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -350,6 +351,53 @@ class AuthControllerTest {
                         .param("size", "0"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("COMMON400_1"));
+    }
+
+    @Test
+    void pointsCanBeReadThroughMyPointsPath() throws Exception {
+        JsonNode loginBody = login("my-points-path-code");
+        String accessToken = loginBody.at("/result/accessToken").asText();
+        User user = userRepository.findById(loginBody.at("/result/userId").asLong())
+                .orElseThrow();
+        user.skipOnboarding();
+        user.markRegisteredIfResolved();
+        userRepository.saveAndFlush(user);
+
+        mockMvc.perform(get("/api/v1/users/me/points")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.isSuccess").value(true))
+                .andExpect(jsonPath("$.code").value("COMMON200_1"))
+                .andExpect(jsonPath("$.result.totalPoint").value(0))
+                .andExpect(jsonPath("$.result.activities.length()")
+                        .value(4))
+                .andExpect(jsonPath("$.result.activities[0].pointType")
+                        .value("POST_CREATED"))
+                .andExpect(jsonPath("$.result.activities[0].pointPerAction")
+                        .value(5))
+                .andExpect(jsonPath("$.result.activities[0].earnedPoint")
+                        .value(0))
+                .andExpect(jsonPath("$.result.activities[0].activityCount")
+                        .value(0));
+    }
+
+    @Test
+    void pointsRejectIncompleteSignup() throws Exception {
+        String accessToken = login("my-points-incomplete-signup-code")
+                .at("/result/accessToken")
+                .asText();
+
+        mockMvc.perform(get("/api/v1/users/me/points")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("AUTH403_1"));
+    }
+
+    @Test
+    void pointsRequireAccessToken() throws Exception {
+        mockMvc.perform(get("/api/v1/users/me/points"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("AUTH401_1"));
     }
 
     @Test
