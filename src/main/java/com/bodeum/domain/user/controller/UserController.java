@@ -85,6 +85,21 @@ public class UserController {
     }
 
     @Operation(
+            summary = "마이페이지 대시보드 조회",
+            description = "현재 로그인한 사용자의 기본 프로필과 포인트, 등급, "
+                    + "저장한 정보, 작성 게시글, 작성 댓글 수를 조회한다."
+    )
+    @GetMapping("/me/dashboard")
+    public ApiResponse<MyPageProfileResponse> getDashboard(
+            @LoginUser Long userId
+    ) {
+        return ApiResponse.of(
+                GeneralSuccessCode.OK,
+                myPageService.getProfile(userId)
+        );
+    }
+
+    @Operation(
             summary = "저장한 정보 목록 조회",
             description = "현재 로그인한 사용자가 저장한 복지·시설 정보, "
                     + "뉴스·활동 정보와 커뮤니티 게시글을 최신 저장순으로 조회한다."
