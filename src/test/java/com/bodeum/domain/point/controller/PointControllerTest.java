@@ -1,5 +1,6 @@
 package com.bodeum.domain.point.controller;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -11,6 +12,7 @@ import com.bodeum.domain.point.dto.response.MyPointResponse.PointActivity;
 import com.bodeum.domain.point.enums.PointType;
 import com.bodeum.domain.point.service.PointService;
 import com.bodeum.global.auth.LoginUser;
+import com.bodeum.global.auth.RequireSignupCompleted;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -71,6 +73,12 @@ class PointControllerTest {
                         .value(2));
 
         then(pointService).should().getMyPoints(10L);
+    }
+
+    @Test
+    void pointControllerRequiresSignupCompleted() {
+        assertThat(PointController.class.isAnnotationPresent(RequireSignupCompleted.class))
+                .isTrue();
     }
 
     private HandlerMethodArgumentResolver loginUserArgumentResolver() {

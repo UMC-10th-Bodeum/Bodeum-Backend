@@ -11,6 +11,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.bodeum.domain.auth.repository.AuthLoginCodeRepository;
 import com.bodeum.domain.auth.repository.OAuthStateRepository;
 import com.bodeum.domain.auth.repository.RefreshTokenSessionRepository;
+import com.bodeum.domain.user.entity.User;
 import com.bodeum.domain.user.repository.UserRepository;
 import com.bodeum.domain.user.service.UserService;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -354,7 +355,13 @@ class AuthControllerTest {
 
     @Test
     void pointsCanBeReadThroughMyPointsPath() throws Exception {
-        String accessToken = login("my-points-path-code").at("/result/accessToken").asText();
+        JsonNode loginBody = login("my-points-path-code");
+        String accessToken = loginBody.at("/result/accessToken").asText();
+        User user = userRepository.findById(loginBody.at("/result/userId").asLong())
+                .orElseThrow();
+        user.skipOnboarding();
+        user.markRegisteredIfResolved();
+        userRepository.saveAndFlush(user);
 
         mockMvc.perform(get("/api/v1/users/me/points")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
@@ -372,6 +379,18 @@ class AuthControllerTest {
                         .value(0))
                 .andExpect(jsonPath("$.result.activities[0].activityCount")
                         .value(0));
+    }
+
+    @Test
+    void pointsRejectIncompleteSignup() throws Exception {
+        String accessToken = login("my-points-incomplete-signup-code")
+                .at("/result/accessToken")
+                .asText();
+
+        mockMvc.perform(get("/api/v1/users/me/points")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("AUTH403_1"));
     }
 
     @Test

@@ -10,8 +10,6 @@ import com.bodeum.domain.point.enums.PointType;
 import com.bodeum.domain.point.repository.GuardianPointHistoryRepository;
 import com.bodeum.domain.point.repository.GuardianPointHistoryRepository.PointActivitySummary;
 import com.bodeum.domain.point.repository.GuardianPointRepository;
-import com.bodeum.domain.user.entity.User;
-import com.bodeum.domain.user.service.UserService;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
@@ -24,9 +22,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class PointServiceTest {
 
     @Mock
-    private UserService userService;
-
-    @Mock
     private GuardianPointRepository guardianPointRepository;
 
     @Mock
@@ -36,19 +31,17 @@ class PointServiceTest {
     private PointService pointService;
 
     @Test
-    void getMyPointsReturnsAllActivityTypesWithAggregatedHistory() {
-        User user = org.mockito.Mockito.mock(User.class);
+    void getMyPointsReturnsGuardianPointTotalAndAggregatedHistory() {
         GuardianPoint guardianPoint = org.mockito.Mockito.mock(GuardianPoint.class);
         PointActivitySummary postSummary =
                 org.mockito.Mockito.mock(PointActivitySummary.class);
         PointActivitySummary acceptedSummary =
                 org.mockito.Mockito.mock(PointActivitySummary.class);
 
-        given(userService.getCurrentUser(1L)).willReturn(user);
-        given(user.getPoint()).willReturn(30);
         given(guardianPointRepository.findByUserId(1L))
                 .willReturn(Optional.of(guardianPoint));
         given(guardianPoint.getId()).willReturn(7L);
+        given(guardianPoint.getTotalPoint()).willReturn(42);
         given(pointHistoryRepository.summarizeByGuardianPointId(7L))
                 .willReturn(List.of(postSummary, acceptedSummary));
 
@@ -61,7 +54,7 @@ class PointServiceTest {
 
         MyPointResponse response = pointService.getMyPoints(1L);
 
-        assertThat(response.totalPoint()).isEqualTo(30);
+        assertThat(response.totalPoint()).isEqualTo(42);
         assertThat(response.activities())
                 .extracting(MyPointResponse.PointActivity::pointType)
                 .containsExactly(PointType.values());
@@ -75,10 +68,6 @@ class PointServiceTest {
 
     @Test
     void getMyPointsReturnsZeroActivitiesWhenPointAggregateDoesNotExist() {
-        User user = org.mockito.Mockito.mock(User.class);
-
-        given(userService.getCurrentUser(1L)).willReturn(user);
-        given(user.getPoint()).willReturn(0);
         given(guardianPointRepository.findByUserId(1L))
                 .willReturn(Optional.empty());
 

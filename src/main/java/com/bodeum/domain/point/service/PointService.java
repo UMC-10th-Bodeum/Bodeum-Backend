@@ -7,12 +7,11 @@ import com.bodeum.domain.point.enums.PointType;
 import com.bodeum.domain.point.repository.GuardianPointHistoryRepository;
 import com.bodeum.domain.point.repository.GuardianPointHistoryRepository.PointActivitySummary;
 import com.bodeum.domain.point.repository.GuardianPointRepository;
-import com.bodeum.domain.user.entity.User;
-import com.bodeum.domain.user.service.UserService;
 import java.util.Arrays;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,16 +20,16 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class PointService {
 
-    private final UserService userService;
     private final GuardianPointRepository guardianPointRepository;
     private final GuardianPointHistoryRepository pointHistoryRepository;
 
     @Transactional(readOnly = true)
     public MyPointResponse getMyPoints(Long userId) {
-        User user = userService.getCurrentUser(userId);
+        Optional<GuardianPoint> guardianPoint =
+                guardianPointRepository.findByUserId(userId);
 
         Map<PointType, PointActivitySummary> summaries =
-                guardianPointRepository.findByUserId(userId)
+                guardianPoint
                         .map(this::getActivitySummaries)
                         .orElseGet(() -> new EnumMap<>(PointType.class));
 
@@ -38,7 +37,11 @@ public class PointService {
                 .map(pointType -> toActivity(pointType, summaries.get(pointType)))
                 .toList();
 
-        return new MyPointResponse(user.getPoint(), activities);
+        int totalPoint = guardianPoint
+                .map(GuardianPoint::getTotalPoint)
+                .orElse(0);
+
+        return new MyPointResponse(totalPoint, activities);
     }
 
     private Map<PointType, PointActivitySummary> getActivitySummaries(
