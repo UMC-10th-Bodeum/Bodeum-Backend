@@ -86,8 +86,8 @@ public class UserController {
 
     @Operation(
             summary = "저장한 정보 목록 조회",
-            description = "현재 로그인한 사용자가 저장한 복지·시설 정보와 "
-                    + "뉴스·활동 정보를 최신 저장순으로 조회한다."
+            description = "현재 로그인한 사용자가 저장한 복지·시설 정보, "
+                    + "뉴스·활동 정보와 커뮤니티 게시글을 최신 저장순으로 조회한다."
     )
     @GetMapping("/me/scraps")
     public ApiResponse<MyScrapListResponse> getScraps(

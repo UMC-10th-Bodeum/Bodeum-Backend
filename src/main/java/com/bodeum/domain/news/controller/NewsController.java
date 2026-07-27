@@ -32,7 +32,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @Validated
 @RestController
-@RequestMapping("/api/news")
+@RequestMapping("/api/v1/news")
 @RequiredArgsConstructor
 @Tag(name = "News", description = "소식 조회 API")
 @SecurityRequirements
