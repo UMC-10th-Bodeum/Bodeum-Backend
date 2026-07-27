@@ -1,17 +1,21 @@
 package com.bodeum.domain.user.controller;
 
+import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 import static org.mockito.Mockito.never;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.bodeum.domain.mypage.dto.response.MyPageProfileResponse;
 import com.bodeum.domain.mypage.entity.enums.ScrapType;
 import com.bodeum.domain.mypage.service.MyPageService;
 import com.bodeum.domain.onboarding.service.OnboardingService;
 import com.bodeum.domain.user.service.UserService;
 import com.bodeum.global.apiPayload.handler.GeneralExceptionAdvice;
 import com.bodeum.global.auth.LoginUser;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -57,6 +61,43 @@ class UserControllerTest {
                 .setCustomArgumentResolvers(loginUserArgumentResolver())
                 .setValidator(validator)
                 .build();
+    }
+
+    @Test
+    void getDashboardReturnsProfileAndActivitySummary() throws Exception {
+        MyPageProfileResponse response = new MyPageProfileResponse(
+                10L,
+                "보듬 부모님",
+                "https://example.com/profile.png",
+                120,
+                2,
+                "잎새",
+                "이웃 보호자들과 정보를 나누는 단계입니다.",
+                null,
+                null,
+                List.of(),
+                1L,
+                "서울특별시",
+                "강남구",
+                "보듬 부모님",
+                null,
+                null,
+                new MyPageProfileResponse.ActivitySummary(3L, 4L, 5L)
+        );
+        given(myPageService.getProfile(10L)).willReturn(response);
+
+        mockMvc.perform(get("/api/v1/users/me/dashboard"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.isSuccess").value(true))
+                .andExpect(jsonPath("$.code").value("COMMON200_1"))
+                .andExpect(jsonPath("$.result.userId").value(10))
+                .andExpect(jsonPath("$.result.nickname").value("보듬 부모님"))
+                .andExpect(jsonPath("$.result.point").value(120))
+                .andExpect(jsonPath("$.result.activitySummary.savedInfoCount").value(3))
+                .andExpect(jsonPath("$.result.activitySummary.myPostCount").value(4))
+                .andExpect(jsonPath("$.result.activitySummary.myCommentCount").value(5));
+
+        then(myPageService).should().getProfile(10L);
     }
 
     @Test

@@ -250,6 +250,29 @@ class AuthControllerTest {
     }
 
     @Test
+    void dashboardCanBeReadWithAccessToken() throws Exception {
+        String accessToken = login("dashboard-path-code").at("/result/accessToken").asText();
+
+        mockMvc.perform(get("/api/v1/users/me/dashboard")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("COMMON200_1"))
+                .andExpect(jsonPath("$.result.userId").isNumber())
+                .andExpect(jsonPath("$.result.point").isNumber())
+                .andExpect(jsonPath("$.result.level").isNumber())
+                .andExpect(jsonPath("$.result.activitySummary.savedInfoCount").value(0))
+                .andExpect(jsonPath("$.result.activitySummary.myPostCount").value(0))
+                .andExpect(jsonPath("$.result.activitySummary.myCommentCount").value(0));
+    }
+
+    @Test
+    void dashboardRejectsAnonymousRequest() throws Exception {
+        mockMvc.perform(get("/api/v1/users/me/dashboard"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("AUTH401_1"));
+    }
+
+    @Test
     void scrapsCanBeReadThroughMyScrapsPath() throws Exception {
         String accessToken = login("my-scraps-path-code").at("/result/accessToken").asText();
 
