@@ -71,7 +71,12 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(requests -> requests
                         .requestMatchers(allowUris).permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/v1/news", "/api/v1/news/*").permitAll()
+                        .requestMatchers(
+                                HttpMethod.GET,
+                                "/api/v1/news",
+                                "/api/v1/news/*",
+                                "/api/v1/news/*/related"
+                        ).permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/community/posts/*/comments").permitAll()
                         .anyRequest().authenticated()
                 )

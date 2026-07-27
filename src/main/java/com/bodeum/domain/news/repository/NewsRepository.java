@@ -74,6 +74,22 @@ public interface NewsRepository extends JpaRepository<News, Long> {
             """)
     Optional<News> findVisibleById(@Param("id") Long id);
 
+    @Query("""
+            select news
+            from News news
+            where news.id <> :newsId
+              and news.regionId in :regionIds
+              and news.recruitmentStatus = :status
+              and news.active = true
+              and news.deletedAt is null
+            """)
+    List<News> findRelatedRecruitingNews(
+            @Param("newsId") Long newsId,
+            @Param("regionIds") Collection<Long> regionIds,
+            @Param("status") RecruitmentStatus status,
+            Pageable pageable
+    );
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
             select news
