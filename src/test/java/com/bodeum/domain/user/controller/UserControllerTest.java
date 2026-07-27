@@ -8,7 +8,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.bodeum.domain.mypage.dto.response.MyPageProfileResponse;
+import com.bodeum.domain.mypage.dto.response.MyPageDashboardResponse;
 import com.bodeum.domain.mypage.entity.enums.ScrapType;
 import com.bodeum.domain.mypage.service.MyPageService;
 import com.bodeum.domain.onboarding.service.OnboardingService;
@@ -65,7 +65,7 @@ class UserControllerTest {
 
     @Test
     void getDashboardReturnsProfileAndActivitySummary() throws Exception {
-        MyPageProfileResponse response = new MyPageProfileResponse(
+        MyPageDashboardResponse response = new MyPageDashboardResponse(
                 10L,
                 "보듬 부모님",
                 "https://example.com/profile.png",
@@ -82,9 +82,9 @@ class UserControllerTest {
                 "보듬 부모님",
                 null,
                 null,
-                new MyPageProfileResponse.ActivitySummary(3L, 4L, 5L)
+                new MyPageDashboardResponse.ActivitySummary(3L, 4L, 5L)
         );
-        given(myPageService.getProfile(10L)).willReturn(response);
+        given(myPageService.getDashboard(10L)).willReturn(response);
 
         mockMvc.perform(get("/api/v1/users/me/dashboard"))
                 .andExpect(status().isOk())
@@ -97,7 +97,7 @@ class UserControllerTest {
                 .andExpect(jsonPath("$.result.activitySummary.myPostCount").value(4))
                 .andExpect(jsonPath("$.result.activitySummary.myCommentCount").value(5));
 
-        then(myPageService).should().getProfile(10L);
+        then(myPageService).should().getDashboard(10L);
     }
 
     @Test

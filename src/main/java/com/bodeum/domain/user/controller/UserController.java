@@ -1,7 +1,7 @@
 package com.bodeum.domain.user.controller;
 
 import com.bodeum.domain.mypage.dto.response.MyCommentListResponse;
-import com.bodeum.domain.mypage.dto.response.MyPageProfileResponse;
+import com.bodeum.domain.mypage.dto.response.MyPageDashboardResponse;
 import com.bodeum.domain.mypage.dto.response.MyPostListResponse;
 import com.bodeum.domain.mypage.dto.response.MyScrapListResponse;
 import com.bodeum.domain.mypage.entity.enums.ScrapType;
@@ -70,32 +70,17 @@ public class UserController {
     }
 
     @Operation(
-            summary = "내 프로필 대시보드 조회",
-            description = "현재 로그인한 사용자의 상세 프로필과 저장한 정보, "
-                    + "작성 게시글, 작성 댓글 수를 조회한다."
-    )
-    @GetMapping("/me/profile")
-    public ApiResponse<MyPageProfileResponse> getProfile(
-            @LoginUser Long userId
-    ) {
-        return ApiResponse.of(
-                GeneralSuccessCode.OK,
-                myPageService.getProfile(userId)
-        );
-    }
-
-    @Operation(
             summary = "마이페이지 대시보드 조회",
             description = "현재 로그인한 사용자의 기본 프로필과 포인트, 등급, "
                     + "저장한 정보, 작성 게시글, 작성 댓글 수를 조회한다."
     )
     @GetMapping("/me/dashboard")
-    public ApiResponse<MyPageProfileResponse> getDashboard(
+    public ApiResponse<MyPageDashboardResponse> getDashboard(
             @LoginUser Long userId
     ) {
         return ApiResponse.of(
                 GeneralSuccessCode.OK,
-                myPageService.getProfile(userId)
+                myPageService.getDashboard(userId)
         );
     }
 
