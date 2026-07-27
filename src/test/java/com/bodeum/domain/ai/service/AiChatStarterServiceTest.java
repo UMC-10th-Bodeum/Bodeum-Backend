@@ -60,7 +60,7 @@ class AiChatStarterServiceTest {
     }
 
     @Test
-    void appendsHonorificEvenWhenNicknameEndsWithHonorific() {
+    void doesNotDuplicateHonorificWhenNicknameEndsWithHonorific() {
         User user = mock(User.class);
         when(userService.getCurrentUser(10L)).thenReturn(user);
         when(user.getNickname()).thenReturn("민정님");
@@ -68,14 +68,14 @@ class AiChatStarterServiceTest {
         AiChatStarterResponse response = aiChatStarterService.getChatStarter(10L);
 
         assertThat(response.greeting())
-                .contains("민정님님의 정보를 바탕으로");
+                .contains("민정님의 정보를 바탕으로")
+                .doesNotContain("민정님님의 정보를 바탕으로");
     }
 
     @Test
-    void usesGuardianFallbackForOauthGeneratedNickname() {
+    void usesGuardianFallbackForOauthGeneratedNicknameWithoutProvider() {
         User user = mock(User.class);
         when(userService.getCurrentUser(10L)).thenReturn(user);
-        when(user.getProvider()).thenReturn(SocialProvider.KAKAO);
         when(user.getNickname()).thenReturn(SocialProvider.KAKAO.getDisplayName() + " 사용자");
 
         AiChatStarterResponse response = aiChatStarterService.getChatStarter(10L);

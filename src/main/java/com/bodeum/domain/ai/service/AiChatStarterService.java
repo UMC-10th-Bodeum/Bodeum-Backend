@@ -1,9 +1,13 @@
 package com.bodeum.domain.ai.service;
 
 import com.bodeum.domain.ai.dto.response.AiChatStarterResponse;
+import com.bodeum.domain.auth.enums.SocialProvider;
 import com.bodeum.domain.user.entity.User;
 import com.bodeum.domain.user.service.UserService;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -13,6 +17,11 @@ import org.springframework.transaction.annotation.Transactional;
 public class AiChatStarterService {
 
     private static final String DEFAULT_DISPLAY_NAME = "보호자";
+    private static final Set<String> OAUTH_DEFAULT_NICKNAMES = Arrays.stream(
+                    SocialProvider.values()
+            )
+            .map(provider -> provider.getDisplayName() + " 사용자")
+            .collect(Collectors.toUnmodifiableSet());
     private static final String GREETING_TEMPLATE = """
             안녕하세요! 저는 보듬 AI 큐레이션입니다 😊
 
@@ -47,11 +56,13 @@ public class AiChatStarterService {
         }
 
         String trimmedNickname = nickname.trim();
-        if (user.getProvider() != null
-                && trimmedNickname.equals(user.getProvider().getDisplayName() + " 사용자")) {
+        if (OAUTH_DEFAULT_NICKNAMES.contains(trimmedNickname)) {
             return DEFAULT_DISPLAY_NAME;
         }
 
-        return trimmedNickname;
+        String normalizedNickname = trimmedNickname.endsWith("님")
+                ? trimmedNickname.substring(0, trimmedNickname.length() - 1).trim()
+                : trimmedNickname;
+        return normalizedNickname.isBlank() ? DEFAULT_DISPLAY_NAME : normalizedNickname;
     }
 }
