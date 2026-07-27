@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @Tag(name = "AI feedback", description = "AI 메시지 피드백 API")
+@RequireSignupCompleted
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/v1/ai/messages")
@@ -29,7 +30,6 @@ public class AiFeedbackController {
             summary = "AI 메시지 피드백 등록",
             description = "현재 사용자의 AI 메시지에 HELPFUL 또는 INCORRECT 피드백을 등록합니다."
     )
-    @RequireSignupCompleted
     @PostMapping("/{aiMessageId}/feedback")
     public ApiResponse<CreateAiFeedbackResponse> createFeedback(
             @LoginUser Long userId,

@@ -9,6 +9,7 @@ import com.bodeum.domain.ai.service.AiMessageService;
 import com.bodeum.global.apiPayload.ApiResponse;
 import com.bodeum.global.apiPayload.code.GeneralSuccessCode;
 import com.bodeum.global.auth.LoginUser;
+import com.bodeum.global.auth.RequireSignupCompleted;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -21,6 +22,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import jakarta.validation.Valid;
 
 @Tag(name = "AI chat", description = "AI 챗봇 API")
+@RequireSignupCompleted
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/v1/ai/chat-room")

@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @Tag(name = "AI chat starter", description = "AI 챗봇 초기 대화 콘텐츠 API")
+@RequireSignupCompleted
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/v1/ai/chat-room/starter")
@@ -25,7 +26,6 @@ public class AiChatStarterController {
             summary = "초기 대화 콘텐츠 조회",
             description = "AI 챗봇 초기 진입 시 노출할 인사말과 고정 추천 질문 5개를 조회합니다."
     )
-    @RequireSignupCompleted
     @GetMapping
     public ApiResponse<AiChatStarterResponse> getChatStarter(
             @LoginUser Long userId
