@@ -48,8 +48,8 @@ public interface HomeNewsRepository extends JpaRepository<News, Long> {
             WHERE ns.userId = :userId
               AND n.active = true
               AND n.deletedAt IS NULL
-              AND n.recruitmentStatus != :excluded
-              AND n.applyEndDate >= CURRENT_DATE
+              AND (n.recruitmentStatus IS NULL OR n.recruitmentStatus != :excluded)
+              AND (n.applyEndDate IS NULL OR n.applyEndDate >= CURRENT_DATE)
             ORDER BY n.applyEndDate ASC
             """)
     List<News> findBannerForUser(
@@ -62,8 +62,8 @@ public interface HomeNewsRepository extends JpaRepository<News, Long> {
             SELECT n FROM News n
             WHERE n.active = true
               AND n.deletedAt IS NULL
-              AND n.recruitmentStatus != :excluded
-              AND n.applyEndDate >= CURRENT_DATE
+              AND (n.recruitmentStatus IS NULL OR n.recruitmentStatus != :excluded)
+              AND (n.applyEndDate IS NULL OR n.applyEndDate >= CURRENT_DATE)
             ORDER BY n.scrapCount DESC
             """)
     List<News> findBannerForAnonymous(
