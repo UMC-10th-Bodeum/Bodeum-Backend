@@ -12,9 +12,9 @@ public interface SearchInfoItemRepository extends JpaRepository<InfoItem, Long> 
 
     List<InfoItem> findByNameContaining(String keyword, Pageable pageable);
 
-    // N+1 방지를 위해 Fetch Join을 적용한 자동완성 쿼리
     @Query("SELECT DISTINCT i FROM InfoItem i " +
             "JOIN FETCH i.infoCategory " +
+            "LEFT JOIN FETCH i.infoItemTags " +
             "WHERE i.name LIKE CONCAT('%', :keyword, '%') " +
             "ORDER BY i.name ASC")
     List<InfoItem> findAutocompleteByKeyword(@Param("keyword") String keyword, Pageable pageable);
