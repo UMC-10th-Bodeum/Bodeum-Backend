@@ -6,6 +6,7 @@ import com.bodeum.domain.community.dto.response.PostLikeResponse;
 import com.bodeum.domain.community.dto.response.PostListItemResponse;
 import com.bodeum.domain.community.dto.response.PostResponse;
 import com.bodeum.domain.community.dto.response.PostScrapResponse;
+import com.bodeum.domain.community.enums.PostListSortType;
 import com.bodeum.domain.community.service.PostListService;
 import com.bodeum.domain.community.service.PostQueryFacade;
 import com.bodeum.domain.community.service.PostService;
@@ -53,8 +54,11 @@ public class PostController {
             @LoginUser Long userId,
             @Parameter(description = "페이지 번호(0부터 시작)", example = "0")
             @RequestParam(defaultValue = "0") @Min(0) int page,
-            @Parameter(description = "정렬 기준: view, scrap, comment", example = "view")
-            @RequestParam(defaultValue = "view") String sort,
+            @Parameter(
+                    description = "정렬 기준: view, scrap, comment",
+                    example = PostListSortType.DEFAULT_SORT_VALUE
+            )
+            @RequestParam(defaultValue = PostListSortType.DEFAULT_SORT_VALUE) String sort,
             @Parameter(description = "제목 또는 본문 검색어. 생략하거나 공백이면 전체 조회")
             @RequestParam(required = false) String keyword
     ) {

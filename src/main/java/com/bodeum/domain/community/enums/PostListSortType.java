@@ -11,6 +11,8 @@ public enum PostListSortType {
     SCRAP("scrapCount"),
     COMMENT("commentCount");
 
+    public static final String DEFAULT_SORT_VALUE = "view";
+
     private final String property;
 
     PostListSortType(String property) {

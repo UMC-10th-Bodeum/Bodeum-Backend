@@ -28,6 +28,8 @@ public record PostListItemResponse(
         Instant createdAt
 ) {
 
+    static final int CONTENT_PREVIEW_MAX_LENGTH = 200;
+
     public static PostListItemResponse of(
             Post post,
             User author,
@@ -40,7 +42,7 @@ public record PostListItemResponse(
                 post.getBoardType(),
                 post.getAnonymityType(),
                 post.getTitle(),
-                post.getContent(),
+                toContentPreview(post.getContent()),
                 post.isQuestion(),
                 AuthorResponse.of(post, author, viewerId),
                 thumbnailUrl,
@@ -51,6 +53,10 @@ public record PostListItemResponse(
                 liked,
                 post.getCreatedAt()
         );
+    }
+
+    private static String toContentPreview(String content) {
+        return content.substring(0, Math.min(content.length(), CONTENT_PREVIEW_MAX_LENGTH));
     }
 
     public record AuthorResponse(
