@@ -44,6 +44,7 @@ public class NewsPublicDataSyncService {
         for (PublicDataNewsCollector collector : collectors) {
             NewsSource source = findOrCreateSource(collector);
             List<NewsCandidate> candidates = collector.collect(source);
+            Map<String, News> newsByExternalItemId = loadNewsByExternalItemId(source, candidates);
             fetched += candidates.size();
 
             for (NewsCandidate candidate : candidates) {
@@ -52,12 +53,13 @@ public class NewsPublicDataSyncService {
                         ignored -> findOrCreateCategory(candidate.newsType(), candidate.categoryName())
                 );
                 Long regionId = resolveRegion(candidate.regionName(), regions);
-                News news = newsRepository
-                        .findByNewsSourceAndExternalItemId(source, candidate.externalItemId())
-                        .orElse(null);
+                News news = newsByExternalItemId.get(candidate.externalItemId());
 
                 if (news == null) {
-                    newsRepository.save(News.create(category, source, regionId, candidate));
+                    News createdNews = newsRepository.save(
+                            News.create(category, source, regionId, candidate)
+                    );
+                    newsByExternalItemId.put(candidate.externalItemId(), createdNews);
                     created++;
                 } else {
                     news.updateCollectedData(category, source, regionId, candidate);
@@ -69,6 +71,26 @@ public class NewsPublicDataSyncService {
         }
 
         return new NewsSyncResult(fetched, created, updated);
+    }
+
+    private Map<String, News> loadNewsByExternalItemId(
+            NewsSource source,
+            List<NewsCandidate> candidates
+    ) {
+        List<String> externalItemIds = candidates.stream()
+                .map(NewsCandidate::externalItemId)
+                .filter(StringUtils::hasText)
+                .distinct()
+                .toList();
+
+        Map<String, News> newsByExternalItemId = new HashMap<>();
+        if (externalItemIds.isEmpty()) {
+            return newsByExternalItemId;
+        }
+
+        newsRepository.findAllByNewsSourceAndExternalItemIdIn(source, externalItemIds)
+                .forEach(news -> newsByExternalItemId.put(news.getExternalItemId(), news));
+        return newsByExternalItemId;
     }
 
     private NewsSource findOrCreateSource(PublicDataNewsCollector collector) {

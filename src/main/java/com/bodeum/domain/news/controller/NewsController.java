@@ -4,6 +4,7 @@ import com.bodeum.domain.news.dto.NewsStatus;
 import com.bodeum.domain.news.dto.response.NewsDetailResponse;
 import com.bodeum.domain.news.dto.response.NewsListResponse;
 import com.bodeum.domain.news.dto.response.NewsScrapResponse;
+import com.bodeum.domain.news.dto.response.RelatedRecruitingNewsResponse;
 import com.bodeum.domain.news.service.NewsQueryService;
 import com.bodeum.domain.news.service.NewsScrapService;
 import com.bodeum.global.apiPayload.ApiResponse;
@@ -21,6 +22,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -32,7 +34,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @Validated
 @RestController
-@RequestMapping("/api/news")
+@RequestMapping("/api/v1/news")
 @RequiredArgsConstructor
 @Tag(name = "News", description = "소식 조회 API")
 @SecurityRequirements
@@ -100,6 +102,23 @@ public class NewsController {
         return ApiResponse.of(
                 GeneralSuccessCode.OK,
                 newsQueryService.getNewsDetail(userId, newsId)
+        );
+    }
+
+    @GetMapping("/{newsId}/related")
+    @Operation(
+            summary = "같은 지역 모집 중 소식 조회",
+            description = "현재 소식을 제외하고 같은 시 단위 지역에서 모집 중인 소식을 최신순으로 조회한다."
+    )
+    public ApiResponse<List<RelatedRecruitingNewsResponse>> getRelatedRecruitingNews(
+            @Parameter(description = "현재 조회 중인 소식 ID", example = "1")
+            @PathVariable @Positive Long newsId,
+            @Parameter(description = "조회 개수", example = "5")
+            @RequestParam(defaultValue = "5") @Min(1) @Max(20) int size
+    ) {
+        return ApiResponse.of(
+                GeneralSuccessCode.OK,
+                newsQueryService.getRelatedRecruitingNews(newsId, size)
         );
     }
 

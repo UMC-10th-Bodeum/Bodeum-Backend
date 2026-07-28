@@ -5,7 +5,6 @@ import com.bodeum.domain.onboarding.enums.CommunityRoleType;
 import com.bodeum.domain.onboarding.enums.GuardianType;
 import com.bodeum.domain.region.entity.Region;
 import com.bodeum.domain.user.enums.DisabilityType;
-import com.bodeum.domain.user.enums.GuardianLevel;
 import com.bodeum.domain.user.enums.InterestCategory;
 import com.bodeum.domain.user.enums.UserStatus;
 import com.bodeum.global.common.entity.BaseCreatedUpdatedDeletedEntity;
@@ -392,14 +391,6 @@ public class User extends BaseCreatedUpdatedDeletedEntity {
 
     public CommunityRoleType getCommunityRoleType() {
         return guardianProfile == null ? null : guardianProfile.getCommunityRoleType();
-    }
-
-    public int getPoint() {
-        return guardianProfile == null ? 0 : guardianProfile.getPoint();
-    }
-
-    public GuardianLevel getGuardianLevel() {
-        return GuardianLevel.from(getPoint());
     }
 
     public boolean isWithdrawn() {

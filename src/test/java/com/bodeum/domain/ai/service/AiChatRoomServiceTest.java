@@ -9,8 +9,6 @@ import com.bodeum.domain.ai.repository.AiChatRoomRepository;
 import com.bodeum.domain.ai.repository.AiMessageRepository;
 import com.bodeum.domain.auth.enums.SocialProvider;
 import com.bodeum.domain.user.entity.User;
-import com.bodeum.domain.user.entity.UserAgreement;
-import com.bodeum.domain.user.repository.UserAgreementRepository;
 import com.bodeum.domain.user.repository.UserRepository;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
@@ -31,9 +29,6 @@ class AiChatRoomServiceTest {
     private UserRepository userRepository;
 
     @Mock
-    private UserAgreementRepository userAgreementRepository;
-
-    @Mock
     private AiMessageRepository aiMessageRepository;
 
     @InjectMocks
@@ -48,8 +43,6 @@ class AiChatRoomServiceTest {
         AiChatRoom concurrentlyCreatedRoom = AiChatRoom.create(user);
         ReflectionTestUtils.setField(concurrentlyCreatedRoom, "id", 10L);
 
-        given(userAgreementRepository.findByUserId(userId))
-                .willReturn(Optional.of(UserAgreement.create(user, true, true, true)));
         given(aiChatRoomRepository.findByUserId(userId))
                 .willReturn(Optional.empty(), Optional.of(concurrentlyCreatedRoom));
         given(userRepository.findById(userId)).willReturn(Optional.of(user));

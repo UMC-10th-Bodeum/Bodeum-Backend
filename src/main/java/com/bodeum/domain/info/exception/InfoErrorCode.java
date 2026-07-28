@@ -23,8 +23,10 @@ public enum InfoErrorCode implements BaseErrorCode {
     FORBIDDEN_REVIEW_UPDATE(HttpStatus.FORBIDDEN, "INFO403_2", "권한이 없습니다. 본인이 작성한 후기만 수정할 수 있습니다."),
 
     // 404 Not Found
-    INFO_ITEM_NOT_FOUND(HttpStatus.NOT_FOUND, "INFO404_1", "해당 리소스를 찾을 수 없어 후기를 등록할 수 없습니다."),
-    INFO_REVIEW_NOT_FOUND(HttpStatus.NOT_FOUND, "INFO404_2", "해당 리소스를 찾을 수 없어 후기를 처리할 수 없습니다.");
+    INFO_ITEM_NOT_FOUND(HttpStatus.NOT_FOUND, "INFO404_1", "해당 리소스를 찾을 수 없어 후기를 처리할 수 없습니다."),
+    INFO_REVIEW_NOT_FOUND(HttpStatus.NOT_FOUND, "INFO404_2", "해당 리소스를 찾을 수 없어 후기를 처리할 수 없습니다."),
+
+    INFO_SHARE_LINK_NOT_FOUND(HttpStatus.NOT_FOUND, "INFO0404_1", "해당 리소스를 찾을 수 없어 공유 링크 생성이 불가능합니다.");
 
     private final HttpStatus status;
     private final String code;
