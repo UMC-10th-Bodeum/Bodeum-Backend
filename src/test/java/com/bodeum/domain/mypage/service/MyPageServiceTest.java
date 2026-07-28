@@ -79,12 +79,16 @@ class MyPageServiceTest {
                 new UserProfileResponse(
                         1L,
                         "민준맘",
+                        "parent@example.com",
+                        "kakao",
                         null,
                         230,
                         3,
                         "꽃",
                         "정성스러운 답변과 경험 공유로 "
                                 + "커뮤니티에 본격적인 신뢰의 결실을 피워내는 단계입니다.",
+                        null,
+                        null,
                         new UserProfileResponse.ChildProfile(
                                 null,
                                 null,
