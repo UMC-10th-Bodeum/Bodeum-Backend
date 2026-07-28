@@ -2,8 +2,7 @@ package com.bodeum.global.common.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.MappedSuperclass;
-
-import java.time.Instant;
+import java.time.LocalDateTime;
 import lombok.Getter;
 
 @Getter
@@ -11,10 +10,10 @@ import lombok.Getter;
 public abstract class BaseCreatedDeletedEntity extends BaseCreatedEntity {
 
     @Column(name = "deleted_at")
-    private Instant deletedAt;
+    private LocalDateTime deletedAt;
 
     public void delete() {
-        this.deletedAt = Instant.now();
+        this.deletedAt = LocalDateTime.now();
     }
 
     public boolean isDeleted() {
