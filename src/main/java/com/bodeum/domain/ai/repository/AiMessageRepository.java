@@ -11,6 +11,7 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.jpa.repository.QueryHints;
 import org.springframework.data.repository.query.Param;
+import org.springframework.data.domain.Pageable;
 
 import java.time.Instant;
 import java.util.List;
@@ -51,12 +52,20 @@ public interface AiMessageRepository extends JpaRepository<AiMessage, Long> {
         WHERE m.chatRoom.id = :chatRoomId
           AND m.createdAt >= :startAt
           AND m.createdAt < :endAt
-        ORDER BY m.createdAt ASC
+          AND (
+                :cursorCreatedAt IS NULL
+                OR m.createdAt < :cursorCreatedAt
+                OR (m.createdAt = :cursorCreatedAt AND m.id < :cursorId)
+          )
+        ORDER BY m.createdAt DESC, m.id DESC
         """)
     List<AiMessage> findTodayMessages(
             @Param("chatRoomId") Long chatRoomId,
             @Param("startAt") Instant startAt,
-            @Param("endAt") Instant endAt
+            @Param("endAt") Instant endAt,
+            @Param("cursorId") Long cursorId,
+            @Param("cursorCreatedAt") Instant cursorCreatedAt,
+            Pageable pageable
     );
 
     @Query("""
