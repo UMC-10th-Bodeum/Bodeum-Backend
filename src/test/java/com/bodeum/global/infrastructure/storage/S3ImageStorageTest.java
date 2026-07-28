@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 import com.bodeum.global.apiPayload.exception.ProjectException;
@@ -17,6 +18,7 @@ import org.springframework.mock.web.MockMultipartFile;
 import software.amazon.awssdk.core.exception.SdkClientException;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
 @ExtendWith(MockitoExtension.class)
@@ -100,6 +102,51 @@ class S3ImageStorageTest {
                 .isInstanceOf(ProjectException.class)
                 .extracting(exception -> ((ProjectException) exception).getErrorCode())
                 .isEqualTo(StorageErrorCode.IMAGE_UPLOAD_FAILED);
+    }
+
+    @Test
+    void deleteRemovesObjectByKeyFromStandardS3Url() {
+        String url = "https://bodeum-bucket.s3.ap-northeast-2.amazonaws.com/profile-images/abc.png";
+
+        s3ImageStorage.delete(url);
+
+        assertDeleteObjectKey("profile-images/abc.png");
+    }
+
+    @Test
+    void deleteRemovesObjectByKeyFromPublicBaseUrl() {
+        s3Properties.setPublicBaseUrl("https://cdn.bodeum.com/");
+        String url = "https://cdn.bodeum.com/profile-images/abc.webp";
+
+        s3ImageStorage.delete(url);
+
+        assertDeleteObjectKey("profile-images/abc.webp");
+    }
+
+    @Test
+    void deleteSkipsUnrecognizedUrl() {
+        // publicBaseUrl도 표준 S3 URL도 아닌 형식은 key를 역산할 수 없어 삭제를 건너뛴다.
+        s3ImageStorage.delete("https://other.example.com/profile-images/abc.png");
+
+        verify(s3Client, never()).deleteObject(any(DeleteObjectRequest.class));
+    }
+
+    @Test
+    void deleteSkipsBlankUrl() {
+        s3ImageStorage.delete(null);
+        s3ImageStorage.delete("   ");
+
+        verify(s3Client, never()).deleteObject(any(DeleteObjectRequest.class));
+    }
+
+    private void assertDeleteObjectKey(String expectedKey) {
+        ArgumentCaptor<DeleteObjectRequest> requestCaptor = ArgumentCaptor.forClass(DeleteObjectRequest.class);
+
+        verify(s3Client).deleteObject(requestCaptor.capture());
+
+        DeleteObjectRequest request = requestCaptor.getValue();
+        assertThat(request.bucket()).isEqualTo("bodeum-bucket");
+        assertThat(request.key()).isEqualTo(expectedKey);
     }
 
     private void assertPutObjectRequest(String keyPrefix, String keySuffix, String contentType) {

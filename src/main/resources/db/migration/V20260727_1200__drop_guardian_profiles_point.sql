@@ -1,0 +1,15 @@
+-- 보호자 프로필 포인트(point) 컬럼 제거 (#162)
+--
+-- 배경: 포인트 총점이 guardian_profiles.point(user 도메인)와 guardian_point.total_point
+--   (point 도메인)에 중복 존재했다. #155에서 포인트 조회 기준을 total_point로 이전하고
+--   user.getPoint() 의존을 제거했으므로, 원천을 total_point 하나로 통일하기 위해
+--   더 이상 매핑되지 않는 guardian_profiles.point 컬럼을 제거한다.
+--
+-- 배포 순서(중요): 이 마이그레이션은 신규 앱 기동 시 Flyway가 실행하며 컬럼을 제거한다.
+--   구버전 앱(이 컬럼을 매핑하던 #162 이전 이미지)이 컬럼 제거 후에도 살아 있으면
+--   guardian_profiles 조회/저장에서 "Unknown column 'point'" 오류가 난다. 따라서
+--   (1) 구버전 컨테이너를 먼저 종료(drain)한 뒤 신규 버전을 기동하고,
+--   (2) 이 마이그레이션 적용 이후에는 #162 이전 이미지로 롤백하지 않는다
+--       (롤백이 필요하면 컬럼을 되살리는 별도 마이그레이션을 선행해야 한다).
+--   단일 인스턴스 stop→start 배포에서는 두 버전이 동시에 뜨지 않아 안전하다.
+ALTER TABLE guardian_profiles DROP COLUMN point;

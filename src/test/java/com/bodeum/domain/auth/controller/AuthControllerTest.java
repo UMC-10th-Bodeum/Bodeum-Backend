@@ -11,6 +11,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.bodeum.domain.auth.repository.AuthLoginCodeRepository;
 import com.bodeum.domain.auth.repository.OAuthStateRepository;
 import com.bodeum.domain.auth.repository.RefreshTokenSessionRepository;
+import com.bodeum.domain.user.entity.User;
 import com.bodeum.domain.user.repository.UserRepository;
 import com.bodeum.domain.user.service.UserService;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -73,7 +74,7 @@ class AuthControllerTest {
         assertThat(loginBody.at("/result/refreshToken").asText()).isNotEmpty();
         String accessToken = loginBody.at("/result/accessToken").asText();
 
-        mockMvc.perform(get("/api/v1/users/me/profile")
+        mockMvc.perform(get("/api/v1/users/me/dashboard")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.result.userId").isNumber())
@@ -222,17 +223,8 @@ class AuthControllerTest {
     }
 
     @Test
-    void profileCanBeReadAndUpdatedThroughProfilePath() throws Exception {
+    void profileCanBeUpdatedThroughProfilePath() throws Exception {
         String accessToken = login("profile-path-code").at("/result/accessToken").asText();
-
-        mockMvc.perform(get("/api/v1/users/me/profile")
-                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.result.userId").isNumber())
-                .andExpect(jsonPath("$.result.childProfile").exists())
-                .andExpect(jsonPath("$.result.activitySummary.savedInfoCount").value(0))
-                .andExpect(jsonPath("$.result.activitySummary.myPostCount").value(0))
-                .andExpect(jsonPath("$.result.activitySummary.myCommentCount").value(0));
 
         mockMvc.perform(patch("/api/v1/users/me/profile")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
@@ -247,6 +239,29 @@ class AuthControllerTest {
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.result.updated").value(true));
+    }
+
+    @Test
+    void dashboardCanBeReadWithAccessToken() throws Exception {
+        String accessToken = login("dashboard-path-code").at("/result/accessToken").asText();
+
+        mockMvc.perform(get("/api/v1/users/me/dashboard")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("COMMON200_1"))
+                .andExpect(jsonPath("$.result.userId").isNumber())
+                .andExpect(jsonPath("$.result.point").isNumber())
+                .andExpect(jsonPath("$.result.level").isNumber())
+                .andExpect(jsonPath("$.result.activitySummary.savedInfoCount").value(0))
+                .andExpect(jsonPath("$.result.activitySummary.myPostCount").value(0))
+                .andExpect(jsonPath("$.result.activitySummary.myCommentCount").value(0));
+    }
+
+    @Test
+    void dashboardRejectsAnonymousRequest() throws Exception {
+        mockMvc.perform(get("/api/v1/users/me/dashboard"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("AUTH401_1"));
     }
 
     @Test
@@ -330,6 +345,53 @@ class AuthControllerTest {
     }
 
     @Test
+    void pointsCanBeReadThroughMyPointsPath() throws Exception {
+        JsonNode loginBody = login("my-points-path-code");
+        String accessToken = loginBody.at("/result/accessToken").asText();
+        User user = userRepository.findById(loginBody.at("/result/userId").asLong())
+                .orElseThrow();
+        user.skipOnboarding();
+        user.markRegisteredIfResolved();
+        userRepository.saveAndFlush(user);
+
+        mockMvc.perform(get("/api/v1/users/me/points")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.isSuccess").value(true))
+                .andExpect(jsonPath("$.code").value("COMMON200_1"))
+                .andExpect(jsonPath("$.result.totalPoint").value(0))
+                .andExpect(jsonPath("$.result.activities.length()")
+                        .value(4))
+                .andExpect(jsonPath("$.result.activities[0].pointType")
+                        .value("POST_CREATED"))
+                .andExpect(jsonPath("$.result.activities[0].pointPerAction")
+                        .value(5))
+                .andExpect(jsonPath("$.result.activities[0].earnedPoint")
+                        .value(0))
+                .andExpect(jsonPath("$.result.activities[0].activityCount")
+                        .value(0));
+    }
+
+    @Test
+    void pointsRejectIncompleteSignup() throws Exception {
+        String accessToken = login("my-points-incomplete-signup-code")
+                .at("/result/accessToken")
+                .asText();
+
+        mockMvc.perform(get("/api/v1/users/me/points")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("AUTH403_1"));
+    }
+
+    @Test
+    void pointsRequireAccessToken() throws Exception {
+        mockMvc.perform(get("/api/v1/users/me/points"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("AUTH401_1"));
+    }
+
+    @Test
     void briefReturnsLoggedOutWhenAnonymous() throws Exception {
         mockMvc.perform(get("/api/v1/users/me/brief"))
                 .andExpect(status().isOk())
@@ -342,7 +404,7 @@ class AuthControllerTest {
 
         userService.withdraw(userRepository.findAll().getFirst().getId());
 
-        mockMvc.perform(get("/api/v1/users/me/profile")
+        mockMvc.perform(get("/api/v1/users/me/dashboard")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("AUTH401_1"));
@@ -402,6 +464,8 @@ class AuthControllerTest {
         assertThat(codeParameter).isNotNull();
         assertThat(codeParameter.path("required").asBoolean()).isTrue();
         assertThat(openApi.at("/paths/~1api~1v1~1users~1me~1summary").isMissingNode())
+                .isTrue();
+        assertThat(openApi.at("/paths/~1api~1v1~1users~1me~1profile/get").isMissingNode())
                 .isTrue();
         assertThat(hasParameter(openApi, "/paths/~1api~1v1~1users~1me~1profile/patch/parameters", "userId"))
                 .isFalse();

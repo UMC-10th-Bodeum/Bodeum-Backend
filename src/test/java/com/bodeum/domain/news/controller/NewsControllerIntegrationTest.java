@@ -93,7 +93,7 @@ class NewsControllerIntegrationTest {
                 RecruitmentStatus.OPEN
         ));
 
-        mockMvc.perform(get("/api/news")
+        mockMvc.perform(get("/api/v1/news")
                         .param("page", "0")
                         .param("size", "10")
                         .param("sort", "latest")
@@ -127,7 +127,7 @@ class NewsControllerIntegrationTest {
                 RecruitmentStatus.OPEN
         ));
 
-        mockMvc.perform(get("/api/news/{newsId}", news.getId()))
+        mockMvc.perform(get("/api/v1/news/{newsId}", news.getId()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.result.newsId").value(news.getId()))
                 .andExpect(jsonPath("$.result.title").value("상세 소식"))
@@ -140,7 +140,7 @@ class NewsControllerIntegrationTest {
 
     @Test
     void getNewsDetailReturnsCommonNotFoundResponse() throws Exception {
-        mockMvc.perform(get("/api/news/{newsId}", 999999L))
+        mockMvc.perform(get("/api/v1/news/{newsId}", 999999L))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.isSuccess").value(false))
                 .andExpect(jsonPath("$.code").value("COMMON404_1"))
@@ -148,8 +148,169 @@ class NewsControllerIntegrationTest {
     }
 
     @Test
+    void getRelatedRecruitingNewsReturnsLatestOpenNewsFromSameRegion() throws Exception {
+        Region suwonYeongtong = regionRepository.save(
+                Region.create("경기도", "수원시 영통구")
+        );
+        Region suwonPaldal = regionRepository.save(
+                Region.create("경기도", "수원시 팔달구")
+        );
+        Region yongin = regionRepository.save(Region.create("경기도", "용인시"));
+        NewsCategory category = newsCategoryRepository.save(
+                NewsCategory.create(NewsType.ACTIVITY, "WELFARE_PROGRAM", 1)
+        );
+        NewsSource source = newsSourceRepository.save(source());
+        News current = newsRepository.save(news(
+                category,
+                source,
+                suwonYeongtong.getId(),
+                "related-current",
+                "현재 조회 중인 소식",
+                LocalDateTime.of(2026, 7, 10, 10, 0),
+                RecruitmentStatus.OPEN
+        ));
+        News older = newsRepository.save(news(
+                category,
+                source,
+                suwonPaldal.getId(),
+                "related-older",
+                "수원 이전 모집 소식",
+                LocalDateTime.of(2026, 7, 1, 10, 0),
+                RecruitmentStatus.OPEN
+        ));
+        News latest = news(
+                category,
+                source,
+                suwonPaldal.getId(),
+                "related-latest",
+                "수원 최신 모집 소식",
+                LocalDateTime.of(2026, 7, 3, 10, 0),
+                RecruitmentStatus.OPEN
+        );
+        latest.increaseScrapCount();
+        latest.increaseViewCount();
+        latest.increaseViewCount();
+        latest = newsRepository.save(latest);
+        newsRepository.save(news(
+                category,
+                source,
+                suwonPaldal.getId(),
+                "related-over-limit",
+                "수원 오래된 모집 소식",
+                LocalDateTime.of(2026, 6, 30, 10, 0),
+                RecruitmentStatus.OPEN
+        ));
+        newsRepository.save(news(
+                category,
+                source,
+                suwonPaldal.getId(),
+                "related-closed",
+                "수원 마감 소식",
+                LocalDateTime.of(2026, 7, 5, 10, 0),
+                RecruitmentStatus.CLOSED
+        ));
+        newsRepository.save(news(
+                category,
+                source,
+                yongin.getId(),
+                "related-other-region",
+                "용인 모집 소식",
+                LocalDateTime.of(2026, 7, 6, 10, 0),
+                RecruitmentStatus.OPEN
+        ));
+
+        mockMvc.perform(get("/api/v1/news/{newsId}/related", current.getId())
+                        .param("size", "2"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.isSuccess").value(true))
+                .andExpect(jsonPath("$.code").value("COMMON200_1"))
+                .andExpect(jsonPath("$.result.length()").value(2))
+                .andExpect(jsonPath("$.result[0].newsId").value(latest.getId()))
+                .andExpect(jsonPath("$.result[0].region").value("경기도 수원시 팔달구"))
+                .andExpect(jsonPath("$.result[0].title").value("수원 최신 모집 소식"))
+                .andExpect(jsonPath("$.result[0].scrapCount").value(1))
+                .andExpect(jsonPath("$.result[0].viewCount").value(2))
+                .andExpect(jsonPath("$.result[1].newsId").value(older.getId()));
+    }
+
+    @Test
+    void getRelatedRecruitingNewsUsesDefaultSizeFive() throws Exception {
+        Region currentRegion = regionRepository.save(
+                Region.create("부산광역시", "수영구")
+        );
+        Region relatedRegion = regionRepository.save(
+                Region.create("부산광역시", "해운대구")
+        );
+        NewsCategory category = newsCategoryRepository.save(
+                NewsCategory.create(NewsType.ACTIVITY, "PROGRAM", 1)
+        );
+        NewsSource source = newsSourceRepository.save(source());
+        News current = newsRepository.save(news(
+                category,
+                source,
+                currentRegion.getId(),
+                "default-size-current",
+                "현재 소식",
+                LocalDateTime.of(2026, 7, 10, 10, 0),
+                RecruitmentStatus.OPEN
+        ));
+        for (int index = 0; index < 6; index++) {
+            newsRepository.save(news(
+                    category,
+                    source,
+                    relatedRegion.getId(),
+                    "default-size-" + index,
+                    "관련 소식 " + index,
+                    LocalDateTime.of(2026, 7, index + 1, 10, 0),
+                    RecruitmentStatus.OPEN
+            ));
+        }
+
+        mockMvc.perform(get("/api/v1/news/{newsId}/related", current.getId()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.length()").value(5));
+    }
+
+    @Test
+    void getRelatedRecruitingNewsReturnsEmptyWhenCurrentNewsHasNoRegion() throws Exception {
+        NewsCategory category = newsCategoryRepository.save(
+                NewsCategory.create(NewsType.ACTIVITY, "PROGRAM", 1)
+        );
+        NewsSource source = newsSourceRepository.save(source());
+        News current = newsRepository.save(news(
+                category,
+                source,
+                null,
+                "related-no-region",
+                "지역 없는 소식",
+                LocalDateTime.of(2026, 7, 1, 10, 0),
+                RecruitmentStatus.OPEN
+        ));
+
+        mockMvc.perform(get("/api/v1/news/{newsId}/related", current.getId()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result").isArray())
+                .andExpect(jsonPath("$.result").isEmpty());
+    }
+
+    @Test
+    void getRelatedRecruitingNewsReturnsNotFoundForUnknownNews() throws Exception {
+        mockMvc.perform(get("/api/v1/news/{newsId}/related", 999999L))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("COMMON404_1"));
+    }
+
+    @Test
+    void getRelatedRecruitingNewsRejectsInvalidSize() throws Exception {
+        mockMvc.perform(get("/api/v1/news/{newsId}/related", 1L)
+                        .param("size", "0"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("COMMON400_1"));
+    }
+
+    @Test
     void getNewsRejectsInvalidPageSize() throws Exception {
-        mockMvc.perform(get("/api/news").param("size", "0"))
+        mockMvc.perform(get("/api/v1/news").param("size", "0"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("COMMON400_1"));
     }
@@ -211,7 +372,7 @@ class NewsControllerIntegrationTest {
                 RecruitmentStatus.OPEN
         ));
 
-        mockMvc.perform(get("/api/news/search")
+        mockMvc.perform(get("/api/v1/news/search")
                         .param("keyword", "봉사")
                         .param("page", "0")
                         .param("size", "10"))
@@ -221,7 +382,7 @@ class NewsControllerIntegrationTest {
                 .andExpect(jsonPath("$.result.items[1].newsId").value(contentMatch.getId()))
                 .andExpect(jsonPath("$.result.items[2].newsId").value(titleMatch.getId()));
 
-        mockMvc.perform(get("/api/news/search")
+        mockMvc.perform(get("/api/v1/news/search")
                         .param("keyword", "수원")
                         .param("page", "0")
                         .param("size", "10"))
@@ -279,7 +440,7 @@ class NewsControllerIntegrationTest {
                 RecruitmentStatus.CLOSED
         ));
 
-        mockMvc.perform(get("/api/news/search")
+        mockMvc.perform(get("/api/v1/news/search")
                         .param("keyword", "봉사")
                         .param("region", "서울")
                         .param("category", "VOLUNTEER")
@@ -291,7 +452,7 @@ class NewsControllerIntegrationTest {
 
     @Test
     void searchNewsRejectsBlankKeyword() throws Exception {
-        mockMvc.perform(get("/api/news/search").param("keyword", "   "))
+        mockMvc.perform(get("/api/v1/news/search").param("keyword", "   "))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("COMMON400_1"));
     }
@@ -312,7 +473,7 @@ class NewsControllerIntegrationTest {
                 RecruitmentStatus.OPEN
         ));
 
-        mockMvc.perform(post("/api/news/{newsId}/scrap", news.getId())
+        mockMvc.perform(post("/api/v1/news/{newsId}/scrap", news.getId())
                         .with(authenticatedUser(10L)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("COMMON200_1"))
@@ -323,7 +484,7 @@ class NewsControllerIntegrationTest {
         assertThat(newsScrapRepository.existsByNewsIdAndUserId(news.getId(), 10L)).isTrue();
         assertThat(newsRepository.findById(news.getId()).orElseThrow().getScrapCount()).isOne();
 
-        mockMvc.perform(post("/api/news/{newsId}/scrap", news.getId())
+        mockMvc.perform(post("/api/v1/news/{newsId}/scrap", news.getId())
                         .with(authenticatedUser(10L)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.result.newsId").value(news.getId()))
@@ -336,13 +497,13 @@ class NewsControllerIntegrationTest {
 
     @Test
     void toggleNewsScrapRequiresAuthentication() throws Exception {
-        mockMvc.perform(post("/api/news/{newsId}/scrap", 1L))
+        mockMvc.perform(post("/api/v1/news/{newsId}/scrap", 1L))
                 .andExpect(status().isUnauthorized());
     }
 
     @Test
     void toggleNewsScrapReturnsCommonNotFoundResponse() throws Exception {
-        mockMvc.perform(post("/api/news/{newsId}/scrap", 999999L)
+        mockMvc.perform(post("/api/v1/news/{newsId}/scrap", 999999L)
                         .with(authenticatedUser(10L)))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("COMMON404_1"));

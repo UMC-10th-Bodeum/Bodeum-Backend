@@ -1,6 +1,7 @@
 package com.bodeum.domain.search.service;
 
 import com.bodeum.domain.info.entity.InfoItem;
+import com.bodeum.domain.search.dto.response.AutocompleteResponse;
 import com.bodeum.domain.search.dto.response.InfoSearchResponse;
 import com.bodeum.domain.search.dto.response.SearchHistoryResponse;
 import com.bodeum.domain.search.entity.SearchLog;
@@ -23,6 +24,7 @@ public class SearchService {
 
     private static final int HISTORY_LIMIT = 10;
     private static final int SEARCH_RESULT_LIMIT = 50;
+    private static final int AUTOCOMPLETE_LIMIT = 10; // 자동완성 추천 최대 개수
 
     private final SearchInfoItemRepository searchInfoItemRepository;
     private final SearchLogRepository searchLogRepository;
@@ -50,5 +52,30 @@ public class SearchService {
         if (deleted == 0) {
             throw new SearchException(SearchErrorCode.SEARCH_HISTORY_NOT_FOUND);
         }
+    }
+
+    public AutocompleteResponse getAutocomplete(String keyword) {
+        // 1. 공백/null 검증 -> 예외 발생
+        if (keyword == null || keyword.trim().isEmpty()) {
+            throw new SearchException(SearchErrorCode.SEARCH_KEYWORD_BLANK);
+        }
+
+        String trimmedKeyword = keyword.trim();
+
+        // 2. 최대 길이 검증 -> 예외 발생
+        if (trimmedKeyword.length() > 50) {
+            throw new SearchException(SearchErrorCode.SEARCH_KEYWORD_TOO_LONG);
+        }
+
+        List<InfoItem> items = searchInfoItemRepository.findAutocompleteByKeyword(
+                trimmedKeyword,
+                PageRequest.of(0, AUTOCOMPLETE_LIMIT)
+        );
+
+        return AutocompleteResponse.from(items);
+    // 회원 탈퇴 시 해당 회원의 검색 기록을 모두 삭제한다.
+    @Transactional
+    public void deleteUserSearchLogs(Long userId) {
+        searchLogRepository.deleteByUserId(userId);
     }
 }

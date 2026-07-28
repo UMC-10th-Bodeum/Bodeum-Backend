@@ -1,6 +1,7 @@
 package com.bodeum.domain.user.dto.response;
 
 import com.bodeum.domain.user.entity.User;
+import com.bodeum.domain.user.enums.GuardianLevel;
 import java.util.List;
 
 public record UserHeaderResponse(
@@ -19,14 +20,15 @@ public record UserHeaderResponse(
         return new UserHeaderResponse(false, false, null, null, null, null, null, null, null);
     }
 
-    public static UserHeaderResponse from(User user) {
+    public static UserHeaderResponse from(User user, int totalPoint) {
+        GuardianLevel level = GuardianLevel.from(totalPoint);
         return new UserHeaderResponse(
                 true,
                 user.isOnboardingCompleted(),
                 user.getNickname(),
                 user.getProfileImageUrl(),
-                user.getGuardianLevel().getLevelNumber(),
-                user.getGuardianLevel().getBadgeName(),
+                level.getLevelNumber(),
+                level.getBadgeName(),
                 user.getDisabilityTypes().stream()
                         .map(CodeLabelResponse::from)
                         .toList(),
