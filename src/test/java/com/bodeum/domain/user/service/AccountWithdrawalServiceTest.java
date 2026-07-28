@@ -5,6 +5,7 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 import static org.mockito.Mockito.never;
 
+import com.bodeum.domain.ai.service.AiWithdrawalService;
 import com.bodeum.domain.auth.enums.SocialProvider;
 import com.bodeum.domain.auth.exception.AuthErrorCode;
 import com.bodeum.domain.community.service.CommentService;
@@ -48,6 +49,8 @@ class AccountWithdrawalServiceTest {
     @Mock
     private PointService pointService;
     @Mock
+    private AiWithdrawalService aiWithdrawalService;
+    @Mock
     private S3ImageStorage s3ImageStorage;
 
     @InjectMocks
@@ -71,12 +74,13 @@ class AccountWithdrawalServiceTest {
         UserWithdrawResponse response = accountWithdrawalService.withdraw(1L);
 
         assertThatResponseSucceeds(response);
-        // 검색기록·스크랩·좋아요 삭제가 각 도메인 핸들러로 위임된다.
+        // 검색기록·스크랩·좋아요·AI 채팅 데이터 삭제가 각 도메인 핸들러로 위임된다.
         then(searchService).should().deleteUserSearchLogs(1L);
         then(postService).should().deleteUserScrapsAndLikes(1L);
         then(commentService).should().deleteUserCommentLikes(1L);
         then(infoScrapService).should().deleteUserScraps(1L);
         then(newsScrapService).should().deleteUserScraps(1L);
+        then(aiWithdrawalService).should().deleteUserAiData(1L);
         // 포인트(총점·적립 내역)도 삭제된다.
         then(pointService).should().deleteUserPoints(1L);
         // user/auth 개인정보 파기는 UserService에 위임된다.
@@ -112,6 +116,7 @@ class AccountWithdrawalServiceTest {
         then(commentService).shouldHaveNoInteractions();
         then(infoScrapService).shouldHaveNoInteractions();
         then(newsScrapService).shouldHaveNoInteractions();
+        then(aiWithdrawalService).shouldHaveNoInteractions();
         then(pointService).shouldHaveNoInteractions();
         then(userService).shouldHaveNoInteractions();
         then(s3ImageStorage).shouldHaveNoInteractions();
