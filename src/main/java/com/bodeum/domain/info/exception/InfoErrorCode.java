@@ -25,7 +25,7 @@ public enum InfoErrorCode implements BaseErrorCode {
 
     // 404 Not Found
     INFO_ITEM_NOT_FOUND(HttpStatus.NOT_FOUND, "INFO404_1", "해당 리소스를 찾을 수 없어 스크랩 처리를 완료할 수 없습니다."),
-    INFO_REVIEW_NOT_FOUND(HttpStatus.NOT_FOUND, "INFO404_2", "해당 리소스를 찾을 수 없어 도움돼요 처리를 완료할 수 없습니다.");
+    INFO_REVIEW_NOT_FOUND(HttpStatus.NOT_FOUND, "INFO404_2", "해당 리소스를 찾을 수 없어 도움돼요 처리를 완료할 수 없습니다."),
   
     INFO_SHARE_LINK_NOT_FOUND(HttpStatus.NOT_FOUND, "INFO0404_1", "해당 리소스를 찾을 수 없어 공유 링크 생성이 불가능합니다.");
 
