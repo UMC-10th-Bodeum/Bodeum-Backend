@@ -4,7 +4,9 @@ import com.bodeum.domain.news.dto.NewsStatus;
 import com.bodeum.domain.news.dto.response.NewsDetailResponse;
 import com.bodeum.domain.news.dto.response.NewsListItemResponse;
 import com.bodeum.domain.news.dto.response.NewsListResponse;
+import com.bodeum.domain.news.dto.response.RelatedRecruitingNewsResponse;
 import com.bodeum.domain.news.entity.News;
+import com.bodeum.domain.news.entity.RecruitmentStatus;
 import com.bodeum.domain.news.repository.NewsRepository;
 import com.bodeum.domain.news.repository.NewsScrapRepository;
 import com.bodeum.domain.region.entity.Region;
@@ -134,6 +136,65 @@ public class NewsQueryService {
                 && newsScrapRepository.existsByNewsIdAndUserId(newsId, userId);
 
         return NewsDetailResponse.of(news, regionName, scrapped);
+    }
+
+    @Transactional(readOnly = true)
+    public List<RelatedRecruitingNewsResponse> getRelatedRecruitingNews(
+            Long newsId,
+            int size
+    ) {
+        News currentNews = newsRepository.findVisibleById(newsId)
+                .orElseThrow(() -> new ProjectException(GeneralErrorCode.NOT_FOUND));
+        Long regionId = currentNews.getRegionId();
+        if (regionId == null) {
+            return List.of();
+        }
+
+        Region currentRegion = regionRepository.findById(regionId)
+                .orElse(null);
+        if (currentRegion == null) {
+            return List.of();
+        }
+
+        List<Region> cityRegions = resolveCityRegions(currentRegion);
+        List<Long> cityRegionIds = cityRegions.stream()
+                .map(Region::getId)
+                .toList();
+        Map<Long, String> regionNames = cityRegions.stream()
+                .collect(Collectors.toMap(Region::getId, Region::getFullName));
+        PageRequest pageable = PageRequest.of(
+                0,
+                size,
+                Sort.by(Sort.Order.desc("publishedAt"), Sort.Order.desc("id"))
+        );
+
+        return newsRepository.findRelatedRecruitingNews(
+                        newsId,
+                        cityRegionIds,
+                        RecruitmentStatus.OPEN,
+                        pageable
+                ).stream()
+                .map(news -> RelatedRecruitingNewsResponse.of(
+                        news,
+                        regionNames.get(news.getRegionId())
+                ))
+                .toList();
+    }
+
+    private List<Region> resolveCityRegions(Region currentRegion) {
+        boolean cityIsRegionLevel1 = currentRegion.getRegionLevel1().endsWith("시");
+        String municipality = primaryMunicipality(currentRegion.getRegionLevel2());
+
+        return regionRepository.findAllByOrderByRegionLevel1AscRegionLevel2Asc().stream()
+                .filter(candidate -> currentRegion.getRegionLevel1()
+                        .equals(candidate.getRegionLevel1()))
+                .filter(candidate -> cityIsRegionLevel1
+                        || municipality.equals(primaryMunicipality(candidate.getRegionLevel2())))
+                .toList();
+    }
+
+    private String primaryMunicipality(String regionLevel2) {
+        return regionLevel2.trim().split("\\s+", 2)[0];
     }
 
     private List<Long> resolveRegionIds(String region) {
