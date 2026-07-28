@@ -18,7 +18,7 @@ import com.bodeum.domain.info.entity.InfoItem;
 import com.bodeum.domain.info.entity.InfoScrap;
 import com.bodeum.domain.info.entity.enums.MainCategory;
 import com.bodeum.domain.mypage.dto.response.MyCommentListResponse;
-import com.bodeum.domain.mypage.dto.response.MyPageProfileResponse;
+import com.bodeum.domain.mypage.dto.response.MyPageDashboardResponse;
 import com.bodeum.domain.mypage.dto.response.MyPostListResponse;
 import com.bodeum.domain.mypage.dto.response.MyScrapListResponse;
 import com.bodeum.domain.mypage.entity.enums.ScrapType;
@@ -74,7 +74,7 @@ class MyPageServiceTest {
     private MyPageService myPageService;
 
     @Test
-    void getProfileReturnsProfileAndActivitySummary() {
+    void getDashboardReturnsProfileAndActivitySummary() {
         UserProfileResponse profile =
                 new UserProfileResponse(
                         1L,
@@ -127,8 +127,8 @@ class MyPageServiceTest {
                 )
         ).willReturn(7L);
 
-        MyPageProfileResponse response =
-                myPageService.getProfile(1L);
+        MyPageDashboardResponse response =
+                myPageService.getDashboard(1L);
 
         assertThat(response.userId())
                 .isEqualTo(1L);

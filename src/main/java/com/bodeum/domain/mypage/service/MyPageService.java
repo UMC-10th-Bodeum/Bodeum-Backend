@@ -7,8 +7,8 @@ import com.bodeum.domain.community.enums.CommentStatus;
 import com.bodeum.domain.community.enums.PostStatus;
 import com.bodeum.domain.info.entity.InfoScrap;
 import com.bodeum.domain.mypage.dto.response.MyCommentListResponse;
-import com.bodeum.domain.mypage.dto.response.MyPageProfileResponse;
-import com.bodeum.domain.mypage.dto.response.MyPageProfileResponse.ActivitySummary;
+import com.bodeum.domain.mypage.dto.response.MyPageDashboardResponse;
+import com.bodeum.domain.mypage.dto.response.MyPageDashboardResponse.ActivitySummary;
 import com.bodeum.domain.mypage.dto.response.MyPostListResponse;
 import com.bodeum.domain.mypage.dto.response.MyScrapListResponse;
 import com.bodeum.domain.mypage.entity.enums.ScrapType;
@@ -41,7 +41,7 @@ public class MyPageService {
     private final MyPageCommentRepository commentRepository;
 
     @Transactional(readOnly = true)
-    public MyPageProfileResponse getProfile(Long userId) {
+    public MyPageDashboardResponse getDashboard(Long userId) {
         UserProfileResponse profile =
                 userService.getProfile(userId);
 
@@ -70,7 +70,7 @@ public class MyPageService {
                         myCommentCount
                 );
 
-        return MyPageProfileResponse.of(
+        return MyPageDashboardResponse.of(
                 profile,
                 activitySummary
         );
