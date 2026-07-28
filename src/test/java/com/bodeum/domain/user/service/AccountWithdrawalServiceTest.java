@@ -5,6 +5,7 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 import static org.mockito.Mockito.never;
 
+import com.bodeum.domain.ai.service.AiWithdrawalService;
 import com.bodeum.domain.auth.enums.SocialProvider;
 import com.bodeum.domain.auth.exception.AuthErrorCode;
 import com.bodeum.domain.community.service.CommentService;
@@ -43,6 +44,8 @@ class AccountWithdrawalServiceTest {
     @Mock
     private NewsScrapService newsScrapService;
     @Mock
+    private AiWithdrawalService aiWithdrawalService;
+    @Mock
     private S3ImageStorage s3ImageStorage;
 
     @InjectMocks
@@ -72,6 +75,7 @@ class AccountWithdrawalServiceTest {
         then(commentService).should().deleteUserCommentLikes(1L);
         then(infoScrapService).should().deleteUserScraps(1L);
         then(newsScrapService).should().deleteUserScraps(1L);
+        then(aiWithdrawalService).should().deleteUserAiData(1L);
         // user/auth 개인정보 파기는 UserService에 위임된다.
         then(userService).should().withdraw(1L);
         // 프로필 이미지는 캡처된 원본 URL로 S3에서 삭제된다(트랜잭션 비활성 상태이므로 즉시 호출).
@@ -105,6 +109,7 @@ class AccountWithdrawalServiceTest {
         then(commentService).shouldHaveNoInteractions();
         then(infoScrapService).shouldHaveNoInteractions();
         then(newsScrapService).shouldHaveNoInteractions();
+        then(aiWithdrawalService).shouldHaveNoInteractions();
         then(userService).shouldHaveNoInteractions();
         then(s3ImageStorage).shouldHaveNoInteractions();
     }

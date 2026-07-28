@@ -1,5 +1,6 @@
 package com.bodeum.domain.user.service;
 
+import com.bodeum.domain.ai.service.AiWithdrawalService;
 import com.bodeum.domain.auth.exception.AuthErrorCode;
 import com.bodeum.domain.community.service.CommentService;
 import com.bodeum.domain.community.service.PostService;
@@ -25,6 +26,8 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
  * <ul>
  *   <li>검색 기록·스크랩·좋아요(공감): 삭제하고 각 콘텐츠의 scrapCount·likeCount를 감소시킨다.</li>
  *   <li>게시글·댓글·답글·정보 리뷰 본문: 보존한다. 작성자 식별은 조회 시점에 '탈퇴한 사용자'로 익명화한다.</li>
+ *   <li>AI 데이터: 회원에게 종속된 채팅방·메시지·응답 출처·피드백·피드백 사유를 삭제한다.
+ *       공용 출처 데이터, 출처 검토 이력, Chroma의 INFO/NEWS 색인은 보존한다.</li>
  *   <li>포인트: 실제 포인트는 GuardianProfile.point에 있고, {@link UserService#withdraw(Long)}의
  *       guardianProfile orphanRemoval로 함께 제거된다(별도 삭제 로직 없음). point 도메인의
  *       GuardianPoint/GuardianPointHistory 엔티티는 현재 미사용이다.</li>
@@ -44,6 +47,7 @@ public class AccountWithdrawalService {
     private final CommentService commentService;
     private final InfoScrapService infoScrapService;
     private final NewsScrapService newsScrapService;
+    private final AiWithdrawalService aiWithdrawalService;
     private final S3ImageStorage s3ImageStorage;
 
     @Transactional
@@ -63,6 +67,8 @@ public class AccountWithdrawalService {
         commentService.deleteUserCommentLikes(userId);
         infoScrapService.deleteUserScraps(userId);
         newsScrapService.deleteUserScraps(userId);
+        // 회원에게 종속된 AI 데이터(채팅방·메시지·응답 출처·피드백·피드백 사유)를 삭제
+        aiWithdrawalService.deleteUserAiData(userId);
         // 3 & 4 & 5. 개인정보 파기 + guardianProfile(포인트)/childProfile/온보딩 orphanRemoval + 인증 수단 폐기
         UserWithdrawResponse response = userService.withdraw(userId);
         // 7. 프로필 이미지 S3 파일 삭제(커밋 이후)

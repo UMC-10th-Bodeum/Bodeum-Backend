@@ -90,4 +90,11 @@ public interface AiMessageRepository extends JpaRepository<AiMessage, Long> {
     java.util.Optional<AiMessage> findByIdForFeedback(
             @Param("messageId") Long messageId
     );
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("""
+            delete from AiMessage message
+             where message.chatRoom.user.id = :userId
+            """)
+    int deleteByUserId(@Param("userId") Long userId);
 }
