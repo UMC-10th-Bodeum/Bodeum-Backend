@@ -1,0 +1,181 @@
+-- AI 외부 검색에서 허용할 공식 사이트와 비영리단체 사이트를 등록한다.
+-- 동일 도메인의 여러 상세 페이지는 하나의 외부 출처로 통합하고,
+-- 실제로 답변에 인용된 상세 URL은 ai_external_document에 별도로 저장한다.
+
+INSERT INTO ai_external_source (
+    name,
+    source_type,
+    base_url,
+    entry_url,
+    description,
+    authority_level,
+    is_active,
+    created_at,
+    updated_at
+)
+VALUES
+    (
+        '복지로',
+        'WEBSITE',
+        'https://www.bokjiro.go.kr/',
+        'https://www.bokjiro.go.kr/index.do',
+        '복지서비스 검색, 복지급여 안내와 온라인 신청 정보를 제공하는 공식 복지 포털',
+        'GOVERNMENT',
+        TRUE,
+        CURRENT_TIMESTAMP(6),
+        CURRENT_TIMESTAMP(6)
+    ),
+    (
+        '국립특수교육원 온맘',
+        'WEBSITE',
+        'https://www.nise.go.kr/',
+        'https://www.nise.go.kr/onmam/front/index.do',
+        '장애 자녀의 특수교육과 가족 지원 정보를 제공하는 국립특수교육원 부모지원 시스템',
+        'GOVERNMENT',
+        TRUE,
+        CURRENT_TIMESTAMP(6),
+        CURRENT_TIMESTAMP(6)
+    ),
+    (
+        '사회서비스 전자바우처',
+        'WEBSITE',
+        'https://www.socialservice.or.kr:444/',
+        'https://www.socialservice.or.kr:444/',
+        '사회서비스 전자바우처 제도와 발달재활서비스 제공기관 검색 정보를 제공하는 공식 사이트',
+        'PUBLIC_INSTITUTION',
+        TRUE,
+        CURRENT_TIMESTAMP(6),
+        CURRENT_TIMESTAMP(6)
+    ),
+    (
+        '중앙장애아동·발달장애인지원센터',
+        'WEBSITE',
+        'https://www.broso.or.kr/',
+        'https://www.broso.or.kr/mainPage.do',
+        '장애아동과 발달장애인을 위한 지원사업, 교육, 지역 지원기관 정보를 제공하는 공식 사이트',
+        'PUBLIC_INSTITUTION',
+        TRUE,
+        CURRENT_TIMESTAMP(6),
+        CURRENT_TIMESTAMP(6)
+    ),
+    (
+        '장애통계데이터포털',
+        'WEBSITE',
+        'https://koddi.or.kr/',
+        'https://koddi.or.kr/stat/html/user/main/main',
+        '한국장애인개발원이 장애인 관련 통계와 조사 자료를 제공하는 공식 데이터 포털',
+        'PUBLIC_INSTITUTION',
+        TRUE,
+        CURRENT_TIMESTAMP(6),
+        CURRENT_TIMESTAMP(6)
+    ),
+    (
+        '국립재활원 장애인 건강·재활 정보포털',
+        'WEBSITE',
+        'https://nrc.go.kr/',
+        'https://nrc.go.kr/nrc/main.do',
+        '장애인 건강과 재활, 재활의료 및 관련 공공정보를 제공하는 국립재활원 공식 사이트',
+        'GOVERNMENT',
+        TRUE,
+        CURRENT_TIMESTAMP(6),
+        CURRENT_TIMESTAMP(6)
+    ),
+    (
+        '전국장애인부모연대',
+        'WEBSITE',
+        'https://www.bumo.or.kr/',
+        'https://www.bumo.or.kr/',
+        '장애인 가족 지원 정보와 지역별 복지기관 검색 정보를 제공하는 비영리단체 사이트',
+        'NONPROFIT_ORGANIZATION',
+        TRUE,
+        CURRENT_TIMESTAMP(6),
+        CURRENT_TIMESTAMP(6)
+    ),
+    (
+        '한국장애인부모회',
+        'WEBSITE',
+        'https://www.kpat.or.kr/',
+        'https://www.kpat.or.kr/',
+        '장애인과 가족을 대상으로 교육, 상담, 직업재활, 공공후견 및 지역 기관 정보를 제공하는 비영리단체 사이트',
+        'NONPROFIT_ORGANIZATION',
+        TRUE,
+        CURRENT_TIMESTAMP(6),
+        CURRENT_TIMESTAMP(6)
+    ),
+    (
+        '푸르메재단',
+        'WEBSITE',
+        'https://purme.org/',
+        'https://purme.org/',
+        '장애인의 재활과 자립을 위한 의료·복지 지원사업 정보를 제공하는 비영리재단 사이트',
+        'NONPROFIT_ORGANIZATION',
+        TRUE,
+        CURRENT_TIMESTAMP(6),
+        CURRENT_TIMESTAMP(6)
+    ),
+    (
+        '한국자폐인사랑협회',
+        'WEBSITE',
+        'https://www.autismkorea.kr/',
+        'https://www.autismkorea.kr/main.php',
+        '자폐성 장애인과 가족을 위한 정책, 교육, 복지 및 권익 지원 정보를 제공하는 비영리단체 사이트',
+        'NONPROFIT_ORGANIZATION',
+        TRUE,
+        CURRENT_TIMESTAMP(6),
+        CURRENT_TIMESTAMP(6)
+    ),
+    (
+        '경기도 장애인가족지원센터',
+        'WEBSITE',
+        'http://ggdf.co.kr/',
+        'http://ggdf.co.kr/',
+        '경기도 장애인 가족을 위한 상담, 정보 연계와 가족 역량 강화 사업을 안내하는 지원센터 사이트',
+        'PUBLIC_INSTITUTION',
+        TRUE,
+        CURRENT_TIMESTAMP(6),
+        CURRENT_TIMESTAMP(6)
+    ),
+    (
+        '정부24',
+        'WEBSITE',
+        'https://www.gov.kr/',
+        'https://www.gov.kr/',
+        '장애인 등록을 포함한 정부 서비스와 민원 신청, 증명서 발급 정보를 제공하는 정부 포털',
+        'GOVERNMENT',
+        TRUE,
+        CURRENT_TIMESTAMP(6),
+        CURRENT_TIMESTAMP(6)
+    )
+ON DUPLICATE KEY UPDATE
+    entry_url = VALUES(entry_url),
+    description = VALUES(description),
+    authority_level = VALUES(authority_level),
+    is_active = TRUE,
+    updated_at = CURRENT_TIMESTAMP(6);
+
+-- 데모 활동 지역인 경기도에서 바로 안내할 수 있도록 경기지역센터 페이지를
+-- 중앙장애아동·발달장애인지원센터의 외부 문서로 미리 등록한다.
+INSERT INTO ai_external_document (
+    ai_external_source_id,
+    title,
+    source_url,
+    source_url_hash,
+    source_updated_at,
+    created_at,
+    updated_at
+)
+SELECT
+    source.ai_external_source_id,
+    '경기지역 발달장애인지원센터',
+    'https://www.broso.or.kr/gyeonggi/mainPage.do',
+    SHA2('https://www.broso.or.kr/gyeonggi/mainPage.do', 256),
+    NULL,
+    CURRENT_TIMESTAMP(6),
+    CURRENT_TIMESTAMP(6)
+FROM ai_external_source source
+WHERE source.base_url = 'https://www.broso.or.kr/'
+ON DUPLICATE KEY UPDATE
+    ai_external_source_id = VALUES(ai_external_source_id),
+    title = VALUES(title),
+    source_url = VALUES(source_url),
+    updated_at = CURRENT_TIMESTAMP(6);

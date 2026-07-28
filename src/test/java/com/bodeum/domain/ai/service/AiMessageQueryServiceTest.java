@@ -87,6 +87,31 @@ class AiMessageQueryServiceTest {
     }
 
     @Test
+    void restoresClarificationResponseWithoutSources() {
+        AiChatRoom chatRoom = mock(AiChatRoom.class);
+        when(chatRoom.getId()).thenReturn(7L);
+        when(aiChatRoomRepository.findByUserId(1L)).thenReturn(Optional.of(chatRoom));
+
+        AiMessage aiMessage = mock(AiMessage.class);
+        when(aiMessage.getId()).thenReturn(23L);
+        when(aiMessage.getSenderType()).thenReturn(SenderType.AI);
+        when(aiMessage.getAiAnswerStatus())
+                .thenReturn(AiAnswerStatus.REGION_REQUIRED);
+        when(aiMessage.getContent()).thenReturn("활동 지역을 알려주세요.");
+        when(aiMessage.getCreatedAt()).thenReturn(Instant.parse("2026-07-21T01:00:01Z"));
+        when(aiMessageRepository.findTodayMessages(eq(7L), any(), any()))
+                .thenReturn(List.of(aiMessage));
+        when(aiResponseSourceRepository.findAllByMessageIds(List.of(23L)))
+                .thenReturn(List.of());
+
+        var result = service.getTodayMessages(1L);
+
+        assertThat(result.messages().getFirst().answerStatus())
+                .isEqualTo(AiAnswerStatus.REGION_REQUIRED);
+        assertThat(result.messages().getFirst().sources()).isEmpty();
+    }
+
+    @Test
     void returnsPreviousMessagesGroupedByDateWithCursor() {
         AiChatRoom chatRoom = mock(AiChatRoom.class);
         when(chatRoom.getId()).thenReturn(7L);

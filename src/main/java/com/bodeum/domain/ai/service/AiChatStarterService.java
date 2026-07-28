@@ -1,6 +1,7 @@
 package com.bodeum.domain.ai.service;
 
 import com.bodeum.domain.ai.dto.response.AiChatStarterResponse;
+import com.bodeum.domain.ai.enums.AiStarterQuestionType;
 import com.bodeum.domain.auth.enums.SocialProvider;
 import com.bodeum.domain.user.entity.User;
 import com.bodeum.domain.user.service.UserService;
@@ -29,13 +30,10 @@ public class AiChatStarterService {
             복지 바우처, 재활 기관, 지원 제도 등 발달장애 아동 양육에 필요한 정보를 쉽고 빠르게 안내해드려요.
 
             무엇이 궁금하신가요?""";
-    private static final List<String> SUGGESTED_QUESTIONS = List.of(
-            "참고하면 좋을 복지사이트 알려줘",
-            "우리 동네 재활센터 추천해줘",
-            "장애아동 의료비 지원이 궁금해",
-            "장애 진단 후 첫 번째로 해야 할 일",
-            "바우처 신청 방법 알려줘"
-    );
+    private static final List<String> SUGGESTED_QUESTIONS =
+            Arrays.stream(AiStarterQuestionType.values())
+                    .map(AiStarterQuestionType::getContent)
+                    .toList();
 
     private final UserService userService;
 

@@ -15,6 +15,7 @@ import com.bodeum.domain.ai.entity.AiMessage;
 import com.bodeum.domain.ai.enums.AiResponseSourceType;
 import com.bodeum.domain.ai.enums.AiAnswerStatus;
 import com.bodeum.domain.ai.enums.AiWarningType;
+import com.bodeum.domain.ai.enums.AiStarterQuestionType;
 import com.bodeum.domain.ai.enums.SenderType;
 import com.bodeum.domain.ai.exception.AiErrorCode;
 import com.bodeum.domain.ai.infrastructure.retrieval.AiReferenceDocumentResolver;
@@ -25,6 +26,7 @@ import com.bodeum.domain.ai.model.rag.AiReferenceDocument;
 import com.bodeum.domain.ai.model.rag.AiSourceKey;
 import com.bodeum.domain.ai.model.answer.GeneratedAiAnswer;
 import com.bodeum.domain.ai.model.answer.ExternalAiAnswer;
+import com.bodeum.domain.ai.model.answer.AiStarterQuestionAnswer;
 import com.bodeum.domain.ai.repository.AiChatRoomRepository;
 import com.bodeum.domain.ai.repository.AiSourceReviewRepository;
 import com.bodeum.domain.auth.enums.SocialProvider;
@@ -34,6 +36,7 @@ import com.bodeum.global.apiPayload.exception.ProjectException;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -53,6 +56,7 @@ class AiMessageServiceTest {
     @Mock AiSourceReviewRepository aiSourceReviewRepository;
     @Mock AiRequestGuard requestGuard;
     @Mock AiReferenceDocumentResolver referenceDocumentResolver;
+    @Mock AiStarterQuestionRouter starterQuestionRouter;
 
     private AiMessageService service;
     private AiChatRoom chatRoom;
@@ -64,7 +68,7 @@ class AiMessageServiceTest {
                 aiChatRoomRepository, userRepository,
                 documentRetriever, answerGenerator, externalAnswerProvider,
                 persistenceService, failureService, aiSourceReviewRepository, requestGuard,
-                referenceDocumentResolver);
+                referenceDocumentResolver, starterQuestionRouter);
         user = User.createSocialUser(SocialProvider.KAKAO, "provider-id", "a@b.com", "보호자");
         chatRoom = AiChatRoom.create(user);
         lenient().when(aiChatRoomRepository.findByUserId(1L)).thenReturn(Optional.of(chatRoom));
@@ -75,6 +79,8 @@ class AiMessageServiceTest {
                 .thenReturn(ExternalAiAnswer.empty());
         lenient().when(referenceDocumentResolver.resolve(any()))
                 .thenAnswer(invocation -> invocation.getArgument(0));
+        lenient().when(starterQuestionRouter.route(any(), any()))
+                .thenReturn(Optional.empty());
         AiMessage userMessage = mock(AiMessage.class);
         lenient().when(userMessage.getId()).thenReturn(11L);
         lenient().when(persistenceService.saveProcessingUserMessage(eq(chatRoom), any()))
@@ -122,6 +128,149 @@ class AiMessageServiceTest {
         assertThat(result.aiMessage().answerStatus()).isEqualTo(AiAnswerStatus.NO_EVIDENCE);
         assertThat(result.aiMessage().sources()).isEmpty();
         verify(answerGenerator, never()).generate(any(), any(), any());
+    }
+
+    @Test
+    void returnsRoutedStarterAnswerWithoutCallingOpenAi() {
+        String question = AiStarterQuestionType.WELFARE_SITES.getContent();
+        AiReferenceDocument source = new AiReferenceDocument(
+                "SITE-1",
+                "복지로",
+                AiResponseSourceType.SITE,
+                1L,
+                "복지로",
+                "https://www.bokjiro.go.kr",
+                null
+        );
+        when(starterQuestionRouter.route(
+                eq(AiStarterQuestionType.WELFARE_SITES),
+                any()
+        )).thenReturn(Optional.of(
+                AiStarterQuestionAnswer.answered("공식 복지 사이트 안내", List.of(source))
+        ));
+        AiMessage saved = savedAiMessage("공식 복지 사이트 안내");
+        when(persistenceService.saveAiMessageAndComplete(
+                11L,
+                chatRoom,
+                "공식 복지 사이트 안내",
+                false,
+                AiAnswerStatus.ANSWERED,
+                List.of(source)
+        )).thenReturn(saved);
+
+        var result = service.createMessage(1L, question);
+
+        assertThat(result.aiMessage().answerStatus()).isEqualTo(AiAnswerStatus.ANSWERED);
+        assertThat(result.aiMessage().sources()).hasSize(1);
+        verify(documentRetriever, never()).retrieve(any(), any());
+        verify(answerGenerator, never()).generate(any(), any(), any());
+        verify(externalAnswerProvider, never()).search(any(), any());
+    }
+
+    @Test
+    void returnsRegionRequiredWhenLocalCenterQuestionHasNoRegion() {
+        String question = AiStarterQuestionType.LOCAL_REHAB_CENTERS.getContent();
+        String regionRequiredMessage = "확인할 시·도와 시·군·구를 알려주세요.";
+        when(starterQuestionRouter.route(
+                eq(AiStarterQuestionType.LOCAL_REHAB_CENTERS),
+                any()
+        ))
+                .thenReturn(Optional.of(
+                        AiStarterQuestionAnswer.regionRequired(regionRequiredMessage)
+                ));
+        AiMessage saved = savedAiMessage(regionRequiredMessage);
+        when(persistenceService.saveAiMessageAndComplete(
+                11L,
+                chatRoom,
+                regionRequiredMessage,
+                false,
+                AiAnswerStatus.REGION_REQUIRED,
+                List.of()
+        )).thenReturn(saved);
+
+        var result = service.createMessage(1L, question);
+
+        assertThat(result.aiMessage().answerStatus())
+                .isEqualTo(AiAnswerStatus.REGION_REQUIRED);
+        assertThat(result.aiMessage().sources()).isEmpty();
+        verify(documentRetriever, never()).retrieve(any(), any());
+        verify(externalAnswerProvider, never()).search(any(), any());
+    }
+
+    @Test
+    void limitsMedicalSupportFallbackSearchToBokjiro() {
+        String question = AiStarterQuestionType.CHILD_MEDICAL_SUPPORT.getContent();
+        when(documentRetriever.retrieve(
+                eq(question
+                        + "\n중앙부처복지서비스 장애아동 의료비 지원 대상 선정 기준 신청 방법"),
+                any()
+        )).thenReturn(List.of());
+        when(externalAnswerProvider.searchWithinDomains(
+                eq(question),
+                any(),
+                eq(Set.of("bokjiro.go.kr"))
+        )).thenReturn(ExternalAiAnswer.empty());
+        AiMessage saved = savedAiMessage("관련 정보를 찾을 수 없습니다.");
+        when(persistenceService.saveAiMessageAndComplete(
+                11L,
+                chatRoom,
+                "관련 정보를 찾을 수 없습니다.",
+                false,
+                AiAnswerStatus.NO_EVIDENCE,
+                List.of()
+        )).thenReturn(saved);
+
+        var result = service.createMessage(1L, question);
+
+        assertThat(result.aiMessage().answerStatus()).isEqualTo(AiAnswerStatus.NO_EVIDENCE);
+        verify(externalAnswerProvider).searchWithinDomains(
+                eq(question),
+                any(),
+                eq(Set.of("bokjiro.go.kr"))
+        );
+        verify(externalAnswerProvider, never()).search(any(), any());
+    }
+
+    @Test
+    void prioritizesOfficialVoucherPagesForVoucherFallback() {
+        String question = AiStarterQuestionType.VOUCHER_APPLICATION.getContent();
+        when(documentRetriever.retrieve(
+                eq(question
+                        + "\n발달재활서비스 바우처 지원 대상 서비스 내용 신청 방법 제공기관"),
+                any()
+        )).thenReturn(List.of());
+        List<String> preferredUrls = List.of(
+                "https://www.bokjiro.go.kr/ssis-tbu/ssis-tbu/twataa/wlfareInfo/"
+                        + "moveTWAT52011M.do?wlfareInfoId=WLF00003195",
+                "https://www.socialservice.or.kr:444/",
+                "https://www.bokjiro.go.kr/ssis-tbu/twofa/followStep/"
+                        + "selectFollowStepTwoaa.do"
+        );
+        when(externalAnswerProvider.searchWithinSources(
+                eq(question),
+                any(),
+                eq(Set.of("bokjiro.go.kr", "socialservice.or.kr")),
+                eq(preferredUrls)
+        )).thenReturn(ExternalAiAnswer.empty());
+        AiMessage saved = savedAiMessage("관련 정보를 찾을 수 없습니다.");
+        when(persistenceService.saveAiMessageAndComplete(
+                11L,
+                chatRoom,
+                "관련 정보를 찾을 수 없습니다.",
+                false,
+                AiAnswerStatus.NO_EVIDENCE,
+                List.of()
+        )).thenReturn(saved);
+
+        service.createMessage(1L, question);
+
+        verify(externalAnswerProvider).searchWithinSources(
+                eq(question),
+                any(),
+                eq(Set.of("bokjiro.go.kr", "socialservice.or.kr")),
+                eq(preferredUrls)
+        );
+        verify(externalAnswerProvider, never()).search(any(), any());
     }
 
     @Test

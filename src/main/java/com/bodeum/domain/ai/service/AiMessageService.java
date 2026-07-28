@@ -4,12 +4,14 @@ import com.bodeum.domain.ai.dto.response.*;
 import com.bodeum.domain.ai.entity.AiChatRoom;
 import com.bodeum.domain.ai.entity.AiMessage;
 import com.bodeum.domain.ai.enums.AiAnswerStatus;
+import com.bodeum.domain.ai.enums.AiStarterQuestionType;
 import com.bodeum.domain.ai.exception.AiErrorCode;
 import com.bodeum.domain.ai.model.rag.AiReferenceDocument;
 import com.bodeum.domain.ai.model.rag.AiSourceKey;
 import com.bodeum.domain.ai.model.rag.AiUserProfile;
 import com.bodeum.domain.ai.model.answer.GeneratedAiAnswer;
 import com.bodeum.domain.ai.model.answer.ExternalAiAnswer;
+import com.bodeum.domain.ai.model.answer.AiStarterQuestionAnswer;
 import com.bodeum.domain.ai.infrastructure.retrieval.AiReferenceDocumentResolver;
 import com.bodeum.domain.ai.service.port.AiAnswerGenerator;
 import com.bodeum.domain.ai.service.port.AiDocumentRetriever;
@@ -24,6 +26,7 @@ import com.bodeum.global.apiPayload.exception.ProjectException;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.Optional;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -35,6 +38,18 @@ import org.springframework.stereotype.Service;
 public class AiMessageService {
 
     private static final String NO_RESULT_MESSAGE = "관련 정보를 찾을 수 없습니다.";
+    private static final Set<String> BOKJIRO_DOMAIN = Set.of("bokjiro.go.kr");
+    private static final Set<String> VOUCHER_DOMAINS = Set.of(
+            "bokjiro.go.kr",
+            "socialservice.or.kr"
+    );
+    private static final List<String> VOUCHER_PREFERRED_URLS = List.of(
+            "https://www.bokjiro.go.kr/ssis-tbu/ssis-tbu/twataa/wlfareInfo/"
+                    + "moveTWAT52011M.do?wlfareInfoId=WLF00003195",
+            "https://www.socialservice.or.kr:444/",
+            "https://www.bokjiro.go.kr/ssis-tbu/twofa/followStep/"
+                    + "selectFollowStepTwoaa.do"
+    );
     private final AiChatRoomRepository aiChatRoomRepository;
     private final UserRepository userRepository;
     private final AiDocumentRetriever documentRetriever;
@@ -45,6 +60,7 @@ public class AiMessageService {
     private final AiSourceReviewRepository aiSourceReviewRepository;
     private final AiRequestGuard requestGuard;
     private final AiReferenceDocumentResolver referenceDocumentResolver;
+    private final AiStarterQuestionRouter starterQuestionRouter;
 
     public CreateAiMessageResponse createMessage(Long userId, String content) {
         AiChatRoom chatRoom = aiChatRoomRepository.findByUserId(userId)
@@ -72,7 +88,13 @@ public class AiMessageService {
         AiMessage userMessage = persistenceService.saveProcessingUserMessage(chatRoom, content);
 
         try {
-            return generateAndSaveResponse(chatRoom, userMessage, content, user, userWithDisabilities);
+            return generateAndSaveResponse(
+                    chatRoom,
+                    userMessage,
+                    content,
+                    user,
+                    userWithDisabilities
+            );
         } catch (Exception e) {
             markFailedSafely(userMessage.getId(), e);
             throw e;
@@ -88,10 +110,22 @@ public class AiMessageService {
     ) {
 
         AiUserProfile profile = toProfile(user, userWithDisabilities);
+        Optional<AiStarterQuestionType> starterQuestionType =
+                AiStarterQuestionType.fromQuestion(content);
+
+        Optional<AiStarterQuestionAnswer> starterAnswer =
+                starterQuestionType.flatMap(type ->
+                        starterQuestionRouter.route(type, profile));
+        if (starterAnswer.isPresent()) {
+            return saveStarterAnswer(chatRoom, userMessage, starterAnswer.get());
+        }
 
         log.debug("[AI] 문서 검색 시작");
         List<AiReferenceDocument> retrievedDocuments = referenceDocumentResolver.resolve(
-                documentRetriever.retrieve(content, profile)
+                documentRetriever.retrieve(
+                        retrievalQuestion(content, starterQuestionType),
+                        profile
+                )
         );
 
         log.info("[AI] 검색 문서 수: {}", retrievedDocuments.size());
@@ -102,7 +136,8 @@ public class AiMessageService {
 
         if (retrievedDocuments.isEmpty()) {
             log.info("[AI] 내부 문서 없음, 외부 검색 시작");
-            return createExternalOrNoResultResponse(chatRoom, userMessage, content, profile);
+            return createExternalOrNoResultResponse(
+                    chatRoom, userMessage, content, profile, starterQuestionType);
         }
 
         log.debug("[AI] 답변 생성 시작");
@@ -122,7 +157,7 @@ public class AiMessageService {
         if (citedSources.isEmpty()) {
             log.info("[AI] 내부 문서 인용 근거 없음, 외부 검색 시작");
             return createExternalOrNoResultResponse(
-                    chatRoom, userMessage, content, profile);
+                    chatRoom, userMessage, content, profile, starterQuestionType);
         }
 
         boolean warning = hasIncorrectFeedback(citedSources);
@@ -134,13 +169,63 @@ public class AiMessageService {
                 message, citedSources, warningResponse(warning), AiAnswerStatus.ANSWERED);
     }
 
+    private String retrievalQuestion(
+            String question,
+            Optional<AiStarterQuestionType> starterQuestionType
+    ) {
+        AiStarterQuestionType type = starterQuestionType.orElse(null);
+        if (type == AiStarterQuestionType.CHILD_MEDICAL_SUPPORT) {
+            return question
+                    + "\n중앙부처복지서비스 장애아동 의료비 지원 대상 선정 기준 신청 방법";
+        }
+        if (type == AiStarterQuestionType.VOUCHER_APPLICATION) {
+            return question
+                    + "\n발달재활서비스 바우처 지원 대상 서비스 내용 신청 방법 제공기관";
+        }
+        return question;
+    }
+
+    private CreateAiMessageResponse saveStarterAnswer(
+            AiChatRoom chatRoom,
+            AiMessage userMessage,
+            AiStarterQuestionAnswer answer
+    ) {
+        if (answer.isRegionRequired()) {
+            return createRegionRequiredResponse(chatRoom, userMessage, answer.content());
+        }
+        if (!answer.hasEvidence()) {
+            return createNoEvidenceResponse(chatRoom, userMessage);
+        }
+
+        boolean warning = hasIncorrectFeedback(answer.sources());
+        AiMessage message = persistenceService.saveAiMessageAndComplete(
+                userMessage.getId(),
+                chatRoom,
+                answer.content(),
+                warning,
+                AiAnswerStatus.ANSWERED,
+                answer.sources()
+        );
+        return sourceBackedResponse(
+                message,
+                answer.sources(),
+                warningResponse(warning),
+                AiAnswerStatus.ANSWERED
+        );
+    }
+
     private CreateAiMessageResponse createExternalOrNoResultResponse(
             AiChatRoom chatRoom,
             AiMessage userMessage,
             String question,
-            AiUserProfile profile
+            AiUserProfile profile,
+            Optional<AiStarterQuestionType> starterQuestionType
     ) {
-        ExternalAiAnswer externalAnswer = externalAnswerProvider.search(question, profile);
+        ExternalAiAnswer externalAnswer = searchExternal(
+                question,
+                profile,
+                starterQuestionType
+        );
         if (!externalAnswer.hasEvidence()) {
             return createNoEvidenceResponse(chatRoom, userMessage);
         }
@@ -155,6 +240,52 @@ public class AiMessageService {
                 warningResponse(warning),
                 externalAnswer.answerStatus()
         );
+    }
+
+    private ExternalAiAnswer searchExternal(
+            String question,
+            AiUserProfile profile,
+            Optional<AiStarterQuestionType> starterQuestionType
+    ) {
+        if (starterQuestionType.orElse(null)
+                == AiStarterQuestionType.CHILD_MEDICAL_SUPPORT) {
+            return externalAnswerProvider.searchWithinDomains(
+                    question,
+                    profile,
+                    BOKJIRO_DOMAIN
+            );
+        }
+        if (starterQuestionType.orElse(null)
+                == AiStarterQuestionType.VOUCHER_APPLICATION) {
+            return externalAnswerProvider.searchWithinSources(
+                    question,
+                    profile,
+                    VOUCHER_DOMAINS,
+                    VOUCHER_PREFERRED_URLS
+            );
+        }
+        return externalAnswerProvider.search(question, profile);
+    }
+
+    private CreateAiMessageResponse createRegionRequiredResponse(
+            AiChatRoom chatRoom,
+            AiMessage userMessage,
+            String content
+    ) {
+        AiMessage message = persistenceService.saveAiMessageAndComplete(
+                userMessage.getId(),
+                chatRoom,
+                content,
+                false,
+                AiAnswerStatus.REGION_REQUIRED,
+                List.of()
+        );
+        return new CreateAiMessageResponse(AiMessageResponse.regionRequired(
+                message.getId(),
+                message.getSenderType(),
+                message.getContent(),
+                message.getCreatedAt()
+        ));
     }
 
     private CreateAiMessageResponse createNoEvidenceResponse(
