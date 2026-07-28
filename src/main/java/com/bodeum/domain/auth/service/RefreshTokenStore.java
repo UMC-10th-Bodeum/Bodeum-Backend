@@ -21,6 +21,10 @@ import org.springframework.stereotype.Component;
  * <p>Redis 경로에서 소비된 토큰은 즉시 삭제하지 않고 TTL 동안 tombstone(C 상태)으로 남긴다.
  * logout이 refresh 회전과 경쟁해 옛 토큰을 받더라도 familyId를 찾아 현재 회전 토큰까지
  * 폐기할 수 있게 하기 위해서다.
+ *
+ * <p>폐기 마커는 두 단위로 둔다. 기기별 로그아웃은 family 마커를, 탈퇴는 사용자 마커를 남겨
+ * 폐기와 경쟁하던 refresh가 뒤늦게 새 토큰을 저장하는 것을 막는다. 탈퇴 회원의 userId는
+ * 재사용되지 않으므로(재가입 시 새 User 행이 생성된다) 사용자 마커가 정상 로그인을 막지 않는다.
  */
 @Component
 @RequiredArgsConstructor
@@ -30,14 +34,15 @@ public class RefreshTokenStore {
     private static final String SESSIONS_KEY_PREFIX = "bodeum:auth:user-sessions:";
     private static final String FAMILY_KEY_PREFIX = "bodeum:auth:refresh-family:";
     private static final String REVOKED_FAMILY_KEY_PREFIX = "bodeum:auth:refresh-family-revoked:";
+    private static final String REVOKED_USER_KEY_PREFIX = "bodeum:auth:user-revoked:";
     private static final String VALUE_DELIMITER = ":";
     private static final String ACTIVE_STATUS = "A";
 
-    // family 폐기 여부 확인 + refresh 저장 + 역인덱스·family 현재 토큰 갱신을 원자적으로 수행한다.
-    // KEYS[1]=refresh, KEYS[2]=user sessions, KEYS[3]=family, KEYS[4]=revoked family
+    // family·사용자 폐기 여부 확인 + refresh 저장 + 역인덱스·family 현재 토큰 갱신을 원자적으로 수행한다.
+    // KEYS[1]=refresh, KEYS[2]=user sessions, KEYS[3]=family, KEYS[4]=revoked family, KEYS[5]=revoked user
     // ARGV[1]=session value, ARGV[2]=ttl(ms), ARGV[3]=tokenHash, ARGV[4]=family value
     private static final RedisScript<Long> SAVE_SCRIPT = new DefaultRedisScript<>(
-            "if redis.call('EXISTS', KEYS[4]) == 1 then return 0 end "
+            "if redis.call('EXISTS', KEYS[4]) == 1 or redis.call('EXISTS', KEYS[5]) == 1 then return 0 end "
                     + "redis.call('SET', KEYS[1], ARGV[1], 'PX', ARGV[2]) "
                     + "redis.call('SADD', KEYS[2], ARGV[3]) "
                     + "redis.call('PEXPIRE', KEYS[2], ARGV[2]) "
@@ -84,10 +89,14 @@ public class RefreshTokenStore {
                     + "return 1",
             Long.class);
 
-    // 역인덱스의 모든 활성 refresh 키와 family 키를 원자적으로 삭제한다.
-    // KEYS[1]=sessions / ARGV[1]=refresh prefix, ARGV[2]=family prefix
+    // 역인덱스의 모든 활성 refresh 키와 family 키를 원자적으로 삭제하고, 사용자 폐기 마커를 남긴다.
+    // 소비된 tombstone은 역인덱스에서 이미 빠져 있어 순회로는 찾을 수 없다. 따라서 탈퇴와 경쟁하던
+    // refresh가 뒤늦게 회전 토큰을 저장하는 것을 막으려면 family 단위가 아닌 사용자 단위 마커가 필요하다.
+    // KEYS[1]=sessions, KEYS[2]=revoked user
+    // ARGV[1]=refresh prefix, ARGV[2]=family prefix, ARGV[3]=revoked user TTL(ms)
     private static final RedisScript<Long> REVOKE_ALL_SCRIPT = new DefaultRedisScript<>(
-            "local members = redis.call('SMEMBERS', KEYS[1]) "
+            "redis.call('SET', KEYS[2], '1', 'PX', ARGV[3]) "
+                    + "local members = redis.call('SMEMBERS', KEYS[1]) "
                     + "for i=1,#members do "
                     + "  local value = redis.call('GET', ARGV[1] .. members[i]) "
                     + "  if value then "
@@ -123,7 +132,8 @@ public class RefreshTokenStore {
                             REFRESH_KEY_PREFIX + tokenHash,
                             SESSIONS_KEY_PREFIX + userId,
                             FAMILY_KEY_PREFIX + familyId,
-                            REVOKED_FAMILY_KEY_PREFIX + familyId
+                            REVOKED_FAMILY_KEY_PREFIX + familyId,
+                            REVOKED_USER_KEY_PREFIX + userId
                     ),
                     serializeSession(ACTIVE_STATUS, userId, familyId, expiresAt),
                     Long.toString(ttl.toMillis()),
@@ -197,9 +207,10 @@ public class RefreshTokenStore {
         if (authTokenProperties.isRedisEnabled()) {
             redisTemplate.execute(
                     REVOKE_ALL_SCRIPT,
-                    List.of(SESSIONS_KEY_PREFIX + userId),
+                    List.of(SESSIONS_KEY_PREFIX + userId, REVOKED_USER_KEY_PREFIX + userId),
                     REFRESH_KEY_PREFIX,
-                    FAMILY_KEY_PREFIX);
+                    FAMILY_KEY_PREFIX,
+                    Long.toString(authTokenProperties.getRefreshTokenTtl().toMillis()));
             return;
         }
         refreshTokenSessionRepository.deleteByUserId(userId);

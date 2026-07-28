@@ -234,6 +234,35 @@ class RedisAuthStoreIntegrationTest {
     }
 
     @Test
+    void refreshConsumedBeforeWithdrawal_cannotResaveSessionAfterRevokeAll() {
+        AuthTokenService service = buildAuthTokenService(userServiceReturning(17L));
+        AuthTokenService.AuthTokenPair pair = service.issueTokens(17L);
+
+        // 탈퇴와 경쟁하던 refresh가 토큰을 소비한 상태를 만든다.
+        // 소비된 tombstone은 역인덱스에서 빠지므로 revokeAll의 Set 순회로는 찾을 수 없다.
+        RefreshTokenStore.ConsumedSession consumed = refreshTokenStore
+                .consume(hashToken(pair.refreshToken()), Instant.now())
+                .orElseThrow();
+
+        refreshTokenStore.revokeAll(17L);
+
+        // 탈퇴 이후 같은 family로 회전 토큰을 저장하려는 시도는 거부돼야 한다.
+        boolean saved = refreshTokenStore.save(
+                hashToken("rotated-after-withdrawal"),
+                17L,
+                consumed.familyId(),
+                Instant.now().plus(properties.getRefreshTokenTtl()),
+                properties.getRefreshTokenTtl()
+        );
+
+        assertThat(saved).isFalse();
+        assertThat(redisTemplate.hasKey("bodeum:auth:refresh:" + hashToken("rotated-after-withdrawal")))
+                .isFalse();
+        // 소비된 tombstone은 TTL까지 남지만 C 상태라 다시 소비될 수 없다.
+        assertThat(refreshTokenStore.consume(hashToken(pair.refreshToken()), Instant.now())).isEmpty();
+    }
+
+    @Test
     void revokeFamily_keepsOtherDeviceRefreshSessionActive() {
         AuthTokenService service = buildAuthTokenService(userServiceReturning(15L));
         AuthTokenService.AuthTokenPair firstDevice = service.issueTokens(15L);
