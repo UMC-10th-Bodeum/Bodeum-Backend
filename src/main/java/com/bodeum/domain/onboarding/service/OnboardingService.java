@@ -68,7 +68,7 @@ public class OnboardingService {
         user.markRegisteredIfResolved();
 
         // updateGuardianProfile은 principal의 nickname(User.nickname)도 갱신하므로 인증 캐시를 무효화한다.
-        eventPublisher.publishEvent(new UserPrincipalChangedEvent(user.getAuthSubject(), false));
+        eventPublisher.publishEvent(new UserPrincipalChangedEvent(user.getAuthSubject()));
 
         return OnboardingStepResponse.of(OnboardingStep.GUARDIAN_PROFILE, user.isOnboardingCompleted());
     }

@@ -14,8 +14,12 @@ import com.bodeum.domain.user.entity.User;
 import com.bodeum.domain.user.service.UserService;
 import com.bodeum.global.apiPayload.exception.ProjectException;
 import com.bodeum.global.auth.AuthUserPrincipal;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.HexFormat;
 import java.util.Optional;
 import java.util.Set;
 import org.junit.jupiter.api.AfterAll;
@@ -154,8 +158,8 @@ class RedisAuthStoreIntegrationTest {
 
         AuthTokenService.AuthTokenPair rotated = service.refresh(pair.refreshToken());
         assertThat(rotated.refreshToken()).isNotEqualTo(pair.refreshToken());
-        // 회전 후에도 유효 키는 1개(옛 키 삭제 + 새 키 생성), 역인덱스도 1개 유지
-        assertThat(refreshKeys()).hasSize(1);
+        // 옛 토큰은 logout 경쟁 처리를 위한 consumed tombstone으로 남고, 활성 세션은 1개만 유지된다.
+        assertThat(refreshKeys()).hasSize(2);
         assertThat(redisTemplate.opsForSet().size("bodeum:auth:user-sessions:7")).isEqualTo(1);
 
         // 옛 refresh token 재사용 불가
@@ -202,6 +206,46 @@ class RedisAuthStoreIntegrationTest {
         assertThat(redisTemplate.hasKey("bodeum:auth:user-sessions:11")).isFalse();
     }
 
+    @Test
+    void refreshConsumedBeforeLogout_cannotResurrectSessionAfterLogout() {
+        AuthTokenService service = buildAuthTokenService(userServiceReturning(13L));
+        AuthTokenService.AuthTokenPair pair = service.issueTokens(13L);
+        String oldTokenHash = hashToken(pair.refreshToken());
+
+        // refresh가 기존 토큰을 소비한 직후 logout이 끼어든 경쟁 순서를 재현한다.
+        RefreshTokenStore.ConsumedSession consumed = refreshTokenStore
+                .consume(oldTokenHash, Instant.now())
+                .orElseThrow();
+        refreshTokenStore.revokeFamily(13L, oldTokenHash);
+
+        // 이미 진행 중이던 refresh가 logout 뒤 같은 family로 저장을 시도해도 거부된다.
+        String tokenSavedAfterLogout = "rotated-after-logout";
+        boolean saved = refreshTokenStore.save(
+                hashToken(tokenSavedAfterLogout),
+                13L,
+                consumed.familyId(),
+                Instant.now().plus(properties.getRefreshTokenTtl()),
+                properties.getRefreshTokenTtl()
+        );
+
+        assertThat(saved).isFalse();
+        assertThatThrownBy(() -> service.refresh(tokenSavedAfterLogout))
+                .isInstanceOf(ProjectException.class);
+    }
+
+    @Test
+    void revokeFamily_keepsOtherDeviceRefreshSessionActive() {
+        AuthTokenService service = buildAuthTokenService(userServiceReturning(15L));
+        AuthTokenService.AuthTokenPair firstDevice = service.issueTokens(15L);
+        AuthTokenService.AuthTokenPair secondDevice = service.issueTokens(15L);
+
+        refreshTokenStore.revokeFamily(15L, hashToken(firstDevice.refreshToken()));
+
+        assertThatThrownBy(() -> service.refresh(firstDevice.refreshToken()))
+                .isInstanceOf(ProjectException.class);
+        assertThat(service.refresh(secondDevice.refreshToken()).refreshToken()).isNotBlank();
+    }
+
     // ---------- principal 캐시 ----------
 
     @Test
@@ -226,6 +270,33 @@ class RedisAuthStoreIntegrationTest {
         assertThat(denylist.isRevoked("subject-x", revokedAt)).isTrue();
         assertThat(denylist.isRevoked("subject-x", revokedAt.minusSeconds(1))).isTrue();
         assertThat(denylist.isRevoked("subject-x", revokedAt.plusSeconds(1))).isFalse();
+    }
+
+    @Test
+    void tokenDenylist_blocksOnlySpecifiedAccessToken() {
+        Instant expiresAt = Instant.now().plusSeconds(60);
+        denylist.revokeToken("token-a", expiresAt);
+
+        assertThat(denylist.isRevoked("subject-x", "token-a", Instant.now())).isTrue();
+        assertThat(denylist.isRevoked("subject-x", "token-b", Instant.now())).isFalse();
+        assertThat(redisTemplate.getExpire("bodeum:auth:denylist-token:token-a"))
+                .isBetween(1L, 60L);
+    }
+
+    @Test
+    void deviceLogout_blocksOnlyCurrentDeviceTokens() {
+        AuthTokenService service = buildAuthTokenService(userServiceReturning(17L));
+        AuthTokenService.AuthTokenPair firstDevice = service.issueTokens(17L);
+        AuthTokenService.AuthTokenPair secondDevice = service.issueTokens(17L);
+
+        service.revoke(17L, firstDevice.refreshToken());
+        service.revokeAccessToken(firstDevice.accessToken());
+
+        assertThat(service.authenticate(firstDevice.accessToken())).isEmpty();
+        assertThat(service.authenticate(secondDevice.accessToken())).isPresent();
+        assertThatThrownBy(() -> service.refresh(firstDevice.refreshToken()))
+                .isInstanceOf(ProjectException.class);
+        assertThat(service.refresh(secondDevice.refreshToken()).accessToken()).isNotBlank();
     }
 
     @Test
@@ -275,11 +346,24 @@ class RedisAuthStoreIntegrationTest {
 
         UserService userService = mock(UserService.class);
         when(userService.findActiveUser(userId)).thenReturn(Optional.of(user));
+        when(userService.findActiveUserByAuthSubject("subject-" + userId))
+                .thenReturn(Optional.of(user));
         return userService;
     }
 
     private Set<String> refreshKeys() {
         return redisTemplate.keys("bodeum:auth:refresh:*");
+    }
+
+    private String hashToken(String token) {
+        try {
+            return HexFormat.of().formatHex(
+                    MessageDigest.getInstance("SHA-256")
+                            .digest(token.getBytes(StandardCharsets.UTF_8))
+            );
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException(e);
+        }
     }
 
     private void flushTestKeys() {

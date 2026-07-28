@@ -9,6 +9,7 @@ import static org.mockito.ArgumentMatchers.any;
 import com.bodeum.domain.auth.enums.SocialProvider;
 import com.bodeum.domain.auth.exception.AuthErrorCode;
 import com.bodeum.domain.auth.repository.AuthLoginCodeRepository;
+import com.bodeum.domain.auth.service.AccessTokenDenylist;
 import com.bodeum.domain.auth.service.RefreshTokenStore;
 import com.bodeum.domain.region.service.RegionService;
 import com.bodeum.domain.user.event.UserPrincipalChangedEvent;
@@ -22,6 +23,7 @@ import com.bodeum.domain.user.repository.UserRepository;
 import com.bodeum.global.apiPayload.exception.ProjectException;
 import com.bodeum.global.infrastructure.storage.S3ImageStorage;
 import java.util.Optional;
+import org.springframework.dao.DataAccessResourceFailureException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -52,6 +54,9 @@ class UserServiceTest {
 
     @Mock
     private AuthLoginCodeRepository authLoginCodeRepository;
+
+    @Mock
+    private AccessTokenDenylist accessTokenDenylist;
 
     @InjectMocks
     private UserService userService;
@@ -117,11 +122,32 @@ class UserServiceTest {
         assertThat(response.success()).isTrue();
         assertThat(user.isWithdrawn()).isTrue();
         assertThat(user.getDeletedAt()).isNotNull();
-        // 개인정보 파기와 세션 폐기(전체 기기)가 수행되고, access token 폐기·캐시 무효화 이벤트가 발행된다.
+        // 개인정보 파기와 세션 폐기(전체 기기)가 수행되고, access token은 strict로 폐기된다.
+        then(accessTokenDenylist).should()
+                .revokeAllBefore(org.mockito.ArgumentMatchers.eq(previousAuthSubject), any());
         then(refreshTokenStore).should().revokeAll(1L);
         then(authLoginCodeRepository).should().deleteByUserId(1L);
         then(eventPublisher).should()
-                .publishEvent(new UserPrincipalChangedEvent(previousAuthSubject, true));
+                .publishEvent(new UserPrincipalChangedEvent(previousAuthSubject));
+    }
+
+    @Test
+    void withdrawFailsBeforeMutationWhenDenylistRegistrationFails() {
+        User user = User.createSocialUser(
+                SocialProvider.KAKAO, "kakao-1", "parent@example.com", "민준맘");
+        ReflectionTestUtils.setField(user, "id", 1L);
+        String previousAuthSubject = user.getAuthSubject();
+        given(userRepository.findById(1L)).willReturn(Optional.of(user));
+        org.mockito.BDDMockito.willThrow(new DataAccessResourceFailureException("redis down"))
+                .given(accessTokenDenylist)
+                .revokeAllBefore(org.mockito.ArgumentMatchers.eq(previousAuthSubject), any());
+
+        assertThatThrownBy(() -> userService.withdraw(1L))
+                .isInstanceOf(DataAccessResourceFailureException.class);
+
+        assertThat(user.isWithdrawn()).isFalse();
+        then(refreshTokenStore).shouldHaveNoInteractions();
+        then(eventPublisher).shouldHaveNoInteractions();
     }
 
     @Test

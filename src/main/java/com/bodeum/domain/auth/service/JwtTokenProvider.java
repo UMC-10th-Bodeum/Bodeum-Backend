@@ -56,21 +56,30 @@ public class JwtTokenProvider {
                     .getPayload();
 
             String subject = claims.getSubject();
-            if (!StringUtils.hasText(subject)) {
+            String tokenId = claims.getId();
+            Date expiresAt = claims.getExpiration();
+            if (!StringUtils.hasText(subject) || !StringUtils.hasText(tokenId) || expiresAt == null) {
                 return Optional.empty();
             }
 
             Date issuedAt = claims.getIssuedAt();
             return Optional.of(new ParsedClaims(
                     subject,
-                    issuedAt == null ? null : issuedAt.toInstant()
+                    tokenId,
+                    issuedAt == null ? null : issuedAt.toInstant(),
+                    expiresAt.toInstant()
             ));
         } catch (JwtException | IllegalArgumentException e) {
             return Optional.empty();
         }
     }
 
-    /** 서명 검증을 통과한 access token의 subject(인증 식별자)와 발급 시각. */
-    public record ParsedClaims(String authSubject, Instant issuedAt) {
+    /** 서명 검증을 통과한 access token의 인증·폐기 판정용 claim. */
+    public record ParsedClaims(
+            String authSubject,
+            String tokenId,
+            Instant issuedAt,
+            Instant expiresAt
+    ) {
     }
 }
