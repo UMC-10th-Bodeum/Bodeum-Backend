@@ -73,7 +73,11 @@ public class SearchService {
         );
 
         return AutocompleteResponse.from(items);
-    // 회원 탈퇴 시 해당 회원의 검색 기록을 모두 삭제한다.
+    }
+
+    /**
+     * 회원 탈퇴 시 해당 회원의 검색 기록을 모두 삭제한다.
+     */
     @Transactional
     public void deleteUserSearchLogs(Long userId) {
         searchLogRepository.deleteByUserId(userId);

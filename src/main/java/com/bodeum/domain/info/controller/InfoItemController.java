@@ -1,8 +1,10 @@
 package com.bodeum.domain.info.controller;
 
 import com.bodeum.domain.info.dto.request.InfoItemSearchCondition;
+import com.bodeum.domain.info.dto.request.KakaoMapUrlRequest;
 import com.bodeum.domain.info.dto.response.InfoItemDetailResponse;
 import com.bodeum.domain.info.dto.response.InfoItemPageResponse;
+import com.bodeum.domain.info.dto.response.KakaoMapUrlResponse;
 import com.bodeum.domain.info.dto.response.InfoItemShareResponse;
 import com.bodeum.domain.info.service.InfoItemQueryService;
 import com.bodeum.global.apiPayload.ApiResponse;
@@ -11,6 +13,7 @@ import com.bodeum.global.auth.LoginUser;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.Pageable;
@@ -50,6 +53,18 @@ public class InfoItemController {
             @PathVariable("infoItemId") Long infoItemId
     ) {
         InfoItemDetailResponse response = infoItemQueryService.getInfoItemDetail(userId, infoItemId);
+        return ApiResponse.of(GeneralSuccessCode.OK, response);
+    }
+
+    @Operation(
+            summary = "카카오지도 URL 생성",
+            description = "정보 항목 ID를 전달받아 해당 기관/병원의 카카오지도 이동(검색) URL을 생성하여 반환합니다."
+    )
+    @PostMapping("/kakaomap-url")
+    public ApiResponse<KakaoMapUrlResponse> createKakaoMapUrl(
+            @Valid @RequestBody KakaoMapUrlRequest request
+    ) {
+        KakaoMapUrlResponse response = infoItemQueryService.createKakaoMapUrl(request);
         return ApiResponse.of(GeneralSuccessCode.OK, response);
     }
 

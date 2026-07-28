@@ -1,10 +1,12 @@
 package com.bodeum.domain.info.service;
 
 import com.bodeum.domain.info.dto.request.InfoItemSearchCondition;
+import com.bodeum.domain.info.dto.request.KakaoMapUrlRequest;
 import com.bodeum.domain.info.dto.response.InfoItemDetailResponse;
 import com.bodeum.domain.info.dto.response.InfoItemPageResponse;
 import com.bodeum.domain.info.dto.response.InfoItemResponse;
 import com.bodeum.domain.info.dto.response.InfoItemShareResponse;
+import com.bodeum.domain.info.dto.response.KakaoMapUrlResponse;
 import com.bodeum.domain.info.entity.InfoCategory;
 import com.bodeum.domain.info.entity.InfoItem;
 import com.bodeum.domain.info.entity.enums.MainCategory;
@@ -23,7 +25,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 import org.springframework.web.util.UriComponentsBuilder;
+import org.springframework.web.util.UriUtils;
 
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 @Service
@@ -110,16 +114,31 @@ public class InfoItemQueryService {
      * 3. 정보 공유 링크 조회 API
      */
     public InfoItemShareResponse getInfoItemShareUrl(Long infoItemId) {
-        // 1) 공유 전용 예외 처리
         InfoItem infoItem = infoItemRepository.findById(infoItemId)
                 .orElseThrow(() -> new InfoException(InfoErrorCode.INFO_SHARE_LINK_NOT_FOUND));
 
-        // 2) UriComponentsBuilder로 URL 정규화 (fromUriString 사용)
         String shareUrl = UriComponentsBuilder.fromUriString(shareBaseUrl)
                 .pathSegment("info", String.valueOf(infoItem.getId()))
                 .build()
                 .toUriString();
 
         return InfoItemShareResponse.of(infoItem.getId(), shareUrl);
+    }
+
+    /**
+     * 4. 카카오지도 URL 생성 API
+     */
+    public KakaoMapUrlResponse createKakaoMapUrl(KakaoMapUrlRequest request) {
+        InfoItem infoItem = infoItemRepository.findById(request.infoItemId())
+                .orElseThrow(() -> new InfoException(InfoErrorCode.INFO_ITEM_NOT_FOUND));
+
+        String searchQuery = (infoItem.getName() != null && !infoItem.getName().isBlank())
+                ? infoItem.getName()
+                : infoItem.getAddress();
+
+        String encodedQuery = UriUtils.encodePathSegment(searchQuery, StandardCharsets.UTF_8);
+        String kakaoMapUrl = "https://map.kakao.com/link/search/" + encodedQuery;
+
+        return KakaoMapUrlResponse.from(kakaoMapUrl);
     }
 }
