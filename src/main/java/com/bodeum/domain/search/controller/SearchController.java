@@ -20,7 +20,7 @@ public class SearchController {
 
     private final SearchService searchService;
 
-    @GetMapping("/search")
+    @GetMapping("/info/search")
     @Operation(summary = "INFO 검색")
     public ApiResponse<InfoSearchResponse> searchInfo(
             @RequestParam String keyword,
