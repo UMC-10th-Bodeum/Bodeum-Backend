@@ -11,6 +11,7 @@ import com.bodeum.global.apiPayload.code.BaseErrorCode;
 import com.bodeum.global.apiPayload.exception.ProjectException;
 import com.bodeum.global.config.FrontProperties;
 import java.net.URI;
+import java.time.Instant;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -29,6 +30,7 @@ public class AuthService {
     private final SocialOAuthClient socialOAuthClient;
     private final OAuthStateStore oAuthStateStore;
     private final AuthLoginCodeStore authLoginCodeStore;
+    private final AccessTokenDenylist accessTokenDenylist;
     private final FrontProperties frontProperties;
 
     public URI createLoginRedirectUri(SocialProvider provider) {
@@ -100,8 +102,10 @@ public class AuthService {
     }
 
     public void logout(Long userId, String refreshToken) {
-        userService.getCurrentUser(userId);
+        User user = userService.getCurrentUser(userId);
         authTokenService.revoke(userId, refreshToken);
+        // stateless access token은 만료 전까지 유효하므로, 로그아웃 즉시 무효화되도록 denylist에 등록한다.
+        accessTokenDenylist.revokeAllBefore(user.getAuthSubject(), Instant.now());
     }
 
     private URI buildFrontRedirectUri(String loginCode) {

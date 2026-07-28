@@ -8,6 +8,7 @@ import java.time.Instant;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
@@ -20,11 +21,20 @@ import org.springframework.util.StringUtils;
 public class OAuthStateStore {
 
     private static final Duration STATE_TTL = Duration.ofMinutes(10);
+    private static final String KEY_PREFIX = "bodeum:auth:oauth-state:";
 
     private final OAuthStateRepository oAuthStateRepository;
+    private final AuthTokenProperties authTokenProperties;
+    private final StringRedisTemplate redisTemplate;
 
     @Transactional
     public String issue(SocialProvider provider) {
+        if (authTokenProperties.isRedisEnabled()) {
+            String state = UUID.randomUUID().toString();
+            redisTemplate.opsForValue().set(KEY_PREFIX + state, provider.name(), STATE_TTL);
+            return state;
+        }
+
         purgeExpired();
 
         String state = UUID.randomUUID().toString();
@@ -37,6 +47,11 @@ public class OAuthStateStore {
     public boolean consume(SocialProvider provider, String state) {
         if (!StringUtils.hasText(state)) {
             return false;
+        }
+
+        if (authTokenProperties.isRedisEnabled()) {
+            String storedProvider = redisTemplate.opsForValue().getAndDelete(KEY_PREFIX + state);
+            return provider.name().equals(storedProvider);
         }
 
         Instant now = Instant.now();

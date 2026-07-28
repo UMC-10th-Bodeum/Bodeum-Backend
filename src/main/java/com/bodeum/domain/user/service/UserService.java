@@ -3,8 +3,10 @@ package com.bodeum.domain.user.service;
 import com.bodeum.domain.auth.enums.SocialProvider;
 import com.bodeum.domain.auth.exception.AuthErrorCode;
 import com.bodeum.domain.auth.repository.AuthLoginCodeRepository;
+import com.bodeum.domain.auth.service.AccessTokenDenylist;
+import com.bodeum.domain.auth.service.AuthPrincipalCache;
+import com.bodeum.domain.auth.service.RefreshTokenStore;
 import com.bodeum.domain.user.dto.response.AiTermsAgreementResponse;
-import com.bodeum.domain.auth.repository.RefreshTokenSessionRepository;
 import com.bodeum.domain.region.entity.Region;
 import com.bodeum.domain.region.service.RegionService;
 import com.bodeum.domain.user.dto.request.CreateUserAgreementRequest;
@@ -22,6 +24,7 @@ import com.bodeum.domain.user.repository.UserRepository;
 import com.bodeum.global.apiPayload.code.GeneralErrorCode;
 import com.bodeum.global.apiPayload.exception.ProjectException;
 import com.bodeum.global.infrastructure.storage.S3ImageStorage;
+import java.time.Instant;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -37,8 +40,10 @@ public class UserService {
     private static final String PROFILE_IMAGE_DIRECTORY = "profile-images";
 
     private final UserRepository userRepository;
-    private final RefreshTokenSessionRepository refreshTokenSessionRepository;
+    private final RefreshTokenStore refreshTokenStore;
     private final AuthLoginCodeRepository authLoginCodeRepository;
+    private final AuthPrincipalCache authPrincipalCache;
+    private final AccessTokenDenylist accessTokenDenylist;
     private final S3ImageStorage s3ImageStorage;
     private final UserProfileImageUpdater userProfileImageUpdater;
     private final RegionService regionService;
@@ -80,6 +85,9 @@ public class UserService {
                 request.communityRoleType()
         );
 
+        // nickname 등 principal 필드가 바뀌므로 캐시된 인증 정보를 무효화해 stale을 막는다.
+        authPrincipalCache.evict(user.getAuthSubject());
+
         return UserProfileUpdateResponse.ofSuccess();
     }
 
@@ -114,11 +122,19 @@ public class UserService {
             throw new ProjectException(AuthErrorCode.ALREADY_WITHDRAWN);
         }
 
+        // withdraw()가 authSubject를 새 값으로 교체(묘비 처리)하므로, 폐기 대상인 옛 값을 먼저 캡처한다.
+        String previousAuthSubject = user.getAuthSubject();
+
         // User 개인정보와 소셜 식별자를 파기하고 Auth 인증 수단을 폐기한다.
         // 다른 도메인의 탈퇴 후속 처리는 각 도메인 정책이 확정된 뒤 별도로 연결한다.
         user.withdraw();
-        refreshTokenSessionRepository.deleteByUserId(userId);
+        refreshTokenStore.revokeAll(userId);
         authLoginCodeRepository.deleteByUserId(userId);
+
+        // 이미 발급된 access token까지 즉시 무효화하고 캐시된 인증 정보를 제거한다.
+        // (login code는 60초 TTL이라 Redis 경로에서는 별도 정리 없이 자연 만료에 맡긴다.)
+        accessTokenDenylist.revokeAllBefore(previousAuthSubject, Instant.now());
+        authPrincipalCache.evict(previousAuthSubject);
 
         return UserWithdrawResponse.ofSuccess();
     }
