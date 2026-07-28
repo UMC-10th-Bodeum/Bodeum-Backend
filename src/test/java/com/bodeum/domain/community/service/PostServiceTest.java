@@ -27,6 +27,7 @@ import com.bodeum.domain.community.repository.PostImageRepository;
 import com.bodeum.domain.community.repository.PostLikeRepository;
 import com.bodeum.domain.community.repository.PostRepository;
 import com.bodeum.domain.community.repository.PostScrapRepository;
+import com.bodeum.domain.user.repository.UserRepository;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
@@ -53,6 +54,8 @@ class PostServiceTest {
     private PostLikeRepository postLikeRepository;
     @Mock
     private PostScrapRepository postScrapRepository;
+    @Mock
+    private UserRepository userRepository;
     @InjectMocks
     private PostService postService;
 

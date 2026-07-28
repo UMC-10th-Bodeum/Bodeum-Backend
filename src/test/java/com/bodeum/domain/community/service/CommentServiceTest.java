@@ -22,6 +22,7 @@ import com.bodeum.domain.community.exception.CommunityException;
 import com.bodeum.domain.community.repository.CommentLikeRepository;
 import com.bodeum.domain.community.repository.CommentRepository;
 import com.bodeum.domain.community.repository.PostRepository;
+import com.bodeum.domain.user.repository.UserRepository;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
@@ -40,6 +41,8 @@ class CommentServiceTest {
     private CommentLikeRepository commentLikeRepository;
     @Mock
     private PostRepository postRepository;
+    @Mock
+    private UserRepository userRepository;
     @InjectMocks
     private CommentService commentService;
 
