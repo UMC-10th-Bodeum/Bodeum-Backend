@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -33,6 +34,7 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class AiMessageQueryService {
 
+    private static final int TODAY_MESSAGE_LIMIT = 20;
     private static final int HISTORY_MESSAGE_LIMIT = 20;
     private static final int HISTORY_LOOKBACK_DAYS = 7;
 
@@ -41,7 +43,11 @@ public class AiMessageQueryService {
     private final AiResponseSourceRepository aiResponseSourceRepository;
 
     @Transactional(readOnly = true)
-    public AiTodayMessageResponse getTodayMessages(Long userId) {
+    public AiTodayMessageResponse getTodayMessages(
+            Long userId,
+            Long cursorId,
+            Instant cursorCreatedAt
+    ) {
         AiChatRoom chatRoom = aiChatRoomRepository.findByUserId(userId)
                 .orElseThrow(() -> new ProjectException(AiErrorCode.AI_CHAT_ROOM_NOT_FOUND));
 
@@ -51,19 +57,42 @@ public class AiMessageQueryService {
                 .atStartOfDay(SERVICE_ZONE_ID)
                 .toInstant();
 
-        List<AiMessage> messages = aiMessageRepository.findTodayMessages(
-                chatRoom.getId(), startOfToday, startOfTomorrow);
-        if (messages.isEmpty()) {
-            return AiTodayMessageResponse.of(List.of());
+        List<AiMessage> fetchedMessages = aiMessageRepository.findTodayMessages(
+                chatRoom.getId(),
+                startOfToday,
+                startOfTomorrow,
+                cursorId,
+                cursorCreatedAt,
+                PageRequest.of(0, TODAY_MESSAGE_LIMIT + 1)
+        );
+        if (fetchedMessages.isEmpty()) {
+            return AiTodayMessageResponse.of(List.of(), null, false);
         }
 
-        Map<Long, List<AiResponseSourceProjection>> sourceMap = loadSourceMap(messages);
-        List<AiMessageResponse> messageResponses = messages.stream()
+        boolean hasNext = fetchedMessages.size() > TODAY_MESSAGE_LIMIT;
+        List<AiMessage> pageMessages = List.copyOf(
+                fetchedMessages.subList(
+                        0,
+                        Math.min(fetchedMessages.size(), TODAY_MESSAGE_LIMIT)
+                )
+        );
+
+        Map<Long, List<AiResponseSourceProjection>> sourceMap = loadSourceMap(pageMessages);
+        List<AiMessageResponse> messageResponses = pageMessages.stream()
                 .map(message -> toMessageResponse(
                         message,
                         sourceMap.getOrDefault(message.getId(), List.of())))
                 .toList();
-        return AiTodayMessageResponse.of(messageResponses);
+
+        AiMessage oldestMessage = pageMessages.getLast();
+        return AiTodayMessageResponse.of(
+                reverseCopy(messageResponses),
+                new AiTodayMessageResponse.Cursor(
+                        oldestMessage.getId(),
+                        oldestMessage.getCreatedAt()
+                ),
+                hasNext
+        );
     }
 
     @Transactional(readOnly = true)
@@ -109,12 +138,15 @@ public class AiMessageQueryService {
                             sourceMap.getOrDefault(message.getId(), List.of())));
         }
 
-        List<AiMessageHistoryResponse.HistoryDateGroup> dateGroups = groupedMessages.entrySet()
+        List<AiMessageHistoryResponse.HistoryDateGroup> dateGroupsDescending =
+                groupedMessages.entrySet()
                 .stream()
                 .map(entry -> AiMessageHistoryResponse.HistoryDateGroup.of(
                         entry.getKey(),
                         reverseCopy(entry.getValue())))
                 .toList();
+        List<AiMessageHistoryResponse.HistoryDateGroup> dateGroups =
+                reverseCopy(dateGroupsDescending);
 
         Long nextCursor = pageMessages.getLast().getId();
         Instant nextCursorCreatedAt = pageMessages.getLast().getCreatedAt();
@@ -203,11 +235,11 @@ public class AiMessageQueryService {
         return List.copyOf(selectedMessages);
     }
 
-    private List<AiMessageResponse> reverseCopy(
-            List<AiMessageResponse> messages
+    private <T> List<T> reverseCopy(
+            List<T> items
     ) {
-        List<AiMessageResponse> reversedMessages = new ArrayList<>(messages);
-        Collections.reverse(reversedMessages);
-        return List.copyOf(reversedMessages);
+        List<T> reversedItems = new ArrayList<>(items);
+        Collections.reverse(reversedItems);
+        return List.copyOf(reversedItems);
     }
 }
