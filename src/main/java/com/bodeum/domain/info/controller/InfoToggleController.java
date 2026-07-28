@@ -9,6 +9,7 @@ import com.bodeum.global.auth.LoginUser;
 import com.bodeum.global.auth.RequireSignupCompleted;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -16,7 +17,9 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-@Tag(name = "Info Toggle API", description = "정보 스크랩 및 후기 도움돼요 토글 API")
+// 1. name을 'Info'로 설정하여 기존 Info 섹션 아래로 합칩니다.
+@Tag(name = "Info", description = "정보 항목 관련 API")
+@SecurityRequirement(name = "JWT TOKEN")
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/v1/info-items")
