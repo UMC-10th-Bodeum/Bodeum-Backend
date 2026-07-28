@@ -125,11 +125,14 @@ public class AuthTokenService {
     /**
      * 일반 로그아웃에 사용한 access token 하나만 폐기한다.
      * 회원탈퇴의 사용자 단위 폐기는 UserService에서 별도로 처리한다.
+     *
+     * <p>파싱 불가(만료·손상) 토큰은 이미 인증에 쓸 수 없으므로 폐기 대상이 아니며, 조용히 넘어간다.
+     * 여기서 예외를 던지면 앞 단계에서 이미 refresh 세션이 폐기됐는데 응답만 실패가 되어,
+     * 클라이언트가 로그아웃 실패로 오인하고 재시도해도 계속 실패한다.
      */
     public void revokeAccessToken(String accessToken) {
-        ParsedClaims claims = jwtTokenProvider.parseClaims(accessToken)
-                .orElseThrow(() -> new ProjectException(AuthErrorCode.INVALID_ACCESS_TOKEN));
-        accessTokenDenylist.revokeToken(claims.tokenId(), claims.expiresAt());
+        jwtTokenProvider.parseClaims(accessToken)
+                .ifPresent(claims -> accessTokenDenylist.revokeToken(claims.tokenId(), claims.expiresAt()));
     }
 
     private AuthUserPrincipal toPrincipal(User user) {

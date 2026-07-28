@@ -301,6 +301,33 @@ class RedisAuthStoreIntegrationTest {
     }
 
     @Test
+    void denylist_treatsMissingTokenIdSameWhetherNullOrEmpty() {
+        Instant issuedAt = Instant.now();
+
+        // jti를 알 수 없는 경우 null과 ""가 같은 결과여야 한다(둘 다 사용자 cutoff만으로 판단).
+        assertThat(denylist.isRevoked("subject-n", null, issuedAt))
+                .isEqualTo(denylist.isRevoked("subject-n", "", issuedAt))
+                .isFalse();
+
+        denylist.revokeAllBefore("subject-n", issuedAt);
+
+        assertThat(denylist.isRevoked("subject-n", null, issuedAt))
+                .isEqualTo(denylist.isRevoked("subject-n", "", issuedAt))
+                .isTrue();
+    }
+
+    @Test
+    void revokeAccessToken_doesNotFailOnUnparsableToken() {
+        AuthTokenService service = buildAuthTokenService(mock(UserService.class));
+
+        // 만료·손상 토큰은 폐기 대상이 아니므로 예외 없이 넘어가야 한다.
+        // (예외를 던지면 앞서 폐기된 refresh 세션과 달리 응답만 실패해 로그아웃이 깨진다.)
+        service.revokeAccessToken("not-a-jwt");
+
+        assertThat(redisTemplate.keys("bodeum:auth:denylist-token:*")).isEmpty();
+    }
+
+    @Test
     void deviceLogout_blocksOnlyCurrentDeviceTokens() {
         AuthTokenService service = buildAuthTokenService(userServiceReturning(17L));
         AuthTokenService.AuthTokenPair firstDevice = service.issueTokens(17L);

@@ -7,6 +7,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataAccessException;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 
 /**
  * stateless access token(JWT)을 만료 전에 강제 무효화하기 위한 denylist.
@@ -76,14 +77,18 @@ public class AccessTokenDenylist {
             return false;
         }
 
-        try {
-            if (tokenId == null || Boolean.TRUE.equals(redisTemplate.hasKey(TOKEN_KEY_PREFIX + tokenId))) {
-                return true;
+        // jti가 없으면 토큰 단위 폐기를 판정할 수 없으므로 사용자 cutoff만으로 판단한다.
+        // 정상 경로에서는 parseClaims가 jti 없는 토큰을 이미 거부하므로 항상 존재한다.
+        if (StringUtils.hasText(tokenId)) {
+            try {
+                if (Boolean.TRUE.equals(redisTemplate.hasKey(TOKEN_KEY_PREFIX + tokenId))) {
+                    return true;
+                }
+            } catch (DataAccessException e) {
+                // Redis 장애 시 fail-open: 전체 인증 장애를 피한다(노출은 accessTokenTtl로 한정).
+                log.warn("[AUTH] token denylist 조회 실패 (Redis 장애) - fail-open 처리 tokenId={}", tokenId, e);
+                return false;
             }
-        } catch (DataAccessException e) {
-            // Redis 장애 시 fail-open: 전체 인증 장애를 피한다(노출은 accessTokenTtl로 한정).
-            log.warn("[AUTH] token denylist 조회 실패 (Redis 장애) - fail-open 처리 tokenId={}", tokenId, e);
-            return false;
         }
 
         String revokedAtRaw;
@@ -117,8 +122,8 @@ public class AccessTokenDenylist {
         }
     }
 
-    /** 사용자 단위 cutoff만 확인하는 기존 호출용 편의 메서드. */
+    /** jti 없이 사용자 단위 cutoff만 확인하는 편의 메서드. */
     public boolean isRevoked(String authSubject, Instant tokenIssuedAt) {
-        return isRevoked(authSubject, "", tokenIssuedAt);
+        return isRevoked(authSubject, null, tokenIssuedAt);
     }
 }
