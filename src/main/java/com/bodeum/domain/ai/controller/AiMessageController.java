@@ -7,6 +7,8 @@ import com.bodeum.domain.ai.service.AiMessageQueryService;
 import com.bodeum.global.apiPayload.ApiResponse;
 import com.bodeum.global.apiPayload.code.GeneralSuccessCode;
 import com.bodeum.global.auth.LoginUser;
+import com.bodeum.global.auth.RequireAiTermsAgreed;
+import com.bodeum.global.auth.RequireSignupCompleted;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.time.Instant;
@@ -17,6 +19,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @Tag(name = "AI message", description = "AI 챗봇 대화 이력 조회 API")
+@RequireSignupCompleted
+@RequireAiTermsAgreed
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/v1/ai/messages")

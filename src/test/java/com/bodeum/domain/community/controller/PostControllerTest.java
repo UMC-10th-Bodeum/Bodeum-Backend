@@ -315,6 +315,7 @@ class PostControllerTest {
         return new PostResponse(
                 1L,
                 10L,
+                null,
                 true,
                 PostBoardType.FREE_COMMUNICATION,
                 PostAnonymityType.PROFILE_TAG_VISIBLE,

@@ -7,9 +7,7 @@ import com.bodeum.domain.ai.exception.AiErrorCode;
 import com.bodeum.domain.ai.repository.AiChatRoomRepository;
 import com.bodeum.domain.ai.repository.AiMessageRepository;
 import com.bodeum.domain.user.entity.User;
-import com.bodeum.domain.user.entity.UserAgreement;
 import com.bodeum.domain.user.exception.UserErrorCode;
-import com.bodeum.domain.user.repository.UserAgreementRepository;
 import com.bodeum.domain.user.repository.UserRepository;
 import com.bodeum.global.apiPayload.exception.ProjectException;
 import lombok.RequiredArgsConstructor;
@@ -32,7 +30,6 @@ public class AiChatRoomService {
 
     private final AiChatRoomRepository aiChatRoomRepository;
     private final UserRepository userRepository;
-    private final UserAgreementRepository userAgreementRepository;
     private final AiMessageRepository aiMessageRepository;
 
     @Transactional
@@ -49,8 +46,6 @@ public class AiChatRoomService {
 
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public AiChatRoomResponse getOrCreateChatRoom(Long userId) {
-        validateAiTermsAgreement(userId);
-
         AiChatRoom chatRoom = getOrCreateChatRoomSafely(userId);
 
         // 한국 시간 기준 오늘 0시를 Instant로 변환
@@ -86,15 +81,6 @@ public class AiChatRoomService {
                 hasTodayMessages,
                 hasPreviousMessages
         );
-    }
-
-    private void validateAiTermsAgreement(Long userId) {
-        UserAgreement agreement = userAgreementRepository.findByUserId(userId)
-                .orElseThrow(() -> new ProjectException(UserErrorCode.USER_AGREEMENT_NOT_FOUND));
-
-        if (!agreement.isAiTermsAgreed()) {
-            throw new ProjectException(AiErrorCode.AI_TERMS_NOT_AGREED);
-        }
     }
 
     private AiChatRoom createChatRoom(Long userId) {

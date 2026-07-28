@@ -28,8 +28,9 @@ bodeum:
     # 운영 프론트(Vercel) 콜백 URL. 소셜 로그인 완료 후 일회용 code를 붙여 이 주소로 리다이렉트한다.
     callback-url: ${FRONT_CALLBACK_URL:https://bodeum-site.vercel.app/auth/callback}
   cors:
-    # 프론트(Vercel) 운영 도메인 + 프리뷰 배포 + 통합 초기 로컬 개발용
+    # 커스텀 도메인(프론트 컷오버 대비) + 프론트(Vercel) 운영 도메인 + 프리뷰 배포 + 통합 초기 로컬 개발용
     allowed-origins:
+      - https://bodeum.site
       - https://bodeum-site.vercel.app
       - https://bodeum-site-*.vercel.app
       - http://localhost:*

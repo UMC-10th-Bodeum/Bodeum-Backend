@@ -1,12 +1,14 @@
 package com.bodeum.domain.mypage.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
 import com.bodeum.domain.community.entity.Comment;
 import com.bodeum.domain.community.entity.Post;
+import com.bodeum.domain.community.entity.PostScrap;
 import com.bodeum.domain.community.enums.CommentStatus;
 import com.bodeum.domain.community.enums.PostAnonymityType;
 import com.bodeum.domain.community.enums.PostBoardType;
@@ -16,13 +18,15 @@ import com.bodeum.domain.info.entity.InfoItem;
 import com.bodeum.domain.info.entity.InfoScrap;
 import com.bodeum.domain.info.entity.enums.MainCategory;
 import com.bodeum.domain.mypage.dto.response.MyCommentListResponse;
-import com.bodeum.domain.mypage.dto.response.MyPageProfileResponse;
+import com.bodeum.domain.mypage.dto.response.MyPageDashboardResponse;
 import com.bodeum.domain.mypage.dto.response.MyPostListResponse;
 import com.bodeum.domain.mypage.dto.response.MyScrapListResponse;
+import com.bodeum.domain.mypage.entity.enums.ScrapType;
 import com.bodeum.domain.mypage.repository.MyPageCommentRepository;
 import com.bodeum.domain.mypage.repository.MyPageInfoScrapRepository;
 import com.bodeum.domain.mypage.repository.MyPageNewsScrapRepository;
 import com.bodeum.domain.mypage.repository.MyPagePostRepository;
+import com.bodeum.domain.mypage.repository.MyPagePostScrapRepository;
 import com.bodeum.domain.news.entity.News;
 import com.bodeum.domain.news.entity.NewsScrap;
 import com.bodeum.domain.news.entity.NewsType;
@@ -30,9 +34,12 @@ import com.bodeum.domain.news.entity.RecruitmentStatus;
 import com.bodeum.domain.user.dto.response.UserProfileResponse;
 import com.bodeum.domain.user.entity.User;
 import com.bodeum.domain.user.service.UserService;
+import com.bodeum.global.apiPayload.code.GeneralErrorCode;
+import com.bodeum.global.apiPayload.exception.ProjectException;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -55,6 +62,9 @@ class MyPageServiceTest {
     private MyPageNewsScrapRepository newsScrapRepository;
 
     @Mock
+    private MyPagePostScrapRepository postScrapRepository;
+
+    @Mock
     private MyPagePostRepository postRepository;
 
     @Mock
@@ -64,7 +74,7 @@ class MyPageServiceTest {
     private MyPageService myPageService;
 
     @Test
-    void getProfileReturnsProfileAndActivitySummary() {
+    void getDashboardReturnsProfileAndActivitySummary() {
         UserProfileResponse profile =
                 new UserProfileResponse(
                         1L,
@@ -99,6 +109,9 @@ class MyPageServiceTest {
         given(newsScrapRepository.countVisibleByUserId(1L))
                 .willReturn(2L);
 
+        given(postScrapRepository.countVisibleByUserId(1L, PostStatus.ACTIVE))
+                .willReturn(1L);
+
         given(
                 postRepository.countVisibleByUserId(
                         1L,
@@ -114,8 +127,8 @@ class MyPageServiceTest {
                 )
         ).willReturn(7L);
 
-        MyPageProfileResponse response =
-                myPageService.getProfile(1L);
+        MyPageDashboardResponse response =
+                myPageService.getDashboard(1L);
 
         assertThat(response.userId())
                 .isEqualTo(1L);
@@ -127,7 +140,7 @@ class MyPageServiceTest {
                 .isEqualTo(230);
 
         assertThat(response.activitySummary().savedInfoCount())
-                .isEqualTo(5L);
+                .isEqualTo(6L);
 
         assertThat(response.activitySummary().myPostCount())
                 .isEqualTo(4L);
@@ -137,7 +150,7 @@ class MyPageServiceTest {
     }
 
     @Test
-    void getScrapsReturnsInfoAndNewsScraps() {
+    void getScrapsReturnsInfoNewsAndPostScraps() {
         User user = mock(User.class);
 
         InfoScrap infoScrap = mock(InfoScrap.class);
@@ -147,11 +160,23 @@ class MyPageServiceTest {
         NewsScrap newsScrap = mock(NewsScrap.class);
         News news = mock(News.class);
 
+        PostScrap postScrap = mock(PostScrap.class);
+        Post post = mock(Post.class);
+
         Instant infoScrappedAt =
                 Instant.parse("2026-07-17T20:00:00Z");
 
         Instant newsScrappedAt =
                 Instant.parse("2026-07-16T18:00:00Z");
+
+        Instant postScrappedAt =
+                Instant.parse("2026-07-15T17:00:00Z");
+
+        Instant postCreatedAt =
+                Instant.parse("2026-07-14T16:00:00Z");
+
+        Instant postUpdatedAt =
+                Instant.parse("2026-07-15T16:00:00Z");
 
         LocalDateTime publishedAt =
                 LocalDateTime.of(
@@ -174,6 +199,14 @@ class MyPageServiceTest {
                 newsScrapRepository
                         .findAllVisibleByUserIdOrderByCreatedAtDesc(1L)
         ).willReturn(List.of(newsScrap));
+
+        given(
+                postScrapRepository
+                        .findAllVisibleByUserIdOrderByCreatedAtDesc(
+                                1L,
+                                PostStatus.ACTIVE
+                        )
+        ).willReturn(List.of(postScrap));
 
         given(infoScrap.getId())
                 .willReturn(10L);
@@ -259,16 +292,64 @@ class MyPageServiceTest {
         given(news.getPublishedAt())
                 .willReturn(publishedAt);
 
+        given(postScrap.getId())
+                .willReturn(30L);
+
+        given(postScrap.getPost())
+                .willReturn(post);
+
+        given(postScrap.getCreatedAt())
+                .willReturn(postScrappedAt);
+
+        given(post.getId())
+                .willReturn(300L);
+
+        given(post.getBoardType())
+                .willReturn(PostBoardType.FREE_COMMUNICATION);
+
+        given(post.getAnonymityType())
+                .willReturn(PostAnonymityType.PROFILE_TAG_VISIBLE);
+
+        given(post.getTitle())
+                .willReturn("발달 지원 경험을 공유합니다");
+
+        given(post.getContent())
+                .willReturn("지원 프로그램을 이용한 경험입니다.");
+
+        given(post.isQuestion())
+                .willReturn(false);
+
+        given(post.getViewCount())
+                .willReturn(120);
+
+        given(post.getLikeCount())
+                .willReturn(15);
+
+        given(post.getCommentCount())
+                .willReturn(8);
+
+        given(post.getScrapCount())
+                .willReturn(4);
+
+        given(post.getCreatedAt())
+                .willReturn(postCreatedAt);
+
+        given(post.getUpdatedAt())
+                .willReturn(postUpdatedAt);
+
         MyScrapListResponse response =
                 myPageService.getScraps(1L);
 
         assertThat(response.totalCount())
-                .isEqualTo(2L);
+                .isEqualTo(3L);
 
         assertThat(response.infoScraps())
                 .hasSize(1);
 
         assertThat(response.newsScraps())
+                .hasSize(1);
+
+        assertThat(response.postScraps())
                 .hasSize(1);
 
         MyScrapListResponse.InfoScrapItem infoResponse =
@@ -322,6 +403,30 @@ class MyPageServiceTest {
         assertThat(newsResponse.scrappedAt())
                 .isEqualTo(newsScrappedAt);
 
+        MyScrapListResponse.PostScrapItem postResponse =
+                response.postScraps().getFirst();
+
+        assertThat(postResponse.scrapId())
+                .isEqualTo(30L);
+
+        assertThat(postResponse.postId())
+                .isEqualTo(300L);
+
+        assertThat(postResponse.boardType())
+                .isEqualTo(PostBoardType.FREE_COMMUNICATION);
+
+        assertThat(postResponse.title())
+                .isEqualTo("발달 지원 경험을 공유합니다");
+
+        assertThat(postResponse.scrapCount())
+                .isEqualTo(4);
+
+        assertThat(postResponse.createdAt())
+                .isEqualTo(postCreatedAt);
+
+        assertThat(postResponse.scrappedAt())
+                .isEqualTo(postScrappedAt);
+
         verify(userService).getCurrentUser(1L);
     }
 
@@ -342,6 +447,14 @@ class MyPageServiceTest {
                         .findAllVisibleByUserIdOrderByCreatedAtDesc(1L)
         ).willReturn(List.of());
 
+        given(
+                postScrapRepository
+                        .findAllVisibleByUserIdOrderByCreatedAtDesc(
+                                1L,
+                                PostStatus.ACTIVE
+                        )
+        ).willReturn(List.of());
+
         MyScrapListResponse response =
                 myPageService.getScraps(1L);
 
@@ -352,6 +465,9 @@ class MyPageServiceTest {
                 .isEmpty();
 
         assertThat(response.newsScraps())
+                .isEmpty();
+
+        assertThat(response.postScraps())
                 .isEmpty();
 
         verify(userService).getCurrentUser(1L);
@@ -657,6 +773,75 @@ class MyPageServiceTest {
 
         assertThat(response.comments())
                 .isEmpty();
+
+        verify(userService).getCurrentUser(1L);
+    }
+
+    @Test
+    void deleteScrapDeletesOwnedInfoScrapAndDecreasesCount() {
+        User user = mock(User.class);
+        InfoScrap scrap = mock(InfoScrap.class);
+        InfoItem infoItem = mock(InfoItem.class);
+
+        given(userService.getCurrentUser(1L))
+                .willReturn(user);
+
+        given(infoScrapRepository.findOwnedById(10L, 1L))
+                .willReturn(Optional.of(scrap));
+
+        given(scrap.getInfoItem())
+                .willReturn(infoItem);
+
+        myPageService.deleteScrap(1L, 10L, ScrapType.INFO);
+
+        verify(infoItem).updateScrapCount(-1);
+        verify(infoScrapRepository).delete(scrap);
+        verify(userService).getCurrentUser(1L);
+    }
+
+    @Test
+    void deleteScrapDeletesOwnedNewsScrapAndDecreasesCount() {
+        User user = mock(User.class);
+        NewsScrap scrap = mock(NewsScrap.class);
+        News news = mock(News.class);
+
+        given(userService.getCurrentUser(1L))
+                .willReturn(user);
+
+        given(newsScrapRepository.findOwnedById(20L, 1L))
+                .willReturn(Optional.of(scrap));
+
+        given(scrap.getNews())
+                .willReturn(news);
+
+        myPageService.deleteScrap(1L, 20L, ScrapType.NEWS);
+
+        verify(news).decreaseScrapCount();
+        verify(newsScrapRepository).delete(scrap);
+        verify(userService).getCurrentUser(1L);
+    }
+
+    @Test
+    void deleteScrapThrowsNotFoundWhenScrapIsMissingOrNotOwned() {
+        User user = mock(User.class);
+
+        given(userService.getCurrentUser(1L))
+                .willReturn(user);
+
+        given(infoScrapRepository.findOwnedById(99L, 1L))
+                .willReturn(Optional.empty());
+
+        assertThatThrownBy(
+                () -> myPageService.deleteScrap(
+                        1L,
+                        99L,
+                        ScrapType.INFO
+                )
+        ).isInstanceOfSatisfying(
+                ProjectException.class,
+                exception -> assertThat(exception.getErrorCode())
+                        .isEqualTo(GeneralErrorCode.NOT_FOUND)
+        );
 
         verify(userService).getCurrentUser(1L);
     }

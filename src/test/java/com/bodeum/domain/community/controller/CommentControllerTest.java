@@ -205,6 +205,7 @@ class CommentControllerTest {
                 commentId,
                 parentCommentId,
                 10L,
+                null,
                 true,
                 "댓글 내용",
                 false,

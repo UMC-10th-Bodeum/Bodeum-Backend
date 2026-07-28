@@ -2,21 +2,26 @@ package com.bodeum.domain.mypage.service;
 
 import com.bodeum.domain.community.entity.Comment;
 import com.bodeum.domain.community.entity.Post;
+import com.bodeum.domain.community.entity.PostScrap;
 import com.bodeum.domain.community.enums.CommentStatus;
 import com.bodeum.domain.community.enums.PostStatus;
 import com.bodeum.domain.info.entity.InfoScrap;
 import com.bodeum.domain.mypage.dto.response.MyCommentListResponse;
-import com.bodeum.domain.mypage.dto.response.MyPageProfileResponse;
-import com.bodeum.domain.mypage.dto.response.MyPageProfileResponse.ActivitySummary;
+import com.bodeum.domain.mypage.dto.response.MyPageDashboardResponse;
+import com.bodeum.domain.mypage.dto.response.MyPageDashboardResponse.ActivitySummary;
 import com.bodeum.domain.mypage.dto.response.MyPostListResponse;
 import com.bodeum.domain.mypage.dto.response.MyScrapListResponse;
+import com.bodeum.domain.mypage.entity.enums.ScrapType;
 import com.bodeum.domain.mypage.repository.MyPageCommentRepository;
 import com.bodeum.domain.mypage.repository.MyPageInfoScrapRepository;
 import com.bodeum.domain.mypage.repository.MyPageNewsScrapRepository;
 import com.bodeum.domain.mypage.repository.MyPagePostRepository;
+import com.bodeum.domain.mypage.repository.MyPagePostScrapRepository;
 import com.bodeum.domain.news.entity.NewsScrap;
 import com.bodeum.domain.user.dto.response.UserProfileResponse;
 import com.bodeum.domain.user.service.UserService;
+import com.bodeum.global.apiPayload.code.GeneralErrorCode;
+import com.bodeum.global.apiPayload.exception.ProjectException;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -31,17 +36,19 @@ public class MyPageService {
     private final UserService userService;
     private final MyPageInfoScrapRepository infoScrapRepository;
     private final MyPageNewsScrapRepository newsScrapRepository;
+    private final MyPagePostScrapRepository postScrapRepository;
     private final MyPagePostRepository postRepository;
     private final MyPageCommentRepository commentRepository;
 
     @Transactional(readOnly = true)
-    public MyPageProfileResponse getProfile(Long userId) {
+    public MyPageDashboardResponse getDashboard(Long userId) {
         UserProfileResponse profile =
                 userService.getProfile(userId);
 
         long savedInfoCount =
                 infoScrapRepository.countByUserId(userId)
-                        + newsScrapRepository.countVisibleByUserId(userId);
+                        + newsScrapRepository.countVisibleByUserId(userId)
+                        + postScrapRepository.countVisibleByUserId(userId, PostStatus.ACTIVE);
 
         long myPostCount =
                 postRepository.countVisibleByUserId(
@@ -63,7 +70,7 @@ public class MyPageService {
                         myCommentCount
                 );
 
-        return MyPageProfileResponse.of(
+        return MyPageDashboardResponse.of(
                 profile,
                 activitySummary
         );
@@ -81,10 +88,32 @@ public class MyPageService {
                 newsScrapRepository
                         .findAllVisibleByUserIdOrderByCreatedAtDesc(userId);
 
+        List<PostScrap> postScraps =
+                postScrapRepository
+                        .findAllVisibleByUserIdOrderByCreatedAtDesc(
+                                userId,
+                                PostStatus.ACTIVE
+                        );
+
         return MyScrapListResponse.of(
                 infoScraps,
-                newsScraps
+                newsScraps,
+                postScraps
         );
+    }
+
+    @Transactional
+    public void deleteScrap(
+            Long userId,
+            Long scrapId,
+            ScrapType scrapType
+    ) {
+        userService.getCurrentUser(userId);
+
+        switch (scrapType) {
+            case INFO -> deleteInfoScrap(userId, scrapId);
+            case NEWS -> deleteNewsScrap(userId, scrapId);
+        }
     }
 
     @Transactional(readOnly = true)
@@ -124,5 +153,27 @@ public class MyPageService {
                         );
 
         return MyCommentListResponse.from(comments);
+    }
+
+    private void deleteInfoScrap(Long userId, Long scrapId) {
+        InfoScrap scrap = infoScrapRepository
+                .findOwnedById(scrapId, userId)
+                .orElseThrow(MyPageService::scrapNotFound);
+
+        scrap.getInfoItem().updateScrapCount(-1);
+        infoScrapRepository.delete(scrap);
+    }
+
+    private void deleteNewsScrap(Long userId, Long scrapId) {
+        NewsScrap scrap = newsScrapRepository
+                .findOwnedById(scrapId, userId)
+                .orElseThrow(MyPageService::scrapNotFound);
+
+        scrap.getNews().decreaseScrapCount();
+        newsScrapRepository.delete(scrap);
+    }
+
+    private static ProjectException scrapNotFound() {
+        return new ProjectException(GeneralErrorCode.NOT_FOUND);
     }
 }

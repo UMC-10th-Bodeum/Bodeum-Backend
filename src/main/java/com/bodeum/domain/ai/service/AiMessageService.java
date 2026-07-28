@@ -17,9 +17,7 @@ import com.bodeum.domain.ai.service.port.AiExternalAnswerProvider;
 import com.bodeum.domain.ai.repository.AiChatRoomRepository;
 import com.bodeum.domain.ai.repository.AiSourceReviewRepository;
 import com.bodeum.domain.user.entity.User;
-import com.bodeum.domain.user.entity.UserAgreement;
 import com.bodeum.domain.user.exception.UserErrorCode;
-import com.bodeum.domain.user.repository.UserAgreementRepository;
 import com.bodeum.domain.user.repository.UserRepository;
 import com.bodeum.global.apiPayload.exception.ProjectException;
 
@@ -38,7 +36,6 @@ public class AiMessageService {
 
     private static final String NO_RESULT_MESSAGE = "관련 정보를 찾을 수 없습니다.";
     private final AiChatRoomRepository aiChatRoomRepository;
-    private final UserAgreementRepository userAgreementRepository;
     private final UserRepository userRepository;
     private final AiDocumentRetriever documentRetriever;
     private final AiAnswerGenerator answerGenerator;
@@ -50,7 +47,6 @@ public class AiMessageService {
     private final AiReferenceDocumentResolver referenceDocumentResolver;
 
     public CreateAiMessageResponse createMessage(Long userId, String content) {
-        validateAiTermsAgreement(userId);
         AiChatRoom chatRoom = aiChatRoomRepository.findByUserId(userId)
                 .orElseThrow(() -> new ProjectException(AiErrorCode.AI_CHAT_ROOM_NOT_FOUND));
         try (AiRequestGuard.Permit ignored = requestGuard.acquire(userId, chatRoom.getId())) {
@@ -275,11 +271,4 @@ public class AiMessageService {
         }
     }
 
-    private void validateAiTermsAgreement(Long userId) {
-        UserAgreement agreement = userAgreementRepository.findByUserId(userId)
-                .orElseThrow(() -> new ProjectException(UserErrorCode.USER_AGREEMENT_NOT_FOUND));
-        if (!agreement.isAiTermsAgreed()) {
-            throw new ProjectException(AiErrorCode.AI_TERMS_NOT_AGREED);
-        }
-    }
 }
