@@ -39,7 +39,8 @@ public class InfoToggleService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new InfoException(InfoErrorCode.UNAUTHORIZED));
 
-        InfoItem infoItem = infoItemRepository.findById(infoItemId)
+        // 비관적 잠금(Pessimistic Write Lock)을 적용해 카운트 동시성 이슈 방지
+        InfoItem infoItem = infoItemRepository.findByIdWithPessimisticLock(infoItemId)
                 .orElseThrow(() -> new InfoException(InfoErrorCode.INFO_ITEM_NOT_FOUND));
 
         Optional<InfoScrap> existingScrap = infoScrapRepository.findByUserAndInfoItem(user, infoItem);
@@ -67,7 +68,8 @@ public class InfoToggleService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new InfoException(InfoErrorCode.UNAUTHORIZED));
 
-        InfoReview infoReview = infoReviewRepository.findById(infoReviewId)
+        // 비관적 잠금(Pessimistic Write Lock)을 적용해 카운트 동시성 이슈 방지
+        InfoReview infoReview = infoReviewRepository.findByIdWithPessimisticLock(infoReviewId)
                 .orElseThrow(() -> new InfoException(InfoErrorCode.INFO_REVIEW_NOT_FOUND));
 
         // 1) 해당 후기가 경로의 infoItemId에 속하는지 검증
