@@ -51,7 +51,6 @@ class RedisAuthStoreIntegrationTest {
     private AuthTokenProperties properties;
 
     private RefreshTokenStore refreshTokenStore;
-    private AuthPrincipalCache principalCache;
     private AccessTokenDenylist denylist;
 
     @BeforeAll
@@ -90,7 +89,6 @@ class RedisAuthStoreIntegrationTest {
 
         refreshTokenStore = new RefreshTokenStore(
                 properties, mock(RefreshTokenSessionRepository.class), redisTemplate);
-        principalCache = new AuthPrincipalCache(properties, redisTemplate);
         denylist = new AccessTokenDenylist(properties, redisTemplate);
     }
 
@@ -275,20 +273,7 @@ class RedisAuthStoreIntegrationTest {
         assertThat(service.refresh(secondDevice.refreshToken()).refreshToken()).isNotBlank();
     }
 
-    // ---------- principal 캐시 ----------
-
-    @Test
-    void principalCache_putGetEvict_roundTrips() {
-        AuthUserPrincipal principal = new AuthUserPrincipal(7L, SocialProvider.KAKAO, "민준맘", "a@b.com");
-
-        principalCache.put("subject-7", principal);
-        assertThat(redisTemplate.getExpire("bodeum:auth:principal:subject-7"))
-                .isBetween(1L, 180L);
-        assertThat(principalCache.get("subject-7")).contains(principal);
-
-        principalCache.evict("subject-7");
-        assertThat(principalCache.get("subject-7")).isEmpty();
-    }
+    // ---------- access token denylist ----------
 
     @Test
     void denylist_blocksTokenIssuedInSameSecondAsRevocation() {
@@ -329,7 +314,7 @@ class RedisAuthStoreIntegrationTest {
     }
 
     @Test
-    void authenticate_usesCacheThenDenylistBlocksRevokedToken() {
+    void authenticate_blocksRevokedTokenBeforeUserLookup() {
         User user = mock(User.class);
         when(user.getId()).thenReturn(7L);
         when(user.getAuthSubject()).thenReturn("subject-7");
@@ -344,14 +329,12 @@ class RedisAuthStoreIntegrationTest {
         AuthTokenService service = buildAuthTokenService(userService);
         AuthTokenService.AuthTokenPair pair = service.issueTokens(7L);
 
-        // 최초 인증 → DB 조회 후 캐시 적재
         assertThat(service.authenticate(pair.accessToken()))
                 .get()
                 .extracting(AuthUserPrincipal::userId)
                 .isEqualTo(7L);
-        assertThat(redisTemplate.hasKey("bodeum:auth:principal:subject-7")).isTrue();
 
-        // 발급 이후 시각으로 폐기 → 캐시에 있어도 denylist가 먼저 차단
+        // 발급 이후 시각으로 사용자 단위 폐기 → 이후 인증은 거부된다.
         denylist.revokeAllBefore("subject-7", Instant.now().plusSeconds(2));
         assertThat(service.authenticate(pair.accessToken())).isEmpty();
     }
@@ -364,7 +347,6 @@ class RedisAuthStoreIntegrationTest {
                 new JwtTokenProvider(properties),
                 properties,
                 refreshTokenStore,
-                principalCache,
                 denylist);
     }
 

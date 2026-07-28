@@ -33,7 +33,6 @@ public class AuthTokenService {
     private final JwtTokenProvider jwtTokenProvider;
     private final AuthTokenProperties authTokenProperties;
     private final RefreshTokenStore refreshTokenStore;
-    private final AuthPrincipalCache authPrincipalCache;
     private final AccessTokenDenylist accessTokenDenylist;
 
     private final SecureRandom secureRandom = new SecureRandom();
@@ -82,7 +81,7 @@ public class AuthTokenService {
     }
 
     private Optional<AuthUserPrincipal> resolvePrincipal(ParsedClaims claims) {
-        // 폐기(로그아웃·탈퇴)된 토큰은 캐시보다 먼저 걸러낸다.
+        // 폐기(로그아웃·탈퇴)된 토큰은 사용자 조회보다 먼저 걸러낸다.
         if (accessTokenDenylist.isRevoked(
                 claims.authSubject(),
                 claims.tokenId(),
@@ -91,16 +90,9 @@ public class AuthTokenService {
             return Optional.empty();
         }
 
-        Optional<AuthUserPrincipal> cached = authPrincipalCache.get(claims.authSubject());
-        if (cached.isPresent()) {
-            return cached;
-        }
-
-        Optional<AuthUserPrincipal> principal = userService
+        return userService
                 .findActiveUserByAuthSubject(claims.authSubject())
                 .map(this::toPrincipal);
-        principal.ifPresent(p -> authPrincipalCache.put(claims.authSubject(), p));
-        return principal;
     }
 
     @Transactional

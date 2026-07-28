@@ -12,7 +12,6 @@ import com.bodeum.domain.auth.repository.AuthLoginCodeRepository;
 import com.bodeum.domain.auth.service.AccessTokenDenylist;
 import com.bodeum.domain.auth.service.RefreshTokenStore;
 import com.bodeum.domain.region.service.RegionService;
-import com.bodeum.domain.user.event.UserPrincipalChangedEvent;
 import com.bodeum.domain.user.dto.request.CreateUserAgreementRequest;
 import com.bodeum.domain.user.dto.response.UserAgreementResponse;
 import com.bodeum.domain.user.dto.response.UserHeaderResponse;
@@ -39,9 +38,6 @@ class UserServiceTest {
 
     @Mock
     private RefreshTokenStore refreshTokenStore;
-
-    @Mock
-    private org.springframework.context.ApplicationEventPublisher eventPublisher;
 
     @Mock
     private S3ImageStorage s3ImageStorage;
@@ -127,8 +123,6 @@ class UserServiceTest {
                 .revokeAllBefore(org.mockito.ArgumentMatchers.eq(previousAuthSubject), any());
         then(refreshTokenStore).should().revokeAll(1L);
         then(authLoginCodeRepository).should().deleteByUserId(1L);
-        then(eventPublisher).should()
-                .publishEvent(new UserPrincipalChangedEvent(previousAuthSubject));
     }
 
     @Test
@@ -147,7 +141,6 @@ class UserServiceTest {
 
         assertThat(user.isWithdrawn()).isFalse();
         then(refreshTokenStore).shouldHaveNoInteractions();
-        then(eventPublisher).shouldHaveNoInteractions();
     }
 
     @Test

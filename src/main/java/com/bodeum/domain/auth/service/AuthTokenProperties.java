@@ -29,10 +29,4 @@ public class AuthTokenProperties {
 
     /** Redis를 인증 임시 데이터·refresh 세션 저장소로 사용할지 여부. */
     private boolean redisEnabled;
-
-    /**
-     * 매 요청 인증 시 사용자 조회 결과(principal)를 Redis에 캐시하는 시간.
-     * DB가 원본이므로 stale을 짧게 유지하려고 기본값은 3분이다. redis-enabled=false면 무시된다.
-     */
-    private Duration principalCacheTtl = Duration.ofMinutes(3);
 }

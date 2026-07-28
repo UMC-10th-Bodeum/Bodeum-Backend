@@ -18,7 +18,6 @@ import com.bodeum.domain.user.dto.response.UserWithdrawResponse;
 import com.bodeum.domain.user.entity.User;
 import com.bodeum.domain.user.entity.UserAgreement;
 import com.bodeum.domain.user.exception.UserErrorCode;
-import com.bodeum.domain.user.event.UserPrincipalChangedEvent;
 import com.bodeum.domain.user.repository.UserAgreementRepository;
 import com.bodeum.domain.user.repository.UserRepository;
 import com.bodeum.global.apiPayload.code.GeneralErrorCode;
@@ -27,7 +26,6 @@ import com.bodeum.global.infrastructure.storage.S3ImageStorage;
 import java.time.Instant;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -48,7 +46,6 @@ public class UserService {
     private final UserProfileImageUpdater userProfileImageUpdater;
     private final RegionService regionService;
     private final UserAgreementRepository userAgreementRepository;
-    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional(readOnly = true)
     public UserProfileResponse getProfile(Long userId) {
@@ -85,9 +82,6 @@ public class UserService {
                 request.guardianType(),
                 request.communityRoleType()
         );
-
-        // nickname 등 principal 필드가 바뀌므로, 커밋 이후 인증 캐시를 무효화한다(리스너에서 처리).
-        eventPublisher.publishEvent(new UserPrincipalChangedEvent(user.getAuthSubject()));
 
         return UserProfileUpdateResponse.ofSuccess();
     }
@@ -136,10 +130,7 @@ public class UserService {
         refreshTokenStore.revokeAll(userId);
         authLoginCodeRepository.deleteByUserId(userId);
 
-        // principal 캐시는 DB 커밋 이후 제거한다. denylist가 먼저 등록되어 stale 캐시 인증을 막는다.
         // (login code는 60초 TTL이라 Redis 경로에서는 별도 정리 없이 자연 만료에 맡긴다.)
-        eventPublisher.publishEvent(new UserPrincipalChangedEvent(previousAuthSubject));
-
         return UserWithdrawResponse.ofSuccess();
     }
 

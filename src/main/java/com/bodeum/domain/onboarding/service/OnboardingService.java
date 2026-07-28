@@ -9,10 +9,8 @@ import com.bodeum.domain.onboarding.enums.OnboardingStep;
 import com.bodeum.domain.region.entity.Region;
 import com.bodeum.domain.region.service.RegionService;
 import com.bodeum.domain.user.entity.User;
-import com.bodeum.domain.user.event.UserPrincipalChangedEvent;
 import com.bodeum.domain.user.service.UserService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,7 +20,6 @@ public class OnboardingService {
 
     private final UserService userService;
     private final RegionService regionService;
-    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public OnboardingStepResponse registerChildProfile(
@@ -66,9 +63,6 @@ public class OnboardingService {
                 request.communityRoleType()
         );
         user.markRegisteredIfResolved();
-
-        // updateGuardianProfile은 principal의 nickname(User.nickname)도 갱신하므로 인증 캐시를 무효화한다.
-        eventPublisher.publishEvent(new UserPrincipalChangedEvent(user.getAuthSubject()));
 
         return OnboardingStepResponse.of(OnboardingStep.GUARDIAN_PROFILE, user.isOnboardingCompleted());
     }
