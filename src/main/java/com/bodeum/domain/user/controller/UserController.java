@@ -1,7 +1,7 @@
 package com.bodeum.domain.user.controller;
 
 import com.bodeum.domain.mypage.dto.response.MyCommentListResponse;
-import com.bodeum.domain.mypage.dto.response.MyPageProfileResponse;
+import com.bodeum.domain.mypage.dto.response.MyPageDashboardResponse;
 import com.bodeum.domain.mypage.dto.response.MyPostListResponse;
 import com.bodeum.domain.mypage.dto.response.MyScrapListResponse;
 import com.bodeum.domain.mypage.entity.enums.ScrapType;
@@ -16,6 +16,7 @@ import com.bodeum.domain.user.dto.response.UserHeaderResponse;
 import com.bodeum.domain.user.dto.response.UserProfileResponse;
 import com.bodeum.domain.user.dto.response.UserProfileUpdateResponse;
 import com.bodeum.domain.user.dto.response.UserWithdrawResponse;
+import com.bodeum.domain.user.service.AccountWithdrawalService;
 import com.bodeum.domain.user.service.UserService;
 import com.bodeum.global.apiPayload.ApiResponse;
 import com.bodeum.global.apiPayload.code.GeneralSuccessCode;
@@ -50,6 +51,7 @@ import org.springframework.web.multipart.MultipartFile;
 public class UserController {
 
     private final UserService userService;
+    private final AccountWithdrawalService accountWithdrawalService;
     private final OnboardingService onboardingService;
     private final MyPageService myPageService;
 
@@ -70,24 +72,24 @@ public class UserController {
     }
 
     @Operation(
-            summary = "내 프로필 대시보드 조회",
-            description = "현재 로그인한 사용자의 상세 프로필과 저장한 정보, "
-                    + "작성 게시글, 작성 댓글 수를 조회한다."
+            summary = "마이페이지 대시보드 조회",
+            description = "현재 로그인한 사용자의 기본 프로필과 포인트, 등급, "
+                    + "저장한 정보, 작성 게시글, 작성 댓글 수를 조회한다."
     )
-    @GetMapping("/me/profile")
-    public ApiResponse<MyPageProfileResponse> getProfile(
+    @GetMapping("/me/dashboard")
+    public ApiResponse<MyPageDashboardResponse> getDashboard(
             @LoginUser Long userId
     ) {
         return ApiResponse.of(
                 GeneralSuccessCode.OK,
-                myPageService.getProfile(userId)
+                myPageService.getDashboard(userId)
         );
     }
 
     @Operation(
             summary = "저장한 정보 목록 조회",
-            description = "현재 로그인한 사용자가 저장한 복지·시설 정보와 "
-                    + "뉴스·활동 정보를 최신 저장순으로 조회한다."
+            description = "현재 로그인한 사용자가 저장한 복지·시설 정보, "
+                    + "뉴스·활동 정보와 커뮤니티 게시글을 최신 저장순으로 조회한다."
     )
     @GetMapping("/me/scraps")
     public ApiResponse<MyScrapListResponse> getScraps(
@@ -220,7 +222,7 @@ public class UserController {
     public ApiResponse<UserWithdrawResponse> withdraw(
             @LoginUser Long userId
     ) {
-        return ApiResponse.of(GeneralSuccessCode.OK, userService.withdraw(userId));
+        return ApiResponse.of(GeneralSuccessCode.OK, accountWithdrawalService.withdraw(userId));
     }
 
     @Operation(

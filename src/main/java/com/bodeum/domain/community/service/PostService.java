@@ -23,6 +23,7 @@ import com.bodeum.domain.community.repository.PostImageRepository;
 import com.bodeum.domain.community.repository.PostLikeRepository;
 import com.bodeum.domain.community.repository.PostRepository;
 import com.bodeum.domain.community.repository.PostScrapRepository;
+import com.bodeum.domain.user.repository.UserRepository;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -41,6 +42,7 @@ public class PostService {
     private final PostDisabilityTagRepository postDisabilityTagRepository;
     private final PostLikeRepository postLikeRepository;
     private final PostScrapRepository postScrapRepository;
+    private final UserRepository userRepository;
 
     @Transactional
     public PostResponse createPost(Long userId, CreatePostRequest request) {
@@ -153,6 +155,16 @@ public class PostService {
         return new PostScrapResponse(false, post.getScrapCount());
     }
 
+    // 회원 탈퇴 시: 해당 회원의 게시글 스크랩·좋아요를 삭제하고 각 게시글의 scrapCount·likeCount를 감소시킨다.
+    // 게시글 본문은 보존 대상이므로 삭제하지 않는다. 카운트 감소를 삭제보다 먼저 수행한다.
+    @Transactional
+    public void deleteUserScrapsAndLikes(Long userId) {
+        postScrapRepository.decreaseScrapCountForUserScraps(userId);
+        postScrapRepository.deleteByUserId(userId);
+        postLikeRepository.decreaseLikeCountForUserLikes(userId);
+        postLikeRepository.deleteByUserId(userId);
+    }
+
     private Post getOwnedPost(Long userId, Long postId) {
         validateAuthenticatedUser(userId);
         Post post = findPostForUpdate(postId);
@@ -191,8 +203,12 @@ public class PostService {
                 .stream()
                 .map(PostImage::getImageUrl)
                 .toList();
+        boolean authorWithdrawn = !userRepository
+                .findWithdrawnUserIdsByIdIn(List.of(post.getUserId()))
+                .isEmpty();
 
-        return PostResponse.of(post, viewerId, liked, scrapped, disabilityTypes, hashtags, imageUrls);
+        return PostResponse.of(post, viewerId, liked, scrapped, authorWithdrawn,
+                disabilityTypes, hashtags, imageUrls);
     }
 
     private void replaceDisabilityTags(Post post, List<DisabilityType> disabilityTypes) {
