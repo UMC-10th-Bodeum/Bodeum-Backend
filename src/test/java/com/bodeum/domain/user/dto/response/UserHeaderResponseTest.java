@@ -33,13 +33,22 @@ class UserHeaderResponseTest {
     @Test
     void newUserStartsAtLevelOneSprout() {
         // 신규 가입자는 포인트 0 → Level 1 새싹
-        UserHeaderResponse response = UserHeaderResponse.from(newUser());
+        UserHeaderResponse response = UserHeaderResponse.from(newUser(), 0);
 
         assertThat(response.isLoggedIn()).isTrue();
         assertThat(response.onboardingCompleted()).isFalse();
         assertThat(response.nickname()).isEqualTo("민준맘");
         assertThat(response.level()).isEqualTo(1);
         assertThat(response.badgeName()).isEqualTo("새싹");
+    }
+
+    @Test
+    void mapsInjectedTotalPointToLevel() {
+        // 레벨/뱃지는 주입된 총점 기준으로 계산된다 (230 → Level 3 꽃)
+        UserHeaderResponse response = UserHeaderResponse.from(newUser(), 230);
+
+        assertThat(response.level()).isEqualTo(3);
+        assertThat(response.badgeName()).isEqualTo("꽃");
     }
 
     @Test
@@ -61,7 +70,7 @@ class UserHeaderResponseTest {
                 CommunityRoleType.INFO_SEEKER
         );
 
-        UserHeaderResponse response = UserHeaderResponse.from(user);
+        UserHeaderResponse response = UserHeaderResponse.from(user, 0);
 
         assertThat(response.onboardingCompleted()).isTrue();
     }
@@ -71,12 +80,12 @@ class UserHeaderResponseTest {
         User user = newUser();
         user.updateInterestRegion(Collections.emptyList(), Region.create("서울특별시", "강남구"));
 
-        assertThat(UserHeaderResponse.from(user).region()).isEqualTo("서울특별시 강남구");
+        assertThat(UserHeaderResponse.from(user, 0).region()).isEqualTo("서울특별시 강남구");
     }
 
     @Test
     void regionIsNullWhenNotRegistered() {
-        assertThat(UserHeaderResponse.from(newUser()).region()).isNull();
+        assertThat(UserHeaderResponse.from(newUser(), 0).region()).isNull();
     }
 
     @Test
@@ -91,7 +100,7 @@ class UserHeaderResponseTest {
                 null
         );
 
-        UserHeaderResponse response = UserHeaderResponse.from(user);
+        UserHeaderResponse response = UserHeaderResponse.from(user, 0);
 
         assertThat(response.childAge()).isEqualTo(5);
         assertThat(response.childDisabilityTypes())
@@ -112,12 +121,12 @@ class UserHeaderResponseTest {
 
         // 12월생: 아직 12월 전이면 생일 전이므로 한 살 적게 계산된다.
         int expected = now.getMonthValue() < 12 ? 2 : 3;
-        assertThat(UserHeaderResponse.from(user).childAge()).isEqualTo(expected);
+        assertThat(UserHeaderResponse.from(user, 0).childAge()).isEqualTo(expected);
     }
 
     @Test
     void childAgeIsNullWhenBirthYearMissing() {
-        assertThat(UserHeaderResponse.from(newUser()).childAge()).isNull();
+        assertThat(UserHeaderResponse.from(newUser(), 0).childAge()).isNull();
     }
 
     private User newUser() {

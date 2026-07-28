@@ -15,6 +15,7 @@ import com.bodeum.domain.community.exception.CommunityException;
 import com.bodeum.domain.community.repository.CommentLikeRepository;
 import com.bodeum.domain.community.repository.CommentRepository;
 import com.bodeum.domain.community.repository.PostRepository;
+import com.bodeum.domain.user.repository.UserRepository;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -39,6 +40,7 @@ public class CommentService {
     private final CommentRepository commentRepository;
     private final CommentLikeRepository commentLikeRepository;
     private final PostRepository postRepository;
+    private final UserRepository userRepository;
 
     @Transactional
     public CommentResponse createComment(Long userId, Long postId, CreateCommentRequest request) {
@@ -66,10 +68,11 @@ public class CommentService {
                 CommentStatus.ACTIVE
         );
         Set<Long> likedCommentIds = findLikedCommentIds(userId, comments);
+        Set<Long> withdrawnAuthorIds = findWithdrawnAuthorIds(comments);
 
         return new CommentListResponse(
                 post.getCommentCount(),
-                buildCommentTree(comments, userId, likedCommentIds)
+                buildCommentTree(comments, userId, likedCommentIds, withdrawnAuthorIds)
         );
     }
 
@@ -121,6 +124,14 @@ public class CommentService {
         return new CommentLikeResponse(false, comment.getLikeCount());
     }
 
+    // 회원 탈퇴 시: 해당 회원의 댓글·답글 공감을 삭제하고 각 댓글의 likeCount를 감소시킨다.
+    // 댓글·답글 본문은 보존 대상이므로 삭제하지 않는다. 카운트 감소를 삭제보다 먼저 수행한다.
+    @Transactional
+    public void deleteUserCommentLikes(Long userId) {
+        commentLikeRepository.decreaseLikeCountForUserLikes(userId);
+        commentLikeRepository.deleteByUserId(userId);
+    }
+
     private Comment getOwnedActiveCommentForUpdate(Long userId, Long commentId) {
         validateAuthenticatedUser(userId);
         Comment comment = findActiveCommentForUpdate(commentId);
@@ -170,10 +181,23 @@ public class CommentService {
         return new HashSet<>(commentLikeRepository.findLikedCommentIds(userId, activeCommentIds));
     }
 
+    // 보존된 댓글·답글의 작성자 익명화용. 페이지 내 distinct 작성자 id를 배치 조회해 탈퇴 회원 집합만 판정한다(N+1 방지).
+    private Set<Long> findWithdrawnAuthorIds(List<Comment> comments) {
+        Set<Long> authorIds = comments.stream()
+                .map(Comment::getUserId)
+                .collect(Collectors.toSet());
+        if (authorIds.isEmpty()) {
+            return Set.of();
+        }
+
+        return new HashSet<>(userRepository.findWithdrawnUserIdsByIdIn(authorIds));
+    }
+
     private List<CommentResponse> buildCommentTree(
             List<Comment> comments,
             Long viewerId,
-            Set<Long> likedCommentIds
+            Set<Long> likedCommentIds,
+            Set<Long> withdrawnAuthorIds
     ) {
         List<Comment> orderedComments = comments.stream()
                 .sorted(Comparator.comparing(Comment::getId))
@@ -193,6 +217,7 @@ public class CommentService {
                     visibleParentId,
                     viewerId,
                     likedCommentIds.contains(comment.getId()),
+                    withdrawnAuthorIds.contains(comment.getUserId()),
                     replies
             );
 

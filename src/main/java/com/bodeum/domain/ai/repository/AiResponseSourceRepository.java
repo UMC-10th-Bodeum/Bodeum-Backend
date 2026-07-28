@@ -3,6 +3,7 @@ package com.bodeum.domain.ai.repository;
 import com.bodeum.domain.ai.entity.AiResponseSource;
 import com.bodeum.domain.ai.repository.projection.AiResponseSourceProjection;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -24,4 +25,11 @@ public interface AiResponseSourceRepository extends JpaRepository<AiResponseSour
     List<AiResponseSourceProjection> findAllByMessageIds(
             @Param("messageIds") List<Long> messageIds
     );
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("""
+            delete from AiResponseSource source
+             where source.aiMessage.chatRoom.user.id = :userId
+            """)
+    int deleteByUserId(@Param("userId") Long userId);
 }

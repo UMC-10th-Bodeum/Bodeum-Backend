@@ -29,8 +29,6 @@ import com.bodeum.domain.ai.repository.AiChatRoomRepository;
 import com.bodeum.domain.ai.repository.AiSourceReviewRepository;
 import com.bodeum.domain.auth.enums.SocialProvider;
 import com.bodeum.domain.user.entity.User;
-import com.bodeum.domain.user.entity.UserAgreement;
-import com.bodeum.domain.user.repository.UserAgreementRepository;
 import com.bodeum.domain.user.repository.UserRepository;
 import com.bodeum.global.apiPayload.exception.ProjectException;
 import java.time.Instant;
@@ -46,7 +44,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class AiMessageServiceTest {
 
     @Mock AiChatRoomRepository aiChatRoomRepository;
-    @Mock UserAgreementRepository userAgreementRepository;
     @Mock UserRepository userRepository;
     @Mock AiDocumentRetriever documentRetriever;
     @Mock AiAnswerGenerator answerGenerator;
@@ -64,14 +61,12 @@ class AiMessageServiceTest {
     @BeforeEach
     void setUp() {
         service = new AiMessageService(
-                aiChatRoomRepository, userAgreementRepository, userRepository,
+                aiChatRoomRepository, userRepository,
                 documentRetriever, answerGenerator, externalAnswerProvider,
                 persistenceService, failureService, aiSourceReviewRepository, requestGuard,
                 referenceDocumentResolver);
         user = User.createSocialUser(SocialProvider.KAKAO, "provider-id", "a@b.com", "보호자");
         chatRoom = AiChatRoom.create(user);
-        lenient().when(userAgreementRepository.findByUserId(1L))
-                .thenReturn(Optional.of(UserAgreement.create(user, true, true, true)));
         lenient().when(aiChatRoomRepository.findByUserId(1L)).thenReturn(Optional.of(chatRoom));
         lenient().when(userRepository.findAiProfileById(1L)).thenReturn(Optional.of(user));
         lenient().when(userRepository.findAiDisabilityProfileById(1L))
@@ -84,19 +79,6 @@ class AiMessageServiceTest {
         lenient().when(userMessage.getId()).thenReturn(11L);
         lenient().when(persistenceService.saveProcessingUserMessage(eq(chatRoom), any()))
                 .thenReturn(userMessage);
-    }
-
-    @Test
-    void rejectsQuestionWhenAiTermsAreNotAgreed() {
-        when(userAgreementRepository.findByUserId(1L))
-                .thenReturn(Optional.of(UserAgreement.create(user, true, true, false)));
-
-        assertThatThrownBy(() -> service.createMessage(1L, "복지 센터 알려줘"))
-                .isInstanceOf(ProjectException.class)
-                .extracting(exception -> ((ProjectException) exception).getErrorCode())
-                .isEqualTo(AiErrorCode.AI_TERMS_NOT_AGREED);
-
-        verify(documentRetriever, never()).retrieve(any(), any());
     }
 
     @Test

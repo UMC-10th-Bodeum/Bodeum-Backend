@@ -4,22 +4,25 @@ import com.bodeum.domain.info.dto.request.InfoItemSearchCondition;
 import com.bodeum.domain.info.dto.response.InfoItemDetailResponse;
 import com.bodeum.domain.info.dto.response.InfoItemPageResponse;
 import com.bodeum.domain.info.dto.response.InfoItemResponse;
+import com.bodeum.domain.info.dto.response.InfoItemShareResponse;
 import com.bodeum.domain.info.entity.InfoCategory;
 import com.bodeum.domain.info.entity.InfoItem;
 import com.bodeum.domain.info.entity.enums.MainCategory;
+import com.bodeum.domain.info.exception.InfoErrorCode;
+import com.bodeum.domain.info.exception.InfoException;
 import com.bodeum.domain.info.repository.InfoCategoryRepository;
 import com.bodeum.domain.info.repository.InfoItemRepository;
 import com.bodeum.domain.region.entity.Region;
 import com.bodeum.domain.user.entity.User;
 import com.bodeum.domain.user.repository.UserRepository;
-import com.bodeum.global.apiPayload.code.GeneralErrorCode;
-import com.bodeum.global.apiPayload.exception.ProjectException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
+import org.springframework.web.util.UriComponentsBuilder;
 
 import java.util.List;
 
@@ -32,6 +35,9 @@ public class InfoItemQueryService {
     private final InfoCategoryRepository infoCategoryRepository;
     private final UserRepository userRepository;
 
+    @Value("${bodeum.share.base-url}")
+    private String shareBaseUrl;
+
     /**
      * 1. 메인 정보 목록 조회 / 검색 API
      */
@@ -40,7 +46,6 @@ public class InfoItemQueryService {
             InfoItemSearchCondition condition,
             Pageable pageable
     ) {
-        // regionLevel1 조건이 들어오지 않고, 로그인한 유저인 경우 기본 지역 세팅
         if (!StringUtils.hasText(condition.regionLevel1()) && userId != null) {
             User loginUser = userRepository.findById(userId).orElse(null);
 
@@ -56,7 +61,6 @@ public class InfoItemQueryService {
         Page<InfoItem> infoItems = infoItemRepository.searchInfoItems(condition, pageable);
         Page<InfoItemResponse> itemResponses = infoItems.map(InfoItemResponse::from);
 
-// --- 선택된 카테고리 정보 메타데이터 구성 ---
         MainCategory selectedMainCategory = condition.category();
         String selectedMainCategoryKo = null;
         Long selectedSubCategoryId = condition.subCategory();
@@ -88,23 +92,34 @@ public class InfoItemQueryService {
     }
 
     /**
-     * 2. 정보 상세 조회 API (스크랩 기능은 차후 구현 예정)
+     * 2. 정보 상세 조회 API
      */
     @Transactional
     public InfoItemDetailResponse getInfoItemDetail(Long userId, Long infoItemId) {
-        // 1) 정보 아이템 조회 (없으면 404 예외)
         InfoItem infoItem = infoItemRepository.findById(infoItemId)
-                .orElseThrow(() -> new ProjectException(GeneralErrorCode.NOT_FOUND));
+                .orElseThrow(() -> new InfoException(InfoErrorCode.INFO_ITEM_NOT_FOUND));
 
-        // 2) 조회수 1 증가
         infoItem.incrementViewCount();
-
-        // 3) 스크랩 여부 (차후 구현 시 실제 스크랩 레포지토리 조회로 변경 예정)
         boolean isScrapped = false;
-
-        // 4) 요일별 운영시간 매핑 (기본 빈 리스트 전달)
         List<InfoItemDetailResponse.BusinessHourDto> businessHours = List.of();
 
         return InfoItemDetailResponse.of(infoItem, isScrapped, businessHours);
+    }
+
+    /**
+     * 3. 정보 공유 링크 조회 API
+     */
+    public InfoItemShareResponse getInfoItemShareUrl(Long infoItemId) {
+        // 1) 공유 전용 예외 처리
+        InfoItem infoItem = infoItemRepository.findById(infoItemId)
+                .orElseThrow(() -> new InfoException(InfoErrorCode.INFO_SHARE_LINK_NOT_FOUND));
+
+        // 2) UriComponentsBuilder로 URL 정규화 (fromUriString 사용)
+        String shareUrl = UriComponentsBuilder.fromUriString(shareBaseUrl)
+                .pathSegment("info", String.valueOf(infoItem.getId()))
+                .build()
+                .toUriString();
+
+        return InfoItemShareResponse.of(infoItem.getId(), shareUrl);
     }
 }

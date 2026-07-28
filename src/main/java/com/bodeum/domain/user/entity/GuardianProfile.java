@@ -43,9 +43,6 @@ public class GuardianProfile {
     @Column(name = "community_role_type", length = 50)
     private CommunityRoleType communityRoleType;
 
-    @Column(nullable = false)
-    private int point;
-
     protected GuardianProfile() {
     }
 
@@ -117,9 +114,5 @@ public class GuardianProfile {
 
     public CommunityRoleType getCommunityRoleType() {
         return communityRoleType;
-    }
-
-    public int getPoint() {
-        return point;
     }
 }

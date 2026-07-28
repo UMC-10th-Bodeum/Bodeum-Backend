@@ -8,7 +8,9 @@ import com.bodeum.domain.community.enums.PostStatus;
 import com.bodeum.domain.community.repository.PostDisabilityTagRepository;
 import com.bodeum.domain.home.dto.response.*;
 import com.bodeum.domain.home.repository.*;
+import com.bodeum.domain.news.entity.News;
 import com.bodeum.domain.news.entity.NewsType;
+import com.bodeum.domain.news.entity.RecruitmentStatus;
 import com.bodeum.domain.region.entity.Region;
 import com.bodeum.domain.user.entity.User;
 import com.bodeum.domain.user.enums.InterestCategory;
@@ -19,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
@@ -141,6 +144,20 @@ public class HomeService {
                 .stream()
                 .map(NewsPreviewResponse::from)
                 .toList();
+    }
+
+    public Optional<BannerResponse> getBanner(Long userId) {
+        if (userId != null) {
+            List<News> result = homeNewsRepository.findBannerForUser(
+                    userId, RecruitmentStatus.CLOSED, PageRequest.of(0, 1));
+            if (!result.isEmpty()) {
+                return Optional.of(BannerResponse.from(result.get(0)));
+            }
+        }
+        return homeNewsRepository.findBannerForAnonymous(RecruitmentStatus.CLOSED, PageRequest.of(0, 1))
+                .stream()
+                .findFirst()
+                .map(BannerResponse::from);
     }
 
     public CategoryCountResponse getInfoItemCounts() {
