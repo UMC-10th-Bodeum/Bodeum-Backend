@@ -5,6 +5,7 @@ import com.bodeum.domain.auth.exception.AuthErrorCode;
 import com.bodeum.domain.auth.repository.AuthLoginCodeRepository;
 import com.bodeum.domain.auth.service.AccessTokenDenylist;
 import com.bodeum.domain.auth.service.RefreshTokenStore;
+import com.bodeum.domain.point.service.PointService;
 import com.bodeum.domain.region.entity.Region;
 import com.bodeum.domain.region.service.RegionService;
 import com.bodeum.domain.user.dto.request.CreateUserAgreementRequest;
@@ -46,10 +47,11 @@ public class UserService {
     private final UserProfileImageUpdater userProfileImageUpdater;
     private final RegionService regionService;
     private final UserAgreementRepository userAgreementRepository;
+    private final PointService pointService;
 
     @Transactional(readOnly = true)
     public UserProfileResponse getProfile(Long userId) {
-        return UserProfileResponse.from(getCurrentUser(userId));
+        return UserProfileResponse.from(getCurrentUser(userId), pointService.getTotalPoint(userId));
     }
 
     /**
@@ -63,7 +65,7 @@ public class UserService {
         }
 
         return findActiveUser(userId)
-                .map(UserHeaderResponse::from)
+                .map(user -> UserHeaderResponse.from(user, pointService.getTotalPoint(userId)))
                 .orElseGet(UserHeaderResponse::loggedOut);
     }
 

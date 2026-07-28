@@ -4,6 +4,7 @@ import com.bodeum.domain.onboarding.enums.CommunityRoleType;
 import com.bodeum.domain.onboarding.enums.GuardianType;
 import com.bodeum.domain.region.entity.Region;
 import com.bodeum.domain.user.entity.User;
+import com.bodeum.domain.user.enums.GuardianLevel;
 import java.util.List;
 
 public record UserProfileResponse(
@@ -25,16 +26,17 @@ public record UserProfileResponse(
         CommunityRoleType communityRoleType
 ) {
 
-    public static UserProfileResponse from(User user) {
+    public static UserProfileResponse from(User user, int totalPoint) {
         Region region = user.getRegion();
+        GuardianLevel level = GuardianLevel.from(totalPoint);
         return new UserProfileResponse(
                 user.getId(),
                 user.getNickname(),
                 user.getProfileImageUrl(),
-                user.getPoint(),
-                user.getGuardianLevel().getLevelNumber(),
-                user.getGuardianLevel().getBadgeName(),
-                user.getGuardianLevel().getDescription(),
+                totalPoint,
+                level.getLevelNumber(),
+                level.getBadgeName(),
+                level.getDescription(),
                 ChildProfile.from(user),
                 user.getKeywordText(),
                 user.getInterestCategories().stream()

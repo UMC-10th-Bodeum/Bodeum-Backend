@@ -48,6 +48,7 @@ public class SecurityConfig {
             "/api/v1/community/posts/recommended",
             "/api/v1/home/news/preview",
             "/api/v1/info-items/counts",
+            "/api/v1/home/banner",
             // 검색 API
             "/api/v1/search",
 
@@ -71,7 +72,12 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(requests -> requests
                         .requestMatchers(allowUris).permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/v1/news", "/api/v1/news/*").permitAll()
+                        .requestMatchers(
+                                HttpMethod.GET,
+                                "/api/v1/news",
+                                "/api/v1/news/*",
+                                "/api/v1/news/*/related"
+                        ).permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/community/posts/*/comments").permitAll()
                         .anyRequest().authenticated()
                 )

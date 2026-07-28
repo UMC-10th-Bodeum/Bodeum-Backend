@@ -11,6 +11,7 @@ import com.bodeum.domain.auth.exception.AuthErrorCode;
 import com.bodeum.domain.auth.repository.AuthLoginCodeRepository;
 import com.bodeum.domain.auth.service.AccessTokenDenylist;
 import com.bodeum.domain.auth.service.RefreshTokenStore;
+import com.bodeum.domain.point.service.PointService;
 import com.bodeum.domain.region.service.RegionService;
 import com.bodeum.domain.user.dto.request.CreateUserAgreementRequest;
 import com.bodeum.domain.user.dto.response.UserAgreementResponse;
@@ -54,6 +55,9 @@ class UserServiceTest {
     @Mock
     private AccessTokenDenylist accessTokenDenylist;
 
+    @Mock
+    private PointService pointService;
+
     @InjectMocks
     private UserService userService;
 
@@ -70,6 +74,7 @@ class UserServiceTest {
         User user = User.createSocialUser(
                 SocialProvider.KAKAO, "kakao-1", "parent@example.com", "민준맘");
         given(userRepository.findById(1L)).willReturn(Optional.of(user));
+        given(pointService.getTotalPoint(1L)).willReturn(0);
 
         UserHeaderResponse response = userService.getHeaderInfo(1L);
 

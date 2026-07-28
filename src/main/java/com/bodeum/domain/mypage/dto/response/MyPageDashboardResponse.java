@@ -6,7 +6,7 @@ import com.bodeum.domain.user.dto.response.CodeLabelResponse;
 import com.bodeum.domain.user.dto.response.UserProfileResponse;
 import java.util.List;
 
-public record MyPageProfileResponse(
+public record MyPageDashboardResponse(
         Long userId,
         String nickname,
         String profileImageUrl,
@@ -26,11 +26,11 @@ public record MyPageProfileResponse(
         ActivitySummary activitySummary
 ) {
 
-    public static MyPageProfileResponse of(
+    public static MyPageDashboardResponse of(
             UserProfileResponse profile,
             ActivitySummary activitySummary
     ) {
-        return new MyPageProfileResponse(
+        return new MyPageDashboardResponse(
                 profile.userId(),
                 profile.nickname(),
                 profile.profileImageUrl(),

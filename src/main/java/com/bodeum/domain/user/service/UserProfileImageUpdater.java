@@ -1,6 +1,7 @@
 package com.bodeum.domain.user.service;
 
 import com.bodeum.domain.auth.exception.AuthErrorCode;
+import com.bodeum.domain.point.service.PointService;
 import com.bodeum.domain.user.dto.response.UserProfileResponse;
 import com.bodeum.domain.user.entity.User;
 import com.bodeum.domain.user.repository.UserRepository;
@@ -15,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class UserProfileImageUpdater {
 
     private final UserRepository userRepository;
+    private final PointService pointService;
 
     @Transactional
     public UserProfileResponse updateProfileImage(Long userId, String imageUrl) {
@@ -30,6 +32,6 @@ public class UserProfileImageUpdater {
 
         user.updateProfileImage(imageUrl);
 
-        return UserProfileResponse.from(user);
+        return UserProfileResponse.from(user, pointService.getTotalPoint(userId));
     }
 }
