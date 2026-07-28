@@ -3,7 +3,10 @@ package com.bodeum.domain.auth.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assumptions.assumeThat;
+import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.bodeum.domain.auth.enums.SocialProvider;
@@ -329,14 +332,19 @@ class RedisAuthStoreIntegrationTest {
         AuthTokenService service = buildAuthTokenService(userService);
         AuthTokenService.AuthTokenPair pair = service.issueTokens(7L);
 
+        // 폐기 전에는 사용자 조회로 principal을 만든다.
         assertThat(service.authenticate(pair.accessToken()))
                 .get()
                 .extracting(AuthUserPrincipal::userId)
                 .isEqualTo(7L);
+        verify(userService).findActiveUserByAuthSubject("subject-7");
 
-        // 발급 이후 시각으로 사용자 단위 폐기 → 이후 인증은 거부된다.
+        // 발급 이후 시각으로 사용자 단위 폐기 → 인증이 거부되고, DB 조회까지 가지 않는다.
+        clearInvocations(userService);
         denylist.revokeAllBefore("subject-7", Instant.now().plusSeconds(2));
+
         assertThat(service.authenticate(pair.accessToken())).isEmpty();
+        verify(userService, never()).findActiveUserByAuthSubject("subject-7");
     }
 
     // ---------- helpers ----------
