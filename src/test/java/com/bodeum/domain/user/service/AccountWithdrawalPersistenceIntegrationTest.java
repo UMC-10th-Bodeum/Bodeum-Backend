@@ -26,6 +26,10 @@ import com.bodeum.domain.news.entity.NewsType;
 import com.bodeum.domain.news.repository.NewsScrapRepository;
 import com.bodeum.domain.onboarding.enums.CommunityRoleType;
 import com.bodeum.domain.onboarding.enums.GuardianType;
+import com.bodeum.domain.point.entity.GuardianPoint;
+import com.bodeum.domain.point.entity.GuardianPointHistory;
+import com.bodeum.domain.point.enums.PointType;
+import com.bodeum.domain.point.service.PointService;
 import com.bodeum.domain.search.entity.SearchLog;
 import com.bodeum.domain.search.enums.SearchType;
 import com.bodeum.domain.search.repository.SearchLogRepository;
@@ -37,6 +41,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
@@ -51,13 +56,15 @@ import org.springframework.test.util.ReflectionTestUtils;
  */
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import({QueryDslConfig.class, JpaAuditingConfig.class})
+@Import({QueryDslConfig.class, JpaAuditingConfig.class, PointService.class})
 class AccountWithdrawalPersistenceIntegrationTest {
 
     @Autowired
     private TestEntityManager em;
     @Autowired
     private UserRepository userRepository;
+    @Autowired
+    private PointService pointService;
     @Autowired
     private SearchLogRepository searchLogRepository;
     @Autowired
@@ -229,12 +236,10 @@ class AccountWithdrawalPersistenceIntegrationTest {
     }
 
     @Test
-    @DisplayName("포인트: 탈퇴 시 guardianProfile(포인트) 행이 orphanRemoval로 삭제된다")
-    void withdrawalRemovesGuardianProfilePoint() {
+    @DisplayName("보호자 프로필: 탈퇴 시 guardianProfile 행이 orphanRemoval로 삭제된다")
+    void withdrawalRemovesGuardianProfile() {
         User user = persistUser("kakao-1");
         user.updateGuardianProfile("보호자", GuardianType.PARENT, CommunityRoleType.INFO_SEEKER);
-        Object guardianProfile = ReflectionTestUtils.getField(user, "guardianProfile");
-        ReflectionTestUtils.setField(guardianProfile, "point", 100);
         Long userId = user.getId();
         em.flush();
         em.clear();
@@ -245,8 +250,34 @@ class AccountWithdrawalPersistenceIntegrationTest {
         em.flush();
         em.clear();
 
-        assertThat(countGuardianProfiles()).isZero();                       // 포인트 행 제거
+        assertThat(countGuardianProfiles()).isZero();
         assertThat(em.find(User.class, userId)).isNotNull();                // User 행은 묘비로 유지
+    }
+
+    @Test
+    @DisplayName("포인트: 탈퇴 시 guardian_point와 적립 내역이 삭제된다")
+    void withdrawalDeletesGuardianPointAndHistory() {
+        // 포인트는 GuardianPoint로 분리돼 guardianProfile orphanRemoval로 지워지지 않으므로
+        // PointService가 명시적으로 삭제한다(#176).
+        User user = persistUser("kakao-1");
+        user.updateGuardianProfile("보호자", GuardianType.PARENT, CommunityRoleType.INFO_SEEKER);
+        Long userId = user.getId();
+        em.flush();
+
+        Long guardianProfileId = (Long) ReflectionTestUtils.getField(
+                ReflectionTestUtils.getField(user, "guardianProfile"), "id");
+        persistGuardianPointWithHistory(guardianProfileId);
+        em.flush();
+        em.clear();
+        assertThat(countGuardianPoints()).isEqualTo(1L);
+        assertThat(countGuardianPointHistories()).isEqualTo(1L);
+
+        pointService.deleteUserPoints(userId);
+        em.flush();
+        em.clear();
+
+        assertThat(countGuardianPointHistories()).isZero();
+        assertThat(countGuardianPoints()).isZero();
     }
 
     // --- seeding helpers ---
@@ -301,6 +332,32 @@ class AccountWithdrawalPersistenceIntegrationTest {
     private long countGuardianProfiles() {
         return em.getEntityManager()
                 .createQuery("SELECT COUNT(g) FROM GuardianProfile g", Long.class)
+                .getSingleResult();
+    }
+
+    // GuardianPoint·GuardianPointHistory는 공개 생성자·정적 팩토리가 없어 리플렉션으로 시드한다.
+    private void persistGuardianPointWithHistory(Long guardianProfileId) {
+        GuardianPoint guardianPoint = BeanUtils.instantiateClass(GuardianPoint.class);
+        ReflectionTestUtils.setField(guardianPoint, "guardianProfileId", guardianProfileId);
+        ReflectionTestUtils.setField(guardianPoint, "totalPoint", 100);
+        em.persist(guardianPoint);
+
+        GuardianPointHistory history = BeanUtils.instantiateClass(GuardianPointHistory.class);
+        ReflectionTestUtils.setField(history, "guardianPoint", guardianPoint);
+        ReflectionTestUtils.setField(history, "pointType", PointType.POST_CREATED);
+        ReflectionTestUtils.setField(history, "pointValue", 100);
+        em.persist(history);
+    }
+
+    private long countGuardianPoints() {
+        return em.getEntityManager()
+                .createQuery("SELECT COUNT(p) FROM GuardianPoint p", Long.class)
+                .getSingleResult();
+    }
+
+    private long countGuardianPointHistories() {
+        return em.getEntityManager()
+                .createQuery("SELECT COUNT(h) FROM GuardianPointHistory h", Long.class)
                 .getSingleResult();
     }
 

@@ -11,6 +11,7 @@ import com.bodeum.domain.community.service.CommentService;
 import com.bodeum.domain.community.service.PostService;
 import com.bodeum.domain.info.service.InfoScrapService;
 import com.bodeum.domain.news.service.NewsScrapService;
+import com.bodeum.domain.point.service.PointService;
 import com.bodeum.domain.search.service.SearchService;
 import com.bodeum.domain.user.dto.response.UserWithdrawResponse;
 import com.bodeum.domain.user.entity.User;
@@ -20,8 +21,10 @@ import com.bodeum.global.infrastructure.storage.S3ImageStorage;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -42,6 +45,8 @@ class AccountWithdrawalServiceTest {
     private InfoScrapService infoScrapService;
     @Mock
     private NewsScrapService newsScrapService;
+    @Mock
+    private PointService pointService;
     @Mock
     private S3ImageStorage s3ImageStorage;
 
@@ -72,6 +77,8 @@ class AccountWithdrawalServiceTest {
         then(commentService).should().deleteUserCommentLikes(1L);
         then(infoScrapService).should().deleteUserScraps(1L);
         then(newsScrapService).should().deleteUserScraps(1L);
+        // 포인트(총점·적립 내역)도 삭제된다.
+        then(pointService).should().deleteUserPoints(1L);
         // user/auth 개인정보 파기는 UserService에 위임된다.
         then(userService).should().withdraw(1L);
         // 프로필 이미지는 캡처된 원본 URL로 S3에서 삭제된다(트랜잭션 비활성 상태이므로 즉시 호출).
@@ -105,8 +112,24 @@ class AccountWithdrawalServiceTest {
         then(commentService).shouldHaveNoInteractions();
         then(infoScrapService).shouldHaveNoInteractions();
         then(newsScrapService).shouldHaveNoInteractions();
+        then(pointService).shouldHaveNoInteractions();
         then(userService).shouldHaveNoInteractions();
         then(s3ImageStorage).shouldHaveNoInteractions();
+    }
+
+    @Test
+    void withdrawDeletesPointsBeforeUserWithdrawal() {
+        // GuardianPoint 조회가 GuardianProfile을 경유하는 서브쿼리라, profile이 orphanRemoval로
+        // 제거되기 전에 포인트를 지워야 한다. 순서가 뒤바뀌면 포인트가 고아 행으로 남는다.
+        User user = activeUser(null);
+        given(userRepository.findById(1L)).willReturn(Optional.of(user));
+        given(userService.withdraw(1L)).willReturn(UserWithdrawResponse.ofSuccess());
+
+        accountWithdrawalService.withdraw(1L);
+
+        InOrder inOrder = Mockito.inOrder(pointService, userService);
+        inOrder.verify(pointService).deleteUserPoints(1L);
+        inOrder.verify(userService).withdraw(1L);
     }
 
     private void assertThatResponseSucceeds(UserWithdrawResponse response) {

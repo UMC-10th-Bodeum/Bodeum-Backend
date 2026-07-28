@@ -5,6 +5,7 @@ import com.bodeum.domain.community.service.CommentService;
 import com.bodeum.domain.community.service.PostService;
 import com.bodeum.domain.info.service.InfoScrapService;
 import com.bodeum.domain.news.service.NewsScrapService;
+import com.bodeum.domain.point.service.PointService;
 import com.bodeum.domain.search.service.SearchService;
 import com.bodeum.domain.user.dto.response.UserWithdrawResponse;
 import com.bodeum.domain.user.entity.User;
@@ -25,9 +26,10 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
  * <ul>
  *   <li>검색 기록·스크랩·좋아요(공감): 삭제하고 각 콘텐츠의 scrapCount·likeCount를 감소시킨다.</li>
  *   <li>게시글·댓글·답글·정보 리뷰 본문: 보존한다. 작성자 식별은 조회 시점에 '탈퇴한 사용자'로 익명화한다.</li>
- *   <li>포인트: 실제 포인트는 GuardianProfile.point에 있고, {@link UserService#withdraw(Long)}의
- *       guardianProfile orphanRemoval로 함께 제거된다(별도 삭제 로직 없음). point 도메인의
- *       GuardianPoint/GuardianPointHistory 엔티티는 현재 미사용이다.</li>
+ *   <li>포인트: 총점은 GuardianPoint.totalPoint, 적립 내역은 GuardianPointHistory에 있다.
+ *       GuardianPoint는 guardianProfileId를 단순 컬럼으로 들고 있어 guardianProfile
+ *       orphanRemoval로 지워지지 않으므로 명시적으로 삭제한다. 조회가 GuardianProfile을
+ *       경유하므로 {@link UserService#withdraw(Long)}보다 먼저 삭제해야 한다.</li>
  *   <li>프로필 이미지: 개인정보이므로 S3 실제 파일까지 삭제한다. 롤백 불가한 외부 부수효과라 커밋 이후 수행한다.
  *       게시글·리뷰 이미지는 본문을 보존하므로 함께 보존한다.</li>
  * </ul>
@@ -44,6 +46,7 @@ public class AccountWithdrawalService {
     private final CommentService commentService;
     private final InfoScrapService infoScrapService;
     private final NewsScrapService newsScrapService;
+    private final PointService pointService;
     private final S3ImageStorage s3ImageStorage;
 
     @Transactional
@@ -63,7 +66,9 @@ public class AccountWithdrawalService {
         commentService.deleteUserCommentLikes(userId);
         infoScrapService.deleteUserScraps(userId);
         newsScrapService.deleteUserScraps(userId);
-        // 3 & 4 & 5. 개인정보 파기 + guardianProfile(포인트)/childProfile/온보딩 orphanRemoval + 인증 수단 폐기
+        // 3. 포인트(총점·적립 내역) 삭제. 조회가 guardianProfile을 경유하므로 withdraw()보다 먼저 수행한다.
+        pointService.deleteUserPoints(userId);
+        // 4 & 5 & 6. 개인정보 파기 + guardianProfile/childProfile/온보딩 orphanRemoval + 인증 수단 폐기
         UserWithdrawResponse response = userService.withdraw(userId);
         // 7. 프로필 이미지 S3 파일 삭제(커밋 이후)
         deleteProfileImageAfterCommit(profileImageUrl);
