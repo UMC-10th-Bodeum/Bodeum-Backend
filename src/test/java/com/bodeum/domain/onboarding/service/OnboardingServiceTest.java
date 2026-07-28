@@ -35,6 +35,9 @@ class OnboardingServiceTest {
     @Mock
     private RegionService regionService;
 
+    @Mock
+    private org.springframework.context.ApplicationEventPublisher eventPublisher;
+
     @InjectMocks
     private OnboardingService onboardingService;
 

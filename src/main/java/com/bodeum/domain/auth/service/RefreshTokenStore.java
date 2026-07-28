@@ -4,11 +4,12 @@ import com.bodeum.domain.auth.entity.RefreshTokenSession;
 import com.bodeum.domain.auth.repository.RefreshTokenSessionRepository;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
-import java.util.Set;
-import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
+import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.stereotype.Component;
 
 /**
@@ -29,17 +30,34 @@ public class RefreshTokenStore {
     private static final String REFRESH_KEY_PREFIX = "bodeum:auth:refresh:";
     private static final String SESSIONS_KEY_PREFIX = "bodeum:auth:user-sessions:";
 
+    // refresh 키 저장 + 역인덱스 Set 추가 + Set TTL 갱신을 원자적으로 수행한다.
+    // KEYS[1]=refresh 키, KEYS[2]=sessions 키 / ARGV[1]=userId, ARGV[2]=ttl(ms), ARGV[3]=tokenHash
+    private static final RedisScript<Long> SAVE_SCRIPT = new DefaultRedisScript<>(
+            "redis.call('SET', KEYS[1], ARGV[1], 'PX', ARGV[2]) "
+                    + "redis.call('SADD', KEYS[2], ARGV[3]) "
+                    + "redis.call('PEXPIRE', KEYS[2], ARGV[2]) "
+                    + "return 1",
+            Long.class);
+
+    // 역인덱스의 모든 refresh 키와 Set 자신을 원자적으로 삭제한다(중간에 새 세션 추가되는 경쟁 방지).
+    // KEYS[1]=sessions 키 / ARGV[1]=refresh 키 prefix
+    private static final RedisScript<Long> REVOKE_ALL_SCRIPT = new DefaultRedisScript<>(
+            "local members = redis.call('SMEMBERS', KEYS[1]) "
+                    + "for i=1,#members do redis.call('DEL', ARGV[1] .. members[i]) end "
+                    + "redis.call('DEL', KEYS[1]) "
+                    + "return #members",
+            Long.class);
+
     private final AuthTokenProperties authTokenProperties;
     private final RefreshTokenSessionRepository refreshTokenSessionRepository;
     private final StringRedisTemplate redisTemplate;
 
     public void save(String tokenHash, Long userId, Instant expiresAt, Duration ttl) {
         if (authTokenProperties.isRedisEnabled()) {
-            redisTemplate.opsForValue().set(REFRESH_KEY_PREFIX + tokenHash, userId.toString(), ttl);
-            String sessionsKey = SESSIONS_KEY_PREFIX + userId;
-            redisTemplate.opsForSet().add(sessionsKey, tokenHash);
-            // 역인덱스 Set은 멤버별 TTL이 없으므로, 최신 세션 만료 시점까지로 Set 수명을 갱신한다.
-            redisTemplate.expire(sessionsKey, ttl);
+            redisTemplate.execute(
+                    SAVE_SCRIPT,
+                    List.of(REFRESH_KEY_PREFIX + tokenHash, SESSIONS_KEY_PREFIX + userId),
+                    userId.toString(), Long.toString(ttl.toMillis()), tokenHash);
             return;
         }
         refreshTokenSessionRepository.save(RefreshTokenSession.create(tokenHash, userId, expiresAt));
@@ -101,15 +119,10 @@ public class RefreshTokenStore {
     /** 한 사용자의 모든 refresh 세션을 폐기한다(탈퇴 등 전체 로그아웃용). */
     public void revokeAll(Long userId) {
         if (authTokenProperties.isRedisEnabled()) {
-            String sessionsKey = SESSIONS_KEY_PREFIX + userId;
-            Set<String> tokenHashes = redisTemplate.opsForSet().members(sessionsKey);
-            if (tokenHashes != null && !tokenHashes.isEmpty()) {
-                Set<String> refreshKeys = tokenHashes.stream()
-                        .map(hash -> REFRESH_KEY_PREFIX + hash)
-                        .collect(Collectors.toSet());
-                redisTemplate.delete(refreshKeys);
-            }
-            redisTemplate.delete(sessionsKey);
+            redisTemplate.execute(
+                    REVOKE_ALL_SCRIPT,
+                    List.of(SESSIONS_KEY_PREFIX + userId),
+                    REFRESH_KEY_PREFIX);
             return;
         }
         refreshTokenSessionRepository.deleteByUserId(userId);

@@ -25,10 +25,13 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.testcontainers.DockerClientFactory;
+import org.testcontainers.containers.GenericContainer;
+import org.testcontainers.utility.DockerImageName;
 
 /**
- * 실제 로컬 Redis(localhost:6379)에 붙여 인증 저장소의 Redis 경로를 검증한다.
- * Redis가 없으면 assumeThat으로 스킵한다(CI 안전).
+ * 실제 Redis(Testcontainers) 컨테이너에 붙여 인증 저장소의 Redis 경로를 검증한다.
+ * Docker가 없으면 assumeThat으로 스킵한다(로컬 개발 안전). CI는 Docker가 있어 실제로 실행된다.
  *
  * <p>@Transactional은 스프링 프록시가 있어야 동작하는데 여기서는 컴포넌트를 직접 생성하므로 no-op이다.
  * Redis 분기는 트랜잭션이 필요 없으므로 실제 프로덕션 코드가 그대로 실행된다.
@@ -36,9 +39,9 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class RedisAuthStoreIntegrationTest {
 
-    private static final String REDIS_HOST = "localhost";
-    private static final int REDIS_PORT = 6379;
+    private static final DockerImageName REDIS_IMAGE = DockerImageName.parse("redis:7-alpine");
 
+    private GenericContainer<?> redis;
     private LettuceConnectionFactory connectionFactory;
     private StringRedisTemplate redisTemplate;
     private AuthTokenProperties properties;
@@ -49,20 +52,26 @@ class RedisAuthStoreIntegrationTest {
 
     @BeforeAll
     void connect() {
-        connectionFactory = new LettuceConnectionFactory(REDIS_HOST, REDIS_PORT);
+        assumeThat(DockerClientFactory.instance().isDockerAvailable())
+                .as("이 통합 테스트는 Docker(Testcontainers)가 필요하다")
+                .isTrue();
+
+        redis = new GenericContainer<>(REDIS_IMAGE).withExposedPorts(6379);
+        redis.start();
+
+        connectionFactory = new LettuceConnectionFactory(redis.getHost(), redis.getMappedPort(6379));
         connectionFactory.afterPropertiesSet();
         redisTemplate = new StringRedisTemplate(connectionFactory);
         redisTemplate.afterPropertiesSet();
-
-        assumeThat(pingSucceeds())
-                .as("localhost:6379 Redis가 떠 있어야 이 통합 테스트가 돈다")
-                .isTrue();
     }
 
     @AfterAll
     void disconnect() {
         if (connectionFactory != null) {
             connectionFactory.destroy();
+        }
+        if (redis != null) {
+            redis.stop();
         }
     }
 
@@ -209,6 +218,17 @@ class RedisAuthStoreIntegrationTest {
     }
 
     @Test
+    void denylist_blocksTokenIssuedInSameSecondAsRevocation() {
+        Instant revokedAt = Instant.now();
+        denylist.revokeAllBefore("subject-x", revokedAt);
+
+        // 동일 초 발급 토큰도 차단(<=), 이전 발급도 차단, 이후(+1s) 발급만 허용
+        assertThat(denylist.isRevoked("subject-x", revokedAt)).isTrue();
+        assertThat(denylist.isRevoked("subject-x", revokedAt.minusSeconds(1))).isTrue();
+        assertThat(denylist.isRevoked("subject-x", revokedAt.plusSeconds(1))).isFalse();
+    }
+
+    @Test
     void authenticate_usesCacheThenDenylistBlocksRevokedToken() {
         User user = mock(User.class);
         when(user.getId()).thenReturn(7L);
@@ -256,14 +276,6 @@ class RedisAuthStoreIntegrationTest {
         UserService userService = mock(UserService.class);
         when(userService.findActiveUser(userId)).thenReturn(Optional.of(user));
         return userService;
-    }
-
-    private boolean pingSucceeds() {
-        try {
-            return "PONG".equalsIgnoreCase(connectionFactory.getConnection().ping());
-        } catch (RuntimeException e) {
-            return false;
-        }
     }
 
     private Set<String> refreshKeys() {

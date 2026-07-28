@@ -3,10 +3,9 @@ package com.bodeum.domain.user.service;
 import com.bodeum.domain.auth.enums.SocialProvider;
 import com.bodeum.domain.auth.exception.AuthErrorCode;
 import com.bodeum.domain.auth.repository.AuthLoginCodeRepository;
-import com.bodeum.domain.auth.service.AccessTokenDenylist;
-import com.bodeum.domain.auth.service.AuthPrincipalCache;
 import com.bodeum.domain.auth.service.RefreshTokenStore;
 import com.bodeum.domain.user.dto.response.AiTermsAgreementResponse;
+import com.bodeum.domain.user.event.UserPrincipalChangedEvent;
 import com.bodeum.domain.region.entity.Region;
 import com.bodeum.domain.region.service.RegionService;
 import com.bodeum.domain.user.dto.request.CreateUserAgreementRequest;
@@ -24,9 +23,9 @@ import com.bodeum.domain.user.repository.UserRepository;
 import com.bodeum.global.apiPayload.code.GeneralErrorCode;
 import com.bodeum.global.apiPayload.exception.ProjectException;
 import com.bodeum.global.infrastructure.storage.S3ImageStorage;
-import java.time.Instant;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -42,12 +41,11 @@ public class UserService {
     private final UserRepository userRepository;
     private final RefreshTokenStore refreshTokenStore;
     private final AuthLoginCodeRepository authLoginCodeRepository;
-    private final AuthPrincipalCache authPrincipalCache;
-    private final AccessTokenDenylist accessTokenDenylist;
     private final S3ImageStorage s3ImageStorage;
     private final UserProfileImageUpdater userProfileImageUpdater;
     private final RegionService regionService;
     private final UserAgreementRepository userAgreementRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional(readOnly = true)
     public UserProfileResponse getProfile(Long userId) {
@@ -85,8 +83,8 @@ public class UserService {
                 request.communityRoleType()
         );
 
-        // nickname 등 principal 필드가 바뀌므로 캐시된 인증 정보를 무효화해 stale을 막는다.
-        authPrincipalCache.evict(user.getAuthSubject());
+        // nickname 등 principal 필드가 바뀌므로, 커밋 이후 인증 캐시를 무효화한다(리스너에서 처리).
+        eventPublisher.publishEvent(new UserPrincipalChangedEvent(user.getAuthSubject(), false));
 
         return UserProfileUpdateResponse.ofSuccess();
     }
@@ -131,10 +129,9 @@ public class UserService {
         refreshTokenStore.revokeAll(userId);
         authLoginCodeRepository.deleteByUserId(userId);
 
-        // 이미 발급된 access token까지 즉시 무효화하고 캐시된 인증 정보를 제거한다.
+        // 커밋 이후 이미 발급된 access token까지 즉시 무효화하고 캐시된 인증 정보를 제거한다(리스너에서 처리).
         // (login code는 60초 TTL이라 Redis 경로에서는 별도 정리 없이 자연 만료에 맡긴다.)
-        accessTokenDenylist.revokeAllBefore(previousAuthSubject, Instant.now());
-        authPrincipalCache.evict(previousAuthSubject);
+        eventPublisher.publishEvent(new UserPrincipalChangedEvent(previousAuthSubject, true));
 
         return UserWithdrawResponse.ofSuccess();
     }
