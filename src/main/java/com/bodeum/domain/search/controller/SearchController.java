@@ -48,7 +48,7 @@ public class SearchController {
     @GetMapping("/info-items/search")
     @Operation(summary = "정보 검색어 자동완성 조회", description = "입력한 키워드에 매칭되는 정보(기관/병원 등) 이름 및 추천 태그 목록을 반환합니다.")
     public ApiResponse<AutocompleteResponse> getAutocomplete(
-            @RequestParam String keyword
+            @RequestParam(required = false) String keyword
     ) {
         return ApiResponse.of(GeneralSuccessCode.OK, searchService.getAutocomplete(keyword));
     }
