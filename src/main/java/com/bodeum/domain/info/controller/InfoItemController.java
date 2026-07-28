@@ -6,18 +6,17 @@ import com.bodeum.domain.info.dto.response.InfoItemDetailResponse;
 import com.bodeum.domain.info.dto.response.InfoItemPageResponse;
 import com.bodeum.domain.info.dto.response.InfoItemResponse;
 import com.bodeum.domain.info.dto.response.KakaoMapUrlResponse;
+import com.bodeum.domain.info.dto.response.InfoItemShareResponse;
 import com.bodeum.domain.info.service.InfoItemQueryService;
 import com.bodeum.global.apiPayload.ApiResponse;
 import com.bodeum.global.apiPayload.code.GeneralSuccessCode;
 import com.bodeum.global.auth.LoginUser;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springdoc.core.annotations.ParameterObject;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.web.bind.annotation.*;
@@ -67,6 +66,15 @@ public class InfoItemController {
             @Valid @RequestBody KakaoMapUrlRequest request
     ) {
         KakaoMapUrlResponse response = infoItemQueryService.createKakaoMapUrl(request);
+            summary = "정보 공유 링크 조회",
+            description = "특정 정보 상세 페이지를 공유할 수 있는 URL 정보를 조회한다."
+    )
+    @GetMapping("/{infoItemId}/share")
+    public ApiResponse<InfoItemShareResponse> getInfoItemShareUrl(
+            @Parameter(description = "정보 항목 ID", example = "42")
+            @PathVariable("infoItemId") Long infoItemId
+    ) {
+        InfoItemShareResponse response = infoItemQueryService.getInfoItemShareUrl(infoItemId);
         return ApiResponse.of(GeneralSuccessCode.OK, response);
     }
 }

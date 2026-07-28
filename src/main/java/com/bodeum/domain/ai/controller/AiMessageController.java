@@ -6,7 +6,10 @@ import com.bodeum.domain.ai.exception.AiErrorCode;
 import com.bodeum.domain.ai.service.AiMessageQueryService;
 import com.bodeum.global.apiPayload.ApiResponse;
 import com.bodeum.global.apiPayload.code.GeneralSuccessCode;
+import com.bodeum.global.apiPayload.exception.ProjectException;
 import com.bodeum.global.auth.LoginUser;
+import com.bodeum.global.auth.RequireAiTermsAgreed;
+import com.bodeum.global.auth.RequireSignupCompleted;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.time.Instant;
@@ -17,6 +20,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @Tag(name = "AI message", description = "AI 챗봇 대화 이력 조회 API")
+@RequireSignupCompleted
+@RequireAiTermsAgreed
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/v1/ai/messages")
@@ -30,11 +35,14 @@ public class AiMessageController {
     )
     @GetMapping("/today")
     public ApiResponse<AiTodayMessageResponse> getTodayMessages(
-            @LoginUser Long userId
+            @LoginUser Long userId,
+            @RequestParam(required = false) Long cursorId,
+            @RequestParam(required = false) Instant cursorCreatedAt
     ) {
+        validateCursor(cursorId, cursorCreatedAt);
         return ApiResponse.of(
                 GeneralSuccessCode.OK,
-                aiMessageQueryService.getTodayMessages(userId)
+                aiMessageQueryService.getTodayMessages(userId, cursorId, cursorCreatedAt)
         );
     }
 
@@ -48,21 +56,19 @@ public class AiMessageController {
             @RequestParam(required = false) Long cursorId,
             @RequestParam(required = false) Instant cursorCreatedAt
     ) {
-        validateHistoryCursor(cursorId, cursorCreatedAt);
+        validateCursor(cursorId, cursorCreatedAt);
         return ApiResponse.of(
                 GeneralSuccessCode.OK,
                 aiMessageQueryService.getHistoryMessages(userId, cursorId, cursorCreatedAt)
         );
     }
 
-    private void validateHistoryCursor(Long cursorId, Instant cursorCreatedAt) {
+    private void validateCursor(Long cursorId, Instant cursorCreatedAt) {
         boolean hasCursorId = cursorId != null;
         boolean hasCursorCreatedAt = cursorCreatedAt != null;
 
         if (hasCursorId != hasCursorCreatedAt) {
-            throw new com.bodeum.global.apiPayload.exception.ProjectException(
-                    AiErrorCode.AI_INVALID_HISTORY_CURSOR
-            );
+            throw new ProjectException(AiErrorCode.AI_INVALID_HISTORY_CURSOR);
         }
     }
 }
