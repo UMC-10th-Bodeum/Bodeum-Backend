@@ -213,6 +213,43 @@ ON DUPLICATE KEY UPDATE
     source_url = VALUES(source_url),
     updated_at = CURRENT_TIMESTAMP(6);
 
+-- 발달재활서비스 바우처 신청 추천 질문의 검수 답변에서 사용하는 공식 상세 페이지를
+-- 실제 응답 출처로 연결할 수 있도록 외부 문서로 미리 등록한다.
+INSERT INTO ai_external_document (
+    ai_external_source_id,
+    title,
+    source_url,
+    source_url_hash,
+    source_updated_at,
+    created_at,
+    updated_at
+)
+SELECT
+    source.ai_external_source_id,
+    document.title,
+    document.source_url,
+    SHA2(document.source_url, 256),
+    NULL,
+    CURRENT_TIMESTAMP(6),
+    CURRENT_TIMESTAMP(6)
+FROM ai_external_source source
+JOIN (
+    SELECT
+        'https://www.mohw.go.kr/' AS base_url,
+        '발달재활서비스' AS title,
+        'https://www.mohw.go.kr/menu.es?mid=a10710060600' AS source_url
+    UNION ALL
+    SELECT
+        'https://www.socialservice.or.kr:444/',
+        '발달재활서비스',
+        'https://www.socialservice.or.kr:444/user/htmlEditor/view2.do?p_sn=11'
+) document ON document.base_url = source.base_url
+ON DUPLICATE KEY UPDATE
+    ai_external_source_id = VALUES(ai_external_source_id),
+    title = VALUES(title),
+    source_url = VALUES(source_url),
+    updated_at = CURRENT_TIMESTAMP(6);
+
 -- 장애 진단 후 첫 단계 추천 질문의 검수 답변에서 사용하는 공식 상세 페이지를
 -- 실제 응답 출처로 연결할 수 있도록 외부 문서로 미리 등록한다.
 INSERT INTO ai_external_document (

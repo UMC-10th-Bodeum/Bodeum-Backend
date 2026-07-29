@@ -143,6 +143,30 @@ public class AiStarterQuestionRouter {
                     "https://www.129.go.kr/"
             )
     );
+    private static final String VOUCHER_APPLICATION_ANSWER = """
+            네, 발달재활서비스 바우처 신청 절차를 정리해드릴게요!
+
+            **발달재활서비스 바우처 신청 안내**
+
+            - **자격 확인** — 2026년 기준, 만 18세 미만 등록 장애아동(자폐성 포함)이며, 기준 중위소득 180% 이하 가구면 신청할 수 있어요. 만 9세 미만은 장애 미등록 상태여도 전문의 발달재활서비스 의뢰서, 세부영역검사결과서 및 검사자료로 대체하여 신청 가능해요.
+            - **신청 방법** — 복지로(bokjiro.go.kr) 온라인 신청 또는 관할 주민센터 방문 신청, 두 가지 방법이 있어요.
+            - **필요 서류** — 장애인등록증(또는 발달재활서비스 의뢰서·검사자료), 건강보험료 납부확인서, 사회복지서비스 이용권 제공 신청서예요.
+            - **이용 가능 기관** — 사회서비스 전자바우처(socialservice.or.kr)에서 {{activityRegion}} 지정기관을 확인하실 수 있어요.
+
+            소득 구간에 따라 월 지원금액이 차등 지급되며, 언어·청능, 미술심리·음악·놀이심리·행동발달·재활심리·심리운동, 감각발달·운동발달 재활영역에 사용하실 수 있어요. 보다 정확한 사항은 보건복지부나 거주지 주민센터에서 우리 가구 상황에 맞는 지원을 확인해보시는 게 가장 정확해요.
+            """;
+    private static final List<ExternalDocumentSpec> VOUCHER_APPLICATION_SOURCES = List.of(
+            new ExternalDocumentSpec(
+                    "mohw.go.kr",
+                    "발달재활서비스",
+                    "https://www.mohw.go.kr/menu.es?mid=a10710060600"
+            ),
+            new ExternalDocumentSpec(
+                    "socialservice.or.kr",
+                    "발달재활서비스",
+                    "https://www.socialservice.or.kr:444/user/htmlEditor/view2.do?p_sn=11"
+            )
+    );
 
     private final AiExternalSourceRepository externalSourceRepository;
     private final AiExternalDocumentPersistenceService externalDocumentPersistenceService;
@@ -168,7 +192,7 @@ public class AiStarterQuestionRouter {
             case LOCAL_REHAB_CENTERS -> Optional.of(localRehabCenters(profile));
             case CHILD_MEDICAL_SUPPORT -> Optional.of(childMedicalSupport());
             case DIAGNOSIS_FIRST_STEPS -> Optional.of(diagnosisFirstSteps());
-            case VOUCHER_APPLICATION -> Optional.empty();
+            case VOUCHER_APPLICATION -> Optional.of(voucherApplication(profile));
         };
     }
 
@@ -183,6 +207,19 @@ public class AiStarterQuestionRouter {
         return fixedAnswerWithRequiredSources(
                 DIAGNOSIS_FIRST_STEPS_ANSWER,
                 DIAGNOSIS_FIRST_STEPS_SOURCES
+        );
+    }
+
+    private AiStarterQuestionAnswer voucherApplication(AiUserProfile profile) {
+        String activityRegion = profile.region() == null || profile.region().isBlank()
+                ? "지역별"
+                : profile.region().trim() + " 내";
+        return fixedAnswerWithRequiredSources(
+                VOUCHER_APPLICATION_ANSWER.replace(
+                        "{{activityRegion}}",
+                        activityRegion
+                ),
+                VOUCHER_APPLICATION_SOURCES
         );
     }
 

@@ -213,6 +213,39 @@ class AiStarterQuestionRouterTest {
     }
 
     @Test
+    void returnsReviewedVoucherApplicationAnswerWithOfficialSources() {
+        List<AiExternalSource> sources = List.of(
+                source("보건복지부", "https://www.mohw.go.kr/"),
+                source("사회서비스 전자바우처", "https://www.socialservice.or.kr:444/")
+        );
+        when(externalSourceRepository.findAllBySourceTypeAndActiveTrue(
+                AiExternalSourceType.WEBSITE
+        )).thenReturn(sources);
+        when(externalDocumentPersistenceService.saveAll(any())).thenReturn(List.of(
+                document(1L, "https://www.mohw.go.kr/menu.es?mid=a10710060600"),
+                document(2L, "https://www.socialservice.or.kr:444/user/htmlEditor/view2.do")
+        ));
+
+        var result = router.route(
+                AiStarterQuestionType.VOUCHER_APPLICATION,
+                profile("경기도 수원시")
+        ).orElseThrow();
+
+        assertThat(result.hasEvidence()).isTrue();
+        assertThat(result.content()).contains(
+                "발달재활서비스 바우처 신청 안내",
+                "2026년 기준",
+                "기준 중위소득 180% 이하",
+                "복지로(bokjiro.go.kr) 온라인 신청",
+                "사회서비스 전자바우처(socialservice.or.kr)",
+                "경기도 수원시 내 지정기관"
+        );
+        assertThat(result.sources()).hasSize(2);
+        assertThat(result.sources())
+                .allMatch(source -> source.sourceType() == AiResponseSourceType.SITE);
+    }
+
+    @Test
     void returnsRehabCentersInUserActivityRegion() {
         InfoCategory category = org.mockito.Mockito.mock(InfoCategory.class);
         when(category.getSubCategoryKo()).thenReturn("치료·재활 기관");
