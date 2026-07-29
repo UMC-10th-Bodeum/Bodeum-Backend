@@ -4,6 +4,7 @@ import com.bodeum.domain.news.dto.NewsStatus;
 import com.bodeum.domain.news.dto.response.NewsDetailResponse;
 import com.bodeum.domain.news.dto.response.NewsListResponse;
 import com.bodeum.domain.news.dto.response.NewsScrapResponse;
+import com.bodeum.domain.news.dto.response.NewsSearchSuggestionsResponse;
 import com.bodeum.domain.news.dto.response.RelatedRecruitingNewsResponse;
 import com.bodeum.domain.news.service.NewsQueryService;
 import com.bodeum.domain.news.service.NewsScrapService;
@@ -89,6 +90,23 @@ public class NewsController {
         return ApiResponse.of(
                 GeneralSuccessCode.OK,
                 newsQueryService.searchNews(keyword, page, size, region, category, status)
+        );
+    }
+
+    @GetMapping("/search/suggestions")
+    @Operation(
+            summary = "소식 검색어 자동완성 조회",
+            description = "입력한 검색어가 포함된 활성 소식 제목을 자동완성 검색어로 조회한다."
+    )
+    public ApiResponse<NewsSearchSuggestionsResponse> getNewsSearchSuggestions(
+            @Parameter(description = "자동완성 검색어", example = "봉")
+            @RequestParam @NotBlank @Size(max = 50) String keyword,
+            @Parameter(description = "조회 개수", example = "10")
+            @RequestParam(defaultValue = "10") @Min(1) @Max(20) int size
+    ) {
+        return ApiResponse.of(
+                GeneralSuccessCode.OK,
+                newsQueryService.getSearchSuggestions(keyword, size)
         );
     }
 

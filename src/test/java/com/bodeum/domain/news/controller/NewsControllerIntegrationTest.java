@@ -458,6 +458,124 @@ class NewsControllerIntegrationTest {
     }
 
     @Test
+    void getNewsSearchSuggestionsPrioritizesPrefixAndReturnsDistinctVisibleTitles() throws Exception {
+        NewsCategory category = newsCategoryRepository.save(
+                NewsCategory.create(NewsType.ACTIVITY, "VOLUNTEER", 1)
+        );
+        NewsSource source = newsSourceRepository.save(source());
+        newsRepository.save(news(
+                category,
+                source,
+                null,
+                "suggestion-prefix-1",
+                "봉사활동 참여자 모집",
+                LocalDateTime.of(2026, 7, 1, 10, 0),
+                RecruitmentStatus.OPEN
+        ));
+        newsRepository.save(news(
+                category,
+                source,
+                null,
+                "suggestion-prefix-duplicate",
+                "봉사활동 참여자 모집",
+                LocalDateTime.of(2026, 7, 2, 10, 0),
+                RecruitmentStatus.OPEN
+        ));
+        newsRepository.save(news(
+                category,
+                source,
+                null,
+                "suggestion-contains",
+                "청소년 봉사단 모집",
+                LocalDateTime.of(2026, 7, 3, 10, 0),
+                RecruitmentStatus.OPEN
+        ));
+        newsRepository.save(news(
+                category,
+                source,
+                null,
+                "suggestion-content-only",
+                "언어치료 프로그램",
+                "프로그램 안내",
+                "봉사 활동이 포함된 본문",
+                "테스트 기관",
+                LocalDateTime.of(2026, 7, 4, 10, 0),
+                RecruitmentStatus.OPEN
+        ));
+        News deleted = newsRepository.save(news(
+                category,
+                source,
+                null,
+                "suggestion-deleted",
+                "봉사 종료 소식",
+                LocalDateTime.of(2026, 7, 5, 10, 0),
+                RecruitmentStatus.CLOSED
+        ));
+        deleted.delete();
+
+        mockMvc.perform(get("/api/v1/news/search/suggestions")
+                        .param("keyword", " 봉 ")
+                        .param("size", "10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.isSuccess").value(true))
+                .andExpect(jsonPath("$.code").value("COMMON200_1"))
+                .andExpect(jsonPath("$.result.suggestions.length()").value(2))
+                .andExpect(jsonPath("$.result.suggestions[0].text")
+                        .value("봉사활동 참여자 모집"))
+                .andExpect(jsonPath("$.result.suggestions[0].type").value("NEWS_TITLE"))
+                .andExpect(jsonPath("$.result.suggestions[1].text")
+                        .value("청소년 봉사단 모집"))
+                .andExpect(jsonPath("$.result.suggestions[1].type").value("NEWS_TITLE"));
+    }
+
+    @Test
+    void getNewsSearchSuggestionsUsesDefaultSizeTen() throws Exception {
+        NewsCategory category = newsCategoryRepository.save(
+                NewsCategory.create(NewsType.ACTIVITY, "VOLUNTEER", 1)
+        );
+        NewsSource source = newsSourceRepository.save(source());
+        for (int index = 0; index < 11; index++) {
+            newsRepository.save(news(
+                    category,
+                    source,
+                    null,
+                    "suggestion-default-size-" + index,
+                    "봉사 프로그램 " + String.format("%02d", index),
+                    LocalDateTime.of(2026, 7, index + 1, 10, 0),
+                    RecruitmentStatus.OPEN
+            ));
+        }
+
+        mockMvc.perform(get("/api/v1/news/search/suggestions")
+                        .param("keyword", "봉"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.suggestions.length()").value(10));
+    }
+
+    @Test
+    void getNewsSearchSuggestionsReturnsEmptyListWhenNoTitleMatches() throws Exception {
+        mockMvc.perform(get("/api/v1/news/search/suggestions")
+                        .param("keyword", "검색결과없음"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.suggestions").isArray())
+                .andExpect(jsonPath("$.result.suggestions").isEmpty());
+    }
+
+    @Test
+    void getNewsSearchSuggestionsRejectsInvalidRequest() throws Exception {
+        mockMvc.perform(get("/api/v1/news/search/suggestions")
+                        .param("keyword", "   "))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("COMMON400_1"));
+
+        mockMvc.perform(get("/api/v1/news/search/suggestions")
+                        .param("keyword", "봉")
+                        .param("size", "21"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("COMMON400_1"));
+    }
+
+    @Test
     void toggleNewsScrapAddsAndRemovesScrap() throws Exception {
         NewsCategory category = newsCategoryRepository.save(
                 NewsCategory.create(NewsType.LOCAL, "SUPPORT_SERVICE", 1)

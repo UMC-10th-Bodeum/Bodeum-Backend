@@ -4,6 +4,7 @@ import com.bodeum.domain.news.dto.NewsStatus;
 import com.bodeum.domain.news.dto.response.NewsDetailResponse;
 import com.bodeum.domain.news.dto.response.NewsListItemResponse;
 import com.bodeum.domain.news.dto.response.NewsListResponse;
+import com.bodeum.domain.news.dto.response.NewsSearchSuggestionsResponse;
 import com.bodeum.domain.news.dto.response.RelatedRecruitingNewsResponse;
 import com.bodeum.domain.news.entity.News;
 import com.bodeum.domain.news.entity.RecruitmentStatus;
@@ -13,6 +14,7 @@ import com.bodeum.domain.region.entity.Region;
 import com.bodeum.domain.region.repository.RegionRepository;
 import com.bodeum.global.apiPayload.code.GeneralErrorCode;
 import com.bodeum.global.apiPayload.exception.ProjectException;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Locale;
@@ -101,6 +103,27 @@ public class NewsQueryService {
         );
 
         return toListResponse(result);
+    }
+
+    @Transactional(readOnly = true)
+    public NewsSearchSuggestionsResponse getSearchSuggestions(String keyword, int size) {
+        String normalizedKeyword = keyword.trim().toLowerCase(Locale.ROOT);
+        List<String> titles = new ArrayList<>(
+                newsRepository.findTitleSuggestionsStartingWith(
+                        normalizedKeyword,
+                        PageRequest.of(0, size)
+                )
+        );
+
+        int remainingSize = size - titles.size();
+        if (remainingSize > 0) {
+            titles.addAll(newsRepository.findTitleSuggestionsContaining(
+                    normalizedKeyword,
+                    PageRequest.of(0, remainingSize)
+            ));
+        }
+
+        return NewsSearchSuggestionsResponse.fromTitles(titles);
     }
 
     private NewsListResponse toListResponse(Page<News> result) {
