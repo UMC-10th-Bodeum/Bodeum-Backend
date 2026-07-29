@@ -29,6 +29,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
+
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -196,6 +198,72 @@ public class AiStarterQuestionRouter {
         };
     }
 
+    // -------------------------------------------------------------------------
+    // 질문별 답변 생성
+    // -------------------------------------------------------------------------
+
+    private AiStarterQuestionAnswer welfareSites() {
+        List<AiExternalSource> sources = findRegisteredSources(
+                WELFARE_SITES.stream().map(WelfareSiteSpec::host).toList()
+        );
+        if (sources.size() != WELFARE_SITES.size()) {
+            return AiStarterQuestionAnswer.noEvidence();
+        }
+
+        List<AiReferenceDocument> references = persistSourceEntryPagesAsReferences(sources);
+
+        String content = IntStream.range(0, WELFARE_SITES.size())
+                .mapToObj(index -> {
+                    WelfareSiteSpec spec = WELFARE_SITES.get(index);
+                    return String.format(
+                            "- **%s** — %s",
+                            spec.displayName(),
+                            spec.description()
+                    );
+                })
+                .collect(Collectors.joining(
+                        "\n",
+                        "네, 참고하면 좋을 공식 복지 사이트 5개를 추천드리겠습니다!\n\n"
+                                + "**자주 확인하면 좋은 공식 복지 사이트**\n\n",
+                        "\n\n이 사이트들은 모두 정부·공공기관 및 공식 지원기관이 직접 운영해서 정보 신뢰도가 높아요. "
+                                + "보듬에서도 이 출처들을 기반으로 최신 정보를 정리해드리고 있습니다."
+                ));
+        return AiStarterQuestionAnswer.answered(content, references);
+    }
+
+    private AiStarterQuestionAnswer localRehabCenters(AiUserProfile profile) {
+        Optional<RegionParts> region = RegionParts.from(profile.region());
+        if (region.isEmpty()) {
+            return AiStarterQuestionAnswer.regionRequired(REGION_REQUIRED_MESSAGE);
+        }
+
+        List<InfoItem> centers = infoItemRepository.findRehabCentersByRegion(
+                region.get().sido(),
+                region.get().sigungu(),
+                PageRequest.of(0, LOCAL_CENTER_LIMIT)
+        );
+        if (centers.isEmpty()) {
+            return AiStarterQuestionAnswer.noEvidence();
+        }
+
+        List<AiReferenceDocument> references = centers.stream()
+                .map(this::toReferenceDocument)
+                .toList();
+        String content = IntStream.range(0, centers.size())
+                .mapToObj(index -> centerCard(centers.get(index), index))
+                .collect(Collectors.joining(
+                        "\n\n",
+                        region.get().displayName()
+                                + "에서 확인 가능한 재활센터를 정리해드렸어요!\n"
+                                + "조회, 저장, 후기를 기준으로 정렬된 것이며, 기관의 우수성을 "
+                                + "판단한 결과는 아닙니다.\n"
+                                + "방문 전 꼭 직접 확인하시는 것을 권장합니다.\n\n",
+                        "\n\n> 기관별 대기 여부와 상담 가능 시간은 자주 바뀔 수 있으므로 "
+                                + "방문 전 꼭 전화로 확인해보시는 것을 추천드려요 🍀"
+                ));
+        return AiStarterQuestionAnswer.answered(content, references);
+    }
+
     private AiStarterQuestionAnswer childMedicalSupport() {
         return fixedAnswerWithRequiredSources(
                 CHILD_MEDICAL_SUPPORT_ANSWER,
@@ -222,6 +290,10 @@ public class AiStarterQuestionRouter {
                 VOUCHER_APPLICATION_SOURCES
         );
     }
+
+    // -------------------------------------------------------------------------
+    // 고정 답변 공통 처리
+    // -------------------------------------------------------------------------
 
     private AiStarterQuestionAnswer fixedAnswerWithRequiredSources(
             String answer,
@@ -260,35 +332,11 @@ public class AiStarterQuestionRouter {
         );
     }
 
-    private AiStarterQuestionAnswer welfareSites() {
-        List<AiExternalSource> sources = findRegisteredSources(
-                WELFARE_SITES.stream().map(WelfareSiteSpec::host).toList()
-        );
-        if (sources.size() != WELFARE_SITES.size()) {
-            return AiStarterQuestionAnswer.noEvidence();
-        }
+    // -------------------------------------------------------------------------
+    // 외부 SITE 출처 처리
+    // -------------------------------------------------------------------------
 
-        List<AiReferenceDocument> references = persistAsReferences(sources);
-
-        String content = java.util.stream.IntStream.range(0, WELFARE_SITES.size())
-                .mapToObj(index -> {
-                    WelfareSiteSpec spec = WELFARE_SITES.get(index);
-                    return String.format(
-                        "- **%s** — %s",
-                        spec.displayName(),
-                        spec.description()
-                    );
-                })
-                .collect(Collectors.joining(
-                        "\n",
-                        "네, 참고하면 좋을 공식 복지 사이트 5개를 추천드리겠습니다!\n\n"
-                                + "**자주 확인하면 좋은 공식 복지 사이트**\n\n",
-                        "\n\n이 사이트들은 모두 공공기관이 직접 운영해서 정보 신뢰도가 높아요. "
-                                + "보듬에서도 이 출처들을 기반으로 최신 정보를 정리해드리고 있습니다."
-                ));
-        return AiStarterQuestionAnswer.answered(content, references);
-    }
-
+    // 활성 외부 사이트의 baseUrl에서 도메인 추출 후, 요청한 hosts 순서대로 사이트 반환
     private List<AiExternalSource> findRegisteredSources(List<String> hosts) {
         Map<String, AiExternalSource> sourcesByHost = externalSourceRepository
                 .findAllBySourceTypeAndActiveTrue(AiExternalSourceType.WEBSITE)
@@ -305,7 +353,8 @@ public class AiStarterQuestionRouter {
                 .toList();
     }
 
-    private List<AiReferenceDocument> persistAsReferences(
+    // 등록된 외부 사이트의 대표 진입 페이지를 AI 응답 출처로 변환
+    private List<AiReferenceDocument> persistSourceEntryPagesAsReferences(
             List<AiExternalSource> sources
     ) {
         List<AiExternalDocumentCandidate> candidates = sources.stream()
@@ -322,14 +371,14 @@ public class AiStarterQuestionRouter {
         return persistCandidatesAsReferences(candidates);
     }
 
+    // 외부 문서 후보를 ai_external_document에 저장 또는 갱신하고, AI 응답 출처로 변환
     private List<AiReferenceDocument> persistCandidatesAsReferences(
             List<AiExternalDocumentCandidate> candidates
     ) {
         List<AiExternalDocument> documents =
                 externalDocumentPersistenceService.saveAll(candidates);
 
-        List<AiReferenceDocument> references = java.util.stream.IntStream
-                .range(0, documents.size())
+        List<AiReferenceDocument> references = IntStream.range(0, documents.size())
                 .mapToObj(index -> {
                     AiExternalDocument document = documents.get(index);
                     AiExternalSource source = candidates.get(index).externalSource();
@@ -347,39 +396,61 @@ public class AiStarterQuestionRouter {
         return references;
     }
 
-    private AiStarterQuestionAnswer localRehabCenters(AiUserProfile profile) {
-        Optional<RegionParts> region = RegionParts.from(profile.region());
-        if (region.isEmpty()) {
-            return AiStarterQuestionAnswer.regionRequired(REGION_REQUIRED_MESSAGE);
-        }
+    // -------------------------------------------------------------------------
+    // URL·해시 등 공통 유틸리티
+    // -------------------------------------------------------------------------
 
-        List<InfoItem> centers = infoItemRepository.findRehabCentersByRegion(
-                region.get().sido(),
-                region.get().sigungu(),
-                PageRequest.of(0, LOCAL_CENTER_LIMIT)
-        );
-        if (centers.isEmpty()) {
-            return AiStarterQuestionAnswer.noEvidence();
-        }
-
-        List<AiReferenceDocument> references = centers.stream()
-                .map(this::toReferenceDocument)
-                .toList();
-        String content = java.util.stream.IntStream.range(0, centers.size())
-                .mapToObj(index -> centerCard(centers.get(index), index))
-                .collect(Collectors.joining(
-                        "\n\n",
-                        region.get().displayName()
-                                + "에서 확인 가능한 재활센터를 정리해드렸어요!\n"
-                                + "조회, 저장, 후기를 기준으로 정렬된 것이며, 기관의 우수성을 "
-                                + "판단한 결과는 아닙니다.\n"
-                                + "방문 전 꼭 직접 확인하시는 것을 권장합니다.\n\n",
-                        "\n\n> 기관별 대기 여부와 상담 가능 시간은 자주 바뀔 수 있으므로 "
-                                + "방문 전 꼭 전화로 확인해보시는 것을 추천드려요 🍀"
-                ));
-        return AiStarterQuestionAnswer.answered(content, references);
+    // entryUrl이 있으면 우선 사용하고, 없으면 baseUrl을 사용
+    private String preferredUrl(AiExternalSource source) {
+        return source.getEntryUrl() == null || source.getEntryUrl().isBlank()
+                ? source.getBaseUrl()
+                : source.getEntryUrl();
     }
 
+    private String normalizedHost(String url) {
+        String host = URI.create(normalizeUrl(url)).getHost();
+        if (host == null) {
+            return "";
+        }
+        String normalized = host.toLowerCase(Locale.ROOT);
+        return normalized.startsWith("www.") ? normalized.substring(4) : normalized;
+    }
+
+    // URL 정규화
+    private String normalizeUrl(String url) {
+        URI uri = URI.create(url.trim()).normalize();
+        try {
+            return new URI(
+                    uri.getScheme() == null ? "https" : uri.getScheme().toLowerCase(Locale.ROOT),
+                    uri.getUserInfo(),
+                    uri.getHost() == null ? null : uri.getHost().toLowerCase(Locale.ROOT),
+                    uri.getPort(),
+                    uri.getPath(),
+                    uri.getQuery(),
+                    null
+            ).toString();
+        } catch (Exception e) {
+            throw new ProjectException(AiErrorCode.AI_RESPONSE_FAILED, e);
+        }
+    }
+
+    // 중복 문서 식별에 사용할 URL SHA-256 해시를 생성
+    private String sha256(String value) {
+        try {
+            return HexFormat.of().formatHex(
+                    MessageDigest.getInstance("SHA-256")
+                            .digest(value.getBytes(StandardCharsets.UTF_8))
+            );
+        } catch (NoSuchAlgorithmException e) {
+            throw new ProjectException(AiErrorCode.AI_RESPONSE_FAILED, e);
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // INFO 출처 처리
+    // -------------------------------------------------------------------------
+
+    // InfoItem을 AI 응답 출처 모델로 변환
     private AiReferenceDocument toReferenceDocument(InfoItem info) {
         return new AiReferenceDocument(
                 "INFO-" + info.getId(),
@@ -392,6 +463,7 @@ public class AiStarterQuestionRouter {
         );
     }
 
+    // InfoItem의 상세 내용을 AI 근거 문서 본문으로 변환
     private String infoContent(InfoItem info) {
         return String.format(
                 """
@@ -414,6 +486,7 @@ public class AiStarterQuestionRouter {
         ).trim();
     }
 
+    // 재활센터 정보를 사용자 답변에 표시할 Markdown 카드로 변환
     private String centerCard(InfoItem info, int index) {
         StringBuilder card = new StringBuilder("**")
                 .append(CIRCLED_NUMBERS.get(index))
@@ -428,6 +501,7 @@ public class AiStarterQuestionRouter {
         return card.toString();
     }
 
+    // INFO 출처의 갱신 시각 결정
     private Instant sourceUpdatedAt(InfoItem info) {
         if (info.getUpdatedAt() != null) {
             return info.getUpdatedAt();
@@ -440,53 +514,31 @@ public class AiStarterQuestionRouter {
                 : info.getSyncedAt().atZone(TimeConstants.SERVICE_ZONE_ID).toInstant();
     }
 
-    private String preferredUrl(AiExternalSource source) {
-        return source.getEntryUrl() == null || source.getEntryUrl().isBlank()
-                ? source.getBaseUrl()
-                : source.getEntryUrl();
-    }
-
-    private String normalizedHost(String url) {
-        String host = URI.create(normalizeUrl(url)).getHost();
-        if (host == null) {
-            return "";
-        }
-        String normalized = host.toLowerCase(Locale.ROOT);
-        return normalized.startsWith("www.") ? normalized.substring(4) : normalized;
-    }
-
-    private String normalizeUrl(String url) {
-        URI uri = URI.create(url.trim()).normalize();
-        try {
-            return new URI(
-                    uri.getScheme() == null ? "https" : uri.getScheme().toLowerCase(Locale.ROOT),
-                    uri.getUserInfo(),
-                    uri.getHost() == null ? null : uri.getHost().toLowerCase(Locale.ROOT),
-                    uri.getPort(),
-                    uri.getPath(),
-                    uri.getQuery(),
-                    null
-            ).toString();
-        } catch (Exception e) {
-            throw new ProjectException(AiErrorCode.AI_RESPONSE_FAILED, e);
-        }
-    }
-
-    private String sha256(String value) {
-        try {
-            return HexFormat.of().formatHex(
-                    MessageDigest.getInstance("SHA-256")
-                            .digest(value.getBytes(StandardCharsets.UTF_8))
-            );
-        } catch (NoSuchAlgorithmException e) {
-            throw new ProjectException(AiErrorCode.AI_RESPONSE_FAILED, e);
-        }
-    }
-
     private String value(String value) {
         return value == null || value.isBlank() ? "확인 필요" : value;
     }
 
+    // -------------------------------------------------------------------------
+    // 내부 데이터 구조
+    // -------------------------------------------------------------------------
+
+    // 복지 사이트 고정 답변에 사용할 표시 정보
+    private record WelfareSiteSpec(
+            String host,
+            String displayName,
+            String description
+    ) {
+    }
+
+    // 검수된 고정 답변에 연결할 공식 상세 페이지 정보
+    private record ExternalDocumentSpec(
+            String host,
+            String title,
+            String url
+    ) {
+    }
+
+    // 전체 지역명을 시·도와 시·군·구로 분리해 관리
     private record RegionParts(String sido, String sigungu) {
 
         private static Optional<RegionParts> from(String fullName) {
@@ -507,19 +559,5 @@ public class AiStarterQuestionRouter {
         private String displayName() {
             return sido + " " + sigungu;
         }
-    }
-
-    private record WelfareSiteSpec(
-            String host,
-            String displayName,
-            String description
-    ) {
-    }
-
-    private record ExternalDocumentSpec(
-            String host,
-            String title,
-            String url
-    ) {
     }
 }
