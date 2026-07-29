@@ -7,6 +7,7 @@ import com.bodeum.domain.region.entity.Region;
 import com.bodeum.domain.user.entity.User;
 import com.bodeum.domain.user.enums.DisabilityType;
 import com.bodeum.domain.user.enums.InterestCategory;
+import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -14,7 +15,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 class UserProfileResponseTest {
 
     @Test
-    void exposesNestedChildProfile() {
+    void exposesAccountMetadataAndNestedChildProfile() {
         User user = User.createSocialUser(
                 SocialProvider.KAKAO,
                 "kakao-user-1",
@@ -27,9 +28,16 @@ class UserProfileResponseTest {
                 List.of(DisabilityType.AUTISM, DisabilityType.CEREBRAL_PALSY),
                 "언어치료"
         );
+        Instant persistedAt = Instant.parse("2026-07-16T00:00:00Z");
+        ReflectionTestUtils.setField(user, "createdAt", persistedAt);
+        ReflectionTestUtils.setField(user, "updatedAt", persistedAt);
 
         UserProfileResponse response = UserProfileResponse.from(user, 0);
 
+        assertThat(response.email()).isEqualTo("parent@example.com");
+        assertThat(response.provider()).isEqualTo("kakao");
+        assertThat(response.joinedAt()).isEqualTo(persistedAt);
+        assertThat(response.updatedAt()).isEqualTo(persistedAt);
         assertThat(response.childProfile().nickname()).isEqualTo("민준");
         assertThat(response.childProfile().birth()).isEqualTo("2020-03");
         assertThat(response.childProfile().disabilityTypes()).containsExactly(

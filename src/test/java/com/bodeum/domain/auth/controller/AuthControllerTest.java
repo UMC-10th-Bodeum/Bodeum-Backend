@@ -74,10 +74,11 @@ class AuthControllerTest {
         assertThat(loginBody.at("/result/refreshToken").asText()).isNotEmpty();
         String accessToken = loginBody.at("/result/accessToken").asText();
 
-        mockMvc.perform(get("/api/v1/users/me/dashboard")
+        mockMvc.perform(get("/api/v1/users/me/profile")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.result.userId").isNumber())
+                .andExpect(jsonPath("$.result.provider").value("kakao"))
                 .andExpect(jsonPath("$.result.level").isNumber());
     }
 
@@ -466,7 +467,9 @@ class AuthControllerTest {
         assertThat(openApi.at("/paths/~1api~1v1~1users~1me~1summary").isMissingNode())
                 .isTrue();
         assertThat(openApi.at("/paths/~1api~1v1~1users~1me~1profile/get").isMissingNode())
-                .isTrue();
+                .isFalse();
+        assertThat(hasParameter(openApi, "/paths/~1api~1v1~1users~1me~1profile/get/parameters", "userId"))
+                .isFalse();
         assertThat(hasParameter(openApi, "/paths/~1api~1v1~1users~1me~1profile/patch/parameters", "userId"))
                 .isFalse();
         assertThat(hasParameter(openApi, "/paths/~1api~1v1~1onboarding~1child-profile/post/parameters", "userId"))

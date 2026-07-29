@@ -72,6 +72,20 @@ public class UserController {
     }
 
     @Operation(
+            summary = "내 프로필 조회",
+            description = "설정 화면 초기 데이터와 온보딩 재진입에 필요한 현재 사용자의 상세 프로필을 조회한다."
+    )
+    @GetMapping("/me/profile")
+    public ApiResponse<UserProfileResponse> getProfile(
+            @LoginUser Long userId
+    ) {
+        return ApiResponse.of(
+                GeneralSuccessCode.OK,
+                userService.getProfile(userId)
+        );
+    }
+
+    @Operation(
             summary = "마이페이지 대시보드 조회",
             description = "현재 로그인한 사용자의 기본 프로필과 포인트, 등급, "
                     + "저장한 정보, 작성 게시글, 작성 댓글 수를 조회한다."

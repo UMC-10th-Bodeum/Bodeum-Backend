@@ -5,16 +5,21 @@ import com.bodeum.domain.onboarding.enums.GuardianType;
 import com.bodeum.domain.region.entity.Region;
 import com.bodeum.domain.user.entity.User;
 import com.bodeum.domain.user.enums.GuardianLevel;
+import java.time.Instant;
 import java.util.List;
 
 public record UserProfileResponse(
         Long userId,
         String nickname,
+        String email,
+        String provider,
         String profileImageUrl,
         int point,
         int level,
         String badgeName,
         String levelDescription,
+        Instant joinedAt,
+        Instant updatedAt,
         ChildProfile childProfile,
         String keywordText,
         List<CodeLabelResponse> interestCategories,
@@ -32,11 +37,15 @@ public record UserProfileResponse(
         return new UserProfileResponse(
                 user.getId(),
                 user.getNickname(),
+                user.getEmail(),
+                user.getProvider().getPath(),
                 user.getProfileImageUrl(),
                 totalPoint,
                 level.getLevelNumber(),
                 level.getBadgeName(),
                 level.getDescription(),
+                user.getCreatedAt(),
+                user.getUpdatedAt(),
                 ChildProfile.from(user),
                 user.getKeywordText(),
                 user.getInterestCategories().stream()
