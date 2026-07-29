@@ -9,7 +9,8 @@ import static org.mockito.ArgumentMatchers.any;
 import com.bodeum.domain.auth.enums.SocialProvider;
 import com.bodeum.domain.auth.exception.AuthErrorCode;
 import com.bodeum.domain.auth.repository.AuthLoginCodeRepository;
-import com.bodeum.domain.auth.repository.RefreshTokenSessionRepository;
+import com.bodeum.domain.auth.service.AccessTokenDenylist;
+import com.bodeum.domain.auth.service.RefreshTokenStore;
 import com.bodeum.domain.point.service.PointService;
 import com.bodeum.domain.region.service.RegionService;
 import com.bodeum.domain.user.dto.request.CreateUserAgreementRequest;
@@ -22,6 +23,7 @@ import com.bodeum.domain.user.repository.UserRepository;
 import com.bodeum.global.apiPayload.exception.ProjectException;
 import com.bodeum.global.infrastructure.storage.S3ImageStorage;
 import java.util.Optional;
+import org.springframework.dao.DataAccessResourceFailureException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -36,7 +38,7 @@ class UserServiceTest {
     private UserRepository userRepository;
 
     @Mock
-    private RefreshTokenSessionRepository refreshTokenSessionRepository;
+    private RefreshTokenStore refreshTokenStore;
 
     @Mock
     private S3ImageStorage s3ImageStorage;
@@ -49,6 +51,9 @@ class UserServiceTest {
 
     @Mock
     private AuthLoginCodeRepository authLoginCodeRepository;
+
+    @Mock
+    private AccessTokenDenylist accessTokenDenylist;
 
     @Mock
     private PointService pointService;
@@ -109,6 +114,8 @@ class UserServiceTest {
         User user = User.createSocialUser(
                 SocialProvider.KAKAO, "kakao-1", "parent@example.com", "민준맘");
         ReflectionTestUtils.setField(user, "id", 1L);
+        // withdraw()가 authSubject를 새 값으로 교체하므로, 폐기 대상인 옛 값을 미리 캡처한다.
+        String previousAuthSubject = user.getAuthSubject();
         given(userRepository.findById(1L)).willReturn(Optional.of(user));
 
         UserWithdrawResponse response = userService.withdraw(1L);
@@ -116,9 +123,29 @@ class UserServiceTest {
         assertThat(response.success()).isTrue();
         assertThat(user.isWithdrawn()).isTrue();
         assertThat(user.getDeletedAt()).isNotNull();
-        // 개인정보 파기와 세션 폐기가 수행된다.
-        then(refreshTokenSessionRepository).should().deleteByUserId(1L);
+        // 개인정보 파기와 세션 폐기(전체 기기)가 수행되고, access token은 strict로 폐기된다.
+        then(accessTokenDenylist).should()
+                .revokeAllBefore(org.mockito.ArgumentMatchers.eq(previousAuthSubject), any());
+        then(refreshTokenStore).should().revokeAll(1L);
         then(authLoginCodeRepository).should().deleteByUserId(1L);
+    }
+
+    @Test
+    void withdrawFailsBeforeMutationWhenDenylistRegistrationFails() {
+        User user = User.createSocialUser(
+                SocialProvider.KAKAO, "kakao-1", "parent@example.com", "민준맘");
+        ReflectionTestUtils.setField(user, "id", 1L);
+        String previousAuthSubject = user.getAuthSubject();
+        given(userRepository.findById(1L)).willReturn(Optional.of(user));
+        org.mockito.BDDMockito.willThrow(new DataAccessResourceFailureException("redis down"))
+                .given(accessTokenDenylist)
+                .revokeAllBefore(org.mockito.ArgumentMatchers.eq(previousAuthSubject), any());
+
+        assertThatThrownBy(() -> userService.withdraw(1L))
+                .isInstanceOf(DataAccessResourceFailureException.class);
+
+        assertThat(user.isWithdrawn()).isFalse();
+        then(refreshTokenStore).shouldHaveNoInteractions();
     }
 
     @Test

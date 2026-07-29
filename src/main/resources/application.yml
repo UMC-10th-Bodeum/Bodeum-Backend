@@ -16,6 +16,17 @@ spring:
     username: ${DB_USER}
     password: ${DB_PW}
 
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      username: ${REDIS_USERNAME:default}
+      password: ${REDIS_PASSWORD:}
+      ssl:
+        enabled: ${REDIS_SSL:false}
+      connect-timeout: ${REDIS_CONNECT_TIMEOUT:2s}
+      timeout: ${REDIS_TIMEOUT:2s}
+
   jpa:
     database: mysql
     database-platform: org.hibernate.dialect.MySQLDialect
@@ -96,6 +107,7 @@ bodeum:
     refresh-token-ttl: ${AUTH_REFRESH_TOKEN_TTL:14d}
     # 프론트가 콜백 code를 교환할 때까지의 짧은 핸드오프 창.
     login-code-ttl: ${AUTH_LOGIN_CODE_TTL:60s}
+    redis-enabled: ${REDIS_ENABLED:false}
   oauth:
     base-url: ${BODEUM_BASE_URL:http://localhost:8080}
     mock-enabled: ${OAUTH_MOCK_ENABLED:false}

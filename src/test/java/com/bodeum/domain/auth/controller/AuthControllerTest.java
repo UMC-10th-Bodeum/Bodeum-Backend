@@ -151,6 +151,45 @@ class AuthControllerTest {
     }
 
     @Test
+    void logoutRevokesOnlyRequestedDeviceSession() throws Exception {
+        JsonNode firstDevice = login("multi-device-code");
+        JsonNode secondDevice = login("multi-device-code");
+
+        mockMvc.perform(post("/api/v1/auth/logout")
+                        .header(
+                                HttpHeaders.AUTHORIZATION,
+                                "Bearer " + firstDevice.at("/result/accessToken").asText()
+                        )
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "refreshToken", firstDevice.at("/result/refreshToken").asText()
+                        ))))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/v1/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "refreshToken", secondDevice.at("/result/refreshToken").asText()
+                        ))))
+                .andExpect(status().isOk());
+
+        // 다른 기기의 access token은 계속 인증에 사용할 수 있다(인증이 필요한 임의의 조회로 확인).
+        mockMvc.perform(get("/api/v1/users/me/onboarding-status")
+                        .header(
+                                HttpHeaders.AUTHORIZATION,
+                                "Bearer " + secondDevice.at("/result/accessToken").asText()
+                        ))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/v1/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "refreshToken", firstDevice.at("/result/refreshToken").asText()
+                        ))))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
     void loginRedirectForConfiguredProviderIncludesState() throws Exception {
         MvcResult result = mockMvc.perform(get("/api/v1/auth/login/naver"))
                 .andExpect(status().isFound())

@@ -1,8 +1,7 @@
 package com.bodeum.domain.auth.service;
 
-import com.bodeum.domain.auth.entity.RefreshTokenSession;
 import com.bodeum.domain.auth.exception.AuthErrorCode;
-import com.bodeum.domain.auth.repository.RefreshTokenSessionRepository;
+import com.bodeum.domain.auth.service.JwtTokenProvider.ParsedClaims;
 import com.bodeum.domain.user.entity.User;
 import com.bodeum.domain.user.service.UserService;
 import com.bodeum.global.apiPayload.exception.ProjectException;
@@ -15,6 +14,7 @@ import java.time.Instant;
 import java.util.Base64;
 import java.util.HexFormat;
 import java.util.Optional;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,7 +32,8 @@ public class AuthTokenService {
     private final UserService userService;
     private final JwtTokenProvider jwtTokenProvider;
     private final AuthTokenProperties authTokenProperties;
-    private final RefreshTokenSessionRepository refreshTokenSessionRepository;
+    private final RefreshTokenStore refreshTokenStore;
+    private final AccessTokenDenylist accessTokenDenylist;
 
     private final SecureRandom secureRandom = new SecureRandom();
 
@@ -43,6 +44,10 @@ public class AuthTokenService {
         User user = userService.findActiveUser(userId)
                 .orElseThrow(() -> new ProjectException(AuthErrorCode.INACTIVE_USER));
 
+        return issueTokens(user, UUID.randomUUID().toString());
+    }
+
+    private AuthTokenPair issueTokens(User user, String familyId) {
         Instant now = Instant.now();
         Instant accessTokenExpiresAt = now.plus(authTokenProperties.getAccessTokenTtl());
         Instant refreshTokenExpiresAt = now.plus(authTokenProperties.getRefreshTokenTtl());
@@ -53,57 +58,81 @@ public class AuthTokenService {
                 accessTokenExpiresAt
         );
         String refreshToken = generateRefreshToken();
-        refreshTokenSessionRepository.save(RefreshTokenSession.create(
-                hashToken(refreshToken),
+        String tokenHash = hashToken(refreshToken);
+        boolean saved = refreshTokenStore.save(
+                tokenHash,
                 user.getId(),
-                refreshTokenExpiresAt
-        ));
+                familyId,
+                refreshTokenExpiresAt,
+                authTokenProperties.getRefreshTokenTtl()
+        );
+        if (!saved) {
+            // 같은 family가 logout과 경쟁해 이미 폐기된 경우 새 토큰을 반환하지 않는다.
+            throw new ProjectException(AuthErrorCode.INVALID_REFRESH_TOKEN);
+        }
 
         return new AuthTokenPair(accessToken, refreshToken, accessTokenExpiresAt, refreshTokenExpiresAt);
     }
 
     @Transactional(readOnly = true)
     public Optional<AuthUserPrincipal> authenticate(String accessToken) {
-        return jwtTokenProvider.parseAuthSubject(accessToken)
-                .flatMap(userService::findActiveUserByAuthSubject)
+        return jwtTokenProvider.parseClaims(accessToken)
+                .flatMap(this::resolvePrincipal);
+    }
+
+    private Optional<AuthUserPrincipal> resolvePrincipal(ParsedClaims claims) {
+        // 폐기(로그아웃·탈퇴)된 토큰은 사용자 조회보다 먼저 걸러낸다.
+        if (accessTokenDenylist.isRevoked(
+                claims.authSubject(),
+                claims.tokenId(),
+                claims.issuedAt()
+        )) {
+            return Optional.empty();
+        }
+
+        return userService
+                .findActiveUserByAuthSubject(claims.authSubject())
                 .map(this::toPrincipal);
     }
 
     @Transactional
     public AuthTokenPair refresh(String refreshToken) {
         String tokenHash = hashToken(refreshToken);
-        Instant now = Instant.now();
+        RefreshTokenStore.ConsumedSession session = refreshTokenStore.consume(tokenHash, Instant.now())
+                .orElseThrow(() -> new ProjectException(AuthErrorCode.INVALID_REFRESH_TOKEN));
 
-        RefreshTokenSession session = refreshTokenSessionRepository.findByTokenHashForUpdate(tokenHash)
-                .orElse(null);
-        if (session == null || session.isExpired(now)) {
-            if (session != null) {
-                refreshTokenSessionRepository.delete(session);
-            }
-            throw new ProjectException(AuthErrorCode.INVALID_REFRESH_TOKEN);
-        }
+        User user = userService.findActiveUser(session.userId())
+                .orElseThrow(() -> new ProjectException(AuthErrorCode.INACTIVE_USER));
 
-        refreshTokenSessionRepository.delete(session);
-
-        // issueTokens가 활성 사용자 검증(INACTIVE_USER)을 수행하므로 여기서 중복 조회하지 않는다.
-        return issueTokens(session.getUserId());
+        // refresh 회전 뒤에도 기기별 session-family를 유지한다.
+        return issueTokens(user, session.familyId());
     }
 
     @Transactional
     public void revoke(String refreshToken) {
         if (refreshToken != null && !refreshToken.isBlank()) {
-            refreshTokenSessionRepository.findById(hashToken(refreshToken))
-                    .ifPresent(refreshTokenSessionRepository::delete);
+            refreshTokenStore.revokeFamily(null, hashToken(refreshToken));
         }
     }
 
     @Transactional
     public void revoke(Long userId, String refreshToken) {
         if (refreshToken != null && !refreshToken.isBlank()) {
-            refreshTokenSessionRepository.findById(hashToken(refreshToken))
-                    .filter(session -> session.getUserId().equals(userId))
-                    .ifPresent(refreshTokenSessionRepository::delete);
+            refreshTokenStore.revokeFamily(userId, hashToken(refreshToken));
         }
+    }
+
+    /**
+     * 일반 로그아웃에 사용한 access token 하나만 폐기한다.
+     * 회원탈퇴의 사용자 단위 폐기는 UserService에서 별도로 처리한다.
+     *
+     * <p>파싱 불가(만료·손상) 토큰은 이미 인증에 쓸 수 없으므로 폐기 대상이 아니며, 조용히 넘어간다.
+     * 여기서 예외를 던지면 앞 단계에서 이미 refresh 세션이 폐기됐는데 응답만 실패가 되어,
+     * 클라이언트가 로그아웃 실패로 오인하고 재시도해도 계속 실패한다.
+     */
+    public void revokeAccessToken(String accessToken) {
+        jwtTokenProvider.parseClaims(accessToken)
+                .ifPresent(claims -> accessTokenDenylist.revokeToken(claims.tokenId(), claims.expiresAt()));
     }
 
     private AuthUserPrincipal toPrincipal(User user) {
@@ -116,7 +145,7 @@ public class AuthTokenService {
     }
 
     private void purgeExpiredSessions() {
-        refreshTokenSessionRepository.deleteExpired(Instant.now());
+        refreshTokenStore.purgeExpired(Instant.now());
     }
 
     private String generateRefreshToken() {

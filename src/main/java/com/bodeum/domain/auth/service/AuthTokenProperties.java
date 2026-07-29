@@ -26,4 +26,7 @@ public class AuthTokenProperties {
      * 프론트가 code를 교환(exchange)할 때까지의 짧은 핸드오프 창이라 기본값은 60초다.
      */
     private Duration loginCodeTtl = Duration.ofSeconds(60);
+
+    /** Redis를 인증 임시 데이터·refresh 세션 저장소로 사용할지 여부. */
+    private boolean redisEnabled;
 }

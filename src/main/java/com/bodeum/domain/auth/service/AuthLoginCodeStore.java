@@ -8,6 +8,7 @@ import java.time.Instant;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -20,11 +21,25 @@ import org.springframework.util.StringUtils;
 @RequiredArgsConstructor
 public class AuthLoginCodeStore {
 
+    private static final String KEY_PREFIX = "bodeum:auth:login-code:";
+
     private final AuthLoginCodeRepository authLoginCodeRepository;
     private final AuthTokenProperties authTokenProperties;
+    private final StringRedisTemplate redisTemplate;
 
     @Transactional
     public String issue(Long userId, boolean isNewUser) {
+        if (authTokenProperties.isRedisEnabled()) {
+            String code = UUID.randomUUID().toString();
+            String value = userId + ":" + isNewUser;
+            redisTemplate.opsForValue().set(
+                    KEY_PREFIX + code,
+                    value,
+                    authTokenProperties.getLoginCodeTtl()
+            );
+            return code;
+        }
+
         purgeExpired();
 
         String code = UUID.randomUUID().toString();
@@ -40,6 +55,22 @@ public class AuthLoginCodeStore {
     public Consumed consume(String code) {
         if (!StringUtils.hasText(code)) {
             throw new ProjectException(AuthErrorCode.INVALID_LOGIN_CODE);
+        }
+
+        if (authTokenProperties.isRedisEnabled()) {
+            String value = redisTemplate.opsForValue().getAndDelete(KEY_PREFIX + code);
+            if (value == null) {
+                throw new ProjectException(AuthErrorCode.INVALID_LOGIN_CODE);
+            }
+            String[] parts = value.split(":", -1);
+            if (parts.length != 2) {
+                throw new ProjectException(AuthErrorCode.INVALID_LOGIN_CODE);
+            }
+            try {
+                return new Consumed(Long.parseLong(parts[0]), Boolean.parseBoolean(parts[1]));
+            } catch (NumberFormatException e) {
+                throw new ProjectException(AuthErrorCode.INVALID_LOGIN_CODE);
+            }
         }
 
         AuthLoginCode entry = authLoginCodeRepository.findByCodeForUpdate(code)

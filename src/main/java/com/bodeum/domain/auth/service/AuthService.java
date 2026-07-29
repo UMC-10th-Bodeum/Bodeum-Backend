@@ -99,9 +99,13 @@ public class AuthService {
         return AuthTokenResponse.from(authTokenService.refresh(refreshToken));
     }
 
-    public void logout(Long userId, String refreshToken) {
-        userService.getCurrentUser(userId);
+    public void logout(Long userId, String refreshToken, String accessToken) {
+        // refresh는 전달된 토큰의 session-family만 먼저 폐기한다. 다른 기기 family는 유지한다.
+        // refresh가 먼저 회전했다면 family 폐기가 새 토큰까지 제거하고, logout이 먼저라면
+        // revoked-family marker가 뒤늦은 회전 저장을 거부한다.
         authTokenService.revoke(userId, refreshToken);
+        // 현재 요청에 사용한 access token만 폐기한다. 같은 사용자의 다른 기기 토큰에는 영향이 없다.
+        authTokenService.revokeAccessToken(accessToken);
     }
 
     private URI buildFrontRedirectUri(String loginCode) {
