@@ -58,7 +58,7 @@ class NewsControllerIntegrationTest {
     private RegionRepository regionRepository;
 
     @Test
-    void getNewsFiltersByRegionCategoryAndStatusAndSortsLatestFirst() throws Exception {
+    void getNewsFiltersByRegionIdCategoryAndStatusAndSortsByViewCountByDefault() throws Exception {
         Region seoul = regionRepository.save(Region.create("서울특별시", "강남구"));
         Region suwon = regionRepository.save(Region.create("경기도", "수원시"));
         NewsCategory volunteer = newsCategoryRepository.save(
@@ -83,6 +83,9 @@ class NewsControllerIntegrationTest {
                 LocalDateTime.of(2026, 7, 2, 10, 0),
                 RecruitmentStatus.OPEN
         ));
+        olderSeoulNews.increaseViewCount();
+        olderSeoulNews.increaseViewCount();
+        latestSeoulNews.increaseViewCount();
         newsRepository.save(news(
                 volunteer,
                 source,
@@ -96,18 +99,110 @@ class NewsControllerIntegrationTest {
         mockMvc.perform(get("/api/v1/news")
                         .param("page", "0")
                         .param("size", "10")
-                        .param("sort", "latest")
-                        .param("region", "서울")
+                        .param("regionId", seoul.getId().toString())
                         .param("category", "VOLUNTEER")
                         .param("status", "RECRUITING"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.isSuccess").value(true))
                 .andExpect(jsonPath("$.code").value("COMMON200_1"))
                 .andExpect(jsonPath("$.result.totalElements").value(2))
-                .andExpect(jsonPath("$.result.items[0].newsId").value(latestSeoulNews.getId()))
+                .andExpect(jsonPath("$.result.items[0].newsId").value(olderSeoulNews.getId()))
                 .andExpect(jsonPath("$.result.items[0].status").value("RECRUITING"))
                 .andExpect(jsonPath("$.result.items[0].region").value("서울특별시 강남구"))
-                .andExpect(jsonPath("$.result.items[1].newsId").value(olderSeoulNews.getId()));
+                .andExpect(jsonPath("$.result.items[1].newsId").value(latestSeoulNews.getId()));
+    }
+
+    @Test
+    void getNewsSortsByScrapCount() throws Exception {
+        Region region = regionRepository.save(Region.create("서울특별시", "강남구"));
+        NewsCategory category = newsCategoryRepository.save(
+                NewsCategory.create(NewsType.ACTIVITY, "VOLUNTEER", 1)
+        );
+        NewsSource source = newsSourceRepository.save(source());
+        News lessScrapped = newsRepository.save(news(
+                category,
+                source,
+                region.getId(),
+                "less-scrapped",
+                "저장 수가 적은 소식",
+                LocalDateTime.of(2026, 7, 2, 10, 0),
+                RecruitmentStatus.OPEN
+        ));
+        News moreScrapped = newsRepository.save(news(
+                category,
+                source,
+                region.getId(),
+                "more-scrapped",
+                "저장 수가 많은 소식",
+                LocalDateTime.of(2026, 7, 1, 10, 0),
+                RecruitmentStatus.OPEN
+        ));
+        lessScrapped.increaseScrapCount();
+        moreScrapped.increaseScrapCount();
+        moreScrapped.increaseScrapCount();
+
+        mockMvc.perform(get("/api/v1/news")
+                        .param("sort", "SCRAP")
+                        .param("regionId", region.getId().toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.items[0].newsId").value(moreScrapped.getId()))
+                .andExpect(jsonPath("$.result.items[1].newsId").value(lessScrapped.getId()));
+    }
+
+    @Test
+    void getNewsFiltersAllCitiesByRegionLevel1() throws Exception {
+        Region suwon = regionRepository.save(Region.create("경기도", "수원시"));
+        Region guri = regionRepository.save(Region.create("경기도", "구리시"));
+        Region seongnam = regionRepository.save(Region.create("경기도", "성남시"));
+        Region seoul = regionRepository.save(Region.create("서울특별시", "강남구"));
+        NewsCategory category = newsCategoryRepository.save(
+                NewsCategory.create(NewsType.ACTIVITY, "WELFARE_PROGRAM", 1)
+        );
+        NewsSource source = newsSourceRepository.save(source());
+        News suwonNews = newsRepository.save(news(
+                category,
+                source,
+                suwon.getId(),
+                "suwon-region-level-1",
+                "수원 소식",
+                LocalDateTime.of(2026, 7, 1, 10, 0),
+                null
+        ));
+        News guriNews = newsRepository.save(news(
+                category,
+                source,
+                guri.getId(),
+                "guri-region-level-1",
+                "구리 소식",
+                LocalDateTime.of(2026, 7, 2, 10, 0),
+                null
+        ));
+        News seongnamNews = newsRepository.save(news(
+                category,
+                source,
+                seongnam.getId(),
+                "seongnam-region-level-1",
+                "성남 소식",
+                LocalDateTime.of(2026, 7, 3, 10, 0),
+                null
+        ));
+        newsRepository.save(news(
+                category,
+                source,
+                seoul.getId(),
+                "seoul-region-level-1",
+                "서울 소식",
+                LocalDateTime.of(2026, 7, 4, 10, 0),
+                null
+        ));
+
+        mockMvc.perform(get("/api/v1/news")
+                        .param("regionLevel1", "경기도"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.totalElements").value(3))
+                .andExpect(jsonPath("$.result.items[0].newsId").value(seongnamNews.getId()))
+                .andExpect(jsonPath("$.result.items[1].newsId").value(guriNews.getId()))
+                .andExpect(jsonPath("$.result.items[2].newsId").value(suwonNews.getId()));
     }
 
     @Test
@@ -316,7 +411,18 @@ class NewsControllerIntegrationTest {
     }
 
     @Test
-    void searchNewsMatchesTitleContentSourceNameAndRegionAndSortsLatestFirst() throws Exception {
+    void getNewsRejectsSortOtherThanViewOrScrap() throws Exception {
+        mockMvc.perform(get("/api/v1/news").param("sort", "latest"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("COMMON400_1"));
+
+        mockMvc.perform(get("/api/v1/news").param("sort", "review"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("COMMON400_1"));
+    }
+
+    @Test
+    void searchNewsMatchesTitleContentSourceNameAndRegionAndSortsByViewCountByDefault() throws Exception {
         Region seoul = regionRepository.save(Region.create("서울특별시", "강남구"));
         Region suwon = regionRepository.save(Region.create("경기도", "수원시"));
         NewsCategory volunteer = newsCategoryRepository.save(
@@ -371,6 +477,12 @@ class NewsControllerIntegrationTest {
                 LocalDateTime.of(2026, 7, 4, 10, 0),
                 RecruitmentStatus.OPEN
         ));
+        titleMatch.increaseViewCount();
+        contentMatch.increaseViewCount();
+        contentMatch.increaseViewCount();
+        sourceMatch.increaseViewCount();
+        sourceMatch.increaseViewCount();
+        sourceMatch.increaseViewCount();
 
         mockMvc.perform(get("/api/v1/news/search")
                         .param("keyword", "봉사")
@@ -442,12 +554,48 @@ class NewsControllerIntegrationTest {
 
         mockMvc.perform(get("/api/v1/news/search")
                         .param("keyword", "봉사")
-                        .param("region", "서울")
+                        .param("regionId", seoul.getId().toString())
                         .param("category", "VOLUNTEER")
                         .param("status", "RECRUITING"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.result.totalElements").value(1))
                 .andExpect(jsonPath("$.result.items[0].newsId").value(expected.getId()));
+    }
+
+    @Test
+    void searchNewsSortsByScrapCount() throws Exception {
+        NewsCategory category = newsCategoryRepository.save(
+                NewsCategory.create(NewsType.ACTIVITY, "VOLUNTEER", 1)
+        );
+        NewsSource source = newsSourceRepository.save(source());
+        News lessScrapped = newsRepository.save(news(
+                category,
+                source,
+                null,
+                "search-less-scrapped",
+                "발달 프로그램 안내",
+                LocalDateTime.of(2026, 7, 2, 10, 0),
+                RecruitmentStatus.OPEN
+        ));
+        News moreScrapped = newsRepository.save(news(
+                category,
+                source,
+                null,
+                "search-more-scrapped",
+                "발달 프로그램 모집",
+                LocalDateTime.of(2026, 7, 1, 10, 0),
+                RecruitmentStatus.OPEN
+        ));
+        lessScrapped.increaseScrapCount();
+        moreScrapped.increaseScrapCount();
+        moreScrapped.increaseScrapCount();
+
+        mockMvc.perform(get("/api/v1/news/search")
+                        .param("keyword", "발달")
+                        .param("sort", "SCRAP"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.items[0].newsId").value(moreScrapped.getId()))
+                .andExpect(jsonPath("$.result.items[1].newsId").value(lessScrapped.getId()));
     }
 
     @Test
@@ -514,7 +662,7 @@ class NewsControllerIntegrationTest {
         deleted.delete();
 
         mockMvc.perform(get("/api/v1/news/search/suggestions")
-                        .param("keyword", " 봉 ")
+                        .param("keyword", " 봉사 ")
                         .param("size", "10"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.isSuccess").value(true))
@@ -547,7 +695,7 @@ class NewsControllerIntegrationTest {
         }
 
         mockMvc.perform(get("/api/v1/news/search/suggestions")
-                        .param("keyword", "봉"))
+                        .param("keyword", "봉사"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.result.suggestions.length()").value(10));
     }
@@ -569,7 +717,17 @@ class NewsControllerIntegrationTest {
                 .andExpect(jsonPath("$.code").value("COMMON400_1"));
 
         mockMvc.perform(get("/api/v1/news/search/suggestions")
-                        .param("keyword", "봉")
+                        .param("keyword", "봉"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("COMMON400_1"));
+
+        mockMvc.perform(get("/api/v1/news/search/suggestions")
+                        .param("keyword", " 봉 "))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("COMMON400_1"));
+
+        mockMvc.perform(get("/api/v1/news/search/suggestions")
+                        .param("keyword", "봉사")
                         .param("size", "21"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("COMMON400_1"));

@@ -1,5 +1,6 @@
 package com.bodeum.domain.news.controller;
 
+import com.bodeum.domain.news.dto.NewsSort;
 import com.bodeum.domain.news.dto.NewsStatus;
 import com.bodeum.domain.news.dto.response.NewsDetailResponse;
 import com.bodeum.domain.news.dto.response.NewsListResponse;
@@ -20,7 +21,6 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 import java.util.List;
@@ -45,21 +45,18 @@ public class NewsController {
     private final NewsScrapService newsScrapService;
 
     @GetMapping
-    @Operation(summary = "소식 목록 조회", description = "최신 소식과 모집 상태별 소식을 조회한다.")
+    @Operation(summary = "소식 목록 조회", description = "조회 수 또는 저장 수와 필터를 기준으로 소식을 조회한다.")
     public ApiResponse<NewsListResponse> getNews(
             @Parameter(description = "페이지 번호(0부터 시작)", example = "0")
             @RequestParam(defaultValue = "0") @Min(0) int page,
             @Parameter(description = "페이지 크기", example = "10")
             @RequestParam(defaultValue = "10") @Min(1) @Max(100) int size,
-            @Parameter(
-                    description = "정렬 기준",
-                    example = "latest",
-                    schema = @Schema(allowableValues = "latest")
-            )
-            @RequestParam(defaultValue = "latest")
-            @Pattern(regexp = "latest") String sort,
-            @Parameter(description = "지역", example = "서울")
-            @RequestParam(required = false) @Size(max = 50) String region,
+            @Parameter(description = "정렬 기준", schema = @Schema(allowableValues = {"VIEW", "SCRAP"}))
+            @RequestParam(defaultValue = "VIEW") NewsSort sort,
+            @Parameter(description = "시/군/구 지역 ID(regionLevel1보다 우선)", example = "1")
+            @RequestParam(required = false) @Positive Long regionId,
+            @Parameter(description = "시/도 이름. regionId가 없으면 해당 시/도 전체 조회", example = "경기도")
+            @RequestParam(required = false) @Size(max = 50) String regionLevel1,
             @Parameter(description = "카테고리", example = "VOLUNTEER")
             @RequestParam(required = false) @Size(max = 50) String category,
             @Parameter(description = "모집 상태", example = "RECRUITING")
@@ -67,7 +64,15 @@ public class NewsController {
     ) {
         return ApiResponse.of(
                 GeneralSuccessCode.OK,
-                newsQueryService.getNews(page, size, region, category, status)
+                newsQueryService.getNews(
+                        page,
+                        size,
+                        sort,
+                        regionId,
+                        regionLevel1,
+                        category,
+                        status
+                )
         );
     }
 
@@ -80,8 +85,12 @@ public class NewsController {
             @RequestParam(defaultValue = "0") @Min(0) int page,
             @Parameter(description = "페이지 크기", example = "10")
             @RequestParam(defaultValue = "10") @Min(1) @Max(100) int size,
-            @Parameter(description = "지역", example = "서울")
-            @RequestParam(required = false) @Size(max = 50) String region,
+            @Parameter(description = "정렬 기준", schema = @Schema(allowableValues = {"VIEW", "SCRAP"}))
+            @RequestParam(defaultValue = "VIEW") NewsSort sort,
+            @Parameter(description = "시/군/구 지역 ID(regionLevel1보다 우선)", example = "1")
+            @RequestParam(required = false) @Positive Long regionId,
+            @Parameter(description = "시/도 이름. regionId가 없으면 해당 시/도 전체 조회", example = "경기도")
+            @RequestParam(required = false) @Size(max = 50) String regionLevel1,
             @Parameter(description = "카테고리", example = "VOLUNTEER")
             @RequestParam(required = false) @Size(max = 50) String category,
             @Parameter(description = "모집 상태", example = "RECRUITING")
@@ -89,7 +98,16 @@ public class NewsController {
     ) {
         return ApiResponse.of(
                 GeneralSuccessCode.OK,
-                newsQueryService.searchNews(keyword, page, size, region, category, status)
+                newsQueryService.searchNews(
+                        keyword,
+                        page,
+                        size,
+                        sort,
+                        regionId,
+                        regionLevel1,
+                        category,
+                        status
+                )
         );
     }
 
@@ -99,8 +117,8 @@ public class NewsController {
             description = "입력한 검색어가 포함된 활성 소식 제목을 자동완성 검색어로 조회한다."
     )
     public ApiResponse<NewsSearchSuggestionsResponse> getNewsSearchSuggestions(
-            @Parameter(description = "자동완성 검색어", example = "봉")
-            @RequestParam @NotBlank @Size(max = 50) String keyword,
+            @Parameter(description = "자동완성 검색어(2자 이상)", example = "발달")
+            @RequestParam @NotBlank @Size(min = 2, max = 50) String keyword,
             @Parameter(description = "조회 개수", example = "10")
             @RequestParam(defaultValue = "10") @Min(1) @Max(20) int size
     ) {

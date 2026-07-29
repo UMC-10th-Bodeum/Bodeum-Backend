@@ -9,6 +9,7 @@ import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 @Service
 @RequiredArgsConstructor
@@ -28,5 +29,18 @@ public class RegionService {
     public Region getById(Long regionId) {
         return regionRepository.findById(regionId)
                 .orElseThrow(() -> new ProjectException(RegionErrorCode.REGION_NOT_FOUND));
+    }
+
+    @Transactional(readOnly = true)
+    public ResolvedRegionFilter resolveFilter(Long regionId, String regionLevel1) {
+        if (regionId != null) {
+            return ResolvedRegionFilter.applied(List.of(regionId));
+        }
+        if (!StringUtils.hasText(regionLevel1)) {
+            return ResolvedRegionFilter.none();
+        }
+        return ResolvedRegionFilter.applied(
+                regionRepository.findIdsByRegionLevel1(regionLevel1.trim())
+        );
     }
 }

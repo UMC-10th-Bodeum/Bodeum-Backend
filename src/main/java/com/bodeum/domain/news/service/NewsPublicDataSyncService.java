@@ -11,7 +11,9 @@ import com.bodeum.domain.news.repository.NewsCategoryRepository;
 import com.bodeum.domain.news.repository.NewsRepository;
 import com.bodeum.domain.news.repository.NewsSourceRepository;
 import com.bodeum.domain.region.entity.Region;
+import com.bodeum.domain.region.exception.RegionErrorCode;
 import com.bodeum.domain.region.repository.RegionRepository;
+import com.bodeum.global.apiPayload.exception.ProjectException;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
@@ -129,13 +131,7 @@ public class NewsPublicDataSyncService {
             return region.getId();
         }
 
-        String[] parts = regionName.trim().split("\\s+", 2);
-        if (parts.length < 2) {
-            return null;
-        }
-        Region created = regionRepository.save(Region.create(parts[0], parts[1]));
-        regions.put(created.getFullName(), created);
-        return created.getId();
+        throw new ProjectException(RegionErrorCode.REGION_NOT_FOUND);
     }
 
     public record NewsSyncResult(int fetched, int created, int updated) {
