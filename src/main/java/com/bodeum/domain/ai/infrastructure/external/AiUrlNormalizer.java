@@ -13,26 +13,29 @@ public final class AiUrlNormalizer {
     public static String normalize(String url) {
         try {
             String value = url.trim();
-            URI uri = URI.create(value).normalize();
-            if (uri.getScheme() == null) {
-                uri = URI.create("https://" + value).normalize();
-            }
+            String absoluteUrl = value.startsWith("//")
+                    ? "https:" + value
+                    : value.contains("://") ? value : "https://" + value;
+            URI uri = URI.create(absoluteUrl).normalize();
 
             String host = uri.getHost();
             if (host == null || host.isBlank()) {
                 throw new IllegalArgumentException("URL host is required");
             }
+            if (uri.getRawUserInfo() != null) {
+                throw new IllegalArgumentException("URL userinfo is not allowed");
+            }
 
             StringBuilder normalized = new StringBuilder()
                     .append(uri.getScheme().toLowerCase(Locale.ROOT))
                     .append("://");
-            if (uri.getRawUserInfo() != null) {
-                normalized.append(uri.getRawUserInfo()).append('@');
-            }
-            if (host.contains(":")) {
-                normalized.append('[').append(host.toLowerCase(Locale.ROOT)).append(']');
+            String normalizedHost = host.toLowerCase(Locale.ROOT);
+            if (normalizedHost.startsWith("[") && normalizedHost.endsWith("]")) {
+                normalized.append(normalizedHost);
+            } else if (normalizedHost.contains(":")) {
+                normalized.append('[').append(normalizedHost).append(']');
             } else {
-                normalized.append(host.toLowerCase(Locale.ROOT));
+                normalized.append(normalizedHost);
             }
             if (uri.getPort() >= 0) {
                 normalized.append(':').append(uri.getPort());
