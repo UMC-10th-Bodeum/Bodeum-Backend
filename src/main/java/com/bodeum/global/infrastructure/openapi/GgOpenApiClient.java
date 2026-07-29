@@ -43,11 +43,11 @@ public class GgOpenApiClient {
             String responseBody = restClient.get()
                     .uri(uriBuilder -> uriBuilder
                             .path(resourcePath)
-                            .queryParam("KEY", properties.getServiceKey())
+                            .queryParam("KEY", "{serviceKey}")
                             .queryParam("Type", "json")
                             .queryParam("pIndex", page)
                             .queryParam("pSize", pageSize)
-                            .build())
+                            .build(properties.getServiceKey()))
                     .retrieve()
                     .body(String.class);
 
