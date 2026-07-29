@@ -110,45 +110,15 @@ public class AiMessageService {
             User userWithDisabilities
     ) {
 
-        AiUserProfile profile = toProfile(user, userWithDisabilities);
-        Optional<Region> explicitRegion = resolveExplicitRehabRegion(content);
-        Optional<AiStarterQuestionType> starterQuestionType;
-        if (explicitRegion.isPresent()) {
-            Region region = explicitRegion.get();
-            profile = profile.withRegion(
-                    region.getFullName(),
-                    region.getRegionLevel1(),
-                    region.getRegionLevel2()
-            );
-            starterQuestionType =
-                    Optional.of(AiStarterQuestionType.LOCAL_REHAB_CENTERS);
-        } else {
-            starterQuestionType = AiStarterQuestionType.fromQuestion(content);
-        }
-        if (explicitRegion.isEmpty() && starterQuestionType.isEmpty()) {
-            Optional<Region> followUpRegion = resolveRegionFollowUp(
-                    chatRoom.getId(),
-                    content
-            );
-            if (followUpRegion.isPresent()) {
-                Region region = followUpRegion.get();
-                profile = profile.withRegion(
-                        region.getFullName(),
-                        region.getRegionLevel1(),
-                        region.getRegionLevel2()
-                );
-                starterQuestionType =
-                        Optional.of(AiStarterQuestionType.LOCAL_REHAB_CENTERS);
-            }
-        }
-
+        StarterContext starterContext = resolveStarterContext(
+                chatRoom.getId(),
+                content,
+                toProfile(user, userWithDisabilities)
+        );
+        AiUserProfile profile = starterContext.profile();
         Optional<AiStarterQuestionAnswer> starterAnswer =
-                starterQuestionType.isEmpty()
-                        ? Optional.empty()
-                        : starterQuestionRouter.route(
-                                starterQuestionType.get(),
-                                profile
-                        );
+                starterContext.questionType()
+                        .flatMap(type -> starterQuestionRouter.route(type, profile));
         if (starterAnswer.isPresent()) {
             return saveStarterAnswer(chatRoom, userMessage, starterAnswer.get());
         }
@@ -197,6 +167,42 @@ public class AiMessageService {
 
         return sourceBackedResponse(
                 message, citedSources, warningResponse(warning), AiAnswerStatus.ANSWERED);
+    }
+
+    private StarterContext resolveStarterContext(
+            Long chatRoomId,
+            String content,
+            AiUserProfile profile
+    ) {
+        Optional<Region> explicitRegion = resolveExplicitRehabRegion(content);
+        if (explicitRegion.isPresent()) {
+            return localRehabContext(profile, explicitRegion.get());
+        }
+
+        Optional<AiStarterQuestionType> questionType =
+                AiStarterQuestionType.fromQuestion(content);
+        if (questionType.isPresent()) {
+            return new StarterContext(profile, questionType);
+        }
+
+        return resolveRegionFollowUp(chatRoomId, content)
+                .map(region -> localRehabContext(profile, region))
+                .orElseGet(() -> new StarterContext(profile, Optional.empty()));
+    }
+
+    private StarterContext localRehabContext(
+            AiUserProfile profile,
+            Region region
+    ) {
+        AiUserProfile regionalProfile = profile.withRegion(
+                region.getFullName(),
+                region.getRegionLevel1(),
+                region.getRegionLevel2()
+        );
+        return new StarterContext(
+                regionalProfile,
+                Optional.of(AiStarterQuestionType.LOCAL_REHAB_CENTERS)
+        );
     }
 
     private Optional<Region> resolveExplicitRehabRegion(String content) {
@@ -459,6 +465,12 @@ public class AiMessageService {
             log.error("Failed to mark AI user message as FAILED: userMessageId={}",
                     userMessageId, failureStatusException);
         }
+    }
+
+    private record StarterContext(
+            AiUserProfile profile,
+            Optional<AiStarterQuestionType> questionType
+    ) {
     }
 
 }
