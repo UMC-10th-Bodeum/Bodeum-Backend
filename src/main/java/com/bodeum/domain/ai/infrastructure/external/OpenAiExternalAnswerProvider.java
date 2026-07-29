@@ -302,7 +302,7 @@ public class OpenAiExternalAnswerProvider implements AiExternalAnswerProvider {
                 if (url == null) {
                     continue;
                 }
-                String normalizedUrl = normalizeUrl(url);
+                String normalizedUrl = AiUrlNormalizer.normalize(url);
                 AiExternalSource externalSource = findSource(normalizedUrl, sourcesByDomain).orElse(null);
                 if (externalSource == null) {
                     continue;
@@ -330,7 +330,7 @@ public class OpenAiExternalAnswerProvider implements AiExternalAnswerProvider {
             if (url == null || title == null || title.isBlank()) {
                 continue;
             }
-            String normalizedUrl = normalizeUrl(url);
+            String normalizedUrl = AiUrlNormalizer.normalize(url);
             AiExternalSource externalSource = findSource(normalizedUrl, sourcesByDomain).orElse(null);
             if (externalSource == null) {
                 continue;
@@ -386,23 +386,6 @@ public class OpenAiExternalAnswerProvider implements AiExternalAnswerProvider {
                         || normalizedHost.endsWith("." + entry.getKey()))
                 .map(Map.Entry::getValue)
                 .findFirst();
-    }
-
-    private String normalizeUrl(String url) {
-        URI uri = URI.create(url).normalize();
-        try {
-            return new URI(
-                    uri.getScheme() == null ? "https" : uri.getScheme().toLowerCase(Locale.ROOT),
-                    uri.getUserInfo(),
-                    uri.getHost() == null ? null : uri.getHost().toLowerCase(Locale.ROOT),
-                    uri.getPort(),
-                    uri.getPath(),
-                    uri.getQuery(),
-                    null
-            ).toString();
-        } catch (Exception e) {
-            throw new ProjectException(AiErrorCode.AI_RESPONSE_FAILED, e);
-        }
     }
 
     private String sha256(String value) {

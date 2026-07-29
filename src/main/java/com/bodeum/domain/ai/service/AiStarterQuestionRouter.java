@@ -8,6 +8,7 @@ import com.bodeum.domain.ai.enums.AiStarterQuestionType;
 import com.bodeum.domain.ai.exception.AiErrorCode;
 import com.bodeum.domain.ai.infrastructure.external.AiExternalDocumentCandidate;
 import com.bodeum.domain.ai.infrastructure.external.AiExternalDocumentPersistenceService;
+import com.bodeum.domain.ai.infrastructure.external.AiUrlNormalizer;
 import com.bodeum.domain.ai.model.answer.AiStarterQuestionAnswer;
 import com.bodeum.domain.ai.model.rag.AiReferenceDocument;
 import com.bodeum.domain.ai.model.rag.AiUserProfile;
@@ -370,7 +371,7 @@ public class AiStarterQuestionRouter {
         List<AiExternalDocumentCandidate> candidates = sourceSpecs.stream()
                 .map(spec -> {
                     AiExternalSource source = sourcesByHost.get(spec.host());
-                    String url = normalizeUrl(spec.url());
+                    String url = AiUrlNormalizer.normalize(spec.url());
                     return new AiExternalDocumentCandidate(
                             source,
                             spec.title(),
@@ -413,7 +414,7 @@ public class AiStarterQuestionRouter {
     ) {
         List<AiExternalDocumentCandidate> candidates = sources.stream()
                 .map(source -> {
-                    String url = normalizeUrl(preferredUrl(source));
+                    String url = AiUrlNormalizer.normalize(preferredUrl(source));
                     return new AiExternalDocumentCandidate(
                             source,
                             source.getName(),
@@ -462,30 +463,12 @@ public class AiStarterQuestionRouter {
     }
 
     private String normalizedHost(String url) {
-        String host = URI.create(normalizeUrl(url)).getHost();
+        String host = URI.create(AiUrlNormalizer.normalize(url)).getHost();
         if (host == null) {
             return "";
         }
         String normalized = host.toLowerCase(Locale.ROOT);
         return normalized.startsWith("www.") ? normalized.substring(4) : normalized;
-    }
-
-    // URL 정규화
-    private String normalizeUrl(String url) {
-        URI uri = URI.create(url.trim()).normalize();
-        try {
-            return new URI(
-                    uri.getScheme() == null ? "https" : uri.getScheme().toLowerCase(Locale.ROOT),
-                    uri.getUserInfo(),
-                    uri.getHost() == null ? null : uri.getHost().toLowerCase(Locale.ROOT),
-                    uri.getPort(),
-                    uri.getPath(),
-                    uri.getQuery(),
-                    null
-            ).toString();
-        } catch (Exception e) {
-            throw new ProjectException(AiErrorCode.AI_RESPONSE_FAILED, e);
-        }
     }
 
     // 중복 문서 식별에 사용할 URL SHA-256 해시를 생성
