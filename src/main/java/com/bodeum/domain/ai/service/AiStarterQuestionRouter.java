@@ -39,12 +39,12 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class AiStarterQuestionRouter {
 
+    private static final List<String> CIRCLED_NUMBERS =
+            List.of("①", "②", "③", "④", "⑤");
     private static final int LOCAL_CENTER_LIMIT = 5;
     private static final String REGION_REQUIRED_MESSAGE =
             "활동 지역이 설정되어 있지 않습니다. "
                     + "확인할 시·도와 시·군·구를 알려주세요.";
-    private static final List<String> CIRCLED_NUMBERS =
-            List.of("①", "②", "③", "④", "⑤");
     private static final List<WelfareSiteSpec> WELFARE_SITES = List.of(
             new WelfareSiteSpec(
                     "bokjiro.go.kr",
@@ -526,7 +526,7 @@ public class AiStarterQuestionRouter {
     // 재활센터 정보를 사용자 답변에 표시할 Markdown 카드로 변환
     private String centerCard(InfoItem info, int index) {
         StringBuilder card = new StringBuilder("**")
-                .append(CIRCLED_NUMBERS.get(index))
+                .append(centerNumber(index))
                 .append(" ")
                 .append(info.getName())
                 .append("**\n\n`")
@@ -536,6 +536,12 @@ public class AiStarterQuestionRouter {
                 .append("\n\n")
                 .append(value(info.getIntroduction()));
         return card.toString();
+    }
+
+    private String centerNumber(int index) {
+        return index < CIRCLED_NUMBERS.size()
+                ? CIRCLED_NUMBERS.get(index)
+                : (index + 1) + ".";
     }
 
     // INFO 출처의 갱신 시각 결정
