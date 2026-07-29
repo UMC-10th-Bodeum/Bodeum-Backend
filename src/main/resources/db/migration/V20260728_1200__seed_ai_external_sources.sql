@@ -145,6 +145,28 @@ VALUES
         TRUE,
         CURRENT_TIMESTAMP(6),
         CURRENT_TIMESTAMP(6)
+    ),
+    (
+        '보건복지부',
+        'WEBSITE',
+        'https://www.mohw.go.kr/',
+        'https://www.mohw.go.kr/',
+        '보건복지 정책과 장애인 건강·의료비 지원사업 정보를 제공하는 중앙행정기관 공식 사이트',
+        'GOVERNMENT',
+        TRUE,
+        CURRENT_TIMESTAMP(6),
+        CURRENT_TIMESTAMP(6)
+    ),
+    (
+        '국민건강보험공단',
+        'WEBSITE',
+        'https://www.nhis.or.kr/',
+        'https://www.nhis.or.kr/nhis/index.do',
+        '건강보험과 본인부담액상한제, 재난적의료비 지원사업 정보를 제공하는 공공기관 공식 사이트',
+        'PUBLIC_INSTITUTION',
+        TRUE,
+        CURRENT_TIMESTAMP(6),
+        CURRENT_TIMESTAMP(6)
     )
 ON DUPLICATE KEY UPDATE
     entry_url = VALUES(entry_url),
@@ -174,6 +196,59 @@ SELECT
     CURRENT_TIMESTAMP(6)
 FROM ai_external_source source
 WHERE source.base_url = 'https://www.broso.or.kr/'
+ON DUPLICATE KEY UPDATE
+    ai_external_source_id = VALUES(ai_external_source_id),
+    title = VALUES(title),
+    source_url = VALUES(source_url),
+    updated_at = CURRENT_TIMESTAMP(6);
+
+-- 장애아동 의료비 지원 추천 질문의 검수 답변에서 사용하는 공식 상세 페이지를
+-- 실제 응답 출처로 연결할 수 있도록 외부 문서로 미리 등록한다.
+INSERT INTO ai_external_document (
+    ai_external_source_id,
+    title,
+    source_url,
+    source_url_hash,
+    source_updated_at,
+    created_at,
+    updated_at
+)
+SELECT
+    source.ai_external_source_id,
+    document.title,
+    document.source_url,
+    SHA2(document.source_url, 256),
+    NULL,
+    CURRENT_TIMESTAMP(6),
+    CURRENT_TIMESTAMP(6)
+FROM ai_external_source source
+JOIN (
+    SELECT
+        'https://www.mohw.go.kr/' AS base_url,
+        '장애인 의료비 지원' AS title,
+        'https://www.mohw.go.kr/menu.es?mid=a10710060700' AS source_url
+    UNION ALL
+    SELECT
+        'https://www.nhis.or.kr/',
+        '본인부담액상한제',
+        CONCAT(
+            'https://www.nhis.or.kr/nhis/minwon/minwonServiceBoard.do',
+            '?mode=list&etcChar1=446&etcChar2=447&etcChar3=448',
+            '&categories1=446%2C447%2C448&articleLimit=12',
+            '&nhisOrderTy=ORDER_DT&srSearchVal=%EB%B3%B8%EC%9D%B8',
+            '%EB%B6%80%EB%8B%B4%EA%B8%88'
+        )
+    UNION ALL
+    SELECT
+        'https://www.nhis.or.kr/',
+        '재난적의료비 지원사업',
+        CONCAT(
+            'https://www.nhis.or.kr/nhis/minwon/minwonServiceBoard.do',
+            '?mode=view&articleNo=11009687&article.offset=0',
+            '&articleLimit=12&srSearchVal=%EB%B3%B8%EC%9D%B8',
+            '%EB%B6%80%EB%8B%B4'
+        )
+) document ON document.base_url = source.base_url
 ON DUPLICATE KEY UPDATE
     ai_external_source_id = VALUES(ai_external_source_id),
     title = VALUES(title),

@@ -139,6 +139,54 @@ class AiStarterQuestionRouterTest {
     }
 
     @Test
+    void returnsReviewedChildMedicalSupportAnswerWithOfficialSources() {
+        List<AiExternalSource> sources = List.of(
+                source("보건복지부", "https://www.mohw.go.kr/"),
+                source("국민건강보험공단", "https://www.nhis.or.kr/")
+        );
+        when(externalSourceRepository.findAllBySourceTypeAndActiveTrue(
+                AiExternalSourceType.WEBSITE
+        )).thenReturn(sources);
+        when(externalDocumentPersistenceService.saveAll(any())).thenReturn(List.of(
+                document(1L, "https://www.mohw.go.kr/menu.es?mid=a10710060700"),
+                document(2L, "https://www.nhis.or.kr/nhis/minwon/minwonServiceBoard.do"),
+                document(3L, "https://www.nhis.or.kr/nhis/minwon/minwonServiceBoard.do")
+        ));
+
+        var result = router.route(
+                AiStarterQuestionType.CHILD_MEDICAL_SUPPORT,
+                profile("경기도 수원시")
+        ).orElseThrow();
+
+        assertThat(result.hasEvidence()).isTrue();
+        assertThat(result.content()).contains(
+                "장애아동이 받을 수 있는 의료비 지원",
+                "장애인 의료비 지원",
+                "본인부담액상한제",
+                "재난적의료비 지원사업",
+                "2026년 기준, 기준 중위소득 100% 이하"
+        );
+        assertThat(result.sources()).hasSize(3);
+        assertThat(result.sources())
+                .allMatch(source -> source.sourceType() == AiResponseSourceType.SITE);
+    }
+
+    @Test
+    void returnsNoEvidenceWhenMedicalSupportOfficialSourceIsMissing() {
+        when(externalSourceRepository.findAllBySourceTypeAndActiveTrue(
+                AiExternalSourceType.WEBSITE
+        )).thenReturn(List.of(source("보건복지부", "https://www.mohw.go.kr/")));
+
+        var result = router.route(
+                AiStarterQuestionType.CHILD_MEDICAL_SUPPORT,
+                profile(null)
+        ).orElseThrow();
+
+        assertThat(result.hasEvidence()).isFalse();
+        verify(externalDocumentPersistenceService, never()).saveAll(any());
+    }
+
+    @Test
     void returnsRehabCentersInUserActivityRegion() {
         InfoCategory category = org.mockito.Mockito.mock(InfoCategory.class);
         when(category.getSubCategoryKo()).thenReturn("치료·재활 기관");

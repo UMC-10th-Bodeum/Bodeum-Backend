@@ -69,6 +69,41 @@ public class AiStarterQuestionRouter {
                     "장애인 등록, 각종 증명서 발급 등 행정 절차 안내"
             )
     );
+    private static final String CHILD_MEDICAL_SUPPORT_ANSWER = """
+            의료비 관련 제도를 조건별로 나눠서 정리해드릴게요!
+
+            **장애아동이 받을 수 있는 의료비 지원**
+
+            - **장애인 의료비 지원** — 의료급여 2종 또는 차상위 본인부담 경감대상인 등록장애인이 대상이에요. 18세 미만 등록장애인도 대상에 포함되며, 진료비 본인부담금 일부를 지원받을 수 있어요.
+            - **본인부담액상한제** — 소득과 관계없이 모든 건강보험 가입자에게 적용돼요. 1년간 낸 건강보험 본인부담금이 개인별 상한액을 넘으면 초과분을 공단에서 돌려줘요. (비급여·상급병실료 등은 제외)
+            - **재난적의료비 지원사업** — 2026년 기준, 기준 중위소득 100% 이하 가구가 감당하기 어려운 의료비를 부담한 경우, 비급여 포함 의료비 일부를 연간 한도 내에서 지원받을 수 있어요.
+
+            소득 구간과 등록 여부에 따라 해당되는 제도가 달라서, 국민건강보험공단(1577-1000)이나 거주지 주민센터에서 우리 가구 상황에 맞는 지원을 확인해보시는 게 가장 정확해요.
+            """;
+    private static final List<ExternalDocumentSpec> CHILD_MEDICAL_SUPPORT_SOURCES = List.of(
+            new ExternalDocumentSpec(
+                    "mohw.go.kr",
+                    "장애인 의료비 지원",
+                    "https://www.mohw.go.kr/menu.es?mid=a10710060700"
+            ),
+            new ExternalDocumentSpec(
+                    "nhis.or.kr",
+                    "본인부담액상한제",
+                    "https://www.nhis.or.kr/nhis/minwon/minwonServiceBoard.do"
+                            + "?mode=list&etcChar1=446&etcChar2=447&etcChar3=448"
+                            + "&categories1=446%2C447%2C448&articleLimit=12"
+                            + "&nhisOrderTy=ORDER_DT&srSearchVal=%EB%B3%B8%EC%9D%B8"
+                            + "%EB%B6%80%EB%8B%B4%EA%B8%88"
+            ),
+            new ExternalDocumentSpec(
+                    "nhis.or.kr",
+                    "재난적의료비 지원사업",
+                    "https://www.nhis.or.kr/nhis/minwon/minwonServiceBoard.do"
+                            + "?mode=view&articleNo=11009687&article.offset=0"
+                            + "&articleLimit=12&srSearchVal=%EB%B3%B8%EC%9D%B8"
+                            + "%EB%B6%80%EB%8B%B4"
+            )
+    );
     // PM 검수 답변과 근거 출처가 확정되면 이 슬롯에 연결한다.
     private static final String DIAGNOSIS_FIRST_STEPS_ANSWER = "";
     private static final List<String> DIAGNOSIS_FIRST_STEPS_SOURCE_HOSTS = List.of(
@@ -98,9 +133,49 @@ public class AiStarterQuestionRouter {
         return switch (type) {
             case WELFARE_SITES -> Optional.of(welfareSites());
             case LOCAL_REHAB_CENTERS -> Optional.of(localRehabCenters(profile));
+            case CHILD_MEDICAL_SUPPORT -> Optional.of(childMedicalSupport());
             case DIAGNOSIS_FIRST_STEPS -> diagnosisFirstSteps();
-            case CHILD_MEDICAL_SUPPORT, VOUCHER_APPLICATION -> Optional.empty();
+            case VOUCHER_APPLICATION -> Optional.empty();
         };
+    }
+
+    private AiStarterQuestionAnswer childMedicalSupport() {
+        List<AiExternalSource> registeredSources = findRegisteredSources(
+                CHILD_MEDICAL_SUPPORT_SOURCES.stream()
+                        .map(ExternalDocumentSpec::host)
+                        .distinct()
+                        .toList()
+        );
+        if (registeredSources.size()
+                != CHILD_MEDICAL_SUPPORT_SOURCES.stream()
+                .map(ExternalDocumentSpec::host)
+                .distinct()
+                .count()) {
+            return AiStarterQuestionAnswer.noEvidence();
+        }
+
+        Map<String, AiExternalSource> sourcesByHost = registeredSources.stream()
+                .collect(Collectors.toMap(
+                        source -> normalizedHost(source.getBaseUrl()),
+                        Function.identity()
+                ));
+        List<AiExternalDocumentCandidate> candidates = CHILD_MEDICAL_SUPPORT_SOURCES.stream()
+                .map(spec -> {
+                    AiExternalSource source = sourcesByHost.get(spec.host());
+                    String url = normalizeUrl(spec.url());
+                    return new AiExternalDocumentCandidate(
+                            source,
+                            spec.title(),
+                            url,
+                            sha256(url)
+                    );
+                })
+                .toList();
+
+        return AiStarterQuestionAnswer.answered(
+                CHILD_MEDICAL_SUPPORT_ANSWER,
+                persistCandidatesAsReferences(candidates)
+        );
     }
 
     private Optional<AiStarterQuestionAnswer> diagnosisFirstSteps() {
@@ -177,6 +252,12 @@ public class AiStarterQuestionRouter {
                     );
                 })
                 .toList();
+        return persistCandidatesAsReferences(candidates);
+    }
+
+    private List<AiReferenceDocument> persistCandidatesAsReferences(
+            List<AiExternalDocumentCandidate> candidates
+    ) {
         List<AiExternalDocument> documents =
                 externalDocumentPersistenceService.saveAll(candidates);
 
@@ -365,6 +446,13 @@ public class AiStarterQuestionRouter {
             String host,
             String displayName,
             String description
+    ) {
+    }
+
+    private record ExternalDocumentSpec(
+            String host,
+            String title,
+            String url
     ) {
     }
 }
