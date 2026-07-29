@@ -7,6 +7,7 @@ import com.bodeum.domain.news.dto.response.NewsListResponse;
 import com.bodeum.domain.news.dto.response.NewsSearchSuggestionsResponse;
 import com.bodeum.domain.news.dto.response.RelatedRecruitingNewsResponse;
 import com.bodeum.domain.news.entity.News;
+import com.bodeum.domain.news.entity.NewsCategoryCode;
 import com.bodeum.domain.news.entity.RecruitmentStatus;
 import com.bodeum.domain.news.repository.NewsRepository;
 import com.bodeum.domain.news.repository.NewsScrapRepository;
@@ -44,7 +45,7 @@ public class NewsQueryService {
             int page,
             int size,
             String region,
-            String category,
+            NewsCategoryCode category,
             NewsStatus status
     ) {
         List<Long> regionIds = resolveRegionIds(region);
@@ -59,7 +60,7 @@ public class NewsQueryService {
                 Sort.by(Sort.Order.desc("publishedAt"), Sort.Order.desc("id"))
         );
         Page<News> result = newsRepository.findVisibleNews(
-                normalize(category),
+                category == null ? null : category.name(),
                 status == null ? null : status.toEntity(),
                 filterByRegion,
                 regionIds.isEmpty() ? NO_REGION_IDS : regionIds,
@@ -75,7 +76,7 @@ public class NewsQueryService {
             int page,
             int size,
             String region,
-            String category,
+            NewsCategoryCode category,
             NewsStatus status
     ) {
         List<Long> regionIds = resolveRegionIds(region);
@@ -95,7 +96,7 @@ public class NewsQueryService {
                 "%" + normalizedKeyword + "%",
                 !keywordRegionIds.isEmpty(),
                 keywordRegionIds.isEmpty() ? NO_REGION_IDS : keywordRegionIds,
-                normalize(category),
+                category == null ? null : category.name(),
                 status == null ? null : status.toEntity(),
                 filterByRegion,
                 regionIds.isEmpty() ? NO_REGION_IDS : regionIds,
@@ -248,7 +249,4 @@ public class NewsQueryService {
         return value != null && value.toLowerCase(Locale.ROOT).contains(keyword);
     }
 
-    private String normalize(String value) {
-        return StringUtils.hasText(value) ? value.trim() : null;
-    }
 }

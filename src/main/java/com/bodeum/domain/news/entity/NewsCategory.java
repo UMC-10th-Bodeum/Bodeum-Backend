@@ -29,14 +29,22 @@ public class NewsCategory {
     @Column(name = "is_active", nullable = false)
     private Boolean active = true;
 
-    private NewsCategory(NewsType newsType, String name, Integer sortOrder) {
-        this.newsType = newsType;
-        this.name = name;
-        this.sortOrder = sortOrder;
+    private NewsCategory(NewsCategoryCode code) {
+        this.newsType = code.getNewsType();
+        this.name = code.name();
+        this.sortOrder = code.getSortOrder();
         this.active = true;
     }
 
-    public static NewsCategory create(NewsType newsType, String name, Integer sortOrder) {
-        return new NewsCategory(newsType, name, sortOrder);
+    public static NewsCategory create(NewsCategoryCode code) {
+        return new NewsCategory(code);
+    }
+
+    public NewsCategoryCode getCode() {
+        return NewsCategoryCode.fromStoredValue(newsType, name);
+    }
+
+    public String getLabel() {
+        return getCode().getLabel();
     }
 }
