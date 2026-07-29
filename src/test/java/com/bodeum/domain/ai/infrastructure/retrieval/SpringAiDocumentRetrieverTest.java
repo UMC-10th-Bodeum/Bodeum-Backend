@@ -27,6 +27,8 @@ class SpringAiDocumentRetrieverTest {
                 new SpringAiDocumentRetriever(vectorStoreRetriever, 5, 0.7);
         AiUserProfile profile = new AiUserProfile(
                 "서울 강남구",
+                "서울",
+                "강남구",
                 6,
                 List.of("AUTISM_SPECTRUM"),
                 List.of("HOSPITAL_HEALTH"),

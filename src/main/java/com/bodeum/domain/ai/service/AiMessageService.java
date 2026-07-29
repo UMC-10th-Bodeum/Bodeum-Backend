@@ -18,6 +18,7 @@ import com.bodeum.domain.ai.service.port.AiDocumentRetriever;
 import com.bodeum.domain.ai.service.port.AiExternalAnswerProvider;
 import com.bodeum.domain.ai.repository.AiChatRoomRepository;
 import com.bodeum.domain.ai.repository.AiSourceReviewRepository;
+import com.bodeum.domain.region.entity.Region;
 import com.bodeum.domain.user.entity.User;
 import com.bodeum.domain.user.exception.UserErrorCode;
 import com.bodeum.domain.user.repository.UserRepository;
@@ -351,8 +352,11 @@ public class AiMessageService {
             User user,
             User disabilityProfileUser
     ) {
+        Region region = user.getRegion();
         return new AiUserProfile(
-                user.getRegion() == null ? null : user.getRegion().getFullName(),
+                region == null ? null : region.getFullName(),
+                region == null ? null : region.getRegionLevel1(),
+                region == null ? null : region.getRegionLevel2(),
                 user.getChildAge(),
                 disabilityProfileUser.getDisabilityTypes().stream()
                         .map(Enum::name)

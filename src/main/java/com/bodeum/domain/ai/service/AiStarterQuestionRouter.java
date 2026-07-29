@@ -232,14 +232,14 @@ public class AiStarterQuestionRouter {
     }
 
     private AiStarterQuestionAnswer localRehabCenters(AiUserProfile profile) {
-        Optional<RegionParts> region = RegionParts.from(profile.region());
-        if (region.isEmpty()) {
+        if (profile.regionLevel1() == null || profile.regionLevel1().isBlank()
+                || profile.regionLevel2() == null || profile.regionLevel2().isBlank()) {
             return AiStarterQuestionAnswer.regionRequired(REGION_REQUIRED_MESSAGE);
         }
 
         List<InfoItem> centers = infoItemRepository.findRehabCentersByRegion(
-                region.get().sido(),
-                region.get().sigungu(),
+                profile.regionLevel1(),
+                profile.regionLevel2(),
                 PageRequest.of(0, LOCAL_CENTER_LIMIT)
         );
         if (centers.isEmpty()) {
@@ -253,7 +253,7 @@ public class AiStarterQuestionRouter {
                 .mapToObj(index -> centerCard(centers.get(index), index))
                 .collect(Collectors.joining(
                         "\n\n",
-                        region.get().displayName()
+                        displayRegion(profile)
                                 + "에서 확인 가능한 재활센터를 정리해드렸어요!\n"
                                 + "조회, 저장, 후기를 기준으로 정렬된 것이며, 기관의 우수성을 "
                                 + "판단한 결과는 아닙니다.\n"
@@ -262,6 +262,13 @@ public class AiStarterQuestionRouter {
                                 + "방문 전 꼭 전화로 확인해보시는 것을 추천드려요 🍀"
                 ));
         return AiStarterQuestionAnswer.answered(content, references);
+    }
+
+    private String displayRegion(AiUserProfile profile) {
+        if (profile.region() != null && !profile.region().isBlank()) {
+            return profile.region().trim();
+        }
+        return profile.regionLevel1().trim() + " " + profile.regionLevel2().trim();
     }
 
     private AiStarterQuestionAnswer childMedicalSupport() {
@@ -538,26 +545,4 @@ public class AiStarterQuestionRouter {
     ) {
     }
 
-    // 전체 지역명을 시·도와 시·군·구로 분리해 관리
-    private record RegionParts(String sido, String sigungu) {
-
-        private static Optional<RegionParts> from(String fullName) {
-            if (fullName == null || fullName.isBlank()) {
-                return Optional.empty();
-            }
-            String trimmed = fullName.trim();
-            int separator = trimmed.indexOf(' ');
-            if (separator < 1 || separator == trimmed.length() - 1) {
-                return Optional.empty();
-            }
-            return Optional.of(new RegionParts(
-                    trimmed.substring(0, separator),
-                    trimmed.substring(separator + 1).trim()
-            ));
-        }
-
-        private String displayName() {
-            return sido + " " + sigungu;
-        }
-    }
 }

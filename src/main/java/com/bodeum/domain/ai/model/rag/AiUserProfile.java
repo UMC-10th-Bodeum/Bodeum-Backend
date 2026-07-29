@@ -4,6 +4,8 @@ import java.util.List;
 
 public record AiUserProfile(
         String region,
+        String regionLevel1,
+        String regionLevel2,
         Integer childAge,
         List<String> disabilityTypes,
         List<String> interests,

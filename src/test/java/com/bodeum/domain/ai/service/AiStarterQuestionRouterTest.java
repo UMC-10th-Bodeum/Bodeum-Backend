@@ -311,6 +311,14 @@ class AiStarterQuestionRouterTest {
     }
 
     private AiUserProfile profile(String region) {
-        return new AiUserProfile(region, null, List.of(), List.of(), null);
+        return new AiUserProfile(
+                region,
+                region == null ? null : "경기도",
+                region == null ? null : "수원시",
+                null,
+                List.of(),
+                List.of(),
+                null
+        );
     }
 }
