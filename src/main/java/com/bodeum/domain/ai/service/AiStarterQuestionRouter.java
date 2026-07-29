@@ -104,11 +104,44 @@ public class AiStarterQuestionRouter {
                             + "%EB%B6%80%EB%8B%B4"
             )
     );
-    // PM 검수 답변과 근거 출처가 확정되면 이 슬롯에 연결한다.
-    private static final String DIAGNOSIS_FIRST_STEPS_ANSWER = "";
-    private static final List<String> DIAGNOSIS_FIRST_STEPS_SOURCE_HOSTS = List.of(
-            "bokjiro.go.kr",
-            "broso.or.kr"
+    private static final String DIAGNOSIS_FIRST_STEPS_ANSWER = """
+            지금 챙기시면 좋은 것들을 순서대로 정리해드릴게요!
+
+            **진단 이후 챙기면 좋은 순서**
+
+            **① 장애인 등록** — 병원에서 받은 진단서로 주민센터에서 등록 신청하시면, 이후 대부분의 지원제도를 이용할 기본 자격이 마련돼요.
+
+            **② 발달재활서비스 바우처 신청** — 등록과 동시에 신청 가능하며, 언어·감각통합 등 치료비 부담을 크게 줄일 수 있어요.
+
+            **③ 의료비 지원 대상 확인** — 가구 소득 구간에 따라 의료비 본인부담을 덜 수 있는 제도가 있어요.
+
+            **④ 지역 기관 연결** — 중앙장애아동·발달장애인지원센터 경기지역센터에서 초기 부모 상담과 지역 정보 연계를 받아보실 수 있어요.
+
+            소득 구간과 등록 여부에 따라 해당되는 제도 및 서비스가 달라서, 거주지 주민센터에서 우리 가구 상황에 맞는 지원을 확인해보시는 게 가장 정확해요.
+            """;
+    private static final List<ExternalDocumentSpec> DIAGNOSIS_FIRST_STEPS_SOURCES = List.of(
+            new ExternalDocumentSpec(
+                    "mohw.go.kr",
+                    "2026년 장애아동가족지원 사업안내",
+                    "https://www.mohw.go.kr/board.es?mid=a10411010100&bid=0019"
+                            + "&act=view&list_no=1489566&tag=&nPage=1"
+            ),
+            new ExternalDocumentSpec(
+                    "socialservice.or.kr",
+                    "발달재활서비스",
+                    "https://www.socialservice.or.kr:444/user/htmlEditor/view2.do?p_sn=11"
+            ),
+            new ExternalDocumentSpec(
+                    "bokjiro.go.kr",
+                    "복지서비스 신청",
+                    "https://www.bokjiro.go.kr/ssis-tbu/twatzzza/intgSearch/"
+                            + "moveTWZZ01000M.do"
+            ),
+            new ExternalDocumentSpec(
+                    "129.go.kr",
+                    "보건복지상담센터",
+                    "https://www.129.go.kr/"
+            )
     );
 
     private final AiExternalSourceRepository externalSourceRepository;
@@ -134,13 +167,30 @@ public class AiStarterQuestionRouter {
             case WELFARE_SITES -> Optional.of(welfareSites());
             case LOCAL_REHAB_CENTERS -> Optional.of(localRehabCenters(profile));
             case CHILD_MEDICAL_SUPPORT -> Optional.of(childMedicalSupport());
-            case DIAGNOSIS_FIRST_STEPS -> diagnosisFirstSteps();
+            case DIAGNOSIS_FIRST_STEPS -> Optional.of(diagnosisFirstSteps());
             case VOUCHER_APPLICATION -> Optional.empty();
         };
     }
 
     private AiStarterQuestionAnswer childMedicalSupport() {
-        List<String> requiredHosts = CHILD_MEDICAL_SUPPORT_SOURCES.stream()
+        return fixedAnswerWithRequiredSources(
+                CHILD_MEDICAL_SUPPORT_ANSWER,
+                CHILD_MEDICAL_SUPPORT_SOURCES
+        );
+    }
+
+    private AiStarterQuestionAnswer diagnosisFirstSteps() {
+        return fixedAnswerWithRequiredSources(
+                DIAGNOSIS_FIRST_STEPS_ANSWER,
+                DIAGNOSIS_FIRST_STEPS_SOURCES
+        );
+    }
+
+    private AiStarterQuestionAnswer fixedAnswerWithRequiredSources(
+            String answer,
+            List<ExternalDocumentSpec> sourceSpecs
+    ) {
+        List<String> requiredHosts = sourceSpecs.stream()
                 .map(ExternalDocumentSpec::host)
                 .distinct()
                 .toList();
@@ -154,7 +204,7 @@ public class AiStarterQuestionRouter {
             return AiStarterQuestionAnswer.noEvidence();
         }
 
-        List<AiExternalDocumentCandidate> candidates = CHILD_MEDICAL_SUPPORT_SOURCES.stream()
+        List<AiExternalDocumentCandidate> candidates = sourceSpecs.stream()
                 .map(spec -> {
                     AiExternalSource source = sourcesByHost.get(spec.host());
                     String url = normalizeUrl(spec.url());
@@ -168,24 +218,9 @@ public class AiStarterQuestionRouter {
                 .toList();
 
         return AiStarterQuestionAnswer.answered(
-                CHILD_MEDICAL_SUPPORT_ANSWER,
+                answer,
                 persistCandidatesAsReferences(candidates)
         );
-    }
-
-    private Optional<AiStarterQuestionAnswer> diagnosisFirstSteps() {
-        if (DIAGNOSIS_FIRST_STEPS_ANSWER.isBlank()) {
-            return Optional.empty();
-        }
-        List<AiExternalSource> sources =
-                findRegisteredSources(DIAGNOSIS_FIRST_STEPS_SOURCE_HOSTS);
-        if (sources.size() != DIAGNOSIS_FIRST_STEPS_SOURCE_HOSTS.size()) {
-            return Optional.of(AiStarterQuestionAnswer.noEvidence());
-        }
-        return Optional.of(AiStarterQuestionAnswer.answered(
-                DIAGNOSIS_FIRST_STEPS_ANSWER,
-                persistAsReferences(sources)
-        ));
     }
 
     private AiStarterQuestionAnswer welfareSites() {

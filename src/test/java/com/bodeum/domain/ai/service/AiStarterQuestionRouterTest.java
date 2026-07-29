@@ -48,13 +48,39 @@ class AiStarterQuestionRouterTest {
     }
 
     @Test
-    void usesGeneralRagUntilDiagnosisGuideIsReviewed() {
+    void returnsReviewedDiagnosisFirstStepsAnswerWithOfficialSources() {
+        List<AiExternalSource> sources = List.of(
+                source("보건복지부", "https://www.mohw.go.kr/"),
+                source("사회서비스 전자바우처", "https://www.socialservice.or.kr:444/"),
+                source("복지로", "https://www.bokjiro.go.kr/"),
+                source("보건복지상담센터", "https://www.129.go.kr/")
+        );
+        when(externalSourceRepository.findAllBySourceTypeAndActiveTrue(
+                AiExternalSourceType.WEBSITE
+        )).thenReturn(sources);
+        when(externalDocumentPersistenceService.saveAll(any())).thenReturn(List.of(
+                document(1L, "https://www.mohw.go.kr/board.es"),
+                document(2L, "https://www.socialservice.or.kr:444/user/htmlEditor/view2.do"),
+                document(3L, "https://www.bokjiro.go.kr/ssis-tbu/twatzzza/intgSearch/"),
+                document(4L, "https://www.129.go.kr/")
+        ));
+
         var result = router.route(
                 AiStarterQuestionType.DIAGNOSIS_FIRST_STEPS,
                 profile("경기도 수원시")
-        );
+        ).orElseThrow();
 
-        assertThat(result).isEmpty();
+        assertThat(result.hasEvidence()).isTrue();
+        assertThat(result.content()).contains(
+                "진단 이후 챙기면 좋은 순서",
+                "① 장애인 등록",
+                "② 발달재활서비스 바우처 신청",
+                "③ 의료비 지원 대상 확인",
+                "④ 지역 기관 연결"
+        );
+        assertThat(result.sources()).hasSize(4);
+        assertThat(result.sources())
+                .allMatch(source -> source.sourceType() == AiResponseSourceType.SITE);
     }
 
     @Test

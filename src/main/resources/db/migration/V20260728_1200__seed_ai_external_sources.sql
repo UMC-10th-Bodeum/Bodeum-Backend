@@ -167,6 +167,17 @@ VALUES
         TRUE,
         CURRENT_TIMESTAMP(6),
         CURRENT_TIMESTAMP(6)
+    ),
+    (
+        '보건복지상담센터',
+        'WEBSITE',
+        'https://www.129.go.kr/',
+        'https://www.129.go.kr/',
+        '보건복지 제도와 긴급복지, 장애인 지원 등에 관한 상담 정보를 제공하는 공식 상담센터 사이트',
+        'GOVERNMENT',
+        TRUE,
+        CURRENT_TIMESTAMP(6),
+        CURRENT_TIMESTAMP(6)
     )
 ON DUPLICATE KEY UPDATE
     entry_url = VALUES(entry_url),
@@ -196,6 +207,59 @@ SELECT
     CURRENT_TIMESTAMP(6)
 FROM ai_external_source source
 WHERE source.base_url = 'https://www.broso.or.kr/'
+ON DUPLICATE KEY UPDATE
+    ai_external_source_id = VALUES(ai_external_source_id),
+    title = VALUES(title),
+    source_url = VALUES(source_url),
+    updated_at = CURRENT_TIMESTAMP(6);
+
+-- 장애 진단 후 첫 단계 추천 질문의 검수 답변에서 사용하는 공식 상세 페이지를
+-- 실제 응답 출처로 연결할 수 있도록 외부 문서로 미리 등록한다.
+INSERT INTO ai_external_document (
+    ai_external_source_id,
+    title,
+    source_url,
+    source_url_hash,
+    source_updated_at,
+    created_at,
+    updated_at
+)
+SELECT
+    source.ai_external_source_id,
+    document.title,
+    document.source_url,
+    SHA2(document.source_url, 256),
+    NULL,
+    CURRENT_TIMESTAMP(6),
+    CURRENT_TIMESTAMP(6)
+FROM ai_external_source source
+JOIN (
+    SELECT
+        'https://www.mohw.go.kr/' AS base_url,
+        '2026년 장애아동가족지원 사업안내' AS title,
+        CONCAT(
+            'https://www.mohw.go.kr/board.es?mid=a10411010100&bid=0019',
+            '&act=view&list_no=1489566&tag=&nPage=1'
+        ) AS source_url
+    UNION ALL
+    SELECT
+        'https://www.socialservice.or.kr:444/',
+        '발달재활서비스',
+        'https://www.socialservice.or.kr:444/user/htmlEditor/view2.do?p_sn=11'
+    UNION ALL
+    SELECT
+        'https://www.bokjiro.go.kr/',
+        '복지서비스 신청',
+        CONCAT(
+            'https://www.bokjiro.go.kr/ssis-tbu/twatzzza/intgSearch/',
+            'moveTWZZ01000M.do'
+        )
+    UNION ALL
+    SELECT
+        'https://www.129.go.kr/',
+        '보건복지상담센터',
+        'https://www.129.go.kr/'
+) document ON document.base_url = source.base_url
 ON DUPLICATE KEY UPDATE
     ai_external_source_id = VALUES(ai_external_source_id),
     title = VALUES(title),
