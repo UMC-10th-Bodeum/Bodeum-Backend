@@ -155,12 +155,14 @@ class AiMessageQueryServiceTest {
                 .thenReturn(AiAnswerStatus.REGION_REQUIRED);
         when(aiMessage.getContent()).thenReturn("활동 지역을 알려주세요.");
         when(aiMessage.getCreatedAt()).thenReturn(Instant.parse("2026-07-21T01:00:01Z"));
-        when(aiMessageRepository.findTodayMessages(eq(7L), any(), any()))
+        when(aiMessageRepository.findTodayMessages(
+                eq(7L), any(), any(), any(), any(), any()
+        ))
                 .thenReturn(List.of(aiMessage));
         when(aiResponseSourceRepository.findAllByMessageIds(List.of(23L)))
                 .thenReturn(List.of());
 
-        var result = service.getTodayMessages(1L);
+        var result = service.getTodayMessages(1L, null, null);
 
         assertThat(result.messages().getFirst().answerStatus())
                 .isEqualTo(AiAnswerStatus.REGION_REQUIRED);

@@ -5,6 +5,7 @@ import com.bodeum.domain.ai.entity.AiChatRoom;
 import com.bodeum.domain.ai.entity.AiMessage;
 import com.bodeum.domain.ai.enums.AiAnswerStatus;
 import com.bodeum.domain.ai.enums.AiStarterQuestionType;
+import com.bodeum.domain.ai.enums.SenderType;
 import com.bodeum.domain.ai.exception.AiErrorCode;
 import com.bodeum.domain.ai.model.rag.AiReferenceDocument;
 import com.bodeum.domain.ai.model.rag.AiSourceKey;
@@ -17,8 +18,10 @@ import com.bodeum.domain.ai.service.port.AiAnswerGenerator;
 import com.bodeum.domain.ai.service.port.AiDocumentRetriever;
 import com.bodeum.domain.ai.service.port.AiExternalAnswerProvider;
 import com.bodeum.domain.ai.repository.AiChatRoomRepository;
+import com.bodeum.domain.ai.repository.AiMessageRepository;
 import com.bodeum.domain.ai.repository.AiSourceReviewRepository;
 import com.bodeum.domain.region.entity.Region;
+import com.bodeum.domain.region.repository.RegionRepository;
 import com.bodeum.domain.user.entity.User;
 import com.bodeum.domain.user.exception.UserErrorCode;
 import com.bodeum.domain.user.repository.UserRepository;
@@ -31,6 +34,7 @@ import java.util.Optional;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -39,6 +43,12 @@ import org.springframework.stereotype.Service;
 public class AiMessageService {
 
     private static final String NO_RESULT_MESSAGE = "관련 정보를 찾을 수 없습니다.";
+    private static final Set<String> EXPLICIT_REGION_REHAB_QUESTIONS = Set.of(
+            "재활센터추천해줘",
+            "재활센터를추천해줘",
+            "재활센터알려줘",
+            "재활센터를알려줘"
+    );
     private static final Set<String> BOKJIRO_DOMAIN = Set.of("bokjiro.go.kr");
     private static final Set<String> VOUCHER_DOMAINS = Set.of(
             "bokjiro.go.kr",
@@ -52,7 +62,9 @@ public class AiMessageService {
                     + "selectFollowStepTwoaa.do"
     );
     private final AiChatRoomRepository aiChatRoomRepository;
+    private final AiMessageRepository aiMessageRepository;
     private final UserRepository userRepository;
+    private final RegionRepository regionRepository;
     private final AiDocumentRetriever documentRetriever;
     private final AiAnswerGenerator answerGenerator;
     private final AiExternalAnswerProvider externalAnswerProvider;
@@ -111,12 +123,44 @@ public class AiMessageService {
     ) {
 
         AiUserProfile profile = toProfile(user, userWithDisabilities);
-        Optional<AiStarterQuestionType> starterQuestionType =
-                AiStarterQuestionType.fromQuestion(content);
+        Optional<Region> explicitRegion = resolveExplicitRehabRegion(content);
+        Optional<AiStarterQuestionType> starterQuestionType;
+        if (explicitRegion.isPresent()) {
+            Region region = explicitRegion.get();
+            profile = profile.withRegion(
+                    region.getFullName(),
+                    region.getRegionLevel1(),
+                    region.getRegionLevel2()
+            );
+            starterQuestionType =
+                    Optional.of(AiStarterQuestionType.LOCAL_REHAB_CENTERS);
+        } else {
+            starterQuestionType = AiStarterQuestionType.fromQuestion(content);
+        }
+        if (explicitRegion.isEmpty() && starterQuestionType.isEmpty()) {
+            Optional<Region> followUpRegion = resolveRegionFollowUp(
+                    chatRoom.getId(),
+                    content
+            );
+            if (followUpRegion.isPresent()) {
+                Region region = followUpRegion.get();
+                profile = profile.withRegion(
+                        region.getFullName(),
+                        region.getRegionLevel1(),
+                        region.getRegionLevel2()
+                );
+                starterQuestionType =
+                        Optional.of(AiStarterQuestionType.LOCAL_REHAB_CENTERS);
+            }
+        }
 
         Optional<AiStarterQuestionAnswer> starterAnswer =
-                starterQuestionType.flatMap(type ->
-                        starterQuestionRouter.route(type, profile));
+                starterQuestionType.isEmpty()
+                        ? Optional.empty()
+                        : starterQuestionRouter.route(
+                                starterQuestionType.get(),
+                                profile
+                        );
         if (starterAnswer.isPresent()) {
             return saveStarterAnswer(chatRoom, userMessage, starterAnswer.get());
         }
@@ -168,6 +212,78 @@ public class AiMessageService {
 
         return sourceBackedResponse(
                 message, citedSources, warningResponse(warning), AiAnswerStatus.ANSWERED);
+    }
+
+    private Optional<Region> resolveExplicitRehabRegion(String content) {
+        String normalizedQuestion = normalizeQuestion(content);
+        boolean rehabRecommendation = normalizedQuestion.contains("재활센터")
+                && (normalizedQuestion.contains("추천")
+                || normalizedQuestion.contains("알려"));
+        if (!rehabRecommendation) {
+            return Optional.empty();
+        }
+
+        String normalizedContent = normalizeSpacing(content);
+        return regionRepository.findMentionedInQuestion(
+                        normalizedContent,
+                        PageRequest.of(0, 1)
+                )
+                .stream()
+                .filter(region -> isGenericRehabQuestion(
+                        normalizedContent,
+                        region
+                ))
+                .findFirst();
+    }
+
+    private boolean isGenericRehabQuestion(
+            String question,
+            Region region
+    ) {
+        String questionWithoutRegion = question
+                .replace(region.getFullName(), " ")
+                .trim()
+                .replaceFirst("^(에서|의|에|내)\\s*", "");
+        String normalizedQuestion = normalizeQuestion(questionWithoutRegion)
+                .replaceFirst("추천해주세요$", "추천해줘")
+                .replaceFirst("알려주세요$", "알려줘");
+        return EXPLICIT_REGION_REHAB_QUESTIONS.contains(normalizedQuestion);
+    }
+
+    private Optional<Region> resolveRegionFollowUp(
+            Long chatRoomId,
+            String content
+    ) {
+        boolean awaitingRegion = aiMessageRepository
+                .findTopByChatRoomIdAndSenderTypeOrderByCreatedAtDescIdDesc(
+                        chatRoomId,
+                        SenderType.AI
+                )
+                .map(AiMessage::getAiAnswerStatus)
+                .filter(status -> status == AiAnswerStatus.REGION_REQUIRED)
+                .isPresent();
+        if (!awaitingRegion) {
+            return Optional.empty();
+        }
+
+        String regionName = normalizeSpacing(content);
+        if (regionName.isEmpty()) {
+            return Optional.empty();
+        }
+        return regionRepository.findByFullName(regionName);
+    }
+
+    private String normalizeQuestion(String content) {
+        return normalizeSpacing(content).replaceAll("\\s+", "");
+    }
+
+    private String normalizeSpacing(String content) {
+        return content == null
+                ? ""
+                : content.trim()
+                        .replaceFirst("[.!?~]+$", "")
+                        .trim()
+                        .replaceAll("\\s+", " ");
     }
 
     private String retrievalQuestion(

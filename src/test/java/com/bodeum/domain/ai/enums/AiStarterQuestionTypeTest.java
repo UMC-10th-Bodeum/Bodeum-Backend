@@ -15,6 +15,12 @@ class AiStarterQuestionTypeTest {
                 "우리 동네 재활센터 추천해주세요"
         )).contains(AiStarterQuestionType.LOCAL_REHAB_CENTERS);
         assertThat(AiStarterQuestionType.fromQuestion(
+                "우리 동네 재활 센터를 추천해 주세요."
+        )).contains(AiStarterQuestionType.LOCAL_REHAB_CENTERS);
+        assertThat(AiStarterQuestionType.fromQuestion(
+                "재활 센터를 추천해 주세요."
+        )).isEmpty();
+        assertThat(AiStarterQuestionType.fromQuestion(
                 "장애아동 의료비 지원이 궁금합니다"
         )).contains(AiStarterQuestionType.CHILD_MEDICAL_SUPPORT);
         assertThat(AiStarterQuestionType.fromQuestion(

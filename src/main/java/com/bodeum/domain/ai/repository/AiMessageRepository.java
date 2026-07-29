@@ -15,8 +15,14 @@ import org.springframework.data.domain.Pageable;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 
 public interface AiMessageRepository extends JpaRepository<AiMessage, Long> {
+
+    Optional<AiMessage> findTopByChatRoomIdAndSenderTypeOrderByCreatedAtDescIdDesc(
+            Long chatRoomId,
+            SenderType senderType
+    );
 
     boolean existsByChatRoomIdAndCreatedAtGreaterThanEqualAndCreatedAtLessThan(
             Long chatRoomId,
@@ -96,7 +102,7 @@ public interface AiMessageRepository extends JpaRepository<AiMessage, Long> {
         FROM AiMessage m
         WHERE m.id = :messageId
         """)
-    java.util.Optional<AiMessage> findByIdForFeedback(
+    Optional<AiMessage> findByIdForFeedback(
             @Param("messageId") Long messageId
     );
 

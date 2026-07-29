@@ -10,7 +10,13 @@ import static java.util.stream.Stream.concat;
 public enum AiStarterQuestionType {
 
     WELFARE_SITES(true, "참고하면 좋을 복지사이트 알려줘"),
-    LOCAL_REHAB_CENTERS(true, "우리 동네 재활센터 추천해줘"),
+    LOCAL_REHAB_CENTERS(
+            true,
+            "우리 동네 재활센터 추천해줘",
+            "우리 동네 재활센터를 추천해줘",
+            "우리 지역 재활센터 알려줘",
+            "우리 지역 재활센터를 알려줘"
+    ),
     CHILD_MEDICAL_SUPPORT(true, "장애아동 의료비 지원이 궁금해"),
     DIAGNOSIS_FIRST_STEPS(true, "장애 진단 후 첫 번째로 해야 할 일"),
     VOUCHER_APPLICATION(true, "바우처 신청 방법 알려줘"),

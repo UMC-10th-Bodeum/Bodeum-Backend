@@ -28,8 +28,11 @@ import com.bodeum.domain.ai.model.answer.GeneratedAiAnswer;
 import com.bodeum.domain.ai.model.answer.ExternalAiAnswer;
 import com.bodeum.domain.ai.model.answer.AiStarterQuestionAnswer;
 import com.bodeum.domain.ai.repository.AiChatRoomRepository;
+import com.bodeum.domain.ai.repository.AiMessageRepository;
 import com.bodeum.domain.ai.repository.AiSourceReviewRepository;
 import com.bodeum.domain.auth.enums.SocialProvider;
+import com.bodeum.domain.region.entity.Region;
+import com.bodeum.domain.region.repository.RegionRepository;
 import com.bodeum.domain.user.entity.User;
 import com.bodeum.domain.user.repository.UserRepository;
 import com.bodeum.global.apiPayload.exception.ProjectException;
@@ -47,7 +50,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class AiMessageServiceTest {
 
     @Mock AiChatRoomRepository aiChatRoomRepository;
+    @Mock AiMessageRepository aiMessageRepository;
     @Mock UserRepository userRepository;
+    @Mock RegionRepository regionRepository;
     @Mock AiDocumentRetriever documentRetriever;
     @Mock AiAnswerGenerator answerGenerator;
     @Mock AiExternalAnswerProvider externalAnswerProvider;
@@ -65,7 +70,7 @@ class AiMessageServiceTest {
     @BeforeEach
     void setUp() {
         service = new AiMessageService(
-                aiChatRoomRepository, userRepository,
+                aiChatRoomRepository, aiMessageRepository, userRepository, regionRepository,
                 documentRetriever, answerGenerator, externalAnswerProvider,
                 persistenceService, failureService, aiSourceReviewRepository, requestGuard,
                 referenceDocumentResolver, starterQuestionRouter);
@@ -194,6 +199,148 @@ class AiMessageServiceTest {
                 .isEqualTo(AiAnswerStatus.REGION_REQUIRED);
         assertThat(result.aiMessage().sources()).isEmpty();
         verify(documentRetriever, never()).retrieve(any(), any());
+        verify(externalAnswerProvider, never()).search(any(), any());
+    }
+
+    @Test
+    void prioritizesExplicitRegionInRehabCenterQuestion() {
+        Region region = Region.create("경기도", "수원시");
+        when(regionRepository.findMentionedInQuestion(
+                eq("경기도 수원시 재활센터를 추천해줘"),
+                any()
+        )).thenReturn(List.of(region));
+
+        AiReferenceDocument source = new AiReferenceDocument(
+                "INFO-1",
+                "수원시 재활센터",
+                AiResponseSourceType.INFO,
+                1L,
+                "수원시 재활센터",
+                "https://example.com/info/1",
+                null
+        );
+        when(starterQuestionRouter.route(
+                eq(AiStarterQuestionType.LOCAL_REHAB_CENTERS),
+                org.mockito.ArgumentMatchers.argThat(profile ->
+                        profile.region().equals("경기도 수원시")
+                                && profile.regionLevel1().equals("경기도")
+                                && profile.regionLevel2().equals("수원시"))
+        )).thenReturn(Optional.of(
+                AiStarterQuestionAnswer.answered(
+                        "경기도 수원시 재활센터 안내",
+                        List.of(source)
+                )
+        ));
+        AiMessage saved = savedAiMessage("경기도 수원시 재활센터 안내");
+        when(persistenceService.saveAiMessageAndComplete(
+                11L,
+                chatRoom,
+                "경기도 수원시 재활센터 안내",
+                false,
+                AiAnswerStatus.ANSWERED,
+                List.of(source)
+        )).thenReturn(saved);
+
+        var result = service.createMessage(
+                1L,
+                "경기도 수원시 재활센터를 추천해줘."
+        );
+
+        assertThat(result.aiMessage().answerStatus()).isEqualTo(AiAnswerStatus.ANSWERED);
+        assertThat(result.aiMessage().sources()).hasSize(1);
+        verify(aiMessageRepository, never())
+                .findTopByChatRoomIdAndSenderTypeOrderByCreatedAtDescIdDesc(
+                        any(),
+                        any()
+                );
+        verify(documentRetriever, never()).retrieve(any(), any());
+        verify(answerGenerator, never()).generate(any(), any(), any());
+        verify(externalAnswerProvider, never()).search(any(), any());
+    }
+
+    @Test
+    void usesGeneralRagWhenExplicitRegionQuestionHasAdditionalRehabCondition() {
+        String question = "경기도 수원시 자폐스펙트럼 재활센터를 추천해줘";
+        Region region = Region.create("경기도", "수원시");
+        when(regionRepository.findMentionedInQuestion(
+                eq(question),
+                any()
+        )).thenReturn(List.of(region));
+        when(documentRetriever.retrieve(eq(question), any()))
+                .thenReturn(List.of());
+        AiMessage saved = savedAiMessage("관련 정보를 찾을 수 없습니다.");
+        when(persistenceService.saveAiMessageAndComplete(
+                eq(11L),
+                eq(chatRoom),
+                eq("관련 정보를 찾을 수 없습니다."),
+                eq(false),
+                eq(AiAnswerStatus.NO_EVIDENCE),
+                eq(List.of())
+        )).thenReturn(saved);
+
+        var result = service.createMessage(1L, question);
+
+        assertThat(result.aiMessage().answerStatus())
+                .isEqualTo(AiAnswerStatus.NO_EVIDENCE);
+        verify(starterQuestionRouter, never()).route(
+                eq(AiStarterQuestionType.LOCAL_REHAB_CENTERS),
+                any()
+        );
+        verify(documentRetriever).retrieve(eq(question), any());
+    }
+
+    @Test
+    void routesRegionOnlyFollowUpToLocalRehabCenters() {
+        AiMessage previousAiMessage = mock(AiMessage.class);
+        when(previousAiMessage.getAiAnswerStatus())
+                .thenReturn(AiAnswerStatus.REGION_REQUIRED);
+        when(aiMessageRepository
+                .findTopByChatRoomIdAndSenderTypeOrderByCreatedAtDescIdDesc(
+                        chatRoom.getId(),
+                        SenderType.AI
+                ))
+                .thenReturn(Optional.of(previousAiMessage));
+        Region region = Region.create("경기도", "수원시");
+        when(regionRepository.findByFullName("경기도 수원시"))
+                .thenReturn(Optional.of(region));
+
+        AiReferenceDocument source = new AiReferenceDocument(
+                "INFO-1",
+                "수원시 재활센터",
+                AiResponseSourceType.INFO,
+                1L,
+                "수원시 재활센터",
+                "https://example.com/info/1",
+                null
+        );
+        when(starterQuestionRouter.route(
+                eq(AiStarterQuestionType.LOCAL_REHAB_CENTERS),
+                org.mockito.ArgumentMatchers.argThat(profile ->
+                        profile.region().equals("경기도 수원시")
+                                && profile.regionLevel1().equals("경기도")
+                                && profile.regionLevel2().equals("수원시"))
+        )).thenReturn(Optional.of(
+                AiStarterQuestionAnswer.answered(
+                        "경기도 수원시 재활센터 안내",
+                        List.of(source)
+                )
+        ));
+        AiMessage saved = savedAiMessage("경기도 수원시 재활센터 안내");
+        when(persistenceService.saveAiMessageAndComplete(
+                11L,
+                chatRoom,
+                "경기도 수원시 재활센터 안내",
+                false,
+                AiAnswerStatus.ANSWERED,
+                List.of(source)
+        )).thenReturn(saved);
+
+        var result = service.createMessage(1L, "  경기도   수원시  ");
+
+        assertThat(result.aiMessage().answerStatus()).isEqualTo(AiAnswerStatus.ANSWERED);
+        assertThat(result.aiMessage().sources()).hasSize(1);
+        verify(documentRetriever, never()).retrieve(any(), any());
+        verify(answerGenerator, never()).generate(any(), any(), any());
         verify(externalAnswerProvider, never()).search(any(), any());
     }
 
