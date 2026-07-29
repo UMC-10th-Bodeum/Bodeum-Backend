@@ -1,5 +1,6 @@
 package com.bodeum.domain.news.service;
 
+import com.bodeum.domain.news.dto.NewsSort;
 import com.bodeum.domain.news.dto.NewsStatus;
 import com.bodeum.domain.news.dto.response.NewsDetailResponse;
 import com.bodeum.domain.news.dto.response.NewsListItemResponse;
@@ -13,6 +14,8 @@ import com.bodeum.domain.news.repository.NewsRepository;
 import com.bodeum.domain.news.repository.NewsScrapRepository;
 import com.bodeum.domain.region.entity.Region;
 import com.bodeum.domain.region.repository.RegionRepository;
+import com.bodeum.domain.region.service.RegionService;
+import com.bodeum.domain.region.service.ResolvedRegionFilter;
 import com.bodeum.global.apiPayload.code.GeneralErrorCode;
 import com.bodeum.global.apiPayload.exception.ProjectException;
 import java.util.ArrayList;
@@ -39,31 +42,36 @@ public class NewsQueryService {
     private final NewsRepository newsRepository;
     private final NewsScrapRepository newsScrapRepository;
     private final RegionRepository regionRepository;
+    private final RegionService regionService;
 
     @Transactional(readOnly = true)
     public NewsListResponse getNews(
             int page,
             int size,
-            String region,
+            NewsSort sort,
+            Long regionId,
+            String regionLevel1,
             NewsCategoryCode category,
             NewsStatus status
     ) {
-        List<Long> regionIds = resolveRegionIds(region);
-        boolean filterByRegion = StringUtils.hasText(region);
-        if (filterByRegion && regionIds.isEmpty()) {
+        ResolvedRegionFilter regionFilter = regionService.resolveFilter(regionId, regionLevel1);
+        if (regionFilter.applied() && regionFilter.regionIds().isEmpty()) {
             return NewsListResponse.empty(page, size);
         }
+        List<Long> regionIds = regionFilter.regionIds().isEmpty()
+                ? NO_REGION_IDS
+                : regionFilter.regionIds();
 
         PageRequest pageable = PageRequest.of(
                 page,
                 size,
-                Sort.by(Sort.Order.desc("publishedAt"), Sort.Order.desc("id"))
+                resolveSort(sort)
         );
         Page<News> result = newsRepository.findVisibleNews(
                 category == null ? null : category.name(),
                 status == null ? null : status.toEntity(),
-                filterByRegion,
-                regionIds.isEmpty() ? NO_REGION_IDS : regionIds,
+                regionFilter.applied(),
+                regionIds,
                 pageable
         );
 
@@ -75,22 +83,26 @@ public class NewsQueryService {
             String keyword,
             int page,
             int size,
-            String region,
+            NewsSort sort,
+            Long regionId,
+            String regionLevel1,
             NewsCategoryCode category,
             NewsStatus status
     ) {
-        List<Long> regionIds = resolveRegionIds(region);
-        boolean filterByRegion = StringUtils.hasText(region);
-        if (filterByRegion && regionIds.isEmpty()) {
+        ResolvedRegionFilter regionFilter = regionService.resolveFilter(regionId, regionLevel1);
+        if (regionFilter.applied() && regionFilter.regionIds().isEmpty()) {
             return NewsListResponse.empty(page, size);
         }
+        List<Long> regionIds = regionFilter.regionIds().isEmpty()
+                ? NO_REGION_IDS
+                : regionFilter.regionIds();
 
         String normalizedKeyword = keyword.trim().toLowerCase(Locale.ROOT);
         List<Long> keywordRegionIds = resolveRegionIds(normalizedKeyword);
         PageRequest pageable = PageRequest.of(
                 page,
                 size,
-                Sort.by(Sort.Order.desc("publishedAt"), Sort.Order.desc("id"))
+                resolveSort(sort)
         );
         Page<News> result = newsRepository.searchVisibleNews(
                 "%" + normalizedKeyword + "%",
@@ -98,8 +110,8 @@ public class NewsQueryService {
                 keywordRegionIds.isEmpty() ? NO_REGION_IDS : keywordRegionIds,
                 category == null ? null : category.name(),
                 status == null ? null : status.toEntity(),
-                filterByRegion,
-                regionIds.isEmpty() ? NO_REGION_IDS : regionIds,
+                regionFilter.applied(),
+                regionIds,
                 pageable
         );
 
@@ -109,6 +121,9 @@ public class NewsQueryService {
     @Transactional(readOnly = true)
     public NewsSearchSuggestionsResponse getSearchSuggestions(String keyword, int size) {
         String normalizedKeyword = keyword.trim().toLowerCase(Locale.ROOT);
+        if (normalizedKeyword.codePointCount(0, normalizedKeyword.length()) < 2) {
+            throw new ProjectException(GeneralErrorCode.BAD_REQUEST);
+        }
         List<String> titles = new ArrayList<>(
                 newsRepository.findTitleSuggestionsStartingWith(
                         normalizedKeyword,
@@ -233,6 +248,19 @@ public class NewsQueryService {
                         || contains(candidate.getFullName(), keyword))
                 .map(Region::getId)
                 .toList();
+    }
+
+    private Sort resolveSort(NewsSort sort) {
+        NewsSort resolvedSort = sort == null ? NewsSort.VIEW : sort;
+        Sort.Order primaryOrder = switch (resolvedSort) {
+            case VIEW -> Sort.Order.desc("viewCount");
+            case SCRAP -> Sort.Order.desc("scrapCount");
+        };
+        return Sort.by(
+                primaryOrder,
+                Sort.Order.desc("publishedAt"),
+                Sort.Order.desc("id")
+        );
     }
 
     private Map<Long, String> resolveRegionNames(Collection<News> newsItems) {

@@ -13,6 +13,7 @@ import java.util.Collections;
 import java.time.LocalDate;
 import java.util.List;
 import org.junit.jupiter.api.Test;
+import org.springframework.test.util.ReflectionTestUtils;
 
 class UserHeaderResponseTest {
 
@@ -27,6 +28,9 @@ class UserHeaderResponseTest {
         assertThat(response.badgeName()).isNull();
         assertThat(response.childDisabilityTypes()).isNull();
         assertThat(response.childAge()).isNull();
+        assertThat(response.regionId()).isNull();
+        assertThat(response.regionLevel1()).isNull();
+        assertThat(response.regionLevel2()).isNull();
         assertThat(response.region()).isNull();
     }
 
@@ -76,16 +80,16 @@ class UserHeaderResponseTest {
     }
 
     @Test
-    void exposesRegionFullName() {
+    void exposesRegionStructureForNewsDefault() {
         User user = newUser();
-        user.updateInterestRegion(Collections.emptyList(), Region.create("서울특별시", "강남구"));
+        Region region = Region.create("서울특별시", "강남구");
+        ReflectionTestUtils.setField(region, "id", 10L);
+        user.updateInterestRegion(Collections.emptyList(), region);
 
+        assertThat(UserHeaderResponse.from(user, 0).regionId()).isEqualTo(10L);
+        assertThat(UserHeaderResponse.from(user, 0).regionLevel1()).isEqualTo("서울특별시");
+        assertThat(UserHeaderResponse.from(user, 0).regionLevel2()).isEqualTo("강남구");
         assertThat(UserHeaderResponse.from(user, 0).region()).isEqualTo("서울특별시 강남구");
-    }
-
-    @Test
-    void regionIsNullWhenNotRegistered() {
-        assertThat(UserHeaderResponse.from(newUser(), 0).region()).isNull();
     }
 
     @Test
