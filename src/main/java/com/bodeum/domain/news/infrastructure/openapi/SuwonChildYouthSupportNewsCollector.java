@@ -1,6 +1,7 @@
 package com.bodeum.domain.news.infrastructure.openapi;
 
 import com.bodeum.domain.news.collector.NewsCandidate;
+import com.bodeum.domain.news.entity.NewsCategoryCode;
 import com.bodeum.domain.news.entity.NewsType;
 import com.bodeum.global.infrastructure.openapi.OdcloudClient;
 import java.nio.charset.StandardCharsets;
@@ -18,7 +19,6 @@ import org.springframework.util.StringUtils;
 public class SuwonChildYouthSupportNewsCollector extends AbstractOdcloudNewsCollector {
 
     public static final String SOURCE_NAME = "경기도 수원시 장애아동청소년지원서비스현황";
-    public static final String CATEGORY_NAME = "SUPPORT_SERVICE";
     public static final String API_RESOURCE_PATH =
             "/15040644/v1/uddi:346a8e04-45d2-4dad-9fae-f0558a5ab1b1";
     public static final String DATA_PORTAL_URL =
@@ -101,7 +101,7 @@ public class SuwonChildYouthSupportNewsCollector extends AbstractOdcloudNewsColl
                 null,
                 null,
                 null,
-                CATEGORY_NAME,
+                NewsCategoryCode.LOCAL_NEWS,
                 NewsType.LOCAL,
                 null
         );

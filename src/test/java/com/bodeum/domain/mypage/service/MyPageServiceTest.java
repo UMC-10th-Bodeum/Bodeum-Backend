@@ -28,6 +28,8 @@ import com.bodeum.domain.mypage.repository.MyPageNewsScrapRepository;
 import com.bodeum.domain.mypage.repository.MyPagePostRepository;
 import com.bodeum.domain.mypage.repository.MyPagePostScrapRepository;
 import com.bodeum.domain.news.entity.News;
+import com.bodeum.domain.news.entity.NewsCategory;
+import com.bodeum.domain.news.entity.NewsCategoryCode;
 import com.bodeum.domain.news.entity.NewsScrap;
 import com.bodeum.domain.news.entity.NewsType;
 import com.bodeum.domain.news.entity.RecruitmentStatus;
@@ -163,6 +165,7 @@ class MyPageServiceTest {
 
         NewsScrap newsScrap = mock(NewsScrap.class);
         News news = mock(News.class);
+        NewsCategory newsCategory = mock(NewsCategory.class);
 
         PostScrap postScrap = mock(PostScrap.class);
         Post post = mock(Post.class);
@@ -290,6 +293,15 @@ class MyPageServiceTest {
         given(news.getNewsType())
                 .willReturn(NewsType.ACTIVITY);
 
+        given(news.getNewsCategory())
+                .willReturn(newsCategory);
+
+        given(newsCategory.getCode())
+                .willReturn(NewsCategoryCode.RECRUITMENT_PARTICIPATION);
+
+        given(newsCategory.getLabel())
+                .willReturn("모집 · 참여");
+
         given(news.getRecruitmentStatus())
                 .willReturn(RecruitmentStatus.OPEN);
 
@@ -398,11 +410,17 @@ class MyPageServiceTest {
         assertThat(newsResponse.newsType())
                 .isEqualTo(NewsType.ACTIVITY);
 
+        assertThat(newsResponse.categoryCode())
+                .isEqualTo(NewsCategoryCode.RECRUITMENT_PARTICIPATION);
+
+        assertThat(newsResponse.categoryLabel())
+                .isEqualTo("모집 · 참여");
+
         assertThat(newsResponse.recruitmentStatus())
                 .isEqualTo(RecruitmentStatus.OPEN);
 
         assertThat(newsResponse.publishedAt())
-                .isEqualTo(publishedAt);
+                .isEqualTo(publishedAt.toLocalDate());
 
         assertThat(newsResponse.scrappedAt())
                 .isEqualTo(newsScrappedAt);

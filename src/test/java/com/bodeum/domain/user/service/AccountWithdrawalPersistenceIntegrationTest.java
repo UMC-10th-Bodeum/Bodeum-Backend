@@ -21,6 +21,7 @@ import com.bodeum.domain.info.repository.InfoScrapRepository;
 import com.bodeum.domain.news.collector.NewsCandidate;
 import com.bodeum.domain.news.entity.News;
 import com.bodeum.domain.news.entity.NewsCategory;
+import com.bodeum.domain.news.entity.NewsCategoryCode;
 import com.bodeum.domain.news.entity.NewsScrap;
 import com.bodeum.domain.news.entity.NewsType;
 import com.bodeum.domain.news.repository.NewsScrapRepository;
@@ -319,11 +320,12 @@ class AccountWithdrawalPersistenceIntegrationTest {
     }
 
     private News persistNews() {
-        NewsCategory category = NewsCategory.create(NewsType.LOCAL, "지역소식", 0);
+        NewsCategory category = NewsCategory.create(NewsCategoryCode.LOCAL_NEWS);
         em.persist(category);
         NewsCandidate candidate = new NewsCandidate(
                 null, "뉴스 제목", null, null, null, null, null, null, null, null, null,
-                LocalDateTime.now(), null, null, null, null, null, NewsType.LOCAL, null);
+                LocalDateTime.now(), null, null, null, null,
+                NewsCategoryCode.LOCAL_NEWS, NewsType.LOCAL, null);
         News news = News.create(category, null, null, candidate);
         em.persist(news);
         return news;

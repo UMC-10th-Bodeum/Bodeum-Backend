@@ -5,6 +5,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.bodeum.domain.news.collector.NewsCandidate;
+import com.bodeum.domain.news.entity.NewsCategoryCode;
 import com.bodeum.domain.news.entity.NewsSource;
 import com.bodeum.domain.news.entity.NewsSourceType;
 import com.bodeum.domain.news.entity.NewsType;
@@ -63,7 +64,7 @@ class SuwonChildYouthSupportNewsCollectorTest {
         assertThat(result).singleElement().satisfies(candidate -> {
             assertThat(candidate.title()).isEqualTo("수원아동발달문화센터 발달 지원 서비스");
             assertThat(candidate.regionName()).isEqualTo("경기도 수원시");
-            assertThat(candidate.categoryName()).isEqualTo("SUPPORT_SERVICE");
+            assertThat(candidate.categoryCode()).isEqualTo(NewsCategoryCode.LOCAL_NEWS);
             assertThat(candidate.newsType()).isEqualTo(NewsType.LOCAL);
             assertThat(candidate.recruitmentStatus()).isNull();
             assertThat(candidate.programStartDate()).isNull();
