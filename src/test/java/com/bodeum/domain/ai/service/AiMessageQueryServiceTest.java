@@ -26,6 +26,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Pageable;
 
 @ExtendWith(MockitoExtension.class)
 class AiMessageQueryServiceTest {
@@ -64,8 +65,9 @@ class AiMessageQueryServiceTest {
         when(aiMessage.getContent()).thenReturn("관련 사이트를 확인해 주세요.");
         when(aiMessage.getCreatedAt()).thenReturn(Instant.parse("2026-07-21T01:00:01Z"));
 
-        when(aiMessageRepository.findTodayMessages(eq(7L), any(), any()))
-                .thenReturn(List.of(userMessage, aiMessage));
+        when(aiMessageRepository.findTodayMessages(
+                eq(7L), any(), any(), eq(null), eq(null), any(Pageable.class)))
+                .thenReturn(List.of(aiMessage, userMessage));
 
         AiResponseSourceProjection source = mock(AiResponseSourceProjection.class);
         when(source.getAiMessageId()).thenReturn(22L);
@@ -73,10 +75,10 @@ class AiMessageQueryServiceTest {
         when(source.getSourceId()).thenReturn(3L);
         when(source.getSourceTitle()).thenReturn("복지 사이트");
         when(source.getSourceUrl()).thenReturn("https://example.com");
-        when(aiResponseSourceRepository.findAllByMessageIds(List.of(21L, 22L)))
+        when(aiResponseSourceRepository.findAllByMessageIds(List.of(22L, 21L)))
                 .thenReturn(List.of(source));
 
-        var result = service.getTodayMessages(1L);
+        var result = service.getTodayMessages(1L, null, null);
 
         assertThat(result.messages()).hasSize(2);
         assertThat(result.messages().getFirst().answerStatus()).isNull();
@@ -84,6 +86,60 @@ class AiMessageQueryServiceTest {
         assertThat(result.messages().getLast().answerStatus())
                 .isEqualTo(AiAnswerStatus.LINK_GUIDANCE);
         assertThat(result.messages().getLast().sources().getFirst().sourceId()).isEqualTo(3L);
+        assertThat(result.nextCursor().id()).isEqualTo(21L);
+        assertThat(result.hasNext()).isFalse();
+    }
+
+    @Test
+    void returnsLatestTodayMessagesInAscendingOrderWithCursor() {
+        AiChatRoom chatRoom = mock(AiChatRoom.class);
+        when(chatRoom.getId()).thenReturn(7L);
+        when(aiChatRoomRepository.findByUserId(1L)).thenReturn(Optional.of(chatRoom));
+
+        List<AiMessage> fetchedMessages = new ArrayList<>();
+        for (long id = 30L; id >= 10L; id--) {
+            AiMessage message = mock(AiMessage.class);
+            lenient().when(message.getId()).thenReturn(id);
+            lenient().when(message.getSenderType()).thenReturn(SenderType.USER);
+            lenient().when(message.getContent()).thenReturn("message-" + id);
+            lenient().when(message.getCreatedAt()).thenReturn(
+                    Instant.parse("2026-07-28T00:00:00Z").plusSeconds(id));
+            fetchedMessages.add(message);
+        }
+
+        Instant cursorCreatedAt = Instant.parse("2026-07-28T00:01:00Z");
+        when(aiMessageRepository.findTodayMessages(
+                eq(7L),
+                any(),
+                any(),
+                eq(31L),
+                eq(cursorCreatedAt),
+                any(Pageable.class)
+        )).thenReturn(fetchedMessages);
+        when(aiResponseSourceRepository.findAllByMessageIds(
+                java.util.stream.LongStream.rangeClosed(11L, 30L)
+                        .boxed()
+                        .sorted(java.util.Comparator.reverseOrder())
+                        .toList()
+        )).thenReturn(List.of());
+
+        var result = service.getTodayMessages(1L, 31L, cursorCreatedAt);
+
+        verify(aiMessageRepository).findTodayMessages(
+                eq(7L),
+                any(),
+                any(),
+                eq(31L),
+                eq(cursorCreatedAt),
+                any(Pageable.class)
+        );
+        assertThat(result.messages()).hasSize(20);
+        assertThat(result.messages().getFirst().aiMessageId()).isEqualTo(11L);
+        assertThat(result.messages().getLast().aiMessageId()).isEqualTo(30L);
+        assertThat(result.nextCursor().id()).isEqualTo(11L);
+        assertThat(result.nextCursor().createdAt())
+                .isEqualTo(Instant.parse("2026-07-28T00:00:11Z"));
+        assertThat(result.hasNext()).isTrue();
     }
 
     @Test
@@ -168,11 +224,11 @@ class AiMessageQueryServiceTest {
         var result = service.getHistoryMessages(1L, null, null);
 
         assertThat(result.messages()).hasSize(2);
-        assertThat(result.messages().getFirst().date().toString()).isEqualTo("2026-07-06");
+        assertThat(result.messages().getFirst().date().toString()).isEqualTo("2026-07-05");
         assertThat(result.messages().getFirst().items()).hasSize(2);
         assertThat(result.messages().getFirst().items().getFirst().senderType()).isEqualTo(SenderType.USER);
         assertThat(result.messages().getFirst().items().getLast().senderType()).isEqualTo(SenderType.AI);
-        assertThat(result.messages().get(1).date().toString()).isEqualTo("2026-07-05");
+        assertThat(result.messages().get(1).date().toString()).isEqualTo("2026-07-06");
         assertThat(result.nextCursor().id()).isEqualTo(26L);
         assertThat(result.nextCursor().createdAt()).isEqualTo(Instant.parse("2026-07-05T05:20:00Z"));
         assertThat(result.hasNext()).isFalse();

@@ -29,3 +29,9 @@ bodeum:
       region: ap-northeast-2
       access-key: test-access-key
       secret-key: test-secret-key
+
+openapi:
+  secret:
+    datago: test-datago-key
+    odcloud: test-odcloud-key
+    gg: test-gg-key

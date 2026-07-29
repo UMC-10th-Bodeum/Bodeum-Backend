@@ -8,10 +8,12 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.bodeum.domain.mypage.dto.response.MyPageProfileResponse;
+import com.bodeum.domain.mypage.dto.response.MyPageDashboardResponse;
 import com.bodeum.domain.mypage.entity.enums.ScrapType;
 import com.bodeum.domain.mypage.service.MyPageService;
 import com.bodeum.domain.onboarding.service.OnboardingService;
+import com.bodeum.domain.user.dto.response.UserProfileResponse;
+import com.bodeum.domain.user.service.AccountWithdrawalService;
 import com.bodeum.domain.user.service.UserService;
 import com.bodeum.global.apiPayload.handler.GeneralExceptionAdvice;
 import com.bodeum.global.auth.LoginUser;
@@ -37,6 +39,9 @@ class UserControllerTest {
     private UserService userService;
 
     @Mock
+    private AccountWithdrawalService accountWithdrawalService;
+
+    @Mock
     private OnboardingService onboardingService;
 
     @Mock
@@ -53,6 +58,7 @@ class UserControllerTest {
                 .standaloneSetup(
                         new UserController(
                                 userService,
+                                accountWithdrawalService,
                                 onboardingService,
                                 myPageService
                         )
@@ -64,8 +70,44 @@ class UserControllerTest {
     }
 
     @Test
+    void getProfileReturnsEditableProfile() throws Exception {
+        UserProfileResponse response = new UserProfileResponse(
+                10L,
+                "보듬 부모님",
+                "parent@example.com",
+                "kakao",
+                "https://example.com/profile.png",
+                120,
+                2,
+                "잎새",
+                "이웃 보호자들과 정보를 나누는 단계입니다.",
+                null,
+                null,
+                null,
+                null,
+                List.of(),
+                1L,
+                "서울특별시",
+                "강남구",
+                "보듬 부모님",
+                null,
+                null
+        );
+        given(userService.getProfile(10L)).willReturn(response);
+
+        mockMvc.perform(get("/api/v1/users/me/profile"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.userId").value(10))
+                .andExpect(jsonPath("$.result.email").value("parent@example.com"))
+                .andExpect(jsonPath("$.result.provider").value("kakao"))
+                .andExpect(jsonPath("$.result.regionLevel2").value("강남구"));
+
+        then(userService).should().getProfile(10L);
+    }
+
+    @Test
     void getDashboardReturnsProfileAndActivitySummary() throws Exception {
-        MyPageProfileResponse response = new MyPageProfileResponse(
+        MyPageDashboardResponse response = new MyPageDashboardResponse(
                 10L,
                 "보듬 부모님",
                 "https://example.com/profile.png",
@@ -82,9 +124,9 @@ class UserControllerTest {
                 "보듬 부모님",
                 null,
                 null,
-                new MyPageProfileResponse.ActivitySummary(3L, 4L, 5L)
+                new MyPageDashboardResponse.ActivitySummary(3L, 4L, 5L)
         );
-        given(myPageService.getProfile(10L)).willReturn(response);
+        given(myPageService.getDashboard(10L)).willReturn(response);
 
         mockMvc.perform(get("/api/v1/users/me/dashboard"))
                 .andExpect(status().isOk())
@@ -97,7 +139,7 @@ class UserControllerTest {
                 .andExpect(jsonPath("$.result.activitySummary.myPostCount").value(4))
                 .andExpect(jsonPath("$.result.activitySummary.myCommentCount").value(5));
 
-        then(myPageService).should().getProfile(10L);
+        then(myPageService).should().getDashboard(10L);
     }
 
     @Test

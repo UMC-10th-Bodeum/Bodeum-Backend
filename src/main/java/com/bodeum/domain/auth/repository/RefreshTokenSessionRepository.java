@@ -20,5 +20,15 @@ public interface RefreshTokenSessionRepository extends JpaRepository<RefreshToke
     @Query("delete from RefreshTokenSession session where session.expiresAt <= :now")
     int deleteExpired(@Param("now") Instant now);
 
+    @Modifying
+    @Query("""
+            delete from RefreshTokenSession session
+            where session.userId = :userId and session.familyId = :familyId
+            """)
+    int deleteByUserIdAndFamilyId(
+            @Param("userId") Long userId,
+            @Param("familyId") String familyId
+    );
+
     long deleteByUserId(Long userId);
 }

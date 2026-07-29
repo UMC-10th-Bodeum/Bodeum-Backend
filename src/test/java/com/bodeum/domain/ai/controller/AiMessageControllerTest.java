@@ -78,10 +78,43 @@ class AiMessageControllerTest {
 
     @Test
     void getTodayMessagesStillWorks() throws Exception {
-        when(aiMessageQueryService.getTodayMessages(10L))
-                .thenReturn(AiTodayMessageResponse.of(List.of()));
+        when(aiMessageQueryService.getTodayMessages(10L, null, null))
+                .thenReturn(AiTodayMessageResponse.of(List.of(), null, false));
 
         mockMvc.perform(get("/api/v1/ai/messages/today"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("COMMON200_1"));
+    }
+
+    @Test
+    void getTodayMessagesRejectsCursorIdOnly() throws Exception {
+        mockMvc.perform(get("/api/v1/ai/messages/today")
+                        .param("cursorId", "10"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("AI400_1"));
+
+        verify(aiMessageQueryService, never()).getTodayMessages(any(), any(), any());
+    }
+
+    @Test
+    void getTodayMessagesRejectsCursorCreatedAtOnly() throws Exception {
+        mockMvc.perform(get("/api/v1/ai/messages/today")
+                        .param("cursorCreatedAt", "2026-07-28T01:00:00Z"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("AI400_1"));
+
+        verify(aiMessageQueryService, never()).getTodayMessages(any(), any(), any());
+    }
+
+    @Test
+    void getTodayMessagesAllowsBothCursorValues() throws Exception {
+        Instant cursorCreatedAt = Instant.parse("2026-07-28T01:00:00Z");
+        when(aiMessageQueryService.getTodayMessages(10L, 10L, cursorCreatedAt))
+                .thenReturn(AiTodayMessageResponse.of(List.of(), null, false));
+
+        mockMvc.perform(get("/api/v1/ai/messages/today")
+                        .param("cursorId", "10")
+                        .param("cursorCreatedAt", cursorCreatedAt.toString()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("COMMON200_1"));
     }

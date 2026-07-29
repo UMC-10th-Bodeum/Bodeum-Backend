@@ -3,12 +3,14 @@ package com.bodeum.domain.user.service;
 import com.bodeum.domain.auth.enums.SocialProvider;
 import com.bodeum.domain.auth.exception.AuthErrorCode;
 import com.bodeum.domain.auth.repository.AuthLoginCodeRepository;
-import com.bodeum.domain.user.dto.response.AiTermsAgreementResponse;
-import com.bodeum.domain.auth.repository.RefreshTokenSessionRepository;
+import com.bodeum.domain.auth.service.AccessTokenDenylist;
+import com.bodeum.domain.auth.service.RefreshTokenStore;
+import com.bodeum.domain.point.service.PointService;
 import com.bodeum.domain.region.entity.Region;
 import com.bodeum.domain.region.service.RegionService;
 import com.bodeum.domain.user.dto.request.CreateUserAgreementRequest;
 import com.bodeum.domain.user.dto.request.UpdateUserProfileRequest;
+import com.bodeum.domain.user.dto.response.AiTermsAgreementResponse;
 import com.bodeum.domain.user.dto.response.UserAgreementResponse;
 import com.bodeum.domain.user.dto.response.UserHeaderResponse;
 import com.bodeum.domain.user.dto.response.UserProfileResponse;
@@ -22,6 +24,7 @@ import com.bodeum.domain.user.repository.UserRepository;
 import com.bodeum.global.apiPayload.code.GeneralErrorCode;
 import com.bodeum.global.apiPayload.exception.ProjectException;
 import com.bodeum.global.infrastructure.storage.S3ImageStorage;
+import java.time.Instant;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -37,16 +40,18 @@ public class UserService {
     private static final String PROFILE_IMAGE_DIRECTORY = "profile-images";
 
     private final UserRepository userRepository;
-    private final RefreshTokenSessionRepository refreshTokenSessionRepository;
+    private final RefreshTokenStore refreshTokenStore;
     private final AuthLoginCodeRepository authLoginCodeRepository;
+    private final AccessTokenDenylist accessTokenDenylist;
     private final S3ImageStorage s3ImageStorage;
     private final UserProfileImageUpdater userProfileImageUpdater;
     private final RegionService regionService;
     private final UserAgreementRepository userAgreementRepository;
+    private final PointService pointService;
 
     @Transactional(readOnly = true)
     public UserProfileResponse getProfile(Long userId) {
-        return UserProfileResponse.from(getCurrentUser(userId));
+        return UserProfileResponse.from(getCurrentUser(userId), pointService.getTotalPoint(userId));
     }
 
     /**
@@ -60,7 +65,7 @@ public class UserService {
         }
 
         return findActiveUser(userId)
-                .map(UserHeaderResponse::from)
+                .map(user -> UserHeaderResponse.from(user, pointService.getTotalPoint(userId)))
                 .orElseGet(UserHeaderResponse::loggedOut);
     }
 
@@ -114,12 +119,20 @@ public class UserService {
             throw new ProjectException(AuthErrorCode.ALREADY_WITHDRAWN);
         }
 
+        // withdraw()가 authSubject를 새 값으로 교체(묘비 처리)하므로, 폐기 대상인 옛 값을 먼저 캡처한다.
+        String previousAuthSubject = user.getAuthSubject();
+
+        // 보안상 중요한 무효화는 AFTER_COMMIT 이벤트에서 best-effort로 처리하지 않는다.
+        // Redis 장애 시 예외를 전파해 탈퇴 트랜잭션이 커밋되지 않도록 한다.
+        accessTokenDenylist.revokeAllBefore(previousAuthSubject, Instant.now());
+
         // User 개인정보와 소셜 식별자를 파기하고 Auth 인증 수단을 폐기한다.
         // 다른 도메인의 탈퇴 후속 처리는 각 도메인 정책이 확정된 뒤 별도로 연결한다.
         user.withdraw();
-        refreshTokenSessionRepository.deleteByUserId(userId);
+        refreshTokenStore.revokeAll(userId);
         authLoginCodeRepository.deleteByUserId(userId);
 
+        // (login code는 60초 TTL이라 Redis 경로에서는 별도 정리 없이 자연 만료에 맡긴다.)
         return UserWithdrawResponse.ofSuccess();
     }
 

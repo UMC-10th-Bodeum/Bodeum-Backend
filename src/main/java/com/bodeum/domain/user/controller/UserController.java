@@ -1,7 +1,7 @@
 package com.bodeum.domain.user.controller;
 
 import com.bodeum.domain.mypage.dto.response.MyCommentListResponse;
-import com.bodeum.domain.mypage.dto.response.MyPageProfileResponse;
+import com.bodeum.domain.mypage.dto.response.MyPageDashboardResponse;
 import com.bodeum.domain.mypage.dto.response.MyPostListResponse;
 import com.bodeum.domain.mypage.dto.response.MyScrapListResponse;
 import com.bodeum.domain.mypage.entity.enums.ScrapType;
@@ -16,6 +16,7 @@ import com.bodeum.domain.user.dto.response.UserHeaderResponse;
 import com.bodeum.domain.user.dto.response.UserProfileResponse;
 import com.bodeum.domain.user.dto.response.UserProfileUpdateResponse;
 import com.bodeum.domain.user.dto.response.UserWithdrawResponse;
+import com.bodeum.domain.user.service.AccountWithdrawalService;
 import com.bodeum.domain.user.service.UserService;
 import com.bodeum.global.apiPayload.ApiResponse;
 import com.bodeum.global.apiPayload.code.GeneralSuccessCode;
@@ -50,6 +51,7 @@ import org.springframework.web.multipart.MultipartFile;
 public class UserController {
 
     private final UserService userService;
+    private final AccountWithdrawalService accountWithdrawalService;
     private final OnboardingService onboardingService;
     private final MyPageService myPageService;
 
@@ -70,17 +72,16 @@ public class UserController {
     }
 
     @Operation(
-            summary = "내 프로필 대시보드 조회",
-            description = "현재 로그인한 사용자의 상세 프로필과 저장한 정보, "
-                    + "작성 게시글, 작성 댓글 수를 조회한다."
+            summary = "내 프로필 조회",
+            description = "설정 화면 초기 데이터와 온보딩 재진입에 필요한 현재 사용자의 상세 프로필을 조회한다."
     )
     @GetMapping("/me/profile")
-    public ApiResponse<MyPageProfileResponse> getProfile(
+    public ApiResponse<UserProfileResponse> getProfile(
             @LoginUser Long userId
     ) {
         return ApiResponse.of(
                 GeneralSuccessCode.OK,
-                myPageService.getProfile(userId)
+                userService.getProfile(userId)
         );
     }
 
@@ -90,12 +91,12 @@ public class UserController {
                     + "저장한 정보, 작성 게시글, 작성 댓글 수를 조회한다."
     )
     @GetMapping("/me/dashboard")
-    public ApiResponse<MyPageProfileResponse> getDashboard(
+    public ApiResponse<MyPageDashboardResponse> getDashboard(
             @LoginUser Long userId
     ) {
         return ApiResponse.of(
                 GeneralSuccessCode.OK,
-                myPageService.getProfile(userId)
+                myPageService.getDashboard(userId)
         );
     }
 
@@ -235,7 +236,7 @@ public class UserController {
     public ApiResponse<UserWithdrawResponse> withdraw(
             @LoginUser Long userId
     ) {
-        return ApiResponse.of(GeneralSuccessCode.OK, userService.withdraw(userId));
+        return ApiResponse.of(GeneralSuccessCode.OK, accountWithdrawalService.withdraw(userId));
     }
 
     @Operation(

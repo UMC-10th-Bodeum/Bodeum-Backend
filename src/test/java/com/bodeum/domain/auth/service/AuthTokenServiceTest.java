@@ -160,6 +160,25 @@ class AuthTokenServiceTest {
     }
 
     @Test
+    void refreshRotationKeepsOriginalSessionFamily() {
+        User user = createUser();
+        AuthTokenService.AuthTokenPair tokenPair = authTokenService.issueTokens(user.getId());
+        String originalFamilyId = refreshTokenSessionRepository.findAll()
+                .getFirst()
+                .getFamilyId();
+
+        authTokenService.refresh(tokenPair.refreshToken());
+
+        assertThat(refreshTokenSessionRepository.findAll())
+                .hasSize(2)
+                .extracting(session -> session.getFamilyId())
+                .containsOnly(originalFamilyId);
+        assertThat(refreshTokenSessionRepository.findAll())
+                .filteredOn(session -> session.isConsumed())
+                .hasSize(1);
+    }
+
+    @Test
     void refreshTokenIsStoredAsHash() {
         User user = createUser();
 

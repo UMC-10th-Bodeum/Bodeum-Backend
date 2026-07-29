@@ -40,6 +40,14 @@ public class JwtTokenProvider {
      * 서명·만료를 검증하고 subject의 인증 식별자를 반환한다. 유효하지 않으면 empty.
      */
     public Optional<String> parseAuthSubject(String accessToken) {
+        return parseClaims(accessToken).map(ParsedClaims::authSubject);
+    }
+
+    /**
+     * 서명·만료를 검증하고 subject와 발급 시각(issuedAt)을 반환한다. 유효하지 않으면 empty.
+     * denylist가 "특정 시각 이전에 발급된 토큰"을 걸러내기 위해 issuedAt을 사용한다.
+     */
+    public Optional<ParsedClaims> parseClaims(String accessToken) {
         try {
             Claims claims = Jwts.parser()
                     .verifyWith(secretKey)
@@ -47,10 +55,31 @@ public class JwtTokenProvider {
                     .parseSignedClaims(accessToken)
                     .getPayload();
 
-            return Optional.ofNullable(claims.getSubject())
-                    .filter(StringUtils::hasText);
+            String subject = claims.getSubject();
+            String tokenId = claims.getId();
+            Date expiresAt = claims.getExpiration();
+            if (!StringUtils.hasText(subject) || !StringUtils.hasText(tokenId) || expiresAt == null) {
+                return Optional.empty();
+            }
+
+            Date issuedAt = claims.getIssuedAt();
+            return Optional.of(new ParsedClaims(
+                    subject,
+                    tokenId,
+                    issuedAt == null ? null : issuedAt.toInstant(),
+                    expiresAt.toInstant()
+            ));
         } catch (JwtException | IllegalArgumentException e) {
             return Optional.empty();
         }
+    }
+
+    /** 서명 검증을 통과한 access token의 인증·폐기 판정용 claim. */
+    public record ParsedClaims(
+            String authSubject,
+            String tokenId,
+            Instant issuedAt,
+            Instant expiresAt
+    ) {
     }
 }
