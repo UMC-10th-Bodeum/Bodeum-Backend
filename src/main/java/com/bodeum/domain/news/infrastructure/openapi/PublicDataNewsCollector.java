@@ -7,6 +7,8 @@ public interface PublicDataNewsCollector extends NewsCollector {
 
     String sourceName();
 
+    String sourceApiBaseUrl();
+
     String sourceListUrl();
 
     @Override

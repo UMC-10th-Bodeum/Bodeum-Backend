@@ -2,10 +2,10 @@ package com.bodeum.domain.news.dto.response;
 
 import com.bodeum.domain.news.dto.NewsStatus;
 import com.bodeum.domain.news.entity.News;
+import com.bodeum.domain.news.entity.NewsCategoryCode;
 import com.bodeum.domain.news.entity.NewsType;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 
 public record NewsDetailResponse(
         @Schema(description = "소식 ID", example = "1")
@@ -15,8 +15,10 @@ public record NewsDetailResponse(
         String content,
         @Schema(description = "지역", example = "경기도 수원시")
         String region,
-        @Schema(description = "카테고리", example = "SUPPORT_SERVICE")
-        String category,
+        @Schema(description = "카테고리 코드", example = "EDUCATION_SEMINAR")
+        NewsCategoryCode categoryCode,
+        @Schema(description = "카테고리 표시명", example = "교육 · 세미나")
+        String categoryLabel,
         String sourceName,
         String originalUrl,
         String thumbnailUrl,
@@ -26,7 +28,8 @@ public record NewsDetailResponse(
         String targetAudience,
         String contact,
         String manager,
-        LocalDateTime publishedAt,
+        @Schema(description = "게시일", example = "2026-07-20")
+        LocalDate publishedAt,
         LocalDate programStartDate,
         LocalDate programEndDate,
         LocalDate applyStartDate,
@@ -44,7 +47,8 @@ public record NewsDetailResponse(
                 news.getSummary(),
                 news.getContent(),
                 region,
-                news.getNewsCategory().getName(),
+                news.getNewsCategory().getCode(),
+                news.getNewsCategory().getLabel(),
                 news.getSourceName(),
                 news.getOriginalUrl(),
                 news.getThumbnailUrl(),
@@ -53,7 +57,7 @@ public record NewsDetailResponse(
                 news.getTargetAudience(),
                 news.getContact(),
                 news.getManager(),
-                news.getPublishedAt(),
+                news.getPublishedAt().toLocalDate(),
                 news.getProgramStartDate(),
                 news.getProgramEndDate(),
                 news.getApplyStartDate(),

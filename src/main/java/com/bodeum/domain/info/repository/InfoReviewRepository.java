@@ -1,9 +1,11 @@
 package com.bodeum.domain.info.repository;
 
 import com.bodeum.domain.info.entity.InfoReview;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -23,4 +25,9 @@ public interface InfoReviewRepository extends JpaRepository<InfoReview, Long> {
             "LEFT JOIN FETCH r.images " +
             "WHERE r.id = :infoReviewId")
     Optional<InfoReview> findByIdWithUserAndImages(@Param("infoReviewId") Long infoReviewId);
+
+    // 동시성 처리를 위해 PESSIMISTIC_WRITE 락 적용 메서드 추가
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT r FROM InfoReview r WHERE r.id = :id")
+    Optional<InfoReview> findByIdWithPessimisticLock(@Param("id") Long id);
 }

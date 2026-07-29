@@ -10,9 +10,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.bodeum.domain.news.collector.NewsCandidate;
 import com.bodeum.domain.news.entity.News;
 import com.bodeum.domain.news.entity.NewsCategory;
+import com.bodeum.domain.news.entity.NewsCategoryCode;
 import com.bodeum.domain.news.entity.NewsSource;
 import com.bodeum.domain.news.entity.NewsSourceType;
-import com.bodeum.domain.news.entity.NewsType;
 import com.bodeum.domain.news.entity.RecruitmentStatus;
 import com.bodeum.domain.news.repository.NewsCategoryRepository;
 import com.bodeum.domain.news.repository.NewsRepository;
@@ -62,7 +62,7 @@ class NewsControllerIntegrationTest {
         Region seoul = regionRepository.save(Region.create("서울특별시", "강남구"));
         Region suwon = regionRepository.save(Region.create("경기도", "수원시"));
         NewsCategory volunteer = newsCategoryRepository.save(
-                NewsCategory.create(NewsType.ACTIVITY, "VOLUNTEER", 1)
+                NewsCategory.create(NewsCategoryCode.RECRUITMENT_PARTICIPATION)
         );
         NewsSource source = newsSourceRepository.save(source());
         News olderSeoulNews = newsRepository.save(news(
@@ -100,7 +100,7 @@ class NewsControllerIntegrationTest {
                         .param("page", "0")
                         .param("size", "10")
                         .param("regionId", seoul.getId().toString())
-                        .param("category", "VOLUNTEER")
+                        .param("category", "RECRUITMENT_PARTICIPATION")
                         .param("status", "RECRUITING"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.isSuccess").value(true))
@@ -108,7 +108,11 @@ class NewsControllerIntegrationTest {
                 .andExpect(jsonPath("$.result.totalElements").value(2))
                 .andExpect(jsonPath("$.result.items[0].newsId").value(olderSeoulNews.getId()))
                 .andExpect(jsonPath("$.result.items[0].status").value("RECRUITING"))
+                .andExpect(jsonPath("$.result.items[0].categoryCode")
+                        .value("RECRUITMENT_PARTICIPATION"))
+                .andExpect(jsonPath("$.result.items[0].categoryLabel").value("모집 · 참여"))
                 .andExpect(jsonPath("$.result.items[0].region").value("서울특별시 강남구"))
+                .andExpect(jsonPath("$.result.items[0].publishedAt").value("2026-07-01"))
                 .andExpect(jsonPath("$.result.items[1].newsId").value(latestSeoulNews.getId()));
     }
 
@@ -116,7 +120,7 @@ class NewsControllerIntegrationTest {
     void getNewsSortsByScrapCount() throws Exception {
         Region region = regionRepository.save(Region.create("서울특별시", "강남구"));
         NewsCategory category = newsCategoryRepository.save(
-                NewsCategory.create(NewsType.ACTIVITY, "VOLUNTEER", 1)
+                NewsCategory.create(NewsCategoryCode.RECRUITMENT_PARTICIPATION)
         );
         NewsSource source = newsSourceRepository.save(source());
         News lessScrapped = newsRepository.save(news(
@@ -156,7 +160,7 @@ class NewsControllerIntegrationTest {
         Region seongnam = regionRepository.save(Region.create("경기도", "성남시"));
         Region seoul = regionRepository.save(Region.create("서울특별시", "강남구"));
         NewsCategory category = newsCategoryRepository.save(
-                NewsCategory.create(NewsType.ACTIVITY, "WELFARE_PROGRAM", 1)
+                NewsCategory.create(NewsCategoryCode.BENEFIT_WELFARE_SERVICE)
         );
         NewsSource source = newsSourceRepository.save(source());
         News suwonNews = newsRepository.save(news(
@@ -209,7 +213,7 @@ class NewsControllerIntegrationTest {
     void getNewsDetailReturnsContentAndIncreasesViewCount() throws Exception {
         Region region = regionRepository.save(Region.create("경기도", "수원시"));
         NewsCategory category = newsCategoryRepository.save(
-                NewsCategory.create(NewsType.LOCAL, "SUPPORT_SERVICE", 1)
+                NewsCategory.create(NewsCategoryCode.LOCAL_NEWS)
         );
         NewsSource source = newsSourceRepository.save(source());
         News news = newsRepository.saveAndFlush(news(
@@ -227,6 +231,9 @@ class NewsControllerIntegrationTest {
                 .andExpect(jsonPath("$.result.newsId").value(news.getId()))
                 .andExpect(jsonPath("$.result.title").value("상세 소식"))
                 .andExpect(jsonPath("$.result.region").value("경기도 수원시"))
+                .andExpect(jsonPath("$.result.categoryCode").value("LOCAL_NEWS"))
+                .andExpect(jsonPath("$.result.categoryLabel").value("소식"))
+                .andExpect(jsonPath("$.result.publishedAt").value("2026-07-02"))
                 .andExpect(jsonPath("$.result.viewCount").value(1))
                 .andExpect(jsonPath("$.result.scrapped").value(false));
 
@@ -252,7 +259,7 @@ class NewsControllerIntegrationTest {
         );
         Region yongin = regionRepository.save(Region.create("경기도", "용인시"));
         NewsCategory category = newsCategoryRepository.save(
-                NewsCategory.create(NewsType.ACTIVITY, "WELFARE_PROGRAM", 1)
+                NewsCategory.create(NewsCategoryCode.BENEFIT_WELFARE_SERVICE)
         );
         NewsSource source = newsSourceRepository.save(source());
         News current = newsRepository.save(news(
@@ -337,7 +344,7 @@ class NewsControllerIntegrationTest {
                 Region.create("부산광역시", "해운대구")
         );
         NewsCategory category = newsCategoryRepository.save(
-                NewsCategory.create(NewsType.ACTIVITY, "PROGRAM", 1)
+                NewsCategory.create(NewsCategoryCode.BENEFIT_WELFARE_SERVICE)
         );
         NewsSource source = newsSourceRepository.save(source());
         News current = newsRepository.save(news(
@@ -369,7 +376,7 @@ class NewsControllerIntegrationTest {
     @Test
     void getRelatedRecruitingNewsReturnsEmptyWhenCurrentNewsHasNoRegion() throws Exception {
         NewsCategory category = newsCategoryRepository.save(
-                NewsCategory.create(NewsType.ACTIVITY, "PROGRAM", 1)
+                NewsCategory.create(NewsCategoryCode.BENEFIT_WELFARE_SERVICE)
         );
         NewsSource source = newsSourceRepository.save(source());
         News current = newsRepository.save(news(
@@ -422,11 +429,18 @@ class NewsControllerIntegrationTest {
     }
 
     @Test
+    void getNewsRejectsUnknownCategoryCode() throws Exception {
+        mockMvc.perform(get("/api/v1/news").param("category", "교육재활"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("COMMON400_1"));
+    }
+
+    @Test
     void searchNewsMatchesTitleContentSourceNameAndRegionAndSortsByViewCountByDefault() throws Exception {
         Region seoul = regionRepository.save(Region.create("서울특별시", "강남구"));
         Region suwon = regionRepository.save(Region.create("경기도", "수원시"));
         NewsCategory volunteer = newsCategoryRepository.save(
-                NewsCategory.create(NewsType.ACTIVITY, "VOLUNTEER", 1)
+                NewsCategory.create(NewsCategoryCode.RECRUITMENT_PARTICIPATION)
         );
         NewsSource source = newsSourceRepository.save(source());
         News titleMatch = newsRepository.save(news(
@@ -509,10 +523,10 @@ class NewsControllerIntegrationTest {
         Region seoul = regionRepository.save(Region.create("서울특별시", "강남구"));
         Region suwon = regionRepository.save(Region.create("경기도", "수원시"));
         NewsCategory volunteer = newsCategoryRepository.save(
-                NewsCategory.create(NewsType.ACTIVITY, "VOLUNTEER", 1)
+                NewsCategory.create(NewsCategoryCode.RECRUITMENT_PARTICIPATION)
         );
         NewsCategory support = newsCategoryRepository.save(
-                NewsCategory.create(NewsType.LOCAL, "SUPPORT_SERVICE", 2)
+                NewsCategory.create(NewsCategoryCode.LOCAL_NEWS)
         );
         NewsSource source = newsSourceRepository.save(source());
         News expected = newsRepository.save(news(
@@ -555,7 +569,7 @@ class NewsControllerIntegrationTest {
         mockMvc.perform(get("/api/v1/news/search")
                         .param("keyword", "봉사")
                         .param("regionId", seoul.getId().toString())
-                        .param("category", "VOLUNTEER")
+                        .param("category", "RECRUITMENT_PARTICIPATION")
                         .param("status", "RECRUITING"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.result.totalElements").value(1))
@@ -565,7 +579,7 @@ class NewsControllerIntegrationTest {
     @Test
     void searchNewsSortsByScrapCount() throws Exception {
         NewsCategory category = newsCategoryRepository.save(
-                NewsCategory.create(NewsType.ACTIVITY, "VOLUNTEER", 1)
+                NewsCategory.create(NewsCategoryCode.RECRUITMENT_PARTICIPATION)
         );
         NewsSource source = newsSourceRepository.save(source());
         News lessScrapped = newsRepository.save(news(
@@ -608,7 +622,7 @@ class NewsControllerIntegrationTest {
     @Test
     void getNewsSearchSuggestionsPrioritizesPrefixAndReturnsDistinctVisibleTitles() throws Exception {
         NewsCategory category = newsCategoryRepository.save(
-                NewsCategory.create(NewsType.ACTIVITY, "VOLUNTEER", 1)
+                NewsCategory.create(NewsCategoryCode.RECRUITMENT_PARTICIPATION)
         );
         NewsSource source = newsSourceRepository.save(source());
         newsRepository.save(news(
@@ -679,7 +693,7 @@ class NewsControllerIntegrationTest {
     @Test
     void getNewsSearchSuggestionsUsesDefaultSizeTen() throws Exception {
         NewsCategory category = newsCategoryRepository.save(
-                NewsCategory.create(NewsType.ACTIVITY, "VOLUNTEER", 1)
+                NewsCategory.create(NewsCategoryCode.RECRUITMENT_PARTICIPATION)
         );
         NewsSource source = newsSourceRepository.save(source());
         for (int index = 0; index < 11; index++) {
@@ -736,7 +750,7 @@ class NewsControllerIntegrationTest {
     @Test
     void toggleNewsScrapAddsAndRemovesScrap() throws Exception {
         NewsCategory category = newsCategoryRepository.save(
-                NewsCategory.create(NewsType.LOCAL, "SUPPORT_SERVICE", 1)
+                NewsCategory.create(NewsCategoryCode.LOCAL_NEWS)
         );
         NewsSource source = newsSourceRepository.save(source());
         News news = newsRepository.saveAndFlush(news(
@@ -855,7 +869,7 @@ class NewsControllerIntegrationTest {
                 LocalDate.of(2026, 12, 31),
                 LocalDate.of(2026, 7, 1),
                 LocalDate.of(2026, 12, 31),
-                category.getName(),
+                category.getCode(),
                 category.getNewsType(),
                 status
         );

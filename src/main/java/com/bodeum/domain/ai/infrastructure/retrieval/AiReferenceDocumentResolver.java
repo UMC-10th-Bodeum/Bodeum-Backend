@@ -130,7 +130,7 @@ public class AiReferenceDocumentResolver {
     private String newsContent(News news) {
         return lines(
                 line("소식명", news.getTitle()),
-                line("카테고리", news.getNewsCategory().getName()),
+                line("카테고리", news.getNewsCategory().getLabel()),
                 line("소식 유형", news.getNewsType()),
                 line("요약", news.getSummary()),
                 line("본문", news.getContent()),

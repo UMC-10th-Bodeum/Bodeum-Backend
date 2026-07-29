@@ -12,6 +12,7 @@ import static org.mockito.Mockito.times;
 import com.bodeum.domain.news.collector.NewsCandidate;
 import com.bodeum.domain.news.entity.News;
 import com.bodeum.domain.news.entity.NewsCategory;
+import com.bodeum.domain.news.entity.NewsCategoryCode;
 import com.bodeum.domain.news.entity.NewsSource;
 import com.bodeum.domain.news.entity.NewsSourceType;
 import com.bodeum.domain.news.entity.NewsType;
@@ -30,6 +31,7 @@ import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -93,7 +95,7 @@ class NewsPublicDataSyncServiceTest {
                 .willReturn("existing-item");
         given(newsCategoryRepository.findByNewsTypeAndName(
                 NewsType.LOCAL,
-                "SUPPORT_SERVICE"
+                "LOCAL_NEWS"
         )).willReturn(Optional.of(category));
         given(newsRepository.save(any(News.class)))
                 .willAnswer(invocation -> invocation.getArgument(0));
@@ -140,7 +142,7 @@ class NewsPublicDataSyncServiceTest {
                 .willReturn(List.of());
         given(newsCategoryRepository.findByNewsTypeAndName(
                 NewsType.LOCAL,
-                "SUPPORT_SERVICE"
+                "LOCAL_NEWS"
         )).willReturn(Optional.of(category));
         given(newsRepository.save(any(News.class))).willAnswer(invocation -> {
             News news = invocation.getArgument(0);
@@ -178,13 +180,37 @@ class NewsPublicDataSyncServiceTest {
         )).willReturn(List.of());
         given(newsCategoryRepository.findByNewsTypeAndName(
                 NewsType.LOCAL,
-                "SUPPORT_SERVICE"
+                "LOCAL_NEWS"
         )).willReturn(Optional.of(category));
 
         assertThatThrownBy(syncService::sync)
                 .isInstanceOf(ProjectException.class);
         then(regionRepository).should(never()).save(any(Region.class));
         then(newsRepository).should(never()).save(any(News.class));
+    }
+
+    @Test
+    void syncStoresTheApiBaseUrlProvidedByEachCollector() {
+        given(regionRepository.findAllByOrderByRegionLevel1AscRegionLevel2Asc())
+                .willReturn(List.of());
+        given(collector.getSourceType()).willReturn(NewsSourceType.PUBLIC_API);
+        given(collector.sourceName()).willReturn("경기도 장애인복지관 운영 프로그램");
+        given(collector.sourceApiBaseUrl()).willReturn("https://openapi.gg.go.kr");
+        given(collector.sourceListUrl()).willReturn("https://data.gg.go.kr/dataset");
+        given(newsSourceRepository.findBySourceTypeAndName(
+                NewsSourceType.PUBLIC_API,
+                "경기도 장애인복지관 운영 프로그램"
+        )).willReturn(Optional.empty());
+        given(newsSourceRepository.save(any(NewsSource.class)))
+                .willAnswer(invocation -> invocation.getArgument(0));
+        given(collector.collect(any(NewsSource.class))).willReturn(List.of());
+
+        syncService.sync();
+
+        ArgumentCaptor<NewsSource> sourceCaptor = ArgumentCaptor.forClass(NewsSource.class);
+        then(newsSourceRepository).should().save(sourceCaptor.capture());
+        assertThat(sourceCaptor.getValue().getBaseUrl()).isEqualTo("https://openapi.gg.go.kr");
+        assertThat(sourceCaptor.getValue().getListUrl()).isEqualTo("https://data.gg.go.kr/dataset");
     }
 
     private NewsCandidate candidate(String externalItemId, String title) {
@@ -209,7 +235,7 @@ class NewsPublicDataSyncServiceTest {
                 null,
                 null,
                 null,
-                "SUPPORT_SERVICE",
+                NewsCategoryCode.LOCAL_NEWS,
                 NewsType.LOCAL,
                 RecruitmentStatus.OPEN
         );

@@ -3,10 +3,9 @@ package com.bodeum.domain.news.service;
 import com.bodeum.domain.news.collector.NewsCandidate;
 import com.bodeum.domain.news.entity.News;
 import com.bodeum.domain.news.entity.NewsCategory;
+import com.bodeum.domain.news.entity.NewsCategoryCode;
 import com.bodeum.domain.news.entity.NewsSource;
-import com.bodeum.domain.news.entity.NewsType;
 import com.bodeum.domain.news.infrastructure.openapi.PublicDataNewsCollector;
-import com.bodeum.domain.news.infrastructure.openapi.SuwonChildYouthSupportNewsCollector;
 import com.bodeum.domain.news.repository.NewsCategoryRepository;
 import com.bodeum.domain.news.repository.NewsRepository;
 import com.bodeum.domain.news.repository.NewsSourceRepository;
@@ -27,8 +26,6 @@ import org.springframework.util.StringUtils;
 @RequiredArgsConstructor
 public class NewsPublicDataSyncService {
 
-    private static final String ODCLOUD_BASE_URL = "https://api.odcloud.kr/api";
-
     private final List<PublicDataNewsCollector> collectors;
     private final NewsRepository newsRepository;
     private final NewsCategoryRepository newsCategoryRepository;
@@ -37,7 +34,7 @@ public class NewsPublicDataSyncService {
 
     @Transactional
     public NewsSyncResult sync() {
-        Map<String, NewsCategory> categories = new HashMap<>();
+        Map<NewsCategoryCode, NewsCategory> categories = new HashMap<>();
         Map<String, Region> regions = loadRegions();
         int fetched = 0;
         int created = 0;
@@ -51,8 +48,8 @@ public class NewsPublicDataSyncService {
 
             for (NewsCandidate candidate : candidates) {
                 NewsCategory category = categories.computeIfAbsent(
-                        candidate.newsType() + ":" + candidate.categoryName(),
-                        ignored -> findOrCreateCategory(candidate.newsType(), candidate.categoryName())
+                        candidate.categoryCode(),
+                        this::findOrCreateCategory
                 );
                 Long regionId = resolveRegion(candidate.regionName(), regions);
                 News news = newsByExternalItemId.get(candidate.externalItemId());
@@ -100,18 +97,14 @@ public class NewsPublicDataSyncService {
                 .orElseGet(() -> newsSourceRepository.save(NewsSource.create(
                         collector.getSourceType(),
                         collector.sourceName(),
-                        ODCLOUD_BASE_URL,
+                        collector.sourceApiBaseUrl(),
                         collector.sourceListUrl()
                 )));
     }
 
-    private NewsCategory findOrCreateCategory(NewsType newsType, String categoryName) {
-        return newsCategoryRepository.findByNewsTypeAndName(newsType, categoryName)
-                .orElseGet(() -> newsCategoryRepository.save(NewsCategory.create(
-                        newsType,
-                        categoryName,
-                        SuwonChildYouthSupportNewsCollector.CATEGORY_NAME.equals(categoryName) ? 1 : 99
-                )));
+    private NewsCategory findOrCreateCategory(NewsCategoryCode code) {
+        return newsCategoryRepository.findByNewsTypeAndName(code.getNewsType(), code.name())
+                .orElseGet(() -> newsCategoryRepository.save(NewsCategory.create(code)));
     }
 
     private Map<String, Region> loadRegions() {

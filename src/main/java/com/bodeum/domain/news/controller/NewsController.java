@@ -7,6 +7,7 @@ import com.bodeum.domain.news.dto.response.NewsListResponse;
 import com.bodeum.domain.news.dto.response.NewsScrapResponse;
 import com.bodeum.domain.news.dto.response.NewsSearchSuggestionsResponse;
 import com.bodeum.domain.news.dto.response.RelatedRecruitingNewsResponse;
+import com.bodeum.domain.news.entity.NewsCategoryCode;
 import com.bodeum.domain.news.service.NewsQueryService;
 import com.bodeum.domain.news.service.NewsScrapService;
 import com.bodeum.global.apiPayload.ApiResponse;
@@ -57,8 +58,8 @@ public class NewsController {
             @RequestParam(required = false) @Positive Long regionId,
             @Parameter(description = "시/도 이름. regionId가 없으면 해당 시/도 전체 조회", example = "경기도")
             @RequestParam(required = false) @Size(max = 50) String regionLevel1,
-            @Parameter(description = "카테고리", example = "VOLUNTEER")
-            @RequestParam(required = false) @Size(max = 50) String category,
+            @Parameter(description = "카테고리 코드", example = "EDUCATION_SEMINAR")
+            @RequestParam(required = false) NewsCategoryCode category,
             @Parameter(description = "모집 상태", example = "RECRUITING")
             @RequestParam(required = false) NewsStatus status
     ) {
@@ -91,8 +92,8 @@ public class NewsController {
             @RequestParam(required = false) @Positive Long regionId,
             @Parameter(description = "시/도 이름. regionId가 없으면 해당 시/도 전체 조회", example = "경기도")
             @RequestParam(required = false) @Size(max = 50) String regionLevel1,
-            @Parameter(description = "카테고리", example = "VOLUNTEER")
-            @RequestParam(required = false) @Size(max = 50) String category,
+            @Parameter(description = "카테고리 코드", example = "EDUCATION_SEMINAR")
+            @RequestParam(required = false) NewsCategoryCode category,
             @Parameter(description = "모집 상태", example = "RECRUITING")
             @RequestParam(required = false) NewsStatus status
     ) {
