@@ -49,18 +49,6 @@ public class AiMessageService {
             "재활센터알려줘",
             "재활센터를알려줘"
     );
-    private static final Set<String> BOKJIRO_DOMAIN = Set.of("bokjiro.go.kr");
-    private static final Set<String> VOUCHER_DOMAINS = Set.of(
-            "bokjiro.go.kr",
-            "socialservice.or.kr"
-    );
-    private static final List<String> VOUCHER_PREFERRED_URLS = List.of(
-            "https://www.bokjiro.go.kr/ssis-tbu/ssis-tbu/twataa/wlfareInfo/"
-                    + "moveTWAT52011M.do?wlfareInfoId=WLF00003195",
-            "https://www.socialservice.or.kr:444/",
-            "https://www.bokjiro.go.kr/ssis-tbu/twofa/followStep/"
-                    + "selectFollowStepTwoaa.do"
-    );
     private final AiChatRoomRepository aiChatRoomRepository;
     private final AiMessageRepository aiMessageRepository;
     private final UserRepository userRepository;
@@ -167,10 +155,7 @@ public class AiMessageService {
 
         log.debug("[AI] 문서 검색 시작");
         List<AiReferenceDocument> retrievedDocuments = referenceDocumentResolver.resolve(
-                documentRetriever.retrieve(
-                        retrievalQuestion(content, starterQuestionType),
-                        profile
-                )
+                documentRetriever.retrieve(content, profile)
         );
 
         log.info("[AI] 검색 문서 수: {}", retrievedDocuments.size());
@@ -182,7 +167,7 @@ public class AiMessageService {
         if (retrievedDocuments.isEmpty()) {
             log.info("[AI] 내부 문서 없음, 외부 검색 시작");
             return createExternalOrNoResultResponse(
-                    chatRoom, userMessage, content, profile, starterQuestionType);
+                    chatRoom, userMessage, content, profile);
         }
 
         log.debug("[AI] 답변 생성 시작");
@@ -202,7 +187,7 @@ public class AiMessageService {
         if (citedSources.isEmpty()) {
             log.info("[AI] 내부 문서 인용 근거 없음, 외부 검색 시작");
             return createExternalOrNoResultResponse(
-                    chatRoom, userMessage, content, profile, starterQuestionType);
+                    chatRoom, userMessage, content, profile);
         }
 
         boolean warning = hasIncorrectFeedback(citedSources);
@@ -286,22 +271,6 @@ public class AiMessageService {
                         .replaceAll("\\s+", " ");
     }
 
-    private String retrievalQuestion(
-            String question,
-            Optional<AiStarterQuestionType> starterQuestionType
-    ) {
-        AiStarterQuestionType type = starterQuestionType.orElse(null);
-        if (type == AiStarterQuestionType.CHILD_MEDICAL_SUPPORT) {
-            return question
-                    + "\n중앙부처복지서비스 장애아동 의료비 지원 대상 선정 기준 신청 방법";
-        }
-        if (type == AiStarterQuestionType.VOUCHER_APPLICATION) {
-            return question
-                    + "\n발달재활서비스 바우처 지원 대상 서비스 내용 신청 방법 제공기관";
-        }
-        return question;
-    }
-
     private CreateAiMessageResponse saveStarterAnswer(
             AiChatRoom chatRoom,
             AiMessage userMessage,
@@ -335,14 +304,9 @@ public class AiMessageService {
             AiChatRoom chatRoom,
             AiMessage userMessage,
             String question,
-            AiUserProfile profile,
-            Optional<AiStarterQuestionType> starterQuestionType
+            AiUserProfile profile
     ) {
-        ExternalAiAnswer externalAnswer = searchExternal(
-                question,
-                profile,
-                starterQuestionType
-        );
+        ExternalAiAnswer externalAnswer = externalAnswerProvider.search(question, profile);
         if (!externalAnswer.hasEvidence()) {
             return createNoEvidenceResponse(chatRoom, userMessage);
         }
@@ -357,31 +321,6 @@ public class AiMessageService {
                 warningResponse(warning),
                 externalAnswer.answerStatus()
         );
-    }
-
-    private ExternalAiAnswer searchExternal(
-            String question,
-            AiUserProfile profile,
-            Optional<AiStarterQuestionType> starterQuestionType
-    ) {
-        if (starterQuestionType.orElse(null)
-                == AiStarterQuestionType.CHILD_MEDICAL_SUPPORT) {
-            return externalAnswerProvider.searchWithinDomains(
-                    question,
-                    profile,
-                    BOKJIRO_DOMAIN
-            );
-        }
-        if (starterQuestionType.orElse(null)
-                == AiStarterQuestionType.VOUCHER_APPLICATION) {
-            return externalAnswerProvider.searchWithinSources(
-                    question,
-                    profile,
-                    VOUCHER_DOMAINS,
-                    VOUCHER_PREFERRED_URLS
-            );
-        }
-        return externalAnswerProvider.search(question, profile);
     }
 
     private CreateAiMessageResponse createRegionRequiredResponse(

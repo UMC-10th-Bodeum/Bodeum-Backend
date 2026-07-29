@@ -28,7 +28,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Profile;
@@ -86,39 +85,9 @@ public class OpenAiExternalAnswerProvider implements AiExternalAnswerProvider {
 
     @Override
     public ExternalAiAnswer search(String question, AiUserProfile profile) {
-        return search(question, profile, Set.of(), List.of());
-    }
-
-    @Override
-    public ExternalAiAnswer searchWithinDomains(
-            String question,
-            AiUserProfile profile,
-            Set<String> allowedDomains
-    ) {
-        return search(question, profile, allowedDomains, List.of());
-    }
-
-    @Override
-    public ExternalAiAnswer searchWithinSources(
-            String question,
-            AiUserProfile profile,
-            Set<String> allowedDomains,
-            List<String> preferredUrls
-    ) {
-        return search(question, profile, allowedDomains, preferredUrls);
-    }
-
-    private ExternalAiAnswer search(
-            String question,
-            AiUserProfile profile,
-            Set<String> allowedDomains,
-            List<String> preferredUrls
-    ) {
         List<AiExternalSource> sources = externalSourceRepository
                 .findAllBySourceTypeAndActiveTrue(AiExternalSourceType.WEBSITE)
                 .stream()
-                .filter(source -> allowedDomains.isEmpty()
-                        || allowedDomains.contains(normalizedDomain(source.getBaseUrl())))
                 .sorted(Comparator.comparing(source -> source.getAuthorityLevel().ordinal()))
                 .toList();
         Map<String, AiExternalSource> sourcesByDomain = indexByDomain(sources);
@@ -135,8 +104,7 @@ public class OpenAiExternalAnswerProvider implements AiExternalAnswerProvider {
                     .body(requestBody(
                             question,
                             profile,
-                            sourcesByDomain.keySet().stream().toList(),
-                            preferredUrls
+                            sourcesByDomain.keySet().stream().toList()
                     ))
                     .retrieve()
                     .body(String.class);
@@ -154,20 +122,10 @@ public class OpenAiExternalAnswerProvider implements AiExternalAnswerProvider {
         }
     }
 
-    private String normalizedDomain(String url) {
-        String host = URI.create(url).getHost();
-        if (host == null) {
-            return "";
-        }
-        String normalized = host.toLowerCase(Locale.ROOT);
-        return normalized.startsWith("www.") ? normalized.substring(4) : normalized;
-    }
-
     private Map<String, Object> requestBody(
             String question,
             AiUserProfile profile,
-            List<String> allowedDomains,
-            List<String> preferredUrls
+            List<String> allowedDomains
     ) {
         Map<String, Object> filters = Map.of(
                 "allowed_domains", allowedDomains.stream().limit(MAX_ALLOWED_DOMAINS).toList());
@@ -182,14 +140,13 @@ public class OpenAiExternalAnswerProvider implements AiExternalAnswerProvider {
         body.put("tools", List.of(webSearch));
         body.put("tool_choice", "required");
         body.put("include", List.of("web_search_call.action.sources"));
-        body.put("input", externalSearchPrompt(question, profile, preferredUrls));
+        body.put("input", externalSearchPrompt(question, profile));
         return body;
     }
 
     private String externalSearchPrompt(
             String question,
-            AiUserProfile profile,
-            List<String> preferredUrls
+            AiUserProfile profile
     ) {
         return """
                 %s
@@ -204,9 +161,7 @@ public class OpenAiExternalAnswerProvider implements AiExternalAnswerProvider {
                 """.formatted(
                 externalSearchSystemPrompt,
                 promptFormatter.formatProfile(profile),
-                preferredUrls.isEmpty()
-                        ? "등록된 허용 도메인에서 관련 상세 페이지를 찾으세요."
-                        : String.join("\n", preferredUrls),
+                "등록된 허용 도메인에서 관련 상세 페이지를 찾으세요.",
                 question
         );
     }
