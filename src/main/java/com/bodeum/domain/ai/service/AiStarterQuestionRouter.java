@@ -140,25 +140,20 @@ public class AiStarterQuestionRouter {
     }
 
     private AiStarterQuestionAnswer childMedicalSupport() {
-        List<AiExternalSource> registeredSources = findRegisteredSources(
-                CHILD_MEDICAL_SUPPORT_SOURCES.stream()
-                        .map(ExternalDocumentSpec::host)
-                        .distinct()
-                        .toList()
-        );
-        if (registeredSources.size()
-                != CHILD_MEDICAL_SUPPORT_SOURCES.stream()
+        List<String> requiredHosts = CHILD_MEDICAL_SUPPORT_SOURCES.stream()
                 .map(ExternalDocumentSpec::host)
                 .distinct()
-                .count()) {
-            return AiStarterQuestionAnswer.noEvidence();
-        }
-
-        Map<String, AiExternalSource> sourcesByHost = registeredSources.stream()
+                .toList();
+        Map<String, AiExternalSource> sourcesByHost =
+                findRegisteredSources(requiredHosts).stream()
                 .collect(Collectors.toMap(
                         source -> normalizedHost(source.getBaseUrl()),
                         Function.identity()
                 ));
+        if (!sourcesByHost.keySet().containsAll(requiredHosts)) {
+            return AiStarterQuestionAnswer.noEvidence();
+        }
+
         List<AiExternalDocumentCandidate> candidates = CHILD_MEDICAL_SUPPORT_SOURCES.stream()
                 .map(spec -> {
                     AiExternalSource source = sourcesByHost.get(spec.host());
