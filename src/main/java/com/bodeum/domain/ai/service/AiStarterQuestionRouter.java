@@ -71,6 +71,29 @@ public class AiStarterQuestionRouter {
                     "장애인 등록, 각종 증명서 발급 등 행정 절차 안내"
             )
     );
+    private static final List<WelfareSiteSpec> AUTISM_INFO_SITES = List.of(
+            new WelfareSiteSpec(
+                    "broso.or.kr",
+                    "중앙장애아동·발달장애인지원센터 (broso.or.kr)",
+                    "자폐성장애를 포함한 발달장애 아동 관련 복지기관·의료·교육·재활 "
+                            + "정보를 지역별로 확인할 수 있어요."
+            ),
+            new WelfareSiteSpec(
+                    "autismkorea.kr",
+                    "한국자폐인사랑협회 (autismkorea.kr)",
+                    "국내 유일의 자폐성장애인 중심 비영리단체로, 자폐 관련 정책·교육·부모 커뮤니티 정보를 제공해요."
+            ),
+            new WelfareSiteSpec(
+                    "nise.go.kr",
+                    "국립특수교육원 온맘 (nise.go.kr/onmam)",
+                    "특수교육 대상자 선정, 자폐 아동 대상 교육기관 정보를 확인할 수 있어요."
+            ),
+            new WelfareSiteSpec(
+                    "broso.or.kr",
+                    "보건복지부 발달장애인지원포털",
+                    "자폐성장애 등록 기준, 관련 복지사업 안내를 제공해요."
+            )
+    );
     private static final String CHILD_MEDICAL_SUPPORT_ANSWER = """
             의료비 관련 제도를 조건별로 나눠서 정리해드릴게요!
 
@@ -195,6 +218,7 @@ public class AiStarterQuestionRouter {
             case CHILD_MEDICAL_SUPPORT -> Optional.of(childMedicalSupport());
             case DIAGNOSIS_FIRST_STEPS -> Optional.of(diagnosisFirstSteps());
             case VOUCHER_APPLICATION -> Optional.of(voucherApplication(profile));
+            case AUTISM_INFO_SITES -> Optional.of(autismInfoSites());
         };
     }
 
@@ -260,6 +284,34 @@ public class AiStarterQuestionRouter {
                                 + "방문 전 꼭 직접 확인하시는 것을 권장합니다.\n\n",
                         "\n\n> 기관별 대기 여부와 상담 가능 시간은 자주 바뀔 수 있으므로 "
                                 + "방문 전 꼭 전화로 확인해보시는 것을 추천드려요 🍀"
+                ));
+        return AiStarterQuestionAnswer.answered(content, references);
+    }
+
+    private AiStarterQuestionAnswer autismInfoSites() {
+        List<String> requiredHosts = AUTISM_INFO_SITES.stream()
+                .map(WelfareSiteSpec::host)
+                .distinct()
+                .toList();
+        List<AiExternalSource> sources = findRegisteredSources(requiredHosts);
+        if (sources.size() != requiredHosts.size()) {
+            return AiStarterQuestionAnswer.noEvidence();
+        }
+
+        List<AiReferenceDocument> references = persistSourceEntryPagesAsReferences(sources);
+        String content = AUTISM_INFO_SITES.stream()
+                .map(spec -> String.format(
+                        "- **%s** — %s",
+                        spec.displayName(),
+                        spec.description()
+                ))
+                .collect(Collectors.joining(
+                        "\n",
+                        "네, 이번엔 자폐스펙트럼에 좀 더 집중된 정보를 찾을 수 있는 곳으로 "
+                                + "좁혀서 알려드릴게요!\n\n"
+                                + "**자폐스펙트럼 관련 정보를 얻을 수 있는 사이트**\n\n",
+                        "\n\n자폐스펙트럼은 아이마다 특성이 다양해서, 사이트에서 얻은 정보를 "
+                                + "바탕으로 전문가 상담과 함께 살펴보시는 걸 추천드려요."
                 ));
         return AiStarterQuestionAnswer.answered(content, references);
     }

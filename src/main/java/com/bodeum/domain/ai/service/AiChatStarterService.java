@@ -32,6 +32,7 @@ public class AiChatStarterService {
             무엇이 궁금하신가요?""";
     private static final List<String> SUGGESTED_QUESTIONS =
             Arrays.stream(AiStarterQuestionType.values())
+                    .filter(AiStarterQuestionType::isSuggestedQuestion)
                     .map(AiStarterQuestionType::getContent)
                     .toList();
 

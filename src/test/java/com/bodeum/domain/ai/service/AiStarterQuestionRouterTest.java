@@ -165,6 +165,40 @@ class AiStarterQuestionRouterTest {
     }
 
     @Test
+    void returnsReviewedAutismInformationSitesWithoutAddingStarterChip() {
+        List<AiExternalSource> sources = List.of(
+                source("중앙장애아동·발달장애인지원센터", "https://www.broso.or.kr/"),
+                source("한국자폐인사랑협회", "https://www.autismkorea.kr/"),
+                source("국립특수교육원 온맘", "https://www.nise.go.kr/")
+        );
+        when(externalSourceRepository.findAllBySourceTypeAndActiveTrue(
+                AiExternalSourceType.WEBSITE
+        )).thenReturn(sources);
+        when(externalDocumentPersistenceService.saveAll(any())).thenReturn(List.of(
+                document(1L, "https://www.broso.or.kr/mainPage.do"),
+                document(2L, "https://www.autismkorea.kr/main.php"),
+                document(3L, "https://www.nise.go.kr/onmam/front/index.do")
+        ));
+
+        AiStarterQuestionType type = AiStarterQuestionType.fromQuestion(
+                "자폐스펙트럼 정보 사이트 알려주세요"
+        ).orElseThrow();
+        var result = router.route(type, profile(null)).orElseThrow();
+
+        assertThat(type).isEqualTo(AiStarterQuestionType.AUTISM_INFO_SITES);
+        assertThat(type.isSuggestedQuestion()).isFalse();
+        assertThat(result.hasEvidence()).isTrue();
+        assertThat(result.sources()).hasSize(3);
+        assertThat(result.content()).contains(
+                "자폐스펙트럼 관련 정보를 얻을 수 있는 사이트",
+                "중앙장애아동·발달장애인지원센터",
+                "한국자폐인사랑협회",
+                "국립특수교육원 온맘",
+                "보건복지부 발달장애인지원포털"
+        );
+    }
+
+    @Test
     void returnsReviewedChildMedicalSupportAnswerWithOfficialSources() {
         List<AiExternalSource> sources = List.of(
                 source("보건복지부", "https://www.mohw.go.kr/"),

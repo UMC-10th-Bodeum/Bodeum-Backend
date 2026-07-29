@@ -20,5 +20,8 @@ class AiStarterQuestionTypeTest {
         assertThat(AiStarterQuestionType.fromQuestion(
                 "바우처 신청 방법 알려주세요!"
         )).contains(AiStarterQuestionType.VOUCHER_APPLICATION);
+        assertThat(AiStarterQuestionType.fromQuestion(
+                "자폐 관련 공식 사이트 알려주세요."
+        )).contains(AiStarterQuestionType.AUTISM_INFO_SITES);
     }
 }
