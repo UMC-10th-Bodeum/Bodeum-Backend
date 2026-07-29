@@ -163,11 +163,25 @@ class PostListServiceTest {
     }
 
     @Test
-    void getPostsRejectsMissingAuthenticatedUser() {
-        assertThatThrownBy(() -> postListService.getPosts(null, 0, "view", null))
-                .isInstanceOf(CommunityException.class)
-                .extracting(exception -> ((CommunityException) exception).getErrorCode())
-                .isEqualTo(CommunityErrorCode.AUTHENTICATION_REQUIRED);
+    void getPostsAllowsAnonymousUserWithoutPersonalizedState() {
+        Post post = post(1L, 10L, PostAnonymityType.PROFILE_TAG_VISIBLE);
+        User author = user(10L, "보듬맘");
+        given(postRepository.findActivePosts(
+                eq(PostStatus.ACTIVE),
+                eq(null),
+                any(Pageable.class)
+        )).willReturn(new PageImpl<>(List.of(post), PageRequest.of(0, 10), 1));
+        given(postAuthorRepository.findAllByIdIn(List.of(10L))).willReturn(List.of(author));
+        given(postImageRepository.findAllByPost_IdInOrderByPost_IdAscSortOrderAsc(List.of(1L)))
+                .willReturn(List.of());
+
+        var response = postListService.getPosts(null, 0, "view", null);
+
+        assertThat(response.getContent()).singleElement().satisfies(item -> {
+            assertThat(item.isLiked()).isFalse();
+            assertThat(item.author().isMine()).isFalse();
+        });
+        then(postLikeRepository).shouldHaveNoInteractions();
     }
 
     private Post post(Long postId, Long userId, PostAnonymityType anonymityType) {

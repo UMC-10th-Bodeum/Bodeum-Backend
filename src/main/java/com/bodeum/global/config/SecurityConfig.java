@@ -77,6 +77,7 @@ public class SecurityConfig {
                                 "/api/v1/news/*",
                                 "/api/v1/news/*/related"
                         ).permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/community/posts").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/community/posts/*/comments").permitAll()
                         .anyRequest().authenticated()
                 )

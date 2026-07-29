@@ -5,8 +5,6 @@ import com.bodeum.domain.community.entity.Post;
 import com.bodeum.domain.community.enums.PostAnonymityType;
 import com.bodeum.domain.community.enums.PostListSortType;
 import com.bodeum.domain.community.enums.PostStatus;
-import com.bodeum.domain.community.exception.CommunityErrorCode;
-import com.bodeum.domain.community.exception.CommunityException;
 import com.bodeum.domain.community.repository.PostAuthorRepository;
 import com.bodeum.domain.community.repository.PostImageRepository;
 import com.bodeum.domain.community.repository.PostLikeRepository;
@@ -44,7 +42,6 @@ public class PostListService {
             String sort,
             String keyword
     ) {
-        validateAuthenticatedUser(userId);
         PostListSortType sortType = PostListSortType.from(sort);
         String normalizedKeyword = normalizeKeyword(keyword);
         PageRequest pageRequest = PageRequest.of(page, PAGE_SIZE, sortType.toSort());
@@ -64,7 +61,7 @@ public class PostListService {
                 .toList();
         Map<Long, User> authorsById = getAuthorsById(posts);
         Map<Long, String> thumbnailsByPostId = getThumbnailsByPostId(postIds);
-        Set<Long> likedPostIds = Set.copyOf(postLikeRepository.findLikedPostIds(postIds, userId));
+        Set<Long> likedPostIds = getLikedPostIds(userId, postIds);
 
         List<PostListItemResponse> responses = posts.stream()
                 .map(post -> PostListItemResponse.of(
@@ -103,6 +100,13 @@ public class PostListService {
         return thumbnailsByPostId;
     }
 
+    private Set<Long> getLikedPostIds(Long userId, List<Long> postIds) {
+        if (userId == null) {
+            return Set.of();
+        }
+        return Set.copyOf(postLikeRepository.findLikedPostIds(postIds, userId));
+    }
+
     private String normalizeKeyword(String keyword) {
         if (keyword == null || keyword.isBlank()) {
             return null;
@@ -114,9 +118,4 @@ public class PostListService {
                 .replace("_", LIKE_ESCAPE_CHARACTER + "_");
     }
 
-    private void validateAuthenticatedUser(Long userId) {
-        if (userId == null) {
-            throw new CommunityException(CommunityErrorCode.AUTHENTICATION_REQUIRED);
-        }
-    }
 }

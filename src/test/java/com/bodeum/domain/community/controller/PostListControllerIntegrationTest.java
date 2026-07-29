@@ -26,6 +26,13 @@ class PostListControllerIntegrationTest {
     private MockMvc mockMvc;
 
     @Test
+    void getPostsAllowsAnonymousUser() throws Exception {
+        mockMvc.perform(get("/api/v1/community/posts"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.content").isArray());
+    }
+
+    @Test
     void getPostsRejectsNegativePage() throws Exception {
         mockMvc.perform(get("/api/v1/community/posts")
                         .param("page", "-1")
