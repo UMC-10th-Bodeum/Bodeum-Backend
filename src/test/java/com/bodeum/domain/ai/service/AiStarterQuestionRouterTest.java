@@ -58,12 +58,13 @@ class AiStarterQuestionRouterTest {
         when(externalSourceRepository.findAllBySourceTypeAndActiveTrue(
                 AiExternalSourceType.WEBSITE
         )).thenReturn(sources);
-        when(externalDocumentPersistenceService.saveAll(any())).thenReturn(List.of(
+        List<AiExternalDocument> documents = List.of(
                 document(1L, "https://www.mohw.go.kr/board.es"),
                 document(2L, "https://www.socialservice.or.kr:444/user/htmlEditor/view2.do"),
                 document(3L, "https://www.bokjiro.go.kr/ssis-tbu/twatzzza/intgSearch/"),
                 document(4L, "https://www.129.go.kr/")
-        ));
+        );
+        when(externalDocumentPersistenceService.saveAll(any())).thenReturn(documents);
 
         var result = router.route(
                 AiStarterQuestionType.DIAGNOSIS_FIRST_STEPS,
@@ -174,11 +175,12 @@ class AiStarterQuestionRouterTest {
         when(externalSourceRepository.findAllBySourceTypeAndActiveTrue(
                 AiExternalSourceType.WEBSITE
         )).thenReturn(sources);
-        when(externalDocumentPersistenceService.saveAll(any())).thenReturn(List.of(
+        List<AiExternalDocument> documents = List.of(
                 document(1L, "https://www.broso.or.kr/mainPage.do"),
                 document(2L, "https://www.autismkorea.kr/main.php"),
                 document(3L, "https://www.nise.go.kr/onmam/front/index.do")
-        ));
+        );
+        when(externalDocumentPersistenceService.saveAll(any())).thenReturn(documents);
 
         AiStarterQuestionType type = AiStarterQuestionType.fromQuestion(
                 "자폐스펙트럼 정보 사이트 알려주세요"
@@ -194,8 +196,9 @@ class AiStarterQuestionRouterTest {
                 "중앙장애아동·발달장애인지원센터",
                 "한국자폐인사랑협회",
                 "국립특수교육원 온맘",
-                "보건복지부 발달장애인지원포털"
+                "자폐성장애 등록 기준"
         );
+        assertThat(result.content()).doesNotContain("보건복지부 발달장애인지원포털");
     }
 
     @Test
@@ -207,11 +210,12 @@ class AiStarterQuestionRouterTest {
         when(externalSourceRepository.findAllBySourceTypeAndActiveTrue(
                 AiExternalSourceType.WEBSITE
         )).thenReturn(sources);
-        when(externalDocumentPersistenceService.saveAll(any())).thenReturn(List.of(
+        List<AiExternalDocument> documents = List.of(
                 document(1L, "https://www.mohw.go.kr/menu.es?mid=a10710060700"),
                 document(2L, "https://www.nhis.or.kr/nhis/minwon/minwonServiceBoard.do"),
                 document(3L, "https://www.nhis.or.kr/nhis/minwon/minwonServiceBoard.do")
-        ));
+        );
+        when(externalDocumentPersistenceService.saveAll(any())).thenReturn(documents);
 
         var result = router.route(
                 AiStarterQuestionType.CHILD_MEDICAL_SUPPORT,
@@ -233,9 +237,10 @@ class AiStarterQuestionRouterTest {
 
     @Test
     void returnsNoEvidenceWhenMedicalSupportOfficialSourceIsMissing() {
+        AiExternalSource mohw = source("보건복지부", "https://www.mohw.go.kr/");
         when(externalSourceRepository.findAllBySourceTypeAndActiveTrue(
                 AiExternalSourceType.WEBSITE
-        )).thenReturn(List.of(source("보건복지부", "https://www.mohw.go.kr/")));
+        )).thenReturn(List.of(mohw));
 
         var result = router.route(
                 AiStarterQuestionType.CHILD_MEDICAL_SUPPORT,
@@ -255,10 +260,11 @@ class AiStarterQuestionRouterTest {
         when(externalSourceRepository.findAllBySourceTypeAndActiveTrue(
                 AiExternalSourceType.WEBSITE
         )).thenReturn(sources);
-        when(externalDocumentPersistenceService.saveAll(any())).thenReturn(List.of(
+        List<AiExternalDocument> documents = List.of(
                 document(1L, "https://www.mohw.go.kr/menu.es?mid=a10710060600"),
                 document(2L, "https://www.socialservice.or.kr:444/user/htmlEditor/view2.do")
-        ));
+        );
+        when(externalDocumentPersistenceService.saveAll(any())).thenReturn(documents);
 
         var result = router.route(
                 AiStarterQuestionType.VOUCHER_APPLICATION,

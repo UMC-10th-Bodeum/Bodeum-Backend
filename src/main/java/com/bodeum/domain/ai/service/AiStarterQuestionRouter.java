@@ -76,7 +76,7 @@ public class AiStarterQuestionRouter {
                     "broso.or.kr",
                     "중앙장애아동·발달장애인지원센터 (broso.or.kr)",
                     "자폐성장애를 포함한 발달장애 아동 관련 복지기관·의료·교육·재활 "
-                            + "정보를 지역별로 확인할 수 있어요."
+                            + "정보와 자폐성장애 등록 기준, 관련 복지사업 안내를 확인할 수 있어요."
             ),
             new WelfareSiteSpec(
                     "autismkorea.kr",
@@ -87,11 +87,6 @@ public class AiStarterQuestionRouter {
                     "nise.go.kr",
                     "국립특수교육원 온맘 (nise.go.kr/onmam)",
                     "특수교육 대상자 선정, 자폐 아동 대상 교육기관 정보를 확인할 수 있어요."
-            ),
-            new WelfareSiteSpec(
-                    "broso.or.kr",
-                    "보건복지부 발달장애인지원포털",
-                    "자폐성장애 등록 기준, 관련 복지사업 안내를 제공해요."
             )
     );
     private static final String CHILD_MEDICAL_SUPPORT_ANSWER = """
