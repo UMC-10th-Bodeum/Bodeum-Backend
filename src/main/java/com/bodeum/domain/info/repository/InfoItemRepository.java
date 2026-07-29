@@ -1,7 +1,8 @@
 package com.bodeum.domain.info.repository;
 
 import com.bodeum.domain.info.entity.InfoItem;
-import org.springframework.data.jpa.repository.JpaRepository;
+import jakarta.persistence.LockModeType;
+import org.springframework.data.jpa.repository.*;
 import org.springframework.stereotype.Repository;
 
 import java.util.Collection;
@@ -9,6 +10,7 @@ import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
+
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -32,6 +34,11 @@ public interface InfoItemRepository extends JpaRepository<InfoItem, Long>, InfoI
     @EntityGraph(attributePaths = "infoCategory")
     @Query("select info from InfoItem info where info.id = :id")
     Optional<InfoItem> findIndexableById(@Param("id") Long id);
+
+    // 동시성 처리를 위해 PESSIMISTIC_WRITE 락 적용 메서드 추가
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT i FROM InfoItem i WHERE i.id = :id")
+    Optional<InfoItem> findByIdWithPessimisticLock(@Param("id") Long id);
 
     @EntityGraph(attributePaths = "infoCategory")
     @Query("""

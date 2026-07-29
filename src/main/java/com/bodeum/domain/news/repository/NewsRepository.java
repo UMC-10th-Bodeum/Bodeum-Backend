@@ -64,6 +64,32 @@ public interface NewsRepository extends JpaRepository<News, Long> {
             Pageable pageable
     );
 
+    @Query("""
+            select distinct news.title
+            from News news
+            where news.active = true
+              and news.deletedAt is null
+              and locate(:keyword, lower(news.title)) = 1
+            order by news.title asc
+            """)
+    List<String> findTitleSuggestionsStartingWith(
+            @Param("keyword") String keyword,
+            Pageable pageable
+    );
+
+    @Query("""
+            select distinct news.title
+            from News news
+            where news.active = true
+              and news.deletedAt is null
+              and locate(:keyword, lower(news.title)) > 1
+            order by news.title asc
+            """)
+    List<String> findTitleSuggestionsContaining(
+            @Param("keyword") String keyword,
+            Pageable pageable
+    );
+
     @EntityGraph(attributePaths = {"newsCategory", "newsSource"})
     @Query("""
             select news
