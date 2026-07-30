@@ -1,5 +1,6 @@
 package com.bodeum.domain.info.dto.response;
 
+import com.bodeum.domain.info.entity.InfoCategory;
 import com.bodeum.domain.info.entity.InfoItem;
 import com.bodeum.domain.info.entity.enums.MainCategory;
 
@@ -21,14 +22,16 @@ public record InfoItemResponse(
         int reviewCount
 ) {
     public static InfoItemResponse from(InfoItem entity) {
+        InfoCategory category = entity.getInfoCategory();
+
         return new InfoItemResponse(
                 entity.getId(),
                 entity.getName(),
-                entity.getInfoCategory().getMainCategory(),
-                entity.getInfoCategory().getMainCategoryKo(),
-                entity.getInfoCategory().getId(),
-                entity.getInfoCategory().getSubCategory(),
-                entity.getInfoCategory().getSubCategoryKo(),
+                category != null ? category.getMainCategory() : null,
+                category != null ? category.getMainCategoryKo() : null,
+                category != null ? category.getId() : null,
+                category != null ? category.getSubCategory() : null,
+                category != null ? category.getSubCategoryKo() : null,
                 entity.getAddress(),
                 entity.getSido(),
                 entity.getSigungu(),

@@ -32,19 +32,22 @@ public class InfoItem extends BaseCreatedUpdatedEntity {
     @JoinColumn(name = "info_category_id", nullable = false)
     private InfoCategory infoCategory;
 
+    // region 마스터 테이블의 PK ID 값 단순 저장 (FK 미설정)
+    @Column(name = "region_id")
+    private Long regionId;
+
     @Column(nullable = false, length = 100)
     private String name;
 
     @Column(columnDefinition = "TEXT")
     private String introduction;
 
-    @Column(nullable = false)
     private String address;
 
-    @Column(nullable = false, length = 30)
+    @Column(length = 30)
     private String sido;
 
-    @Column(nullable = false, length = 50)
+    @Column(length = 50)
     private String sigungu;
 
     @Column(length = 30)
@@ -74,11 +77,12 @@ public class InfoItem extends BaseCreatedUpdatedEntity {
     private List<InfoItemTag> infoItemTags = new ArrayList<>();
 
     @Builder
-    public InfoItem(String externalId, InfoCategory infoCategory, String name, String introduction,
+    public InfoItem(String externalId, InfoCategory infoCategory, Long regionId, String name, String introduction,
                     String address, String sido, String sigungu, String phone, String homepageUrl,
                     String imageUrl, LocalDateTime syncedAt) {
         this.externalId = externalId;
         this.infoCategory = infoCategory;
+        this.regionId = regionId;
         this.name = name;
         this.introduction = introduction;
         this.address = address;
@@ -90,10 +94,11 @@ public class InfoItem extends BaseCreatedUpdatedEntity {
         this.syncedAt = syncedAt;
     }
 
-    public void updateInformation(String name, InfoCategory infoCategory, String introduction, String address,
+    public void updateInformation(String name, InfoCategory infoCategory, Long regionId, String introduction, String address,
                                   String sido, String sigungu, String phone, String homepageUrl, String imageUrl) {
         this.name = name;
         this.infoCategory = infoCategory;
+        this.regionId = regionId;
         this.introduction = introduction;
         this.address = address;
         this.sido = sido;
@@ -118,7 +123,6 @@ public class InfoItem extends BaseCreatedUpdatedEntity {
         this.reviewCount += amount;
     }
 
-    // 1. 카테고리 명칭 반환 (List.of 대신 Stream을 활용해 null 예방)
     public List<String> getCategoryNames() {
         if (this.infoCategory == null) return List.of();
         return Stream.of(this.infoCategory.getMainCategoryKo(), this.infoCategory.getSubCategoryKo())
@@ -126,7 +130,6 @@ public class InfoItem extends BaseCreatedUpdatedEntity {
                 .toList();
     }
 
-    // 2. 전문 분야 태그 명칭 리스트 반환 (InfoItemTag -> InfoTag 매핑)
     public List<String> getTags() {
         if (this.infoItemTags == null || this.infoItemTags.isEmpty()) {
             return List.of();
@@ -136,7 +139,6 @@ public class InfoItem extends BaseCreatedUpdatedEntity {
                 .toList();
     }
 
-    // 3. 이미지 URL 리스트 반환 (이미지가 있으면 리스트에 담고, 없으면 빈 리스트 반환)
     public List<String> getImageUrls() {
         if (this.imageUrl != null && !this.imageUrl.isBlank()) {
             return List.of(this.imageUrl);

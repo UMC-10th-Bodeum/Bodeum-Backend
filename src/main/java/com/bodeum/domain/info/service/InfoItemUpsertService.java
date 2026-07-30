@@ -16,7 +16,6 @@ public class InfoItemUpsertService {
 
     private final InfoItemRepository infoItemRepository;
 
-    // externalId를 기준으로 데이터가 존재하면 변경 감지(Dirty Checking)를 통해 업데이트
     @Transactional
     public void upsert(InfoItem newItem) {
         Optional<InfoItem> existingItemOpt = infoItemRepository.findByExternalId(newItem.getExternalId());
@@ -24,18 +23,19 @@ public class InfoItemUpsertService {
         if (existingItemOpt.isPresent()) {
             InfoItem existingItem = existingItemOpt.get();
 
-            // 엔티티 내부 수정 비즈니스 메서드 호출 (imageUrl 파라미터 추가)
             existingItem.updateInformation(
                     newItem.getName(),
                     newItem.getInfoCategory(),
+                    newItem.getRegionId(),
                     newItem.getIntroduction(),
                     newItem.getAddress(),
                     newItem.getSido(),
                     newItem.getSigungu(),
                     newItem.getPhone(),
                     newItem.getHomepageUrl(),
-                    newItem.getImageUrl() // <- 대표 이미지 URL 추가!
+                    newItem.getImageUrl()
             );
+
             log.debug("기존 InfoItem 동기화 완료 - ID: {}", existingItem.getExternalId());
         } else {
             infoItemRepository.save(newItem);
