@@ -87,6 +87,9 @@ bodeum:
   news:
     public-data:
       sync-on-startup: ${NEWS_PUBLIC_DATA_SYNC_ON_STARTUP:false}
+      sources:
+        busan-sasang:
+          enabled: ${NEWS_PUBLIC_DATA_BUSAN_SASANG_ENABLED:false}
   ai:
     rag:
       top-k: ${AI_RAG_TOP_K:5}
