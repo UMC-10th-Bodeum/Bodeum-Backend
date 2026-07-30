@@ -175,8 +175,10 @@ public class AiContentIndexingService {
         metadata.put("mainCategoryKo", category.getMainCategoryKo());
         metadata.put("subCategory", category.getSubCategory());
         metadata.put("subCategoryKo", category.getSubCategoryKo());
-        metadata.put("sido", item.getSido());
-        metadata.put("sigungu", item.getSigungu());
+
+        // ★ null 또는 공백인 경우 metadata Map에 넣지 않아 Spring AI VectorStore 에러 방지
+        putIfNotNull(metadata, "sido", item.getSido());
+        putIfNotNull(metadata, "sigungu", item.getSigungu());
 
         String content = lines(
                 line("정보명", item.getName()),
@@ -186,7 +188,10 @@ public class AiContentIndexingService {
                 line("세부 분류 코드", category.getSubCategory()),
                 line("소개", item.getIntroduction()),
                 line("주소", item.getAddress()),
-                line("지역", "%s %s".formatted(item.getSido(), item.getSigungu())),
+                line("지역", "%s %s".formatted(
+                        item.getSido() == null ? "" : item.getSido(),
+                        item.getSigungu() == null ? "" : item.getSigungu()
+                ).trim()),
                 line("전화번호", item.getPhone()),
                 line("홈페이지", item.getHomepageUrl())
         );
@@ -354,5 +359,11 @@ public class AiContentIndexingService {
             return "";
         }
         return "%s ~ %s".formatted(start == null ? "미정" : start, end == null ? "미정" : end);
+    }
+
+    private void putIfNotNull(Map<String, Object> map, String key, Object value) {
+        if (value != null && !value.toString().isBlank()) {
+            map.put(key, value);
+        }
     }
 }
