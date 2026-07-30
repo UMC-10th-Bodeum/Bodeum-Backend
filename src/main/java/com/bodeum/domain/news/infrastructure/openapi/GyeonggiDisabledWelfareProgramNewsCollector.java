@@ -4,9 +4,15 @@ import com.bodeum.domain.news.collector.NewsCandidate;
 import com.bodeum.global.infrastructure.openapi.GgOpenApiClient;
 import java.util.Map;
 import java.util.Set;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 @Component
+@ConditionalOnProperty(
+        prefix = "bodeum.news.public-data.sources.gyeonggi",
+        name = "enabled",
+        havingValue = "true"
+)
 public class GyeonggiDisabledWelfareProgramNewsCollector extends AbstractGgNewsCollector {
 
     public static final String SOURCE_NAME = "경기도 장애인복지관 운영 프로그램";
