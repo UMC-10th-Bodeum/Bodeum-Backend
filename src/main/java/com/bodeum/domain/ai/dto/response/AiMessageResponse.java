@@ -13,16 +13,18 @@ public record AiMessageResponse(
         String content,
         Instant createdAt,
         List<AiMessageSourceResponse> sources,
-        AiMessageWarningResponse warning
+        AiMessageWarningResponse warning,
+        AiMessageFeedbackResponse feedback
 ) {
 
     public AiMessageResponse {
         Objects.requireNonNull(senderType, "senderType must not be null");
         sources = sources == null ? List.of() : List.copyOf(sources);
         if (senderType == SenderType.USER) {
-            if (answerStatus != null || !sources.isEmpty() || warning != null) {
+            if (answerStatus != null || !sources.isEmpty() || warning != null
+                    || feedback != null) {
                 throw new IllegalArgumentException(
-                        "USER message must not have answerStatus, sources, or warning");
+                        "USER message must not have answerStatus, sources, warning, or feedback");
             }
         } else {
             Objects.requireNonNull(answerStatus, "AI message answerStatus must not be null");
@@ -54,6 +56,7 @@ public record AiMessageResponse(
                 content,
                 createdAt,
                 List.of(),
+                null,
                 null
         );
     }
@@ -78,7 +81,8 @@ public record AiMessageResponse(
                 content,
                 createdAt,
                 sources,
-                warning
+                warning,
+                null
         );
     }
 
@@ -95,6 +99,7 @@ public record AiMessageResponse(
                 content,
                 createdAt,
                 List.of(),
+                null,
                 null
         );
     }
@@ -112,7 +117,21 @@ public record AiMessageResponse(
                 content,
                 createdAt,
                 List.of(),
+                null,
                 null
+        );
+    }
+
+    public AiMessageResponse withFeedback(AiMessageFeedbackResponse feedback) {
+        return new AiMessageResponse(
+                aiMessageId,
+                senderType,
+                answerStatus,
+                content,
+                createdAt,
+                sources,
+                warning,
+                feedback
         );
     }
 }
