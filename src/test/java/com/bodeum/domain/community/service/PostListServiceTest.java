@@ -20,8 +20,11 @@ import com.bodeum.domain.community.repository.PostAuthorRepository;
 import com.bodeum.domain.community.repository.PostImageRepository;
 import com.bodeum.domain.community.repository.PostLikeRepository;
 import com.bodeum.domain.community.repository.PostRepository;
+import com.bodeum.domain.point.service.PointService;
 import com.bodeum.domain.user.entity.User;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -45,6 +48,8 @@ class PostListServiceTest {
     private PostImageRepository postImageRepository;
     @Mock
     private PostLikeRepository postLikeRepository;
+    @Mock
+    private PointService pointService;
     @InjectMocks
     private PostListService postListService;
 
@@ -60,6 +65,7 @@ class PostListServiceTest {
                 any(Pageable.class)
         )).willReturn(new PageImpl<>(List.of(post), PageRequest.of(0, 10), 1));
         given(postAuthorRepository.findAllByIdIn(List.of(10L))).willReturn(List.of(author));
+        given(pointService.getTotalPoints(Set.of(10L))).willReturn(Map.of(10L, 200));
         given(postImageRepository.findAllByPost_IdInOrderByPost_IdAscSortOrderAsc(List.of(1L)))
                 .willReturn(List.of(thumbnail));
         given(postLikeRepository.findLikedPostIds(List.of(1L), 20L)).willReturn(List.of(1L));
@@ -74,7 +80,7 @@ class PostListServiceTest {
             assertThat(item.isLiked()).isTrue();
             assertThat(item.author().authorId()).isEqualTo(10L);
             assertThat(item.author().nickname()).isEqualTo("보듬맘");
-            assertThat(item.author().level()).isEqualTo(1);
+            assertThat(item.author().level()).isEqualTo(3);
             assertThat(item.author().isMine()).isFalse();
         });
 
@@ -108,6 +114,7 @@ class PostListServiceTest {
         then(postAuthorRepository).shouldHaveNoInteractions();
         then(postImageRepository).shouldHaveNoInteractions();
         then(postLikeRepository).shouldHaveNoInteractions();
+        then(pointService).shouldHaveNoInteractions();
     }
 
     @Test
@@ -150,6 +157,7 @@ class PostListServiceTest {
             assertThat(item.author().isMine()).isTrue();
         });
         then(postAuthorRepository).should(never()).findAllByIdIn(any());
+        then(pointService).shouldHaveNoInteractions();
     }
 
     @Test
@@ -172,6 +180,7 @@ class PostListServiceTest {
                 any(Pageable.class)
         )).willReturn(new PageImpl<>(List.of(post), PageRequest.of(0, 10), 1));
         given(postAuthorRepository.findAllByIdIn(List.of(10L))).willReturn(List.of(author));
+        given(pointService.getTotalPoints(Set.of(10L))).willReturn(Map.of());
         given(postImageRepository.findAllByPost_IdInOrderByPost_IdAscSortOrderAsc(List.of(1L)))
                 .willReturn(List.of());
 
