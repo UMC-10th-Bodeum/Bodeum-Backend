@@ -4,14 +4,16 @@ import com.bodeum.domain.info.entity.InfoCategory;
 import com.bodeum.domain.info.entity.InfoItem;
 import com.bodeum.domain.info.entity.enums.MainCategory;
 
+import java.util.List;
+
 public record InfoItemResponse(
         Long infoItemId,
         String name,
         MainCategory mainCategory,
         String mainCategoryKo,
         Long subCategoryId,
-        String subCategory,      // 예: "EMERGENCY_MEDICAL_CENTER" 또는 영문명
-        String subCategoryKo,    // 예: "응급의료기관"
+        String subCategory,
+        String subCategoryKo,
         String address,
         String sido,
         String sigungu,
@@ -19,9 +21,10 @@ public record InfoItemResponse(
         String homepageUrl,
         int viewCount,
         int scrapCount,
-        int reviewCount
+        int reviewCount,
+        List<String> tags // ★ 태그 목록 추가
 ) {
-    public static InfoItemResponse from(InfoItem entity) {
+    public static InfoItemResponse of(InfoItem entity, List<String> tags) {
         InfoCategory category = entity.getInfoCategory();
 
         return new InfoItemResponse(
@@ -39,7 +42,8 @@ public record InfoItemResponse(
                 entity.getHomepageUrl(),
                 entity.getViewCount(),
                 entity.getScrapCount(),
-                entity.getReviewCount()
+                entity.getReviewCount(),
+                tags != null ? tags : List.of()
         );
     }
 }

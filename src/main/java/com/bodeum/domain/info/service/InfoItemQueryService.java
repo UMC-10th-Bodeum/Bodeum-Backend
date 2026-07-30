@@ -9,11 +9,13 @@ import com.bodeum.domain.info.dto.response.InfoItemShareResponse;
 import com.bodeum.domain.info.dto.response.KakaoMapUrlResponse;
 import com.bodeum.domain.info.entity.InfoCategory;
 import com.bodeum.domain.info.entity.InfoItem;
+import com.bodeum.domain.info.entity.InfoItemTag;
 import com.bodeum.domain.info.entity.enums.MainCategory;
 import com.bodeum.domain.info.exception.InfoErrorCode;
 import com.bodeum.domain.info.exception.InfoException;
 import com.bodeum.domain.info.repository.InfoCategoryRepository;
 import com.bodeum.domain.info.repository.InfoItemRepository;
+import com.bodeum.domain.info.repository.InfoItemTagRepository;
 import com.bodeum.domain.info.repository.InfoScrapRepository;
 import com.bodeum.domain.region.entity.Region;
 import com.bodeum.domain.user.entity.User;
@@ -30,6 +32,8 @@ import org.springframework.web.util.UriUtils;
 
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -40,30 +44,24 @@ public class InfoItemQueryService {
     private final InfoCategoryRepository infoCategoryRepository;
     private final UserRepository userRepository;
     private final InfoScrapRepository infoScrapRepository;
+    private final InfoItemTagRepository infoItemTagRepository; // ★ 추가
 
     @Value("${bodeum.share.base-url}")
     private String shareBaseUrl;
 
     /**
      * 1. 메인 정보 목록 조회 / 검색 API
-     * - 기본 메인 카테고리: 클라이언트 요청이 없으면 '기관(INSTITUTION)' 기본 적용
-     * - 지역 자동 적용:
-     *   - 클라이언트가 regionLevel1을 지정하지 않고 + 로그인 유저인 경우 -> 관심 지역 적용
-     *   - 비로그인 유저 또는 지역 미지정 시 -> 전체 지역 조회
      */
     public InfoItemPageResponse getInfoItems(
             Long userId,
             InfoItemSearchCondition condition,
             Pageable pageable
     ) {
-        // [수정 포인트] 메인 카테고리 및 서브 카테고리가 모두 지정되지 않은 경우, 기본값 '기관(INSTITUTION)' 설정
         if (condition.category() == null && condition.subCategory() == null) {
             condition = condition.withCategory(MainCategory.INSTITUTION);
         }
 
-        // 클라이언트에서 직접 지정한 지역 정보가 없는 경우
         if (!StringUtils.hasText(condition.regionLevel1())) {
-            // 로그인 유저인 경우 관심 지역 가져오기
             if (userId != null) {
                 User loginUser = userRepository.findByIdWithGuardianProfileAndRegion(userId)
                         .orElseGet(() -> userRepository.findById(userId).orElse(null));
@@ -79,7 +77,19 @@ public class InfoItemQueryService {
         }
 
         Page<InfoItem> infoItems = infoItemRepository.searchInfoItems(condition, pageable);
-        Page<InfoItemResponse> itemResponses = infoItems.map(InfoItemResponse::from);
+
+        // ★ 목록 내 Item들의 ID 추출 후 N+1 방지를 위해 IN 쿼리로 태그 배치 조회
+        List<Long> itemIds = infoItems.stream().map(InfoItem::getId).toList();
+        Map<Long, List<String>> tagMap = infoItemTagRepository.findAllByInfoItemIdIn(itemIds).stream()
+                .collect(Collectors.groupingBy(
+                        itemTag -> itemTag.getInfoItem().getId(),
+                        Collectors.mapping(itemTag -> itemTag.getInfoTag().getName(), Collectors.toList())
+                ));
+
+        // InfoItemResponse 생성 시 매핑된 태그 리스트 전달
+        Page<InfoItemResponse> itemResponses = infoItems.map(item ->
+                InfoItemResponse.of(item, tagMap.getOrDefault(item.getId(), List.of()))
+        );
 
         MainCategory selectedMainCategory = condition.category();
         String selectedMainCategoryKo = null;
@@ -113,31 +123,29 @@ public class InfoItemQueryService {
 
     /**
      * 2. 정보 상세 조회 API
-     * - 비로그인 유저: isScrapped = false
-     * - 로그인 유저: existsByUserIdAndInfoItemId 로 쿼리 1번에 스크랩 유무 즉시 판단
      */
     @Transactional
     public InfoItemDetailResponse getInfoItemDetail(Long userId, Long infoItemId) {
         InfoItem infoItem = infoItemRepository.findById(infoItemId)
                 .orElseThrow(() -> new InfoException(InfoErrorCode.INFO_ITEM_NOT_FOUND));
 
-        // 조회수 증가
         infoItem.incrementViewCount();
 
-        // 로그인 유저인 경우 추가 User 조회 쿼리 없이 즉시 스크랩 여부 확인
         boolean isScrapped = false;
         if (userId != null) {
             isScrapped = infoScrapRepository.existsByUserIdAndInfoItemId(userId, infoItemId);
         }
 
+        // ★ 해당 아이템의 태그 목록 조회
+        List<String> tags = infoItemTagRepository.findAllByInfoItem(infoItem).stream()
+                .map(itemTag -> itemTag.getInfoTag().getName())
+                .toList();
+
         List<InfoItemDetailResponse.BusinessHourDto> businessHours = List.of();
 
-        return InfoItemDetailResponse.of(infoItem, isScrapped, businessHours);
+        return InfoItemDetailResponse.of(infoItem, isScrapped, tags, businessHours);
     }
 
-    /**
-     * 3. 정보 공유 링크 조회 API
-     */
     public InfoItemShareResponse getInfoItemShareUrl(Long infoItemId) {
         InfoItem infoItem = infoItemRepository.findById(infoItemId)
                 .orElseThrow(() -> new InfoException(InfoErrorCode.INFO_SHARE_LINK_NOT_FOUND));
@@ -150,9 +158,6 @@ public class InfoItemQueryService {
         return InfoItemShareResponse.of(infoItem.getId(), shareUrl);
     }
 
-    /**
-     * 4. 카카오지도 URL 생성 API
-     */
     public KakaoMapUrlResponse createKakaoMapUrl(KakaoMapUrlRequest request) {
         InfoItem infoItem = infoItemRepository.findById(request.infoItemId())
                 .orElseThrow(() -> new InfoException(InfoErrorCode.INFO_ITEM_NOT_FOUND));
