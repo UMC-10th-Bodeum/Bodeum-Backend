@@ -41,6 +41,11 @@ public record AiMessageResponse(
                 throw new IllegalArgumentException(
                         "REGION_REQUIRED message must not have sources");
             }
+            if (answerStatus == AiAnswerStatus.GREETING
+                    && (!sources.isEmpty() || warning != null)) {
+                throw new IllegalArgumentException(
+                        "GREETING message must not have sources or warning");
+            }
         }
     }
 
@@ -132,6 +137,23 @@ public record AiMessageResponse(
                 sources,
                 warning,
                 feedback
+        );
+    }
+
+    public static AiMessageResponse greeting(
+            Long aiMessageId,
+            SenderType senderType,
+            String content,
+            Instant createdAt
+    ) {
+        return new AiMessageResponse(
+                aiMessageId,
+                senderType,
+                AiAnswerStatus.GREETING,
+                content,
+                createdAt,
+                List.of(),
+                null
         );
     }
 }
