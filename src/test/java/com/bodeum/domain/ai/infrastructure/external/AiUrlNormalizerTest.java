@@ -42,6 +42,16 @@ class AiUrlNormalizerTest {
     }
 
     @Test
+    void rejectsNonHttpSchemes() {
+        assertThatThrownBy(() -> AiUrlNormalizer.normalize("ftp://example.com/file"))
+                .isInstanceOf(ProjectException.class)
+                .hasRootCauseMessage("URL scheme must be http or https");
+        assertThatThrownBy(() -> AiUrlNormalizer.normalize("javascript://example.com/path"))
+                .isInstanceOf(ProjectException.class)
+                .hasRootCauseMessage("URL scheme must be http or https");
+    }
+
+    @Test
     void doesNotDuplicateIpv6Brackets() {
         assertThat(AiUrlNormalizer.normalize("http://[::1]:8000/path"))
                 .isEqualTo("http://[::1]:8000/path");

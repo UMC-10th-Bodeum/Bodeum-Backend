@@ -17,6 +17,10 @@ public final class AiUrlNormalizer {
                     ? "https:" + value
                     : value.contains("://") ? value : "https://" + value;
             URI uri = URI.create(absoluteUrl).normalize();
+            String scheme = uri.getScheme().toLowerCase(Locale.ROOT);
+            if (!scheme.equals("http") && !scheme.equals("https")) {
+                throw new IllegalArgumentException("URL scheme must be http or https");
+            }
 
             String host = uri.getHost();
             if (host == null || host.isBlank()) {
@@ -27,7 +31,7 @@ public final class AiUrlNormalizer {
             }
 
             StringBuilder normalized = new StringBuilder()
-                    .append(uri.getScheme().toLowerCase(Locale.ROOT))
+                    .append(scheme)
                     .append("://");
             String normalizedHost = host.toLowerCase(Locale.ROOT);
             if (normalizedHost.startsWith("[") && normalizedHost.endsWith("]")) {
