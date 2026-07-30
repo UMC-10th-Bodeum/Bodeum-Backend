@@ -30,31 +30,31 @@ public class SecurityConfig {
     private final ApiAccessDeniedHandler apiAccessDeniedHandler;
     private final CorsProperties corsProperties;
 
+    // HTTP Method 상관없이 모두 허용할 URI (로그인, Swagger, 공통 정적 URI 등)
     private final String[] allowUris = {
             // Swagger 허용
             "/swagger-ui/**",
             "/swagger-resources/**",
             "/v3/api-docs/**",
+            // Auth API
             "/api/v1/auth/login/**",
             "/api/v1/auth/callback/**",
             "/api/v1/auth/exchange",
             "/api/v1/auth/refresh",
             "/api/v1/terms/**",
-            // 헤더/사이드바 공통 조회는 비로그인 상태에서도 200으로 응답해야 한다.
+            // 공통 및 홈 화면 API
             "/api/v1/users/me/brief",
-            // 홈 화면 API
             "/api/v1/news/recommended",
             "/api/v1/home/posts/preview",
             "/api/v1/community/posts/recommended",
             "/api/v1/home/news/preview",
             "/api/v1/info-items/counts",
             "/api/v1/home/banner",
-            // 검색 API
+            // 검색 및 지역 API
             "/api/v1/search",
-            // 정보 항목 조회 및 지역 필터 API (비회원 허용)
-            "/api/v1/info-items/**",
             "/api/v1/info-regions/**",
-
+            // 동기화 API
+            "/api/v1/admin/sync/**"
     };
 
     @Bean
@@ -67,15 +67,24 @@ public class SecurityConfig {
                 .logout(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(requests -> requests
+                        // 1. 공통 허용 URI
                         .requestMatchers(allowUris).permitAll()
+
+                        // 2. 정보(Info) 관련 비로그인 허용 API (GET 조회 전체 + 카카오지도 생성 POST)
+                        .requestMatchers(HttpMethod.GET, "/api/v1/info-items/**").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/v1/info-items/kakaomap-url").permitAll()
+
+                        // 3. 뉴스 및 커뮤니티 GET 조회 허용 API
                         .requestMatchers(
                                 HttpMethod.GET,
                                 "/api/v1/news",
                                 "/api/v1/news/*",
                                 "/api/v1/news/*/related",
-                                "/api/v1/news/search/suggestions"
+                                "/api/v1/news/search/suggestions",
+                                "/api/community/posts/*/comments"
                         ).permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/community/posts/*/comments").permitAll()
+
+                        // 4. 그 외 스크랩, 리뷰 작성/공감 등 CUD 요청은 인증(로그인) 필수
                         .anyRequest().authenticated()
                 )
                 .exceptionHandling(exception -> exception
@@ -89,13 +98,14 @@ public class SecurityConfig {
 
     private CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        // 허용 출처에 와일드카드(*)를 쓰므로 setAllowedOrigins가 아닌 setAllowedOriginPatterns를 사용한다.
+
         configuration.setAllowedOriginPatterns(corsProperties.getAllowedOrigins());
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("*"));
         configuration.setExposedHeaders(List.of("Authorization"));
-        // 인증이 쿠키가 아닌 JWT 헤더 방식이라 자격 증명(credentials) 전송은 불필요하다.
-        configuration.setAllowCredentials(false);
+
+        // JWT 헤더 전송 방식이며 필요에 따라 true/false 세팅
+        configuration.setAllowCredentials(true);
         configuration.setMaxAge(3600L);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();

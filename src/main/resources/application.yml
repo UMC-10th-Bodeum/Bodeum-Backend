@@ -32,7 +32,7 @@ spring:
     database-platform: org.hibernate.dialect.MySQLDialect
     show-sql: false
     hibernate:
-      ddl-auto: validate
+      ddl-auto: update
     properties:
       hibernate:
         format_sql: true
@@ -69,11 +69,10 @@ spring:
         collection-name: bodeum-rag
         initialize-schema: true
 
+open-api:
+  service-key: ${OPEN_API_SERVICE_KEY:}
+
 bodeum:
-  public-data:
-    odcloud:
-      base-url: ${ODCLOUD_BASE_URL:https://api.odcloud.kr/api}
-      service-key: ${OPENAPI_SECRET_ODCLOUD:}
   share:
     base-url: ${SHARE_BASE_URL:https://bodeum.site}
   news:
@@ -97,6 +96,8 @@ bodeum:
       chunk-size: 500
       write-batch-size: 50
       source-time-zone: Asia/Seoul
+      lock-timeout-seconds: ${AI_INDEXING_LOCK_TIMEOUT:60} # 기본 60초 대기
+      max-retries: ${AI_INDEXING_MAX_RETRIES:3}             # 락 획득 실패 시 3회 재시도
   front:
     # 소셜 로그인 완료 후 일회용 code를 붙여 리다이렉트할 프론트 콜백 URL.
     # 운영 값은 application-prod.yml에서 오버라이드한다.
@@ -131,9 +132,3 @@ bodeum:
       access-key: ${AWS_ACCESS_KEY:}
       secret-key: ${AWS_SECRET_KEY:}
       public-base-url: ${AWS_S3_PUBLIC_BASE_URL:}
-
-openapi:
-  secret:
-    datago: ${OPENAPI_SECRET_DATAGO:}
-    odcloud: ${OPENAPI_SECRET_ODCLOUD:}
-    gg: ${OPENAPI_SECRET_GG:}
