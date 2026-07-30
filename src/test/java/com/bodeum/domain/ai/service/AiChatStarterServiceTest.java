@@ -1,25 +1,49 @@
 package com.bodeum.domain.ai.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.bodeum.domain.auth.enums.SocialProvider;
 import com.bodeum.domain.ai.dto.response.AiChatStarterResponse;
+import com.bodeum.domain.ai.entity.AiChatRoom;
+import com.bodeum.domain.ai.entity.AiMessage;
+import com.bodeum.domain.ai.enums.AiAnswerStatus;
+import com.bodeum.domain.ai.repository.AiChatRoomRepository;
+import com.bodeum.domain.ai.repository.AiMessageRepository;
+import com.bodeum.domain.auth.enums.SocialProvider;
 import com.bodeum.domain.user.entity.User;
 import com.bodeum.domain.user.service.UserService;
+import java.time.Instant;
+import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 class AiChatStarterServiceTest {
 
     private UserService userService;
+    private AiChatRoomRepository aiChatRoomRepository;
+    private AiMessageRepository aiMessageRepository;
+    private AiChatRoom chatRoom;
     private AiChatStarterService aiChatStarterService;
 
     @BeforeEach
     void setUp() {
         userService = mock(UserService.class);
-        aiChatStarterService = new AiChatStarterService(userService);
+        aiChatRoomRepository = mock(AiChatRoomRepository.class);
+        aiMessageRepository = mock(AiMessageRepository.class);
+        chatRoom = mock(AiChatRoom.class);
+        aiChatStarterService = new AiChatStarterService(
+                userService,
+                aiChatRoomRepository,
+                aiMessageRepository
+        );
+        when(aiChatRoomRepository.findByUserIdForUpdate(10L))
+                .thenReturn(Optional.of(chatRoom));
+        when(chatRoom.getId()).thenReturn(20L);
     }
 
     @Test
@@ -83,5 +107,40 @@ class AiChatStarterServiceTest {
         assertThat(response.greeting())
                 .contains("보호자님의 정보를 바탕으로")
                 .doesNotContain(SocialProvider.KAKAO.getDisplayName() + " 사용자님");
+    }
+
+    @Test
+    void savesGreetingAsFirstMessageOfToday() {
+        User user = mock(User.class);
+        when(userService.getCurrentUser(10L)).thenReturn(user);
+        when(user.getNickname()).thenReturn("test");
+
+        AiChatStarterResponse response = aiChatStarterService.getChatStarter(10L);
+
+        ArgumentCaptor<AiMessage> messageCaptor =
+                ArgumentCaptor.forClass(AiMessage.class);
+        verify(aiMessageRepository).save(messageCaptor.capture());
+        AiMessage savedMessage = messageCaptor.getValue();
+        assertThat(savedMessage.getChatRoom()).isEqualTo(chatRoom);
+        assertThat(savedMessage.getContent()).isEqualTo(response.greeting());
+        assertThat(savedMessage.getAiAnswerStatus()).isEqualTo(AiAnswerStatus.GREETING);
+        assertThat(savedMessage.isWarning()).isFalse();
+        verify(chatRoom).updateLastMessageAt(any(Instant.class));
+    }
+
+    @Test
+    void doesNotSaveGreetingWhenTodayMessageAlreadyExists() {
+        User user = mock(User.class);
+        when(userService.getCurrentUser(10L)).thenReturn(user);
+        when(user.getNickname()).thenReturn("test");
+        when(aiMessageRepository
+                .existsByChatRoomIdAndCreatedAtGreaterThanEqualAndCreatedAtLessThan(
+                        any(), any(Instant.class), any(Instant.class)))
+                .thenReturn(true);
+
+        aiChatStarterService.getChatStarter(10L);
+
+        verify(aiMessageRepository, never()).save(any(AiMessage.class));
+        verify(chatRoom, never()).updateLastMessageAt(any(Instant.class));
     }
 }

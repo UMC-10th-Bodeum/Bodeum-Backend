@@ -170,6 +170,34 @@ class AiMessageQueryServiceTest {
     }
 
     @Test
+    void restoresGreetingResponseWithoutSources() {
+        AiChatRoom chatRoom = mock(AiChatRoom.class);
+        when(chatRoom.getId()).thenReturn(7L);
+        when(aiChatRoomRepository.findByUserId(1L)).thenReturn(Optional.of(chatRoom));
+
+        AiMessage greetingMessage = mock(AiMessage.class);
+        when(greetingMessage.getId()).thenReturn(24L);
+        when(greetingMessage.getSenderType()).thenReturn(SenderType.AI);
+        when(greetingMessage.getAiAnswerStatus()).thenReturn(AiAnswerStatus.GREETING);
+        when(greetingMessage.getContent()).thenReturn("Hello");
+        when(greetingMessage.getCreatedAt())
+                .thenReturn(Instant.parse("2026-07-21T01:00:01Z"));
+        when(aiMessageRepository.findTodayMessages(
+                eq(7L), any(), any(), any(), any(), any()
+        )).thenReturn(List.of(greetingMessage));
+        when(aiResponseSourceRepository.findAllByMessageIds(List.of(24L)))
+                .thenReturn(List.of());
+
+        var result = service.getTodayMessages(1L, null, null);
+
+        assertThat(result.messages().getFirst().answerStatus())
+                .isEqualTo(AiAnswerStatus.GREETING);
+        assertThat(result.messages().getFirst().content()).isEqualTo("Hello");
+        assertThat(result.messages().getFirst().sources()).isEmpty();
+        assertThat(result.messages().getFirst().warning()).isNull();
+    }
+
+    @Test
     void returnsPreviousMessagesGroupedByDateWithCursor() {
         AiChatRoom chatRoom = mock(AiChatRoom.class);
         when(chatRoom.getId()).thenReturn(7L);
