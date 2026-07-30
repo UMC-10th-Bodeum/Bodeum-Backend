@@ -15,6 +15,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.bodeum.domain.community.dto.request.CreatePostRequest;
 import com.bodeum.domain.community.dto.request.UpdatePostRequest;
 import com.bodeum.domain.community.dto.response.PostLikeResponse;
+import com.bodeum.domain.community.dto.response.PostListItemResponse;
 import com.bodeum.domain.community.dto.response.PostResponse;
 import com.bodeum.domain.community.dto.response.PostScrapResponse;
 import com.bodeum.domain.community.enums.DisabilityType;
@@ -22,6 +23,7 @@ import com.bodeum.domain.community.enums.PostAnonymityType;
 import com.bodeum.domain.community.enums.PostBoardType;
 import com.bodeum.domain.community.exception.CommunityErrorCode;
 import com.bodeum.domain.community.exception.CommunityException;
+import com.bodeum.domain.community.service.PostListService;
 import com.bodeum.domain.community.service.PostQueryFacade;
 import com.bodeum.domain.community.service.PostService;
 import com.bodeum.global.apiPayload.handler.GeneralExceptionAdvice;
@@ -36,6 +38,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.core.MethodParameter;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.MediaType;
 import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
 import org.springframework.web.bind.support.WebDataBinderFactory;
@@ -52,6 +56,8 @@ class PostControllerTest {
     private PostService postService;
     @Mock
     private PostQueryFacade postQueryFacade;
+    @Mock
+    private PostListService postListService;
 
     private MockMvc mockMvc;
     private ObjectMapper objectMapper;
@@ -61,7 +67,9 @@ class PostControllerTest {
         LocalValidatorFactoryBean validator = new LocalValidatorFactoryBean();
         validator.afterPropertiesSet();
         objectMapper = new ObjectMapper().findAndRegisterModules();
-        mockMvc = MockMvcBuilders.standaloneSetup(new PostController(postService, postQueryFacade))
+        mockMvc = MockMvcBuilders.standaloneSetup(
+                        new PostController(postService, postQueryFacade, postListService)
+                )
                 .setControllerAdvice(new GeneralExceptionAdvice())
                 .setCustomArgumentResolvers(loginUserArgumentResolver())
                 .setValidator(validator)
@@ -69,10 +77,46 @@ class PostControllerTest {
     }
 
     @Test
+    void getPostsReturnsTenItemPageWithDefaultSort() throws Exception {
+        given(postListService.getPosts(10L, 0, "view", null))
+                .willReturn(new PageImpl<>(
+                        List.of(postListItemResponse()),
+                        PageRequest.of(0, 10),
+                        1
+                ));
+
+        mockMvc.perform(get("/api/v1/community/posts"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.content[0].postId").value(1))
+                .andExpect(jsonPath("$.result.content[0].author.nickname").value("보듬맘"))
+                .andExpect(jsonPath("$.result.content[0].thumbnailUrl")
+                        .value("https://example.com/image.jpg"))
+                .andExpect(jsonPath("$.result.content[0].isLiked").value(true))
+                .andExpect(jsonPath("$.result.size").value(10))
+                .andExpect(jsonPath("$.result.totalElements").value(1));
+
+        then(postListService).should().getPosts(10L, 0, "view", null);
+    }
+
+    @Test
+    void getPostsPassesSearchAndSortParameters() throws Exception {
+        given(postListService.getPosts(10L, 2, "comment", "언어치료"))
+                .willReturn(new PageImpl<>(List.of(), PageRequest.of(2, 10), 0));
+
+        mockMvc.perform(get("/api/v1/community/posts")
+                        .param("page", "2")
+                        .param("sort", "comment")
+                        .param("keyword", "언어치료"))
+                .andExpect(status().isOk());
+
+        then(postListService).should().getPosts(10L, 2, "comment", "언어치료");
+    }
+
+    @Test
     void createPostReturnsCreatedResponse() throws Exception {
         given(postService.createPost(any(), any(CreatePostRequest.class))).willReturn(postResponse());
 
-        mockMvc.perform(post("/api/community/posts")
+        mockMvc.perform(post("/api/v1/community/posts")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -97,7 +141,7 @@ class PostControllerTest {
 
     @Test
     void createPostRejectsBlankTitle() throws Exception {
-        mockMvc.perform(post("/api/community/posts")
+        mockMvc.perform(post("/api/v1/community/posts")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -115,7 +159,7 @@ class PostControllerTest {
 
     @Test
     void createPostRejectsNullDisabilityType() throws Exception {
-        mockMvc.perform(post("/api/community/posts")
+        mockMvc.perform(post("/api/v1/community/posts")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -148,7 +192,7 @@ class PostControllerTest {
                 false
         );
 
-        mockMvc.perform(post("/api/community/posts")
+        mockMvc.perform(post("/api/v1/community/posts")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest())
@@ -161,7 +205,7 @@ class PostControllerTest {
     void updatePostUsesPostPath() throws Exception {
         given(postService.updatePost(any(), any(), any(UpdatePostRequest.class))).willReturn(postResponse());
 
-        mockMvc.perform(patch("/api/community/posts/1")
+        mockMvc.perform(patch("/api/v1/community/posts/1")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -174,7 +218,7 @@ class PostControllerTest {
 
     @Test
     void deletePostUsesPostPath() throws Exception {
-        mockMvc.perform(delete("/api/community/posts/1"))
+        mockMvc.perform(delete("/api/v1/community/posts/1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.isSuccess").value(true));
 
@@ -185,7 +229,7 @@ class PostControllerTest {
     void getPostReturnsDetailResponse() throws Exception {
         given(postQueryFacade.getPost(10L, 1L)).willReturn(postResponse());
 
-        mockMvc.perform(get("/api/community/posts/1"))
+        mockMvc.perform(get("/api/v1/community/posts/1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.result.title").value("게시글 제목"))
                 .andExpect(jsonPath("$.result.isMine").value(true))
@@ -203,7 +247,7 @@ class PostControllerTest {
         given(postQueryFacade.getPost(10L, 99L))
                 .willThrow(new CommunityException(CommunityErrorCode.POST_NOT_FOUND));
 
-        mockMvc.perform(get("/api/community/posts/99"))
+        mockMvc.perform(get("/api/v1/community/posts/99"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("COMMUNITY404_1"));
     }
@@ -212,7 +256,7 @@ class PostControllerTest {
     void likePostReturnsCurrentLikeStateAndCount() throws Exception {
         given(postService.likePost(10L, 1L)).willReturn(new PostLikeResponse(true, 5));
 
-        mockMvc.perform(put("/api/community/posts/1/likes"))
+        mockMvc.perform(put("/api/v1/community/posts/1/likes"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.result.isLiked").value(true))
                 .andExpect(jsonPath("$.result.likeCount").value(5));
@@ -222,7 +266,7 @@ class PostControllerTest {
     void unlikePostReturnsCurrentLikeStateAndCount() throws Exception {
         given(postService.unlikePost(10L, 1L)).willReturn(new PostLikeResponse(false, 3));
 
-        mockMvc.perform(delete("/api/community/posts/1/likes"))
+        mockMvc.perform(delete("/api/v1/community/posts/1/likes"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.result.isLiked").value(false))
                 .andExpect(jsonPath("$.result.likeCount").value(3));
@@ -232,7 +276,7 @@ class PostControllerTest {
     void scrapPostReturnsCurrentScrapStateAndCount() throws Exception {
         given(postService.scrapPost(10L, 1L)).willReturn(new PostScrapResponse(true, 7));
 
-        mockMvc.perform(put("/api/community/posts/1/scraps"))
+        mockMvc.perform(put("/api/v1/community/posts/1/scraps"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.result.isScrapped").value(true))
                 .andExpect(jsonPath("$.result.scrapCount").value(7));
@@ -242,7 +286,7 @@ class PostControllerTest {
     void unscrapPostReturnsCurrentScrapStateAndCount() throws Exception {
         given(postService.unscrapPost(10L, 1L)).willReturn(new PostScrapResponse(false, 6));
 
-        mockMvc.perform(delete("/api/community/posts/1/scraps"))
+        mockMvc.perform(delete("/api/v1/community/posts/1/scraps"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.result.isScrapped").value(false))
                 .andExpect(jsonPath("$.result.scrapCount").value(6));
@@ -288,6 +332,32 @@ class PostControllerTest {
                 List.of("육아"),
                 List.of("https://example.com/image.jpg"),
                 Instant.parse("2026-07-18T00:00:00Z"),
+                Instant.parse("2026-07-18T00:00:00Z")
+        );
+    }
+
+    private PostListItemResponse postListItemResponse() {
+        return new PostListItemResponse(
+                1L,
+                PostBoardType.FREE_COMMUNICATION,
+                PostAnonymityType.PROFILE_TAG_VISIBLE,
+                "게시글 제목",
+                "게시글 내용",
+                false,
+                new PostListItemResponse.AuthorResponse(
+                        10L,
+                        "보듬맘",
+                        "https://example.com/profile.jpg",
+                        1,
+                        "새싹",
+                        true
+                ),
+                "https://example.com/image.jpg",
+                3,
+                4,
+                5,
+                6,
+                true,
                 Instant.parse("2026-07-18T00:00:00Z")
         );
     }
