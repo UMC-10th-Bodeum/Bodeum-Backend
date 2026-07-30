@@ -108,6 +108,32 @@ class NationwideDisabledWelfareProgramNewsCollectorTest {
         );
     }
 
+    @Test
+    void normalizesLegacyRegionNamesToCurrentRegionMaster() {
+        when(dataGoOpenApiClient.fetchPage(
+                NationwideDisabledWelfareProgramNewsCollector.API_RESOURCE_PATH,
+                1,
+                500
+        )).thenReturn(new DataGoOpenApiPageResponse(
+                2,
+                List.of(
+                        programRow("전라남도", "순천시", "순천 프로그램"),
+                        programRow("인천광역시", "동구", "인천 프로그램")
+                )
+        ));
+        NationwideDisabledWelfareProgramNewsCollector collector =
+                new NationwideDisabledWelfareProgramNewsCollector(dataGoOpenApiClient);
+
+        List<NewsCandidate> result = collector.collect(newsSource());
+
+        assertThat(result)
+                .extracting(NewsCandidate::regionName)
+                .containsExactly(
+                        "전남광주통합특별시 순천시",
+                        "인천광역시 제물포구"
+                );
+    }
+
     private Map<String, Object> programRow(String regionLevel1, String regionLevel2, String title) {
         return Map.ofEntries(
                 Map.entry("prgrmNm", title),
