@@ -33,6 +33,7 @@ public record PostListItemResponse(
     public static PostListItemResponse of(
             Post post,
             User author,
+            int authorTotalPoint,
             Long viewerId,
             String thumbnailUrl,
             boolean liked
@@ -44,7 +45,7 @@ public record PostListItemResponse(
                 post.getTitle(),
                 toContentPreview(post.getContent()),
                 post.isQuestion(),
-                AuthorResponse.of(post, author, viewerId),
+                AuthorResponse.of(post, author, authorTotalPoint, viewerId),
                 thumbnailUrl,
                 post.getViewCount(),
                 post.getLikeCount(),
@@ -69,7 +70,12 @@ public record PostListItemResponse(
             boolean isMine
     ) {
 
-        private static AuthorResponse of(Post post, User author, Long viewerId) {
+        private static AuthorResponse of(
+                Post post,
+                User author,
+                int authorTotalPoint,
+                Long viewerId
+        ) {
             boolean mine = Objects.equals(post.getUserId(), viewerId);
             if (post.getAnonymityType() == PostAnonymityType.FULLY_ANONYMOUS) {
                 return new AuthorResponse(null, "익명", null, null, null, mine);
@@ -78,7 +84,7 @@ public record PostListItemResponse(
                 return new AuthorResponse(post.getUserId(), null, null, null, null, mine);
             }
 
-            GuardianLevel guardianLevel = author.getGuardianLevel();
+            GuardianLevel guardianLevel = GuardianLevel.from(authorTotalPoint);
             return new AuthorResponse(
                     author.getId(),
                     author.getNickname(),
