@@ -34,6 +34,11 @@ public record AiMessageResponse(
             if (answerStatus == AiAnswerStatus.NO_EVIDENCE && !sources.isEmpty()) {
                 throw new IllegalArgumentException("NO_EVIDENCE message must not have sources");
             }
+            if (answerStatus == AiAnswerStatus.REGION_REQUIRED
+                    && !sources.isEmpty()) {
+                throw new IllegalArgumentException(
+                        "REGION_REQUIRED message must not have sources");
+            }
         }
     }
 
@@ -87,6 +92,23 @@ public record AiMessageResponse(
                 aiMessageId,
                 senderType,
                 AiAnswerStatus.NO_EVIDENCE,
+                content,
+                createdAt,
+                List.of(),
+                null
+        );
+    }
+
+    public static AiMessageResponse regionRequired(
+            Long aiMessageId,
+            SenderType senderType,
+            String content,
+            Instant createdAt
+    ) {
+        return new AiMessageResponse(
+                aiMessageId,
+                senderType,
+                AiAnswerStatus.REGION_REQUIRED,
                 content,
                 createdAt,
                 List.of(),

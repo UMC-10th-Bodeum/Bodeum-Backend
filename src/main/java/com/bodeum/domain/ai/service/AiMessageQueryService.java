@@ -190,6 +190,14 @@ public class AiMessageQueryService {
                     message.getCreatedAt());
         }
 
+        if (answerStatus == AiAnswerStatus.REGION_REQUIRED) {
+            return AiMessageResponse.regionRequired(
+                    message.getId(),
+                    message.getSenderType(),
+                    message.getContent(),
+                    message.getCreatedAt());
+        }
+
         return AiMessageResponse.sourceBacked(
                 message.getId(),
                 message.getSenderType(),

@@ -101,7 +101,11 @@ public class OpenAiExternalAnswerProvider implements AiExternalAnswerProvider {
             String responseBody = restClient.post()
                     .uri("/v1/responses")
                     .contentType(MediaType.APPLICATION_JSON)
-                    .body(requestBody(question, profile, sourcesByDomain.keySet().stream().toList()))
+                    .body(requestBody(
+                            question,
+                            profile,
+                            sourcesByDomain.keySet().stream().toList()
+                    ))
                     .retrieve()
                     .body(String.class);
             JsonNode response = responseBody == null
@@ -140,10 +144,16 @@ public class OpenAiExternalAnswerProvider implements AiExternalAnswerProvider {
         return body;
     }
 
-    private String externalSearchPrompt(String question, AiUserProfile profile) {
+    private String externalSearchPrompt(
+            String question,
+            AiUserProfile profile
+    ) {
         return """
                 %s
 
+                %s
+
+                [우선 확인할 공식 페이지]
                 %s
 
                 [사용자 질문]
@@ -151,6 +161,7 @@ public class OpenAiExternalAnswerProvider implements AiExternalAnswerProvider {
                 """.formatted(
                 externalSearchSystemPrompt,
                 promptFormatter.formatProfile(profile),
+                "등록된 허용 도메인에서 관련 상세 페이지를 찾으세요.",
                 question
         );
     }
@@ -246,7 +257,7 @@ public class OpenAiExternalAnswerProvider implements AiExternalAnswerProvider {
                 if (url == null) {
                     continue;
                 }
-                String normalizedUrl = normalizeUrl(url);
+                String normalizedUrl = AiUrlNormalizer.normalize(url);
                 AiExternalSource externalSource = findSource(normalizedUrl, sourcesByDomain).orElse(null);
                 if (externalSource == null) {
                     continue;
@@ -274,7 +285,7 @@ public class OpenAiExternalAnswerProvider implements AiExternalAnswerProvider {
             if (url == null || title == null || title.isBlank()) {
                 continue;
             }
-            String normalizedUrl = normalizeUrl(url);
+            String normalizedUrl = AiUrlNormalizer.normalize(url);
             AiExternalSource externalSource = findSource(normalizedUrl, sourcesByDomain).orElse(null);
             if (externalSource == null) {
                 continue;
@@ -330,23 +341,6 @@ public class OpenAiExternalAnswerProvider implements AiExternalAnswerProvider {
                         || normalizedHost.endsWith("." + entry.getKey()))
                 .map(Map.Entry::getValue)
                 .findFirst();
-    }
-
-    private String normalizeUrl(String url) {
-        URI uri = URI.create(url).normalize();
-        try {
-            return new URI(
-                    uri.getScheme() == null ? "https" : uri.getScheme().toLowerCase(Locale.ROOT),
-                    uri.getUserInfo(),
-                    uri.getHost() == null ? null : uri.getHost().toLowerCase(Locale.ROOT),
-                    uri.getPort(),
-                    uri.getPath(),
-                    uri.getQuery(),
-                    null
-            ).toString();
-        } catch (Exception e) {
-            throw new ProjectException(AiErrorCode.AI_RESPONSE_FAILED, e);
-        }
     }
 
     private String sha256(String value) {
