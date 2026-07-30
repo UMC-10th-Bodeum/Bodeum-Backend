@@ -1,9 +1,11 @@
 package com.bodeum.domain.news.collector;
 
+import com.bodeum.domain.news.entity.NewsCategoryCode;
 import com.bodeum.domain.news.entity.NewsType;
 import com.bodeum.domain.news.entity.RecruitmentStatus;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Objects;
 
 public record NewsCandidate(
         String externalItemId,
@@ -22,8 +24,18 @@ public record NewsCandidate(
         LocalDate programEndDate,
         LocalDate applyStartDate,
         LocalDate applyEndDate,
-        String categoryName,
+        NewsCategoryCode categoryCode,
         NewsType newsType,
         RecruitmentStatus recruitmentStatus
 ) {
+
+    public NewsCandidate {
+        Objects.requireNonNull(categoryCode, "categoryCode must not be null");
+        Objects.requireNonNull(newsType, "newsType must not be null");
+        if (!categoryCode.supports(newsType)) {
+            throw new IllegalArgumentException(
+                    "Category " + categoryCode + " does not support news type " + newsType
+            );
+        }
+    }
 }

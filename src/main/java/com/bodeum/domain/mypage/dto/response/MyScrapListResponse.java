@@ -9,11 +9,12 @@ import com.bodeum.domain.info.entity.InfoItem;
 import com.bodeum.domain.info.entity.InfoScrap;
 import com.bodeum.domain.info.entity.enums.MainCategory;
 import com.bodeum.domain.news.entity.News;
+import com.bodeum.domain.news.entity.NewsCategoryCode;
 import com.bodeum.domain.news.entity.NewsScrap;
 import com.bodeum.domain.news.entity.NewsType;
 import com.bodeum.domain.news.entity.RecruitmentStatus;
 import java.time.Instant;
-import java.time.LocalDateTime;
+import java.time.LocalDate;
 import java.util.List;
 
 public record MyScrapListResponse(
@@ -97,8 +98,10 @@ public record MyScrapListResponse(
             String originalUrl,
             String thumbnailUrl,
             NewsType newsType,
+            NewsCategoryCode categoryCode,
+            String categoryLabel,
             RecruitmentStatus recruitmentStatus,
-            LocalDateTime publishedAt,
+            LocalDate publishedAt,
             Instant scrappedAt
     ) {
 
@@ -114,8 +117,10 @@ public record MyScrapListResponse(
                     news.getOriginalUrl(),
                     news.getThumbnailUrl(),
                     news.getNewsType(),
+                    news.getNewsCategory().getCode(),
+                    news.getNewsCategory().getLabel(),
                     news.getRecruitmentStatus(),
-                    news.getPublishedAt(),
+                    news.getPublishedAt().toLocalDate(),
                     scrap.getCreatedAt()
             );
         }

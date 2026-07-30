@@ -12,6 +12,10 @@ public interface RegionRepository extends JpaRepository<Region, Long> {
 
     List<Region> findAllByOrderByRegionLevel1AscRegionLevel2Asc();
 
+    @Query("select region.id from Region region "
+            + "where region.regionLevel1 = :regionLevel1 order by region.regionLevel2 asc")
+    List<Long> findIdsByRegionLevel1(@Param("regionLevel1") String regionLevel1);
+
     Optional<Region> findByFullName(String fullName);
 
     @Query("""

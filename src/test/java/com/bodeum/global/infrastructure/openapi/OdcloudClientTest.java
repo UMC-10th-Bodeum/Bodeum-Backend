@@ -14,12 +14,13 @@ class OdcloudClientTest {
 
     @Test
     void fetchPageAddsPagingAndServiceKey() {
-        OdcloudProperties properties = properties("test-service-key");
+        OdcloudProperties properties = properties("test+service/key=");
         RestClient.Builder builder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
         OdcloudClient client = new OdcloudClient(builder, properties);
         server.expect(requestTo(
-                        "https://example.test/api/dataset?page=1&perPage=10&serviceKey=test-service-key"
+                        "https://example.test/api/dataset?page=1&perPage=10"
+                                + "&serviceKey=test%2Bservice%2Fkey%3D"
                 ))
                 .andRespond(withSuccess("""
                         {

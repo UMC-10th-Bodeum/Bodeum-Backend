@@ -5,6 +5,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.bodeum.domain.news.collector.NewsCandidate;
+import com.bodeum.domain.news.entity.NewsCategoryCode;
 import com.bodeum.domain.news.entity.NewsSource;
 import com.bodeum.domain.news.entity.NewsSourceType;
 import com.bodeum.domain.news.entity.NewsType;
@@ -83,7 +84,8 @@ class SeongnamDisabledWelfareProgramNewsCollectorTest {
             assertThat(candidate.summary()).isEqualTo("개별 언어치료 진행");
             assertThat(candidate.sourceName()).isEqualTo("성남시장애인종합복지관");
             assertThat(candidate.regionName()).isEqualTo("경기도 성남시");
-            assertThat(candidate.categoryName()).isEqualTo("의료재활");
+            assertThat(candidate.categoryCode())
+                    .isEqualTo(NewsCategoryCode.BENEFIT_WELFARE_SERVICE);
             assertThat(candidate.newsType()).isEqualTo(NewsType.ACTIVITY);
             assertThat(candidate.recruitmentStatus()).isNull();
             assertThat(candidate.programStartDate()).isNull();

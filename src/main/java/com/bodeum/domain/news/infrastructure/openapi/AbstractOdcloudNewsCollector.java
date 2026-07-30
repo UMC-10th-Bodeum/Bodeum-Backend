@@ -11,12 +11,18 @@ import java.util.Objects;
 
 public abstract class AbstractOdcloudNewsCollector implements PublicDataNewsCollector {
 
+    private static final String API_BASE_URL = "https://api.odcloud.kr/api";
     private static final int PAGE_SIZE = 100;
 
     private final OdcloudClient odcloudClient;
 
     protected AbstractOdcloudNewsCollector(OdcloudClient odcloudClient) {
         this.odcloudClient = odcloudClient;
+    }
+
+    @Override
+    public final String sourceApiBaseUrl() {
+        return API_BASE_URL;
     }
 
     @Override
