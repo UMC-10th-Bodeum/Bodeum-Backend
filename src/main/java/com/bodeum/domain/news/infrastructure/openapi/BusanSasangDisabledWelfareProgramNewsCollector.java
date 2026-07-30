@@ -2,9 +2,15 @@ package com.bodeum.domain.news.infrastructure.openapi;
 
 import com.bodeum.global.infrastructure.openapi.OdcloudClient;
 import java.util.Map;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 @Component
+@ConditionalOnProperty(
+        prefix = "bodeum.news.public-data.sources.busan-sasang",
+        name = "enabled",
+        havingValue = "true"
+)
 public class BusanSasangDisabledWelfareProgramNewsCollector
         extends AbstractDisabledWelfareProgramNewsCollector {
 
