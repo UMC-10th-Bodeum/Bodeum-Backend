@@ -14,7 +14,7 @@ class PostListItemResponseTest {
         String content = "가".repeat(PostListItemResponse.CONTENT_PREVIEW_MAX_LENGTH + 1);
         Post post = post(content);
 
-        PostListItemResponse response = PostListItemResponse.of(post, null, null, null, false);
+        PostListItemResponse response = PostListItemResponse.of(post, null, 0, null, null, false);
 
         assertThat(response.content())
                 .hasSize(PostListItemResponse.CONTENT_PREVIEW_MAX_LENGTH)
@@ -26,7 +26,7 @@ class PostListItemResponseTest {
         String content = "짧은 게시글 본문";
         Post post = post(content);
 
-        PostListItemResponse response = PostListItemResponse.of(post, null, null, null, false);
+        PostListItemResponse response = PostListItemResponse.of(post, null, 0, null, null, false);
 
         assertThat(response.content()).isEqualTo(content);
     }
