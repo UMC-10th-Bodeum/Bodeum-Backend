@@ -14,13 +14,14 @@ class DataGoOpenApiClientTest {
 
     @Test
     void fetchPageAddsAuthenticationAndPagingParametersAndExtractsArrayItems() {
-        DataGoOpenApiProperties properties = properties("test-service-key");
+        DataGoOpenApiProperties properties = properties("test+service/key=");
         RestClient.Builder builder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
         DataGoOpenApiClient client = new DataGoOpenApiClient(builder, properties, false);
         server.expect(requestTo(
                         "https://example.test/programs"
-                                + "?serviceKey=test-service-key&pageNo=1&numOfRows=3&type=json"
+                                + "?serviceKey=test%2Bservice%2Fkey%3D"
+                                + "&pageNo=1&numOfRows=3&type=json"
                 ))
                 .andRespond(withSuccess("""
                         {

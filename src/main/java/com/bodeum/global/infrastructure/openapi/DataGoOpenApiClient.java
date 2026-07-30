@@ -56,11 +56,11 @@ public class DataGoOpenApiClient {
             String responseBody = restClient.get()
                     .uri(uriBuilder -> uriBuilder
                             .path(resourcePath)
-                            .queryParam("serviceKey", properties.getServiceKey())
+                            .queryParam("serviceKey", "{serviceKey}")
                             .queryParam("pageNo", page)
                             .queryParam("numOfRows", pageSize)
                             .queryParam("type", "json")
-                            .build())
+                            .build(properties.getServiceKey()))
                     .retrieve()
                     .body(String.class);
 

@@ -14,13 +14,14 @@ class GgOpenApiClientTest {
 
     @Test
     void fetchPageAddsAuthenticationAndPagingParametersAndExtractsRows() {
-        GgOpenApiProperties properties = properties("test-service-key");
+        GgOpenApiProperties properties = properties("test+service/key=");
         RestClient.Builder builder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
         GgOpenApiClient client = new GgOpenApiClient(builder, properties);
         server.expect(requestTo(
                         "https://example.test/DspsnCmwelfctOpertProg"
-                                + "?KEY=test-service-key&Type=json&pIndex=1&pSize=5"
+                                + "?KEY=test%2Bservice%2Fkey%3D"
+                                + "&Type=json&pIndex=1&pSize=5"
                 ))
                 .andRespond(withSuccess("""
                         {

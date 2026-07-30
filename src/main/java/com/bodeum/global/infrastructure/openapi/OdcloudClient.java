@@ -27,8 +27,8 @@ public class OdcloudClient {
                             .path(resourcePath)
                             .queryParam("page", page)
                             .queryParam("perPage", perPage)
-                            .queryParam("serviceKey", properties.getServiceKey())
-                            .build())
+                            .queryParam("serviceKey", "{serviceKey}")
+                            .build(properties.getServiceKey()))
                     .retrieve()
                     .body(OdcloudPageResponse.class);
 
