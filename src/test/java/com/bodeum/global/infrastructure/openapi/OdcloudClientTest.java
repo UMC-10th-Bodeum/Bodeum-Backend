@@ -2,10 +2,12 @@ package com.bodeum.global.infrastructure.openapi;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
@@ -20,7 +22,10 @@ class OdcloudClientTest {
         OdcloudClient client = new OdcloudClient(builder, properties);
         server.expect(requestTo(
                         "https://example.test/api/dataset?page=1&perPage=10"
-                                + "&serviceKey=test%2Bservice%2Fkey%3D"
+                ))
+                .andExpect(header(
+                        HttpHeaders.AUTHORIZATION,
+                        "Infuser test+service/key="
                 ))
                 .andRespond(withSuccess("""
                         {
