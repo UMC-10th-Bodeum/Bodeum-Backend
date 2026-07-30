@@ -55,4 +55,9 @@ public class InfoOperatingHour {
         this.isClosed = isClosed;
         this.note = note;
     }
+
+    // InfoOperatingHour.java 클래스 내부 추가
+    public void assignInfoItem(InfoItem infoItem) {
+        this.infoItem = infoItem;
+    }
 }

@@ -9,14 +9,10 @@ import com.bodeum.domain.info.dto.response.InfoItemShareResponse;
 import com.bodeum.domain.info.dto.response.KakaoMapUrlResponse;
 import com.bodeum.domain.info.entity.InfoCategory;
 import com.bodeum.domain.info.entity.InfoItem;
-import com.bodeum.domain.info.entity.InfoItemTag;
 import com.bodeum.domain.info.entity.enums.MainCategory;
 import com.bodeum.domain.info.exception.InfoErrorCode;
 import com.bodeum.domain.info.exception.InfoException;
-import com.bodeum.domain.info.repository.InfoCategoryRepository;
-import com.bodeum.domain.info.repository.InfoItemRepository;
-import com.bodeum.domain.info.repository.InfoItemTagRepository;
-import com.bodeum.domain.info.repository.InfoScrapRepository;
+import com.bodeum.domain.info.repository.*;
 import com.bodeum.domain.region.entity.Region;
 import com.bodeum.domain.user.entity.User;
 import com.bodeum.domain.user.repository.UserRepository;
@@ -44,7 +40,8 @@ public class InfoItemQueryService {
     private final InfoCategoryRepository infoCategoryRepository;
     private final UserRepository userRepository;
     private final InfoScrapRepository infoScrapRepository;
-    private final InfoItemTagRepository infoItemTagRepository; // ★ 추가
+    private final InfoOperatingHourRepository infoOperatingHourRepository;
+    private final InfoItemTagRepository infoItemTagRepository;
 
     @Value("${bodeum.share.base-url}")
     private String shareBaseUrl;
@@ -136,16 +133,27 @@ public class InfoItemQueryService {
             isScrapped = infoScrapRepository.existsByUserIdAndInfoItemId(userId, infoItemId);
         }
 
-        // ★ 해당 아이템의 태그 목록 조회
+        // 해당 아이템의 태그 목록 조회
         List<String> tags = infoItemTagRepository.findAllByInfoItem(infoItem).stream()
                 .map(itemTag -> itemTag.getInfoTag().getName())
                 .toList();
 
-        List<InfoItemDetailResponse.BusinessHourDto> businessHours = List.of();
+        // 해당 아이템의 운영시간 목록 DB 조회 및 DTO 매핑
+        List<InfoItemDetailResponse.BusinessHourDto> businessHours =
+                infoOperatingHourRepository.findAllByInfoItem(infoItem).stream()
+                        .map(hour -> new InfoItemDetailResponse.BusinessHourDto(
+                                hour.getDayOfWeek() != null ? hour.getDayOfWeek().name() : null,
+                                hour.getOpenTime() != null ? hour.getOpenTime().toString() : null,
+                                hour.getCloseTime() != null ? hour.getCloseTime().toString() : null
+                        ))
+                        .toList();
 
         return InfoItemDetailResponse.of(infoItem, isScrapped, tags, businessHours);
     }
 
+    /**
+     * 3. 정보 공유 URL 생성 API
+     */
     public InfoItemShareResponse getInfoItemShareUrl(Long infoItemId) {
         InfoItem infoItem = infoItemRepository.findById(infoItemId)
                 .orElseThrow(() -> new InfoException(InfoErrorCode.INFO_SHARE_LINK_NOT_FOUND));
@@ -158,6 +166,9 @@ public class InfoItemQueryService {
         return InfoItemShareResponse.of(infoItem.getId(), shareUrl);
     }
 
+    /**
+     * 4. 카카오 지도 길찾기 URL 생성 API
+     */
     public KakaoMapUrlResponse createKakaoMapUrl(KakaoMapUrlRequest request) {
         InfoItem infoItem = infoItemRepository.findById(request.infoItemId())
                 .orElseThrow(() -> new InfoException(InfoErrorCode.INFO_ITEM_NOT_FOUND));
