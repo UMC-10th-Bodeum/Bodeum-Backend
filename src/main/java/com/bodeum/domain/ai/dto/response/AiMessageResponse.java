@@ -153,6 +153,7 @@ public record AiMessageResponse(
                 content,
                 createdAt,
                 List.of(),
+                null,
                 null
         );
     }
