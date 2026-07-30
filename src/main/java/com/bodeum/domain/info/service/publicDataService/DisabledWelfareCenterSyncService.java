@@ -7,6 +7,7 @@ import com.bodeum.domain.info.exception.InfoErrorCode;
 import com.bodeum.domain.info.exception.InfoException;
 import com.bodeum.domain.info.repository.InfoCategoryRepository;
 import com.bodeum.domain.info.repository.InfoItemRepository;
+import com.bodeum.domain.info.service.InfoTagMappingService;
 import com.bodeum.domain.info.util.RegionMapper;
 import com.bodeum.global.infrastructure.openapi.publicDataApi.DisabledWelfareCenterApiClient;
 import jakarta.persistence.EntityManager;
@@ -32,6 +33,7 @@ public class DisabledWelfareCenterSyncService {
     private final InfoItemRepository infoItemRepository;
     private final InfoCategoryRepository infoCategoryRepository;
     private final RegionMapper regionMapper;
+    private final InfoTagMappingService infoTagMappingService;
 
     @PersistenceContext
     private EntityManager entityManager;
@@ -79,9 +81,10 @@ public class DisabledWelfareCenterSyncService {
 
             Optional<InfoItem> existingOpt = infoItemRepository.findByExternalId(externalId);
 
+            InfoItem savedItem;
             if (existingOpt.isPresent()) {
-                InfoItem existingItem = existingOpt.get();
-                existingItem.updateInformation(
+                savedItem = existingOpt.get();
+                savedItem.updateInformation(
                         name, category, regionId, introduction, address,
                         sido, sigungu, phone, null, null
                 );
@@ -101,9 +104,12 @@ public class DisabledWelfareCenterSyncService {
                         .syncedAt(now)
                         .build();
 
-                infoItemRepository.save(newItem);
+                savedItem = infoItemRepository.save(newItem);
                 insertedCount++;
             }
+
+            // ★ 태그 자동 매핑 실행
+            infoTagMappingService.autoMapTags(savedItem);
         }
 
         entityManager.flush();

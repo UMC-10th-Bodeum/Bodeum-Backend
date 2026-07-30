@@ -7,6 +7,7 @@ import com.bodeum.domain.info.exception.InfoErrorCode;
 import com.bodeum.domain.info.exception.InfoException;
 import com.bodeum.domain.info.repository.InfoCategoryRepository;
 import com.bodeum.domain.info.repository.InfoItemRepository;
+import com.bodeum.domain.info.service.InfoTagMappingService;
 import com.bodeum.domain.info.util.RegionMapper;
 import com.bodeum.global.infrastructure.openapi.publicDataApi.SpecialEduCenterApiClient;
 import lombok.RequiredArgsConstructor;
@@ -28,6 +29,7 @@ public class SpecialEduCenterSyncService {
     private final InfoItemRepository infoItemRepository;
     private final InfoCategoryRepository infoCategoryRepository;
     private final RegionMapper regionMapper;
+    private final InfoTagMappingService infoTagMappingService;
 
     @Transactional
     public void syncSpecialEduCenterData() {
@@ -104,6 +106,9 @@ public class SpecialEduCenterSyncService {
             } else {
                 updatedCount++;
             }
+
+            // ★ 태그 자동 매핑
+            infoTagMappingService.autoMapTags(infoItem);
         }
 
         log.info("[특수교육지원센터 API 동기화] 완료 - 신규: {}건, 수정: {}건", insertedCount, updatedCount);
