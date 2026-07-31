@@ -86,7 +86,7 @@ public class StandardWorkplaceSyncService {
             String introduction = introBuilder.toString().trim();
             String phone = item.phone();
 
-            InfoItem infoItem = infoItemRepository.findByExternalId(externalId)
+            InfoItem infoItem = infoItemRepository.findFirstByExternalId(externalId)
                     .map(existingItem -> {
                         existingItem.updateInformation(
                                 displayName, category, regionId, introduction, rawAddress,

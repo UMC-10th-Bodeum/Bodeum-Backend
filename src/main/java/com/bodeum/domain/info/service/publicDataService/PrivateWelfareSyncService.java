@@ -74,7 +74,7 @@ public class PrivateWelfareSyncService {
 
             String introduction = introBuilder.toString().trim();
 
-            InfoItem infoItem = infoItemRepository.findByExternalId(externalId)
+            InfoItem infoItem = infoItemRepository.findFirstByExternalId(externalId)
                     .map(existingItem -> {
                         existingItem.updateInformation(
                                 displayName, category, null, introduction, null,

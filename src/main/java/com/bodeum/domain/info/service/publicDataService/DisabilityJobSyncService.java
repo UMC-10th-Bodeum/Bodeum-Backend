@@ -101,7 +101,7 @@ public class DisabilityJobSyncService {
             String introduction = rawIntro.length() > 2000 ? rawIntro.substring(0, 2000) : rawIntro;
             String phone = item.contact();
 
-            Optional<InfoItem> existingOpt = infoItemRepository.findByExternalId(externalId);
+            Optional<InfoItem> existingOpt = infoItemRepository.findFirstByExternalId(externalId);
 
             InfoItem savedItem;
             if (existingOpt.isPresent()) {

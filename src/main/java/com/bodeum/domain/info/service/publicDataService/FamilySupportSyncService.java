@@ -63,7 +63,7 @@ public class FamilySupportSyncService {
                     item.businessType() != null ? item.businessType() : "-",
                     item.representative() != null ? item.representative() : "-");
 
-            InfoItem infoItem = infoItemRepository.findByExternalId(externalId)
+            InfoItem infoItem = infoItemRepository.findFirstByExternalId(externalId)
                     .map(existingItem -> {
                         existingItem.updateInformation(
                                 name, category, regionId, introduction, fullAddress,

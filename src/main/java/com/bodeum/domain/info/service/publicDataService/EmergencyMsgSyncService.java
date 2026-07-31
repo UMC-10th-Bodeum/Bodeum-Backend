@@ -66,7 +66,7 @@ public class EmergencyMsgSyncService {
                     item.symBlkMsgTyp() != null ? item.symBlkMsgTyp() : "일반"
             );
 
-            InfoItem infoItem = infoItemRepository.findByExternalId(externalId)
+            InfoItem infoItem = infoItemRepository.findFirstByExternalId(externalId)
                     .map(existingItem -> {
                         existingItem.updateInformation(
                                 dutyName, category, regionId, introduction, address,

@@ -83,7 +83,7 @@ public class SpecialSchoolSyncService {
             String phone = item.getPrimaryPhone();
             String homepageUrl = item.getFormattedHomepageUrl();
 
-            InfoItem infoItem = infoItemRepository.findByExternalId(externalId)
+            InfoItem infoItem = infoItemRepository.findFirstByExternalId(externalId)
                     .map(existingItem -> {
                         existingItem.updateInformation(
                                 displayName, category, regionId, introduction, rawAddress,

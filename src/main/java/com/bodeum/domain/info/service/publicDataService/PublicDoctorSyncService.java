@@ -63,7 +63,7 @@ public class PublicDoctorSyncService {
                     item.category() != null ? item.category() : "-",
                     item.serviceType() != null ? item.serviceType() : "-");
 
-            InfoItem infoItem = infoItemRepository.findByExternalId(externalId)
+            InfoItem infoItem = infoItemRepository.findFirstByExternalId(externalId)
                     .map(existingItem -> {
                         existingItem.updateInformation(
                                 name, category, regionId, introduction, address,
