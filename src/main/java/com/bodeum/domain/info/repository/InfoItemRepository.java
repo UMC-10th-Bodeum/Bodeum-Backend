@@ -19,7 +19,7 @@ import org.springframework.data.jpa.repository.EntityGraph;
 public interface InfoItemRepository extends JpaRepository<InfoItem, Long>, InfoItemRepositoryCustom {
 
     // 고유 식별자(externalId)로 기존 데이터를 조회
-    Optional<InfoItem> findByExternalId(String externalId);
+    Optional<InfoItem> findFirstByExternalId(String externalId);
 
     @EntityGraph(attributePaths = "infoCategory")
     @Query("select info from InfoItem info")
