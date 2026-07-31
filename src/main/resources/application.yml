@@ -90,6 +90,8 @@ bodeum:
       sources:
         busan-sasang:
           enabled: ${NEWS_PUBLIC_DATA_BUSAN_SASANG_ENABLED:false}
+        gyeonggi:
+          enabled: ${NEWS_PUBLIC_DATA_GYEONGGI_ENABLED:false}
   ai:
     rag:
       top-k: ${AI_RAG_TOP_K:5}

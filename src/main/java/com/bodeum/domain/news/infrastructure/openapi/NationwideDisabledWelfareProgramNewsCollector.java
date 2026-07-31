@@ -63,7 +63,8 @@ public class NationwideDisabledWelfareProgramNewsCollector extends AbstractDataG
     protected NewsCandidate map(Map<String, Object> row) {
         String regionLevel1 = normalizeRegionLevel1(text(row, "ctpvNm", "CTPV_NM"));
         DisabledWelfareProgramData data = DisabledWelfareProgramData.fromDataGoStandard(row);
-        String regionName = fullRegionName(regionLevel1, data.sigungu());
+        String regionLevel2 = normalizeRegionLevel2(regionLevel1, data.sigungu());
+        String regionName = fullRegionName(regionLevel1, regionLevel2);
         if (!StringUtils.hasText(regionName)
                 || REGIONS_COVERED_BY_DEDICATED_COLLECTORS.contains(regionName)) {
             return null;
@@ -76,6 +77,7 @@ public class NationwideDisabledWelfareProgramNewsCollector extends AbstractDataG
                 "nationwide-welfare-program",
                 identity,
                 regionLevel1,
+                regionLevel2,
                 sourceListUrl()
         );
     }
@@ -87,9 +89,20 @@ public class NationwideDisabledWelfareProgramNewsCollector extends AbstractDataG
         return switch (value) {
             case "강원도" -> "강원특별자치도";
             case "전라북도" -> "전북특별자치도";
+            case "광주광역시", "전라남도" -> "전남광주통합특별시";
             case "제주도" -> "제주특별자치도";
             default -> value;
         };
+    }
+
+    private String normalizeRegionLevel2(String regionLevel1, String value) {
+        if (value == null) {
+            return null;
+        }
+        if ("인천광역시".equals(regionLevel1) && "동구".equals(value)) {
+            return "제물포구";
+        }
+        return value;
     }
 
     private String fullRegionName(String regionLevel1, String regionLevel2) {

@@ -97,6 +97,7 @@ public class AiMessageService {
                     userWithDisabilities
             );
         } catch (Exception e) {
+            logResponseGenerationFailure(userId, chatRoom.getId(), userMessage.getId(), e);
             markFailedSafely(userMessage.getId(), e);
             throw e;
         }
@@ -465,6 +466,38 @@ public class AiMessageService {
             log.error("Failed to mark AI user message as FAILED: userMessageId={}",
                     userMessageId, failureStatusException);
         }
+    }
+
+    private void logResponseGenerationFailure(
+            Long userId,
+            Long chatRoomId,
+            Long userMessageId,
+            Exception exception
+    ) {
+        Throwable rootCause = findRootCause(exception);
+        String errorCode = exception instanceof ProjectException projectException
+                ? projectException.getErrorCode().getCode()
+                : "UNEXPECTED_ERROR";
+
+        log.error(
+                "[AI] 응답 생성 실패: userId={}, chatRoomId={}, userMessageId={}, "
+                        + "errorCode={}, exceptionType={}, rootCauseType={}",
+                userId,
+                chatRoomId,
+                userMessageId,
+                errorCode,
+                exception.getClass().getName(),
+                rootCause.getClass().getName(),
+                exception
+        );
+    }
+
+    private Throwable findRootCause(Throwable exception) {
+        Throwable rootCause = exception;
+        while (rootCause.getCause() != null && rootCause.getCause() != rootCause) {
+            rootCause = rootCause.getCause();
+        }
+        return rootCause;
     }
 
     private record StarterContext(

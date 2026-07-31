@@ -31,6 +31,24 @@ final class DisabledWelfareProgramNewsMapper {
             String regionLevel1,
             String sourceListUrl
     ) {
+        return map(
+                data,
+                externalIdPrefix,
+                externalIdentity,
+                regionLevel1,
+                data.sigungu(),
+                sourceListUrl
+        );
+    }
+
+    static NewsCandidate map(
+            DisabledWelfareProgramData data,
+            String externalIdPrefix,
+            String externalIdentity,
+            String regionLevel1,
+            String regionLevel2,
+            String sourceListUrl
+    ) {
         if (!StringUtils.hasText(data.programName())) {
             return null;
         }
@@ -49,7 +67,7 @@ final class DisabledWelfareProgramNewsMapper {
                 limit(firstText(data.facility(), data.managingAgency()), 100),
                 sourceListUrl,
                 null,
-                join(regionLevel1, data.sigungu()),
+                join(regionLevel1, regionLevel2),
                 targetAudience,
                 limit(firstText(
                         data.contact(),

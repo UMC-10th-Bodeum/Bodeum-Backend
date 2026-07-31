@@ -9,6 +9,7 @@ import com.bodeum.domain.community.repository.PostAuthorRepository;
 import com.bodeum.domain.community.repository.PostImageRepository;
 import com.bodeum.domain.community.repository.PostLikeRepository;
 import com.bodeum.domain.community.repository.PostRepository;
+import com.bodeum.domain.point.service.PointService;
 import com.bodeum.domain.user.entity.User;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -35,6 +36,7 @@ public class PostListService {
     private final PostAuthorRepository postAuthorRepository;
     private final PostImageRepository postImageRepository;
     private final PostLikeRepository postLikeRepository;
+    private final PointService pointService;
 
     public Page<PostListItemResponse> getPosts(
             Long userId,
@@ -60,6 +62,9 @@ public class PostListService {
                 .map(Post::getId)
                 .toList();
         Map<Long, User> authorsById = getAuthorsById(posts);
+        Map<Long, Integer> totalPointsByAuthorId = authorsById.isEmpty()
+                ? Map.of()
+                : pointService.getTotalPoints(authorsById.keySet());
         Map<Long, String> thumbnailsByPostId = getThumbnailsByPostId(postIds);
         Set<Long> likedPostIds = getLikedPostIds(userId, postIds);
 
@@ -67,6 +72,7 @@ public class PostListService {
                 .map(post -> PostListItemResponse.of(
                         post,
                         authorsById.get(post.getUserId()),
+                        totalPointsByAuthorId.getOrDefault(post.getUserId(), 0),
                         userId,
                         thumbnailsByPostId.get(post.getId()),
                         likedPostIds.contains(post.getId())
