@@ -37,4 +37,11 @@ public interface InfoItemRepository extends JpaRepository<InfoItem, Long>, InfoI
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT i FROM InfoItem i WHERE i.id = :id")
     Optional<InfoItem> findByIdWithPessimisticLock(@Param("id") Long id);
+
+    @Query("select i from InfoItem i join i.infoCategory c " +
+            "where i.sido = :regionLevel1 and i.sigungu = :regionLevel2 " +
+            "and c.subCategory = 'THERAPY_REHAB'")
+    List<InfoItem> findRehabCentersByRegion(@Param("regionLevel1") String regionLevel1,
+                                            @Param("regionLevel2") String regionLevel2,
+                                            Pageable pageable);
 }
