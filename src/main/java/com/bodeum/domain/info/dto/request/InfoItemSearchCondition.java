@@ -27,4 +27,15 @@ public record InfoItemSearchCondition(
                 this.sort
         );
     }
+
+    // [추가] 메인 카테고리 기본값 설정 시 새로운 레코드를 생성하는 편의 메서드
+    public InfoItemSearchCondition withCategory(MainCategory newCategory) {
+        return new InfoItemSearchCondition(
+                newCategory,
+                this.subCategory,
+                this.regionLevel1,
+                this.regionLevel2,
+                this.sort
+        );
+    }
 }

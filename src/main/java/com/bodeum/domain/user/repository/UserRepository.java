@@ -38,4 +38,10 @@ public interface UserRepository extends JpaRepository<User, Long> {
     })
     @Query("SELECT u FROM User u WHERE u.id = :id")
     Optional<User> findAiDisabilityProfileById(@Param("id") Long id);
+
+    @Query("select u from User u " +
+            "left join fetch u.guardianProfile gp " +
+            "left join fetch gp.region " +
+            "where u.id = :id")
+    Optional<User> findByIdWithGuardianProfileAndRegion(@Param("id") Long id);
 }

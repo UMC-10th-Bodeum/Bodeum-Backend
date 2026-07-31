@@ -16,6 +16,8 @@ public interface InfoScrapRepository extends JpaRepository<InfoScrap, Long> {
 
     boolean existsByUserAndInfoItem(User user, InfoItem infoItem);
 
+    boolean existsByUserIdAndInfoItemId(Long userId, Long infoItemId);
+
      // 회원 탈퇴 시: 해당 회원이 스크랩한 정보의 scrapCount를 1 감소시킨다.
      // 유니크 제약(user_id, info_item_id)으로 정보당 스크랩은 최대 1건이므로 정확히 1씩 감소한다.
      // 삭제(deleteByUserId)보다 먼저 호출해야 대상 info_item_id를 조회할 수 있다.

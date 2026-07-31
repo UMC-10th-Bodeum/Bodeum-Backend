@@ -10,7 +10,7 @@ public record InfoItemDetailResponse(
         MainCategory mainCategory,
         String mainCategoryKo,
         Long subCategoryId,
-        String subCategory,      // 추가!
+        String subCategory,
         String subCategoryKo,
         String address,
         String sido,
@@ -21,11 +21,13 @@ public record InfoItemDetailResponse(
         int scrapCount,
         int reviewCount,
         boolean isScrapped,
+        List<String> tags, // ★ 태그 목록 추가
         List<BusinessHourDto> businessHours
 ) {
     public static InfoItemDetailResponse of(
             InfoItem entity,
             boolean isScrapped,
+            List<String> tags,
             List<BusinessHourDto> businessHours
     ) {
         return new InfoItemDetailResponse(
@@ -45,6 +47,7 @@ public record InfoItemDetailResponse(
                 entity.getScrapCount(),
                 entity.getReviewCount(),
                 isScrapped,
+                tags != null ? tags : List.of(),
                 businessHours
         );
     }

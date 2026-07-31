@@ -12,8 +12,7 @@ import com.bodeum.domain.info.entity.InfoItem;
 import com.bodeum.domain.info.entity.enums.MainCategory;
 import com.bodeum.domain.info.exception.InfoErrorCode;
 import com.bodeum.domain.info.exception.InfoException;
-import com.bodeum.domain.info.repository.InfoCategoryRepository;
-import com.bodeum.domain.info.repository.InfoItemRepository;
+import com.bodeum.domain.info.repository.*;
 import com.bodeum.domain.region.entity.Region;
 import com.bodeum.domain.user.entity.User;
 import com.bodeum.domain.user.repository.UserRepository;
@@ -29,6 +28,8 @@ import org.springframework.web.util.UriUtils;
 
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -38,6 +39,9 @@ public class InfoItemQueryService {
     private final InfoItemRepository infoItemRepository;
     private final InfoCategoryRepository infoCategoryRepository;
     private final UserRepository userRepository;
+    private final InfoScrapRepository infoScrapRepository;
+    private final InfoOperatingHourRepository infoOperatingHourRepository;
+    private final InfoItemTagRepository infoItemTagRepository;
 
     @Value("${bodeum.share.base-url}")
     private String shareBaseUrl;
@@ -50,20 +54,39 @@ public class InfoItemQueryService {
             InfoItemSearchCondition condition,
             Pageable pageable
     ) {
-        if (!StringUtils.hasText(condition.regionLevel1()) && userId != null) {
-            User loginUser = userRepository.findById(userId).orElse(null);
+        if (condition.category() == null && condition.subCategory() == null) {
+            condition = condition.withCategory(MainCategory.INSTITUTION);
+        }
 
-            if (loginUser != null && loginUser.getRegion() != null) {
-                Region userRegion = loginUser.getRegion();
-                condition = condition.withUserRegion(
-                        userRegion.getRegionLevel1(),
-                        userRegion.getRegionLevel2()
-                );
+        if (!StringUtils.hasText(condition.regionLevel1())) {
+            if (userId != null) {
+                User loginUser = userRepository.findByIdWithGuardianProfileAndRegion(userId)
+                        .orElseGet(() -> userRepository.findById(userId).orElse(null));
+
+                if (loginUser != null && loginUser.getRegion() != null) {
+                    Region userRegion = loginUser.getRegion();
+                    condition = condition.withUserRegion(
+                            userRegion.getRegionLevel1(),
+                            userRegion.getRegionLevel2()
+                    );
+                }
             }
         }
 
         Page<InfoItem> infoItems = infoItemRepository.searchInfoItems(condition, pageable);
-        Page<InfoItemResponse> itemResponses = infoItems.map(InfoItemResponse::from);
+
+        // ★ 목록 내 Item들의 ID 추출 후 N+1 방지를 위해 IN 쿼리로 태그 배치 조회
+        List<Long> itemIds = infoItems.stream().map(InfoItem::getId).toList();
+        Map<Long, List<String>> tagMap = infoItemTagRepository.findAllByInfoItemIdIn(itemIds).stream()
+                .collect(Collectors.groupingBy(
+                        itemTag -> itemTag.getInfoItem().getId(),
+                        Collectors.mapping(itemTag -> itemTag.getInfoTag().getName(), Collectors.toList())
+                ));
+
+        // InfoItemResponse 생성 시 매핑된 태그 리스트 전달
+        Page<InfoItemResponse> itemResponses = infoItems.map(item ->
+                InfoItemResponse.of(item, tagMap.getOrDefault(item.getId(), List.of()))
+        );
 
         MainCategory selectedMainCategory = condition.category();
         String selectedMainCategoryKo = null;
@@ -104,14 +127,32 @@ public class InfoItemQueryService {
                 .orElseThrow(() -> new InfoException(InfoErrorCode.INFO_ITEM_NOT_FOUND));
 
         infoItem.incrementViewCount();
-        boolean isScrapped = false;
-        List<InfoItemDetailResponse.BusinessHourDto> businessHours = List.of();
 
-        return InfoItemDetailResponse.of(infoItem, isScrapped, businessHours);
+        boolean isScrapped = false;
+        if (userId != null) {
+            isScrapped = infoScrapRepository.existsByUserIdAndInfoItemId(userId, infoItemId);
+        }
+
+        // 해당 아이템의 태그 목록 조회
+        List<String> tags = infoItemTagRepository.findAllByInfoItem(infoItem).stream()
+                .map(itemTag -> itemTag.getInfoTag().getName())
+                .toList();
+
+        // 해당 아이템의 운영시간 목록 DB 조회 및 DTO 매핑
+        List<InfoItemDetailResponse.BusinessHourDto> businessHours =
+                infoOperatingHourRepository.findAllByInfoItem(infoItem).stream()
+                        .map(hour -> new InfoItemDetailResponse.BusinessHourDto(
+                                hour.getDayOfWeek() != null ? hour.getDayOfWeek().name() : null,
+                                hour.getOpenTime() != null ? hour.getOpenTime().toString() : null,
+                                hour.getCloseTime() != null ? hour.getCloseTime().toString() : null
+                        ))
+                        .toList();
+
+        return InfoItemDetailResponse.of(infoItem, isScrapped, tags, businessHours);
     }
 
     /**
-     * 3. 정보 공유 링크 조회 API
+     * 3. 정보 공유 URL 생성 API
      */
     public InfoItemShareResponse getInfoItemShareUrl(Long infoItemId) {
         InfoItem infoItem = infoItemRepository.findById(infoItemId)
@@ -126,7 +167,7 @@ public class InfoItemQueryService {
     }
 
     /**
-     * 4. 카카오지도 URL 생성 API
+     * 4. 카카오 지도 길찾기 URL 생성 API
      */
     public KakaoMapUrlResponse createKakaoMapUrl(KakaoMapUrlRequest request) {
         InfoItem infoItem = infoItemRepository.findById(request.infoItemId())
