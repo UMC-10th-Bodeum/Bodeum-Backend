@@ -74,7 +74,7 @@ public class LocalWelfareSyncService {
             String introduction = introBuilder.toString().trim();
             String homepageUrl = item.servDtlLink();
 
-            InfoItem infoItem = infoItemRepository.findByExternalId(externalId)
+            InfoItem infoItem = infoItemRepository.findFirstByExternalId(externalId)
                     .map(existingItem -> {
                         existingItem.updateInformation(
                                 displayName, category, regionId, introduction, null,

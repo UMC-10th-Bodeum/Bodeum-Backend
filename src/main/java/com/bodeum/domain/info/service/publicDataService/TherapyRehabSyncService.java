@@ -60,7 +60,7 @@ public class TherapyRehabSyncService {
 
             Long regionId = regionMapper.resolveRegionId(sido, sigungu);
 
-            InfoItem infoItem = infoItemRepository.findByExternalId(externalId)
+            InfoItem infoItem = infoItemRepository.findFirstByExternalId(externalId)
                     .map(existingItem -> {
                         existingItem.updateInformation(
                                 name, category, regionId, null, address,

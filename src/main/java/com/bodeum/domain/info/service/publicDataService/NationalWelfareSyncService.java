@@ -69,7 +69,7 @@ public class NationalWelfareSyncService {
             String phone = item.rprsCtadr();
             String homepageUrl = item.servDtlLink();
 
-            InfoItem infoItem = infoItemRepository.findByExternalId(externalId)
+            InfoItem infoItem = infoItemRepository.findFirstByExternalId(externalId)
                     .map(existingItem -> {
                         existingItem.updateInformation(
                                 displayName, category, null, introduction, null,

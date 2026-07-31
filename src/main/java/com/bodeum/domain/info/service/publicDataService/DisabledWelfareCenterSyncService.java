@@ -79,7 +79,7 @@ public class DisabledWelfareCenterSyncService {
             }
             String introduction = introBuilder.toString().trim();
 
-            Optional<InfoItem> existingOpt = infoItemRepository.findByExternalId(externalId);
+            Optional<InfoItem> existingOpt = infoItemRepository.findFirstByExternalId(externalId);
 
             InfoItem savedItem;
             if (existingOpt.isPresent()) {
