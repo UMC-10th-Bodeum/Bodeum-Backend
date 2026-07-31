@@ -130,6 +130,19 @@ class CommentControllerTest {
     }
 
     @Test
+    void toggleCommentAdoptionReturnsCurrentAdoptionState() throws Exception {
+        given(commentService.toggleCommentAdoption(10L, 1L))
+                .willReturn(commentResponse(1L, null, true, List.of()));
+
+        mockMvc.perform(post("/api/v1/community/comments/1/adopt"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.commentId").value(1))
+                .andExpect(jsonPath("$.result.isAccepted").value(true));
+
+        then(commentService).should().toggleCommentAdoption(10L, 1L);
+    }
+
+    @Test
     void likeAndUnlikeCommentReturnCurrentState() throws Exception {
         given(commentService.likeComment(10L, 1L)).willReturn(new CommentLikeResponse(true, 2));
         given(commentService.unlikeComment(10L, 1L)).willReturn(new CommentLikeResponse(false, 1));
@@ -201,6 +214,15 @@ class CommentControllerTest {
             Long parentCommentId,
             List<CommentResponse> replies
     ) {
+        return commentResponse(commentId, parentCommentId, false, replies);
+    }
+
+    private CommentResponse commentResponse(
+            Long commentId,
+            Long parentCommentId,
+            boolean accepted,
+            List<CommentResponse> replies
+    ) {
         return new CommentResponse(
                 commentId,
                 parentCommentId,
@@ -208,7 +230,7 @@ class CommentControllerTest {
                 null,
                 true,
                 "댓글 내용",
-                false,
+                accepted,
                 1,
                 true,
                 CommentStatus.ACTIVE,

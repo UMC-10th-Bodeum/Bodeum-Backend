@@ -120,9 +120,8 @@ class PostControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  "boardType": "FREE_COMMUNICATION",
+                                  "boardType": "INFORMATION_QUESTION",
                                   "anonymityType": "PROFILE_TAG_VISIBLE",
-                                  "isQuestion": true,
                                   "title": "게시글 제목",
                                   "content": "게시글 내용",
                                   "disabilityTypes": ["AUTISM"],
@@ -188,8 +187,7 @@ class PostControllerTest {
                 "게시글 내용",
                 List.of(DisabilityType.AUTISM),
                 List.of("육아"),
-                imageUrls,
-                false
+                imageUrls
         );
 
         mockMvc.perform(post("/api/v1/community/posts")

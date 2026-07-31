@@ -53,8 +53,7 @@ public class PostService {
                 request.boardType(),
                 request.anonymityType(),
                 request.title(),
-                request.content(),
-                request.isQuestion()
+                request.content()
         ));
 
         saveDisabilityTags(post, safeList(request.disabilityTypes()));
@@ -71,8 +70,7 @@ public class PostService {
                 request.boardType() == null ? post.getBoardType() : request.boardType(),
                 request.anonymityType() == null ? post.getAnonymityType() : request.anonymityType(),
                 request.title() == null ? post.getTitle() : request.title(),
-                request.content() == null ? post.getContent() : request.content(),
-                request.isQuestion() == null ? post.isQuestion() : request.isQuestion()
+                request.content() == null ? post.getContent() : request.content()
         );
 
         if (request.disabilityTypes() != null) {

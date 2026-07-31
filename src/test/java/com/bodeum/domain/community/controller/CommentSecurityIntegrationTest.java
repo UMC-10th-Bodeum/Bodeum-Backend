@@ -29,14 +29,13 @@ class CommentSecurityIntegrationTest {
     private PostRepository postRepository;
 
     @Test
-    void anonymousUserCanReadCommentsButCannotCreateComment() throws Exception {
+    void anonymousUserCanReadCommentsButCannotCreateOrAdoptComment() throws Exception {
         Post post = postRepository.saveAndFlush(Post.create(
                 10L,
                 PostBoardType.FREE_COMMUNICATION,
                 PostAnonymityType.PROFILE_TAG_VISIBLE,
                 "댓글 공개 조회 테스트",
-                "비회원은 댓글을 조회할 수 있지만 등록할 수 없습니다.",
-                false
+                "비회원은 댓글을 조회할 수 있지만 등록할 수 없습니다."
         ));
 
         mockMvc.perform(get("/api/v1/community/posts/{postId}/comments", post.getId()))
@@ -51,6 +50,9 @@ class CommentSecurityIntegrationTest {
                                   "content": "인증 없이 등록할 댓글"
                                 }
                                 """))
+                .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(post("/api/v1/community/comments/1/adopt"))
                 .andExpect(status().isUnauthorized());
     }
 }

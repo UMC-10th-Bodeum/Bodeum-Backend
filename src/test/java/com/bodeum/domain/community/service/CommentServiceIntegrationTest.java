@@ -163,14 +163,48 @@ class CommentServiceIntegrationTest {
                 .isEqualTo(CommunityErrorCode.COMMENT_NOT_FOUND);
     }
 
+    @Test
+    void adoptsAndCancelsOneCommentPerQuestionPost() {
+        Post post = savePost(PostBoardType.INFORMATION_QUESTION);
+        CommentResponse firstComment = commentService.createComment(
+                20L,
+                post.getId(),
+                new CreateCommentRequest("첫 번째 답변")
+        );
+        CommentResponse secondComment = commentService.createComment(
+                30L,
+                post.getId(),
+                new CreateCommentRequest("두 번째 답변")
+        );
+
+        CommentResponse adopted = commentService.toggleCommentAdoption(10L, firstComment.commentId());
+
+        assertThat(adopted.isAccepted()).isTrue();
+        assertThat(commentRepository.findById(firstComment.commentId()).orElseThrow().isAccepted())
+                .isTrue();
+
+        CommentResponse canceled = commentService.toggleCommentAdoption(10L, firstComment.commentId());
+        CommentResponse secondAdopted = commentService.toggleCommentAdoption(10L, secondComment.commentId());
+
+        assertThat(canceled.isAccepted()).isFalse();
+        assertThat(secondAdopted.isAccepted()).isTrue();
+        assertThatThrownBy(() -> commentService.toggleCommentAdoption(10L, firstComment.commentId()))
+                .isInstanceOf(CommunityException.class)
+                .extracting(exception -> ((CommunityException) exception).getErrorCode())
+                .isEqualTo(CommunityErrorCode.COMMENT_ALREADY_ADOPTED);
+    }
+
     private Post savePost() {
+        return savePost(PostBoardType.FREE_COMMUNICATION);
+    }
+
+    private Post savePost(PostBoardType boardType) {
         return postRepository.saveAndFlush(Post.create(
                 10L,
-                PostBoardType.FREE_COMMUNICATION,
+                boardType,
                 PostAnonymityType.PROFILE_TAG_VISIBLE,
                 "댓글 테스트 게시글",
-                "댓글과 중첩 답글을 테스트합니다.",
-                false
+                "댓글과 중첩 답글을 테스트합니다."
         ));
     }
 }

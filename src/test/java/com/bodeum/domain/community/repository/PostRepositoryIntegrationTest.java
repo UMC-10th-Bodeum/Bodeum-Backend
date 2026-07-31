@@ -100,8 +100,7 @@ class PostRepositoryIntegrationTest {
                 PostBoardType.FREE_COMMUNICATION,
                 PostAnonymityType.PROFILE_TAG_VISIBLE,
                 title,
-                content,
-                false
+                content
         );
         ReflectionTestUtils.setField(post, "viewCount", viewCount);
         return post;
