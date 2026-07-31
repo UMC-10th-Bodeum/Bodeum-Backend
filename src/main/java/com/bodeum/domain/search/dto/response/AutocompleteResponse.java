@@ -12,8 +12,8 @@ public record AutocompleteResponse(
             String name,
             String category,
             String categoryLabel,
-            String sido,
-            String sigungu,
+            String regionLevel1,
+            String regionLevel2,
             List<String> tags
     ) {
         public static AutocompleteItemDto from(InfoItem item) {
