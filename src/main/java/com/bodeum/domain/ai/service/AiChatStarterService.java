@@ -14,6 +14,7 @@ import com.bodeum.domain.auth.enums.SocialProvider;
 import com.bodeum.domain.user.entity.User;
 import com.bodeum.domain.user.service.UserService;
 import com.bodeum.global.apiPayload.exception.ProjectException;
+import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Arrays;
@@ -50,6 +51,7 @@ public class AiChatStarterService {
     private final UserService userService;
     private final AiChatRoomRepository aiChatRoomRepository;
     private final AiMessageRepository aiMessageRepository;
+    private final Clock clock;
 
     @Transactional
     public AiChatStarterResponse getChatStarter(Long userId) {
@@ -67,7 +69,7 @@ public class AiChatStarterService {
                 .orElseThrow(() ->
                         new ProjectException(AiErrorCode.AI_CHAT_ROOM_NOT_FOUND));
 
-        Instant now = Instant.now();
+        Instant now = Instant.now(clock);
         LocalDate today = now.atZone(SERVICE_ZONE_ID).toLocalDate();
         Instant startOfToday = today.atStartOfDay(SERVICE_ZONE_ID).toInstant();
         Instant startOfTomorrow = today.plusDays(1)

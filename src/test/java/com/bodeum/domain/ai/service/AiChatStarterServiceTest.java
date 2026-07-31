@@ -16,13 +16,18 @@ import com.bodeum.domain.ai.repository.AiMessageRepository;
 import com.bodeum.domain.auth.enums.SocialProvider;
 import com.bodeum.domain.user.entity.User;
 import com.bodeum.domain.user.service.UserService;
+import java.time.Clock;
 import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
 class AiChatStarterServiceTest {
+
+    private static final Instant FIXED_NOW =
+            Instant.parse("2026-07-30T14:59:59Z");
 
     private UserService userService;
     private AiChatRoomRepository aiChatRoomRepository;
@@ -39,7 +44,8 @@ class AiChatStarterServiceTest {
         aiChatStarterService = new AiChatStarterService(
                 userService,
                 aiChatRoomRepository,
-                aiMessageRepository
+                aiMessageRepository,
+                Clock.fixed(FIXED_NOW, ZoneOffset.UTC)
         );
         when(aiChatRoomRepository.findByUserIdForUpdate(10L))
                 .thenReturn(Optional.of(chatRoom));
@@ -125,7 +131,38 @@ class AiChatStarterServiceTest {
         assertThat(savedMessage.getContent()).isEqualTo(response.greeting());
         assertThat(savedMessage.getAiAnswerStatus()).isEqualTo(AiAnswerStatus.GREETING);
         assertThat(savedMessage.isWarning()).isFalse();
-        verify(chatRoom).updateLastMessageAt(any(Instant.class));
+        verify(aiMessageRepository)
+                .existsByChatRoomIdAndCreatedAtGreaterThanEqualAndCreatedAtLessThan(
+                        20L,
+                        Instant.parse("2026-07-29T15:00:00Z"),
+                        Instant.parse("2026-07-30T15:00:00Z")
+                );
+        verify(chatRoom).updateLastMessageAt(FIXED_NOW);
+    }
+
+    @Test
+    void savesNewGreetingAfterKoreanDateChanges() {
+        Instant nextDayNow = Instant.parse("2026-07-30T15:00:01Z");
+        aiChatStarterService = new AiChatStarterService(
+                userService,
+                aiChatRoomRepository,
+                aiMessageRepository,
+                Clock.fixed(nextDayNow, ZoneOffset.UTC)
+        );
+        User user = mock(User.class);
+        when(userService.getCurrentUser(10L)).thenReturn(user);
+        when(user.getNickname()).thenReturn("test");
+
+        aiChatStarterService.getChatStarter(10L);
+
+        verify(aiMessageRepository)
+                .existsByChatRoomIdAndCreatedAtGreaterThanEqualAndCreatedAtLessThan(
+                        20L,
+                        Instant.parse("2026-07-30T15:00:00Z"),
+                        Instant.parse("2026-07-31T15:00:00Z")
+                );
+        verify(aiMessageRepository).save(any(AiMessage.class));
+        verify(chatRoom).updateLastMessageAt(nextDayNow);
     }
 
     @Test
