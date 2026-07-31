@@ -22,7 +22,7 @@ public class InfoItemUpsertService {
 
     @Transactional
     public InfoItem upsert(InfoItem newItem, List<InfoOperatingHour> operatingHours) {
-        Optional<InfoItem> existingItemOpt = infoItemRepository.findByExternalId(newItem.getExternalId());
+        Optional<InfoItem> existingItemOpt = infoItemRepository.findFirstByExternalId(newItem.getExternalId());
         InfoItem savedItem;
 
         if (existingItemOpt.isPresent()) {
