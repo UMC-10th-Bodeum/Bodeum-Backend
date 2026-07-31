@@ -52,6 +52,14 @@ public class SecurityConfig {
             "/api/v1/home/banner",
             // 검색 및 지역 API
             "/api/v1/search",
+            // 검색 API
+            "/api/v1/info/search",
+
+            // Open API 동기화
+            "/api/v1/admin/openapi/**",
+
+            // 정보 항목 조회 및 지역 필터 API (비회원 허용)
+            "/api/v1/info-items/**",
             "/api/v1/info-regions/**",
             // 동기화 API
             "/api/v1/admin/sync/**"
@@ -85,6 +93,8 @@ public class SecurityConfig {
                         ).permitAll()
 
                         // 4. 그 외 스크랩, 리뷰 작성/공감 등 CUD 요청은 인증(로그인) 필수
+                        .requestMatchers(HttpMethod.GET, "/api/v1/community/posts").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/community/posts/*/comments").permitAll()
                         .anyRequest().authenticated()
                 )
                 .exceptionHandling(exception -> exception

@@ -11,11 +11,15 @@ import static org.mockito.Mockito.when;
 import com.bodeum.domain.ai.entity.AiChatRoom;
 import com.bodeum.domain.ai.entity.AiMessage;
 import com.bodeum.domain.ai.enums.AiAnswerStatus;
+import com.bodeum.domain.ai.enums.AiFeedbackReasonType;
+import com.bodeum.domain.ai.enums.AiFeedbackType;
 import com.bodeum.domain.ai.enums.AiResponseSourceType;
 import com.bodeum.domain.ai.enums.SenderType;
 import com.bodeum.domain.ai.repository.AiChatRoomRepository;
+import com.bodeum.domain.ai.repository.AiFeedbackRepository;
 import com.bodeum.domain.ai.repository.AiMessageRepository;
 import com.bodeum.domain.ai.repository.AiResponseSourceRepository;
+import com.bodeum.domain.ai.repository.projection.AiFeedbackProjection;
 import com.bodeum.domain.ai.repository.projection.AiResponseSourceProjection;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -34,6 +38,7 @@ class AiMessageQueryServiceTest {
     @Mock AiChatRoomRepository aiChatRoomRepository;
     @Mock AiMessageRepository aiMessageRepository;
     @Mock AiResponseSourceRepository aiResponseSourceRepository;
+    @Mock AiFeedbackRepository aiFeedbackRepository;
 
     private AiMessageQueryService service;
 
@@ -42,7 +47,8 @@ class AiMessageQueryServiceTest {
         service = new AiMessageQueryService(
                 aiChatRoomRepository,
                 aiMessageRepository,
-                aiResponseSourceRepository
+                aiResponseSourceRepository,
+                aiFeedbackRepository
         );
     }
 
@@ -77,15 +83,27 @@ class AiMessageQueryServiceTest {
         when(source.getSourceUrl()).thenReturn("https://example.com");
         when(aiResponseSourceRepository.findAllByMessageIds(List.of(22L, 21L)))
                 .thenReturn(List.of(source));
+        AiFeedbackProjection timeReason = feedbackProjection(
+                22L, 9L, AiFeedbackType.INCORRECT, AiFeedbackReasonType.TIME);
+        AiFeedbackProjection etcReason = feedbackProjection(
+                22L, 9L, AiFeedbackType.INCORRECT, AiFeedbackReasonType.ETC);
+        when(aiFeedbackRepository.findAllWithReasonsByMessageIds(List.of(22L)))
+                .thenReturn(List.of(timeReason, etcReason));
 
         var result = service.getTodayMessages(1L, null, null);
 
         assertThat(result.messages()).hasSize(2);
         assertThat(result.messages().getFirst().answerStatus()).isNull();
         assertThat(result.messages().getFirst().sources()).isEmpty();
+        assertThat(result.messages().getFirst().feedback()).isNull();
         assertThat(result.messages().getLast().answerStatus())
                 .isEqualTo(AiAnswerStatus.LINK_GUIDANCE);
         assertThat(result.messages().getLast().sources().getFirst().sourceId()).isEqualTo(3L);
+        assertThat(result.messages().getLast().feedback().aiFeedbackId()).isEqualTo(9L);
+        assertThat(result.messages().getLast().feedback().feedbackType())
+                .isEqualTo(AiFeedbackType.INCORRECT);
+        assertThat(result.messages().getLast().feedback().reasons())
+                .containsExactly(AiFeedbackReasonType.TIME, AiFeedbackReasonType.ETC);
         assertThat(result.nextCursor().id()).isEqualTo(21L);
         assertThat(result.hasNext()).isFalse();
     }
@@ -140,6 +158,61 @@ class AiMessageQueryServiceTest {
         assertThat(result.nextCursor().createdAt())
                 .isEqualTo(Instant.parse("2026-07-28T00:00:11Z"));
         assertThat(result.hasNext()).isTrue();
+    }
+
+    @Test
+    void restoresClarificationResponseWithoutSources() {
+        AiChatRoom chatRoom = mock(AiChatRoom.class);
+        when(chatRoom.getId()).thenReturn(7L);
+        when(aiChatRoomRepository.findByUserId(1L)).thenReturn(Optional.of(chatRoom));
+
+        AiMessage aiMessage = mock(AiMessage.class);
+        when(aiMessage.getId()).thenReturn(23L);
+        when(aiMessage.getSenderType()).thenReturn(SenderType.AI);
+        when(aiMessage.getAiAnswerStatus())
+                .thenReturn(AiAnswerStatus.REGION_REQUIRED);
+        when(aiMessage.getContent()).thenReturn("활동 지역을 알려주세요.");
+        when(aiMessage.getCreatedAt()).thenReturn(Instant.parse("2026-07-21T01:00:01Z"));
+        when(aiMessageRepository.findTodayMessages(
+                eq(7L), any(), any(), any(), any(), any()
+        ))
+                .thenReturn(List.of(aiMessage));
+        when(aiResponseSourceRepository.findAllByMessageIds(List.of(23L)))
+                .thenReturn(List.of());
+
+        var result = service.getTodayMessages(1L, null, null);
+
+        assertThat(result.messages().getFirst().answerStatus())
+                .isEqualTo(AiAnswerStatus.REGION_REQUIRED);
+        assertThat(result.messages().getFirst().sources()).isEmpty();
+    }
+
+    @Test
+    void restoresGreetingResponseWithoutSources() {
+        AiChatRoom chatRoom = mock(AiChatRoom.class);
+        when(chatRoom.getId()).thenReturn(7L);
+        when(aiChatRoomRepository.findByUserId(1L)).thenReturn(Optional.of(chatRoom));
+
+        AiMessage greetingMessage = mock(AiMessage.class);
+        when(greetingMessage.getId()).thenReturn(24L);
+        when(greetingMessage.getSenderType()).thenReturn(SenderType.AI);
+        when(greetingMessage.getAiAnswerStatus()).thenReturn(AiAnswerStatus.GREETING);
+        when(greetingMessage.getContent()).thenReturn("Hello");
+        when(greetingMessage.getCreatedAt())
+                .thenReturn(Instant.parse("2026-07-21T01:00:01Z"));
+        when(aiMessageRepository.findTodayMessages(
+                eq(7L), any(), any(), any(), any(), any()
+        )).thenReturn(List.of(greetingMessage));
+        when(aiResponseSourceRepository.findAllByMessageIds(List.of(24L)))
+                .thenReturn(List.of());
+
+        var result = service.getTodayMessages(1L, null, null);
+
+        assertThat(result.messages().getFirst().answerStatus())
+                .isEqualTo(AiAnswerStatus.GREETING);
+        assertThat(result.messages().getFirst().content()).isEqualTo("Hello");
+        assertThat(result.messages().getFirst().sources()).isEmpty();
+        assertThat(result.messages().getFirst().warning()).isNull();
     }
 
     @Test
@@ -287,5 +360,19 @@ class AiMessageQueryServiceTest {
         assertThat(result.messages().getFirst().items()).hasSize(21);
         assertThat(result.nextCursor().id()).isEqualTo(280L);
         assertThat(result.nextCursor().createdAt()).isEqualTo(Instant.parse("2026-07-06T01:00:00Z"));
+    }
+
+    private AiFeedbackProjection feedbackProjection(
+            Long messageId,
+            Long feedbackId,
+            AiFeedbackType feedbackType,
+            AiFeedbackReasonType reason
+    ) {
+        AiFeedbackProjection projection = mock(AiFeedbackProjection.class);
+        lenient().when(projection.getAiMessageId()).thenReturn(messageId);
+        lenient().when(projection.getAiFeedbackId()).thenReturn(feedbackId);
+        lenient().when(projection.getFeedbackType()).thenReturn(feedbackType);
+        lenient().when(projection.getReason()).thenReturn(reason);
+        return projection;
     }
 }

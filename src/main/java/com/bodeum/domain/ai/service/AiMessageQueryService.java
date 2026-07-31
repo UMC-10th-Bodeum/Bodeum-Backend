@@ -3,6 +3,7 @@ package com.bodeum.domain.ai.service;
 import static com.bodeum.global.common.constant.TimeConstants.SERVICE_ZONE_ID;
 
 import com.bodeum.domain.ai.dto.response.AiMessageHistoryResponse;
+import com.bodeum.domain.ai.dto.response.AiMessageFeedbackResponse;
 import com.bodeum.domain.ai.dto.response.AiMessageResponse;
 import com.bodeum.domain.ai.dto.response.AiMessageSourceResponse;
 import com.bodeum.domain.ai.dto.response.AiMessageWarningResponse;
@@ -13,9 +14,11 @@ import com.bodeum.domain.ai.enums.AiAnswerStatus;
 import com.bodeum.domain.ai.enums.SenderType;
 import com.bodeum.domain.ai.exception.AiErrorCode;
 import com.bodeum.domain.ai.repository.AiChatRoomRepository;
+import com.bodeum.domain.ai.repository.AiFeedbackRepository;
 import com.bodeum.domain.ai.repository.AiMessageRepository;
 import com.bodeum.domain.ai.repository.AiResponseSourceRepository;
 import com.bodeum.domain.ai.repository.projection.AiResponseSourceProjection;
+import com.bodeum.domain.ai.repository.projection.AiFeedbackProjection;
 import com.bodeum.global.apiPayload.exception.ProjectException;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -41,6 +44,7 @@ public class AiMessageQueryService {
     private final AiChatRoomRepository aiChatRoomRepository;
     private final AiMessageRepository aiMessageRepository;
     private final AiResponseSourceRepository aiResponseSourceRepository;
+    private final AiFeedbackRepository aiFeedbackRepository;
 
     @Transactional(readOnly = true)
     public AiTodayMessageResponse getTodayMessages(
@@ -78,10 +82,12 @@ public class AiMessageQueryService {
         );
 
         Map<Long, List<AiResponseSourceProjection>> sourceMap = loadSourceMap(pageMessages);
+        Map<Long, AiMessageFeedbackResponse> feedbackMap = loadFeedbackMap(pageMessages);
         List<AiMessageResponse> messageResponses = pageMessages.stream()
                 .map(message -> toMessageResponse(
                         message,
-                        sourceMap.getOrDefault(message.getId(), List.of())))
+                        sourceMap.getOrDefault(message.getId(), List.of()),
+                        feedbackMap.get(message.getId())))
                 .toList();
 
         AiMessage oldestMessage = pageMessages.getLast();
@@ -126,6 +132,7 @@ public class AiMessageQueryService {
         boolean hasNext = pageMessages.size() < fetchedMessages.size();
 
         Map<Long, List<AiResponseSourceProjection>> sourceMap = loadSourceMap(pageMessages);
+        Map<Long, AiMessageFeedbackResponse> feedbackMap = loadFeedbackMap(pageMessages);
         LinkedHashMap<LocalDate, List<AiMessageResponse>> groupedMessages = new LinkedHashMap<>();
 
         for (AiMessage message : pageMessages) {
@@ -135,7 +142,8 @@ public class AiMessageQueryService {
             groupedMessages.computeIfAbsent(messageDate, ignored -> new ArrayList<>())
                     .add(toMessageResponse(
                             message,
-                            sourceMap.getOrDefault(message.getId(), List.of())));
+                            sourceMap.getOrDefault(message.getId(), List.of()),
+                            feedbackMap.get(message.getId())));
         }
 
         List<AiMessageHistoryResponse.HistoryDateGroup> dateGroupsDescending =
@@ -159,7 +167,8 @@ public class AiMessageQueryService {
 
     private AiMessageResponse toMessageResponse(
             AiMessage message,
-            List<AiResponseSourceProjection> sources
+            List<AiResponseSourceProjection> sources,
+            AiMessageFeedbackResponse feedback
     ) {
         if (message.getSenderType() == SenderType.USER) {
             return AiMessageResponse.user(
@@ -187,6 +196,24 @@ public class AiMessageQueryService {
                     message.getId(),
                     message.getSenderType(),
                     message.getContent(),
+                    message.getCreatedAt())
+                    .withFeedback(feedback);
+        }
+
+        if (answerStatus == AiAnswerStatus.REGION_REQUIRED) {
+            return AiMessageResponse.regionRequired(
+                    message.getId(),
+                    message.getSenderType(),
+                    message.getContent(),
+                    message.getCreatedAt())
+                    .withFeedback(feedback);
+        }
+
+        if (answerStatus == AiAnswerStatus.GREETING) {
+            return AiMessageResponse.greeting(
+                    message.getId(),
+                    message.getSenderType(),
+                    message.getContent(),
                     message.getCreatedAt());
         }
 
@@ -197,7 +224,8 @@ public class AiMessageQueryService {
                 message.getContent(),
                 message.getCreatedAt(),
                 sourceResponses,
-                message.isWarning() ? AiMessageWarningResponse.incorrectSource() : null);
+                message.isWarning() ? AiMessageWarningResponse.incorrectSource() : null)
+                .withFeedback(feedback);
     }
 
     // N+1 방지를 위해 메시지별 출처를 한 번에 조회한 후 메시지 ID별로 그룹화
@@ -209,6 +237,40 @@ public class AiMessageQueryService {
                 .toList();
         return aiResponseSourceRepository.findAllByMessageIds(messageIds).stream()
                 .collect(Collectors.groupingBy(AiResponseSourceProjection::getAiMessageId));
+    }
+
+    private Map<Long, AiMessageFeedbackResponse> loadFeedbackMap(
+            List<AiMessage> messages
+    ) {
+        List<Long> messageIds = messages.stream()
+                .filter(message -> message.getSenderType() == SenderType.AI)
+                .map(AiMessage::getId)
+                .toList();
+        if (messageIds.isEmpty()) {
+            return Map.of();
+        }
+
+        Map<Long, List<AiFeedbackProjection>> projectionsByMessageId =
+                aiFeedbackRepository.findAllWithReasonsByMessageIds(messageIds).stream()
+                        .collect(Collectors.groupingBy(
+                                AiFeedbackProjection::getAiMessageId,
+                                LinkedHashMap::new,
+                                Collectors.toList()
+                        ));
+
+        Map<Long, AiMessageFeedbackResponse> feedbackMap = new LinkedHashMap<>();
+        projectionsByMessageId.forEach((messageId, projections) -> {
+            AiFeedbackProjection feedback = projections.getFirst();
+            feedbackMap.put(messageId, new AiMessageFeedbackResponse(
+                    feedback.getAiFeedbackId(),
+                    feedback.getFeedbackType(),
+                    projections.stream()
+                            .map(AiFeedbackProjection::getReason)
+                            .filter(java.util.Objects::nonNull)
+                            .toList()
+            ));
+        });
+        return Map.copyOf(feedbackMap);
     }
 
     // 같은 날짜 그룹이 페이지 사이에서 분리되지 않도록 최소 20개 이후 날짜 경계에서 자른다.

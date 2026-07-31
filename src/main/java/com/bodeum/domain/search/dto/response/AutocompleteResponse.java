@@ -12,6 +12,8 @@ public record AutocompleteResponse(
             String name,
             String category,
             String categoryLabel,
+            String regionLevel1,
+            String regionLevel2,
             List<String> tags
     ) {
         public static AutocompleteItemDto from(InfoItem item) {
@@ -20,6 +22,8 @@ public record AutocompleteResponse(
                     item.getName(),
                     item.getInfoCategory().getMainCategory().name(),
                     item.getInfoCategory().getMainCategoryKo(), // Entity 내 한글 명칭 활용
+                    item.getSido(),
+                    item.getSigungu(),
                     item.getTags() // Entity 내 편의 메서드 활용
             );
         }

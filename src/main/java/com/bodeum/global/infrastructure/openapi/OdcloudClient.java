@@ -1,5 +1,6 @@
 package com.bodeum.global.infrastructure.openapi;
 
+import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestClient;
@@ -27,8 +28,8 @@ public class OdcloudClient {
                             .path(resourcePath)
                             .queryParam("page", page)
                             .queryParam("perPage", perPage)
-                            .queryParam("serviceKey", properties.getServiceKey())
                             .build())
+                    .header(HttpHeaders.AUTHORIZATION, "Infuser " + properties.getServiceKey())
                     .retrieve()
                     .body(OdcloudPageResponse.class);
 

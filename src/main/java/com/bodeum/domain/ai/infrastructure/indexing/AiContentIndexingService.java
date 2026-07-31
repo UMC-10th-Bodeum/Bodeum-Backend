@@ -210,7 +210,7 @@ public class AiContentIndexingService {
                         news.getPublishedAt().atZone(sourceTimeZone).toInstant())
         );
         metadata.put("newsCategoryId", news.getNewsCategory().getId());
-        metadata.put("newsCategory", news.getNewsCategory().getName());
+        metadata.put("newsCategory", news.getNewsCategory().getCode().name());
         metadata.put("newsType", news.getNewsType().name());
         if (newsSource != null) {
             // newsSource metadata는 수집 원천을 나타내며,
@@ -225,7 +225,7 @@ public class AiContentIndexingService {
 
         String content = lines(
                 line("소식명", news.getTitle()),
-                line("카테고리", news.getNewsCategory().getName()),
+                line("카테고리", news.getNewsCategory().getLabel()),
                 line("소식 유형", news.getNewsType().name()),
                 line("요약", news.getSummary()),
                 line("본문", news.getContent()),

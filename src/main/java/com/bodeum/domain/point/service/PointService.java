@@ -7,11 +7,14 @@ import com.bodeum.domain.point.enums.PointType;
 import com.bodeum.domain.point.repository.GuardianPointHistoryRepository;
 import com.bodeum.domain.point.repository.GuardianPointHistoryRepository.PointActivitySummary;
 import com.bodeum.domain.point.repository.GuardianPointRepository;
+import com.bodeum.domain.point.repository.GuardianPointRepository.UserTotalPoint;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -49,6 +52,19 @@ public class PointService {
         return guardianPointRepository.findByUserId(userId)
                 .map(GuardianPoint::getTotalPoint)
                 .orElse(0);
+    }
+
+    @Transactional(readOnly = true)
+    public Map<Long, Integer> getTotalPoints(Collection<Long> userIds) {
+        if (userIds.isEmpty()) {
+            return Map.of();
+        }
+
+        return guardianPointRepository.findTotalPointsByUserIdIn(userIds).stream()
+                .collect(Collectors.toUnmodifiableMap(
+                        UserTotalPoint::getUserId,
+                        UserTotalPoint::getTotalPoint
+                ));
     }
 
     /**

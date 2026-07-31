@@ -36,22 +36,29 @@ public class HomeService {
     private final HomeInfoItemRepository homeInfoItemRepository;
     private final HomeUserRepository homeUserRepository;
     private final PostDisabilityTagRepository postDisabilityTagRepository;
+    private final HomeRegionRepository homeRegionRepository;
 
     public List<RecommendedNewsResponse> getRecommendedNews(Long userId) {
+        List<News> newsList;
         if (userId != null) {
             Region region = getUserRegion(userId);
             if (region != null) {
-                List<RecommendedNewsResponse> result = homeNewsRepository
-                        .findTopRecommendedByRegion(region.getId(), PageRequest.of(0, 5))
-                        .stream()
-                        .map(RecommendedNewsResponse::from)
-                        .toList();
-                if (!result.isEmpty()) return result;
+                newsList = homeNewsRepository.findTopRecommendedByRegion(region.getId(), PageRequest.of(0, 5));
+                if (!newsList.isEmpty()) {
+                    return toRecommendedNewsResponses(newsList);
+                }
             }
         }
-        return homeNewsRepository.findTopRecommended(PageRequest.of(0, 5))
-                .stream()
-                .map(RecommendedNewsResponse::from)
+        newsList = homeNewsRepository.findTopRecommended(PageRequest.of(0, 5));
+        return toRecommendedNewsResponses(newsList);
+    }
+
+    private List<RecommendedNewsResponse> toRecommendedNewsResponses(List<News> newsList) {
+        Map<Long, Region> regionMap = getRegionMap(newsList.stream()
+                .map(News::getRegionId)
+                .toList());
+        return newsList.stream()
+                .map(news -> RecommendedNewsResponse.from(news, regionMap.get(news.getRegionId())))
                 .toList();
     }
 
@@ -129,21 +136,34 @@ public class HomeService {
     }
 
     public List<NewsPreviewResponse> getNewsPreview(NewsType newsType, int limit, Long userId) {
+        List<News> newsList;
         if (userId != null) {
             Region region = getUserRegion(userId);
             if (region != null) {
-                List<NewsPreviewResponse> result = homeNewsRepository
-                        .findByNewsTypeAndRegion(newsType, region.getId(), PageRequest.of(0, limit))
-                        .stream()
-                        .map(NewsPreviewResponse::from)
-                        .toList();
-                if (!result.isEmpty()) return result;
+                newsList = homeNewsRepository.findByNewsTypeAndRegion(newsType, region.getId(), PageRequest.of(0, limit));
+                if (!newsList.isEmpty()) {
+                    return toNewsPreviewResponses(newsList);
+                }
             }
         }
-        return homeNewsRepository.findByNewsType(newsType, PageRequest.of(0, limit))
-                .stream()
-                .map(NewsPreviewResponse::from)
+        newsList = homeNewsRepository.findByNewsType(newsType, PageRequest.of(0, limit));
+        return toNewsPreviewResponses(newsList);
+    }
+
+    private List<NewsPreviewResponse> toNewsPreviewResponses(List<News> newsList) {
+        Map<Long, Region> regionMap = getRegionMap(newsList.stream()
+                .map(News::getRegionId)
+                .toList());
+        return newsList.stream()
+                .map(news -> NewsPreviewResponse.from(news, regionMap.get(news.getRegionId())))
                 .toList();
+    }
+
+    private Map<Long, Region> getRegionMap(List<Long> regionIds) {
+        List<Long> validIds = regionIds.stream().filter(id -> id != null).toList();
+        if (validIds.isEmpty()) return Map.of();
+        return homeRegionRepository.findAllByIdIn(validIds).stream()
+                .collect(Collectors.toMap(Region::getId, r -> r));
     }
 
     public Optional<BannerResponse> getBanner(Long userId) {

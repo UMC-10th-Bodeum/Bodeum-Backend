@@ -45,7 +45,13 @@ class AiChatStarterControllerTest {
         when(aiChatStarterService.getChatStarter(10L))
                 .thenReturn(AiChatStarterResponse.of(
                         "안녕하세요!\n\n민정맘님에게 필요한 정보를 안내해드려요.",
-                        List.of("질문 1", "질문 2", "질문 3", "질문 4", "질문 5")
+                        List.of(
+                                "질문 1",
+                                "질문 2",
+                                "질문 3",
+                                "질문 4",
+                                "질문 5"
+                        )
                 ));
 
         mockMvc.perform(get("/api/v1/ai/chat-room/starter"))
@@ -54,7 +60,8 @@ class AiChatStarterControllerTest {
                 .andExpect(jsonPath("$.result.greeting")
                         .value("안녕하세요!\n\n민정맘님에게 필요한 정보를 안내해드려요."))
                 .andExpect(jsonPath("$.result.suggestedQuestions.length()").value(5))
-                .andExpect(jsonPath("$.result.suggestedQuestions[0]").value("질문 1"));
+                .andExpect(jsonPath("$.result.suggestedQuestions[0]")
+                        .value("질문 1"));
     }
 
     private HandlerMethodArgumentResolver loginUserArgumentResolver() {

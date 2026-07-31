@@ -15,6 +15,7 @@ import com.bodeum.domain.ai.entity.AiMessage;
 import com.bodeum.domain.ai.enums.AiResponseSourceType;
 import com.bodeum.domain.ai.enums.AiAnswerStatus;
 import com.bodeum.domain.ai.enums.AiWarningType;
+import com.bodeum.domain.ai.enums.AiStarterQuestionType;
 import com.bodeum.domain.ai.enums.SenderType;
 import com.bodeum.domain.ai.exception.AiErrorCode;
 import com.bodeum.domain.ai.infrastructure.retrieval.AiReferenceDocumentResolver;
@@ -25,15 +26,20 @@ import com.bodeum.domain.ai.model.rag.AiReferenceDocument;
 import com.bodeum.domain.ai.model.rag.AiSourceKey;
 import com.bodeum.domain.ai.model.answer.GeneratedAiAnswer;
 import com.bodeum.domain.ai.model.answer.ExternalAiAnswer;
+import com.bodeum.domain.ai.model.answer.AiStarterQuestionAnswer;
 import com.bodeum.domain.ai.repository.AiChatRoomRepository;
+import com.bodeum.domain.ai.repository.AiMessageRepository;
 import com.bodeum.domain.ai.repository.AiSourceReviewRepository;
 import com.bodeum.domain.auth.enums.SocialProvider;
+import com.bodeum.domain.region.entity.Region;
+import com.bodeum.domain.region.repository.RegionRepository;
 import com.bodeum.domain.user.entity.User;
 import com.bodeum.domain.user.repository.UserRepository;
 import com.bodeum.global.apiPayload.exception.ProjectException;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -44,7 +50,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class AiMessageServiceTest {
 
     @Mock AiChatRoomRepository aiChatRoomRepository;
+    @Mock AiMessageRepository aiMessageRepository;
     @Mock UserRepository userRepository;
+    @Mock RegionRepository regionRepository;
     @Mock AiDocumentRetriever documentRetriever;
     @Mock AiAnswerGenerator answerGenerator;
     @Mock AiExternalAnswerProvider externalAnswerProvider;
@@ -53,6 +61,7 @@ class AiMessageServiceTest {
     @Mock AiSourceReviewRepository aiSourceReviewRepository;
     @Mock AiRequestGuard requestGuard;
     @Mock AiReferenceDocumentResolver referenceDocumentResolver;
+    @Mock AiStarterQuestionRouter starterQuestionRouter;
 
     private AiMessageService service;
     private AiChatRoom chatRoom;
@@ -61,10 +70,10 @@ class AiMessageServiceTest {
     @BeforeEach
     void setUp() {
         service = new AiMessageService(
-                aiChatRoomRepository, userRepository,
+                aiChatRoomRepository, aiMessageRepository, userRepository, regionRepository,
                 documentRetriever, answerGenerator, externalAnswerProvider,
                 persistenceService, failureService, aiSourceReviewRepository, requestGuard,
-                referenceDocumentResolver);
+                referenceDocumentResolver, starterQuestionRouter);
         user = User.createSocialUser(SocialProvider.KAKAO, "provider-id", "a@b.com", "보호자");
         chatRoom = AiChatRoom.create(user);
         lenient().when(aiChatRoomRepository.findByUserId(1L)).thenReturn(Optional.of(chatRoom));
@@ -75,6 +84,8 @@ class AiMessageServiceTest {
                 .thenReturn(ExternalAiAnswer.empty());
         lenient().when(referenceDocumentResolver.resolve(any()))
                 .thenAnswer(invocation -> invocation.getArgument(0));
+        lenient().when(starterQuestionRouter.route(any(), any()))
+                .thenReturn(Optional.empty());
         AiMessage userMessage = mock(AiMessage.class);
         lenient().when(userMessage.getId()).thenReturn(11L);
         lenient().when(persistenceService.saveProcessingUserMessage(eq(chatRoom), any()))
@@ -122,6 +133,215 @@ class AiMessageServiceTest {
         assertThat(result.aiMessage().answerStatus()).isEqualTo(AiAnswerStatus.NO_EVIDENCE);
         assertThat(result.aiMessage().sources()).isEmpty();
         verify(answerGenerator, never()).generate(any(), any(), any());
+    }
+
+    @Test
+    void returnsRoutedStarterAnswerWithoutCallingOpenAi() {
+        String question = AiStarterQuestionType.WELFARE_SITES.getContent();
+        AiReferenceDocument source = new AiReferenceDocument(
+                "SITE-1",
+                "복지로",
+                AiResponseSourceType.SITE,
+                1L,
+                "복지로",
+                "https://www.bokjiro.go.kr",
+                null
+        );
+        when(starterQuestionRouter.route(
+                eq(AiStarterQuestionType.WELFARE_SITES),
+                any()
+        )).thenReturn(Optional.of(
+                AiStarterQuestionAnswer.answered("공식 복지 사이트 안내", List.of(source))
+        ));
+        AiMessage saved = savedAiMessage("공식 복지 사이트 안내");
+        when(persistenceService.saveAiMessageAndComplete(
+                11L,
+                chatRoom,
+                "공식 복지 사이트 안내",
+                false,
+                AiAnswerStatus.ANSWERED,
+                List.of(source)
+        )).thenReturn(saved);
+
+        var result = service.createMessage(1L, question);
+
+        assertThat(result.aiMessage().answerStatus()).isEqualTo(AiAnswerStatus.ANSWERED);
+        assertThat(result.aiMessage().sources()).hasSize(1);
+        verify(documentRetriever, never()).retrieve(any(), any());
+        verify(answerGenerator, never()).generate(any(), any(), any());
+        verify(externalAnswerProvider, never()).search(any(), any());
+    }
+
+    @Test
+    void returnsRegionRequiredWhenLocalCenterQuestionHasNoRegion() {
+        String question = AiStarterQuestionType.LOCAL_REHAB_CENTERS.getContent();
+        String regionRequiredMessage = "확인할 시·도와 시·군·구를 알려주세요.";
+        when(starterQuestionRouter.route(
+                eq(AiStarterQuestionType.LOCAL_REHAB_CENTERS),
+                any()
+        ))
+                .thenReturn(Optional.of(
+                        AiStarterQuestionAnswer.regionRequired(regionRequiredMessage)
+                ));
+        AiMessage saved = savedAiMessage(regionRequiredMessage);
+        when(persistenceService.saveAiMessageAndComplete(
+                11L,
+                chatRoom,
+                regionRequiredMessage,
+                false,
+                AiAnswerStatus.REGION_REQUIRED,
+                List.of()
+        )).thenReturn(saved);
+
+        var result = service.createMessage(1L, question);
+
+        assertThat(result.aiMessage().answerStatus())
+                .isEqualTo(AiAnswerStatus.REGION_REQUIRED);
+        assertThat(result.aiMessage().sources()).isEmpty();
+        verify(documentRetriever, never()).retrieve(any(), any());
+        verify(externalAnswerProvider, never()).search(any(), any());
+    }
+
+    @Test
+    void prioritizesExplicitRegionInRehabCenterQuestion() {
+        Region region = Region.create("경기도", "수원시");
+        when(regionRepository.findMentionedInQuestion(
+                eq("경기도 수원시 재활센터를 추천해줘"),
+                any()
+        )).thenReturn(List.of(region));
+
+        AiReferenceDocument source = new AiReferenceDocument(
+                "INFO-1",
+                "수원시 재활센터",
+                AiResponseSourceType.INFO,
+                1L,
+                "수원시 재활센터",
+                "https://example.com/info/1",
+                null
+        );
+        when(starterQuestionRouter.route(
+                eq(AiStarterQuestionType.LOCAL_REHAB_CENTERS),
+                org.mockito.ArgumentMatchers.argThat(profile ->
+                        profile.region().equals("경기도 수원시")
+                                && profile.regionLevel1().equals("경기도")
+                                && profile.regionLevel2().equals("수원시"))
+        )).thenReturn(Optional.of(
+                AiStarterQuestionAnswer.answered(
+                        "경기도 수원시 재활센터 안내",
+                        List.of(source)
+                )
+        ));
+        AiMessage saved = savedAiMessage("경기도 수원시 재활센터 안내");
+        when(persistenceService.saveAiMessageAndComplete(
+                11L,
+                chatRoom,
+                "경기도 수원시 재활센터 안내",
+                false,
+                AiAnswerStatus.ANSWERED,
+                List.of(source)
+        )).thenReturn(saved);
+
+        var result = service.createMessage(
+                1L,
+                "경기도 수원시 재활센터를 추천해줘."
+        );
+
+        assertThat(result.aiMessage().answerStatus()).isEqualTo(AiAnswerStatus.ANSWERED);
+        assertThat(result.aiMessage().sources()).hasSize(1);
+        verify(aiMessageRepository, never())
+                .findTopByChatRoomIdAndSenderTypeOrderByCreatedAtDescIdDesc(
+                        any(),
+                        any()
+                );
+        verify(documentRetriever, never()).retrieve(any(), any());
+        verify(answerGenerator, never()).generate(any(), any(), any());
+        verify(externalAnswerProvider, never()).search(any(), any());
+    }
+
+    @Test
+    void usesGeneralRagWhenExplicitRegionQuestionHasAdditionalRehabCondition() {
+        String question = "경기도 수원시 자폐스펙트럼 재활센터를 추천해줘";
+        Region region = Region.create("경기도", "수원시");
+        when(regionRepository.findMentionedInQuestion(
+                eq(question),
+                any()
+        )).thenReturn(List.of(region));
+        when(documentRetriever.retrieve(eq(question), any()))
+                .thenReturn(List.of());
+        AiMessage saved = savedAiMessage("관련 정보를 찾을 수 없습니다.");
+        when(persistenceService.saveAiMessageAndComplete(
+                eq(11L),
+                eq(chatRoom),
+                eq("관련 정보를 찾을 수 없습니다."),
+                eq(false),
+                eq(AiAnswerStatus.NO_EVIDENCE),
+                eq(List.of())
+        )).thenReturn(saved);
+
+        var result = service.createMessage(1L, question);
+
+        assertThat(result.aiMessage().answerStatus())
+                .isEqualTo(AiAnswerStatus.NO_EVIDENCE);
+        verify(starterQuestionRouter, never()).route(
+                eq(AiStarterQuestionType.LOCAL_REHAB_CENTERS),
+                any()
+        );
+        verify(documentRetriever).retrieve(eq(question), any());
+    }
+
+    @Test
+    void routesRegionOnlyFollowUpToLocalRehabCenters() {
+        AiMessage previousAiMessage = mock(AiMessage.class);
+        when(previousAiMessage.getAiAnswerStatus())
+                .thenReturn(AiAnswerStatus.REGION_REQUIRED);
+        when(aiMessageRepository
+                .findTopByChatRoomIdAndSenderTypeOrderByCreatedAtDescIdDesc(
+                        chatRoom.getId(),
+                        SenderType.AI
+                ))
+                .thenReturn(Optional.of(previousAiMessage));
+        Region region = Region.create("경기도", "수원시");
+        when(regionRepository.findByFullName("경기도 수원시"))
+                .thenReturn(Optional.of(region));
+
+        AiReferenceDocument source = new AiReferenceDocument(
+                "INFO-1",
+                "수원시 재활센터",
+                AiResponseSourceType.INFO,
+                1L,
+                "수원시 재활센터",
+                "https://example.com/info/1",
+                null
+        );
+        when(starterQuestionRouter.route(
+                eq(AiStarterQuestionType.LOCAL_REHAB_CENTERS),
+                org.mockito.ArgumentMatchers.argThat(profile ->
+                        profile.region().equals("경기도 수원시")
+                                && profile.regionLevel1().equals("경기도")
+                                && profile.regionLevel2().equals("수원시"))
+        )).thenReturn(Optional.of(
+                AiStarterQuestionAnswer.answered(
+                        "경기도 수원시 재활센터 안내",
+                        List.of(source)
+                )
+        ));
+        AiMessage saved = savedAiMessage("경기도 수원시 재활센터 안내");
+        when(persistenceService.saveAiMessageAndComplete(
+                11L,
+                chatRoom,
+                "경기도 수원시 재활센터 안내",
+                false,
+                AiAnswerStatus.ANSWERED,
+                List.of(source)
+        )).thenReturn(saved);
+
+        var result = service.createMessage(1L, "  경기도   수원시  ");
+
+        assertThat(result.aiMessage().answerStatus()).isEqualTo(AiAnswerStatus.ANSWERED);
+        assertThat(result.aiMessage().sources()).hasSize(1);
+        verify(documentRetriever, never()).retrieve(any(), any());
+        verify(answerGenerator, never()).generate(any(), any(), any());
+        verify(externalAnswerProvider, never()).search(any(), any());
     }
 
     @Test

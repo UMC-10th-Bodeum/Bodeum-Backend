@@ -10,8 +10,11 @@ import com.bodeum.domain.point.enums.PointType;
 import com.bodeum.domain.point.repository.GuardianPointHistoryRepository;
 import com.bodeum.domain.point.repository.GuardianPointHistoryRepository.PointActivitySummary;
 import com.bodeum.domain.point.repository.GuardianPointRepository;
+import com.bodeum.domain.point.repository.GuardianPointRepository.UserTotalPoint;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -99,5 +102,29 @@ class PointServiceTest {
                 .willReturn(Optional.empty());
 
         assertThat(pointService.getTotalPoint(1L)).isZero();
+    }
+
+    @Test
+    void getTotalPointsReturnsTotalsByUserId() {
+        UserTotalPoint first = org.mockito.Mockito.mock(UserTotalPoint.class);
+        UserTotalPoint second = org.mockito.Mockito.mock(UserTotalPoint.class);
+        Set<Long> userIds = Set.of(1L, 2L);
+
+        given(guardianPointRepository.findTotalPointsByUserIdIn(userIds))
+                .willReturn(List.of(first, second));
+        given(first.getUserId()).willReturn(1L);
+        given(first.getTotalPoint()).willReturn(42);
+        given(second.getUserId()).willReturn(2L);
+        given(second.getTotalPoint()).willReturn(200);
+
+        assertThat(pointService.getTotalPoints(userIds))
+                .isEqualTo(Map.of(1L, 42, 2L, 200));
+    }
+
+    @Test
+    void getTotalPointsSkipsRepositoryWhenUserIdsAreEmpty() {
+        assertThat(pointService.getTotalPoints(Set.of())).isEmpty();
+
+        verifyNoInteractions(guardianPointRepository);
     }
 }

@@ -19,6 +19,7 @@ import com.bodeum.domain.info.entity.enums.MainCategory;
 import com.bodeum.domain.info.repository.InfoItemRepository;
 import com.bodeum.domain.news.entity.News;
 import com.bodeum.domain.news.entity.NewsCategory;
+import com.bodeum.domain.news.entity.NewsCategoryCode;
 import com.bodeum.domain.news.entity.NewsSource;
 import com.bodeum.domain.news.entity.NewsSourceType;
 import com.bodeum.domain.news.entity.NewsType;
@@ -80,6 +81,7 @@ class AiContentIndexingServiceTest {
                 .containsEntry("sourceType", "NEWS")
                 .containsEntry("sourceId", 2L)
                 .containsEntry("newsCategoryId", 3L)
+                .containsEntry("newsCategory", "LOCAL_NEWS")
                 .containsEntry("newsSourceId", 4L)
                 .containsEntry("newsSourceType", "PUBLIC_API")
                 .containsEntry("newsSourceName", "수원시청")
@@ -163,7 +165,8 @@ class AiContentIndexingServiceTest {
     private News news() {
         NewsCategory category = mock(NewsCategory.class);
         when(category.getId()).thenReturn(3L);
-        when(category.getName()).thenReturn("복지 소식");
+        when(category.getCode()).thenReturn(NewsCategoryCode.LOCAL_NEWS);
+        when(category.getLabel()).thenReturn("소식");
         NewsSource source = mock(NewsSource.class);
         when(source.getId()).thenReturn(4L);
         when(source.getSourceType()).thenReturn(NewsSourceType.PUBLIC_API);

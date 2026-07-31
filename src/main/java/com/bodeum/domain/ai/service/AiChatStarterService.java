@@ -1,9 +1,22 @@
 package com.bodeum.domain.ai.service;
 
+import static com.bodeum.global.common.constant.TimeConstants.SERVICE_ZONE_ID;
+
 import com.bodeum.domain.ai.dto.response.AiChatStarterResponse;
+import com.bodeum.domain.ai.entity.AiChatRoom;
+import com.bodeum.domain.ai.entity.AiMessage;
+import com.bodeum.domain.ai.enums.AiAnswerStatus;
+import com.bodeum.domain.ai.enums.AiStarterQuestionType;
+import com.bodeum.domain.ai.exception.AiErrorCode;
+import com.bodeum.domain.ai.repository.AiChatRoomRepository;
+import com.bodeum.domain.ai.repository.AiMessageRepository;
 import com.bodeum.domain.auth.enums.SocialProvider;
 import com.bodeum.domain.user.entity.User;
 import com.bodeum.domain.user.service.UserService;
+import com.bodeum.global.apiPayload.exception.ProjectException;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.LocalDate;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
@@ -29,24 +42,60 @@ public class AiChatStarterService {
             복지 바우처, 재활 기관, 지원 제도 등 발달장애 아동 양육에 필요한 정보를 쉽고 빠르게 안내해드려요.
 
             무엇이 궁금하신가요?""";
-    private static final List<String> SUGGESTED_QUESTIONS = List.of(
-            "참고하면 좋을 복지사이트 알려줘",
-            "우리 동네 재활센터 추천해줘",
-            "장애아동 의료비 지원이 궁금해",
-            "장애 진단 후 첫 번째로 해야 할 일",
-            "바우처 신청 방법 알려줘"
-    );
+    private static final List<String> SUGGESTED_QUESTIONS =
+            Arrays.stream(AiStarterQuestionType.values())
+                    .filter(AiStarterQuestionType::isSuggestedQuestion)
+                    .map(AiStarterQuestionType::getContent)
+                    .toList();
 
     private final UserService userService;
+    private final AiChatRoomRepository aiChatRoomRepository;
+    private final AiMessageRepository aiMessageRepository;
+    private final Clock clock;
 
-    @Transactional(readOnly = true)
+    @Transactional
     public AiChatStarterResponse getChatStarter(Long userId) {
         User user = userService.getCurrentUser(userId);
         String greeting = GREETING_TEMPLATE.replace(
                 "{{displayName}}",
                 displayName(user)
         );
+        saveGreetingOnceToday(userId, greeting);
         return AiChatStarterResponse.of(greeting, SUGGESTED_QUESTIONS);
+    }
+
+    private void saveGreetingOnceToday(Long userId, String greeting) {
+        AiChatRoom chatRoom = aiChatRoomRepository.findByUserIdForUpdate(userId)
+                .orElseThrow(() ->
+                        new ProjectException(AiErrorCode.AI_CHAT_ROOM_NOT_FOUND));
+
+        Instant now = Instant.now(clock);
+        LocalDate today = now.atZone(SERVICE_ZONE_ID).toLocalDate();
+        Instant startOfToday = today.atStartOfDay(SERVICE_ZONE_ID).toInstant();
+        Instant startOfTomorrow = today.plusDays(1)
+                .atStartOfDay(SERVICE_ZONE_ID)
+                .toInstant();
+
+        boolean hasTodayMessages =
+                aiMessageRepository
+                        .existsByChatRoomIdAndCreatedAtGreaterThanEqualAndCreatedAtLessThan(
+                                chatRoom.getId(),
+                                startOfToday,
+                                startOfTomorrow
+                        );
+        if (hasTodayMessages) {
+            return;
+        }
+
+        aiMessageRepository.save(
+                AiMessage.createAiMessage(
+                        chatRoom,
+                        greeting,
+                        false,
+                        AiAnswerStatus.GREETING
+                )
+        );
+        chatRoom.updateLastMessageAt(now);
     }
 
     private String displayName(User user) {

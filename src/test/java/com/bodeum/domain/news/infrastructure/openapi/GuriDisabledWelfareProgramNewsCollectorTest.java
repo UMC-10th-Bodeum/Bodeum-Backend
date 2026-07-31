@@ -5,6 +5,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.bodeum.domain.news.collector.NewsCandidate;
+import com.bodeum.domain.news.entity.NewsCategoryCode;
 import com.bodeum.domain.news.entity.NewsSource;
 import com.bodeum.domain.news.entity.NewsSourceType;
 import com.bodeum.domain.news.entity.NewsType;
@@ -68,7 +69,7 @@ class GuriDisabledWelfareProgramNewsCollectorTest {
             assertThat(candidate.summary()).isEqualTo("지역주민 대상 장애인식개선 교육");
             assertThat(candidate.sourceName()).isEqualTo("구리시장애인종합복지관");
             assertThat(candidate.regionName()).isEqualTo("경기도 구리시");
-            assertThat(candidate.categoryName()).isEqualTo("교육재활");
+            assertThat(candidate.categoryCode()).isEqualTo(NewsCategoryCode.EDUCATION_SEMINAR);
             assertThat(candidate.newsType()).isEqualTo(NewsType.ACTIVITY);
             assertThat(candidate.recruitmentStatus()).isNull();
             assertThat(candidate.programStartDate()).isNull();
