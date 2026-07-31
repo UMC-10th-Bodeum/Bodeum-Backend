@@ -7,6 +7,7 @@ import com.bodeum.domain.community.dto.request.CreateCommentRequest;
 import com.bodeum.domain.community.dto.request.UpdateCommentRequest;
 import com.bodeum.domain.community.dto.response.CommentListResponse;
 import com.bodeum.domain.community.dto.response.CommentResponse;
+import com.bodeum.domain.community.entity.Comment;
 import com.bodeum.domain.community.entity.Post;
 import com.bodeum.domain.community.enums.PostAnonymityType;
 import com.bodeum.domain.community.enums.PostBoardType;
@@ -192,6 +193,21 @@ class CommentServiceIntegrationTest {
                 .isInstanceOf(CommunityException.class)
                 .extracting(exception -> ((CommunityException) exception).getErrorCode())
                 .isEqualTo(CommunityErrorCode.COMMENT_ALREADY_ADOPTED);
+    }
+
+    @Test
+    void cannotCancelAcceptedCommentOnNonQuestionPost() {
+        Post post = savePost(PostBoardType.FREE_COMMUNICATION);
+        Comment comment = Comment.create(post, 20L, "일반 게시글의 채택 댓글");
+        comment.accept();
+        commentRepository.saveAndFlush(comment);
+
+        assertThatThrownBy(() -> commentService.toggleCommentAdoption(10L, comment.getId()))
+                .isInstanceOf(CommunityException.class)
+                .extracting(exception -> ((CommunityException) exception).getErrorCode())
+                .isEqualTo(CommunityErrorCode.POST_NOT_QUESTION);
+
+        assertThat(comment.isAccepted()).isTrue();
     }
 
     private Post savePost() {

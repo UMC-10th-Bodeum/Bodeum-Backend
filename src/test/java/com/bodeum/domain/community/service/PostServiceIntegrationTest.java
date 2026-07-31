@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.bodeum.domain.community.dto.request.CreatePostRequest;
+import com.bodeum.domain.community.dto.request.UpdatePostRequest;
 import com.bodeum.domain.community.dto.response.PostResponse;
 import com.bodeum.domain.community.entity.Comment;
 import com.bodeum.domain.community.entity.CommentLike;
@@ -126,6 +127,40 @@ class PostServiceIntegrationTest {
         assertThat(postDisabilityTagRepository.count()).isZero();
         assertThat(postHashtagRepository.count()).isZero();
         assertThat(postImageRepository.count()).isZero();
+    }
+
+    @Test
+    void updateQuestionPostRejectsBoardChangeWhenActiveAdoptedCommentExists() {
+        Post post = postRepository.saveAndFlush(Post.create(
+                10L,
+                PostBoardType.INFORMATION_QUESTION,
+                PostAnonymityType.PROFILE_TAG_VISIBLE,
+                "채택된 댓글이 있는 질문글",
+                "일반 게시판으로 변경할 수 없습니다."
+        ));
+        Comment comment = Comment.create(post, 20L, "채택된 답변");
+        comment.accept();
+        commentRepository.saveAndFlush(comment);
+
+        assertThatThrownBy(() -> postService.updatePost(
+                10L,
+                post.getId(),
+                new UpdatePostRequest(
+                        PostBoardType.FREE_COMMUNICATION,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null
+                )
+        ))
+                .isInstanceOf(CommunityException.class)
+                .extracting(exception -> ((CommunityException) exception).getErrorCode())
+                .isEqualTo(CommunityErrorCode.POST_BOARD_CHANGE_BLOCKED_BY_ADOPTED_COMMENT);
+
+        assertThat(post.getBoardType()).isEqualTo(PostBoardType.INFORMATION_QUESTION);
+        assertThat(comment.isAccepted()).isTrue();
     }
 
     @Test

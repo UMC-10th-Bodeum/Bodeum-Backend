@@ -96,11 +96,11 @@ public class CommentService {
         Comment comment = findActiveCommentForUpdate(commentId);
         Post post = lockPost(comment.getPost().getId());
         validatePostOwner(userId, post);
+        validateQuestionPost(post);
 
         if (comment.isAccepted()) {
             comment.cancelAcceptance();
         } else {
-            validateQuestionPost(post);
             validateNoAcceptedComment(post.getId());
             comment.accept();
         }

@@ -20,6 +20,7 @@ import com.bodeum.domain.community.enums.PostBoardType;
 import com.bodeum.domain.community.enums.PostStatus;
 import com.bodeum.domain.community.exception.CommunityErrorCode;
 import com.bodeum.domain.community.exception.CommunityException;
+import com.bodeum.domain.community.repository.CommentRepository;
 import com.bodeum.domain.community.repository.HashtagRepository;
 import com.bodeum.domain.community.repository.PostDisabilityTagRepository;
 import com.bodeum.domain.community.repository.PostHashtagRepository;
@@ -42,6 +43,8 @@ class PostServiceTest {
 
     @Mock
     private PostRepository postRepository;
+    @Mock
+    private CommentRepository commentRepository;
     @Mock
     private HashtagRepository hashtagRepository;
     @Mock

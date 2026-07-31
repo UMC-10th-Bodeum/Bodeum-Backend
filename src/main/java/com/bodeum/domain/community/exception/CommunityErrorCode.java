@@ -83,6 +83,11 @@ public enum CommunityErrorCode implements BaseErrorCode {
             HttpStatus.CONFLICT,
             "COMMUNITY409_1",
             "이미 채택된 댓글이 있습니다."
+    ),
+    POST_BOARD_CHANGE_BLOCKED_BY_ADOPTED_COMMENT(
+            HttpStatus.CONFLICT,
+            "COMMUNITY409_2",
+            "채택된 댓글이 있는 질문글은 다른 게시판으로 변경할 수 없습니다."
     );
 
     private final HttpStatus status;
