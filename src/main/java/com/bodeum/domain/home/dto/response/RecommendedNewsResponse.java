@@ -2,6 +2,7 @@ package com.bodeum.domain.home.dto.response;
 
 import com.bodeum.domain.news.entity.News;
 import com.bodeum.domain.news.entity.RecruitmentStatus;
+import com.bodeum.domain.region.entity.Region;
 
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
@@ -10,17 +11,19 @@ public record RecommendedNewsResponse(
         Long newsId,
         String title,
         String thumbnailUrl,
-        Long region,
+        String regionLevel1,
+        String regionLevel2,
         String dDay,
         String status,
         Long viewCount
 ) {
-    public static RecommendedNewsResponse from(News news) {
+    public static RecommendedNewsResponse from(News news, Region region) {
         return new RecommendedNewsResponse(
                 news.getId(),
                 news.getTitle(),
                 news.getThumbnailUrl(),
-                news.getRegionId(),
+                region != null ? region.getRegionLevel1() : null,
+                region != null ? region.getRegionLevel2() : null,
                 calculateDDay(news.getApplyEndDate()),
                 toStatusLabel(news.getRecruitmentStatus()),
                 news.getViewCount()
