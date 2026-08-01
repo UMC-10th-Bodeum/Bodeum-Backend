@@ -5,6 +5,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.List;
+import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.Setter;
 import org.springframework.boot.context.properties.ConfigurationProperties;
@@ -19,6 +20,14 @@ import org.springframework.web.cors.CorsConfiguration;
 public class FrontProperties {
 
     /**
+     * 허용할 콜백 URL 최대 길이.
+     * 이 값은 state에 실려 oauth_states.front_callback_url(VARCHAR(255))에 저장되므로,
+     * 길이를 넘으면 저장 시점에 DataIntegrityViolationException이 나 로그인 시작이 500으로 실패한다.
+     * 허용 origin이라도 path·query를 길게 붙이면 초과할 수 있어 여기서 먼저 막는다.
+     */
+    private static final int MAX_CALLBACK_URL_LENGTH = 255;
+
+    /**
      * 소셜 로그인 완료 후 일회용 code를 붙여 리다이렉트할 기본 프론트 콜백 URL.
      * 예: https://bodeum-site.vercel.app/auth/callback
      */
@@ -31,6 +40,10 @@ public class FrontProperties {
      */
     private List<String> allowedCallbackOrigins = new ArrayList<>();
 
+    // @PostConstruct에서만 채우는 내부 캐시라, 클래스 레벨 @Getter/@Setter의 공개 API에서 제외한다.
+    // setter가 열려 있으면 bodeum.front.callback-origin-matcher 같은 키에 바인딩될 수도 있다.
+    @Getter(AccessLevel.NONE)
+    @Setter(AccessLevel.NONE)
     private CorsConfiguration callbackOriginMatcher;
 
     @PostConstruct
@@ -45,7 +58,9 @@ public class FrontProperties {
      * 이미 차단되고 잘못된 파라미터 하나가 로그인 자체를 막지 않게 하기 위해서다.
      */
     public String resolveCallbackUrl(String requestedCallbackUrl) {
-        if (!StringUtils.hasText(requestedCallbackUrl) || !isAllowedCallbackUrl(requestedCallbackUrl)) {
+        if (!StringUtils.hasText(requestedCallbackUrl)
+                || requestedCallbackUrl.length() > MAX_CALLBACK_URL_LENGTH
+                || !isAllowedCallbackUrl(requestedCallbackUrl)) {
             return callbackUrl;
         }
 

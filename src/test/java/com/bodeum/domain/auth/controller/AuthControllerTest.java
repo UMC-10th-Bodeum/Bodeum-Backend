@@ -243,6 +243,30 @@ class AuthControllerTest {
                 .isEqualTo(FRONT_CALLBACK_URL);
     }
 
+    /**
+     * 허용 origin이라도 path·query가 길면 front_callback_url(VARCHAR(255))을 넘겨
+     * state 저장 시점에 500으로 실패했다. 길이 검증 후 기본값으로 폴백하는지 확인한다.
+     */
+    @Test
+    void loginRedirectFallsBackWhenFrontCallbackUrlIsTooLong() throws Exception {
+        String tooLongUrl = "http://localhost:5173/auth/callback?x=" + "a".repeat(300);
+
+        MvcResult result = mockMvc.perform(get("/api/v1/auth/login/naver")
+                        .param("frontCallbackUrl", tooLongUrl))
+                .andExpect(status().isFound())
+                .andReturn();
+
+        String state = UriComponentsBuilder.fromUriString(result.getResponse().getHeader(HttpHeaders.LOCATION))
+                .build()
+                .getQueryParams()
+                .getFirst("state");
+
+        assertThat(oAuthStateRepository.findById(state))
+                .get()
+                .extracting(OAuthState::getFrontCallbackUrl)
+                .isEqualTo(FRONT_CALLBACK_URL);
+    }
+
     @Test
     void callbackRedirectsToFrontCallbackUrlStoredInState() throws Exception {
         String state = seedState(LOCAL_FRONT_CALLBACK_URL);
@@ -642,9 +666,6 @@ class AuthControllerTest {
     }
 
     /**
-     * 모의 소셜 로그인 콜백(302)으로 일회용 code를 발급받아 반환한다.
-     */
-    /**
      * 모의 로그인(kakao)은 리다이렉트 없이 콜백만 호출하므로, state에 실린 프론트 콜백 URL을
      * 검증하려면 로그인 시작 단계가 저장했을 state 행을 직접 넣어 준다.
      */
@@ -660,6 +681,9 @@ class AuthControllerTest {
         return state;
     }
 
+    /**
+     * 모의 소셜 로그인 콜백(302)으로 일회용 code를 발급받아 반환한다.
+     */
     private String issueLoginCode(String authorizationCode) throws Exception {
         MvcResult callbackResult = mockMvc.perform(get("/api/v1/auth/callback/kakao")
                         .param("code", authorizationCode))

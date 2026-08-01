@@ -48,7 +48,7 @@ public class AuthService {
         if (StringUtils.hasText(requestedFrontCallbackUrl)
                 && !requestedFrontCallbackUrl.equals(frontCallbackUrl)) {
             log.warn("[AUTH] 허용되지 않은 프론트 콜백 URL 요청 provider={} requested={}",
-                    provider, requestedFrontCallbackUrl);
+                    provider, sanitizeForLog(requestedFrontCallbackUrl));
         }
 
         UriComponentsBuilder builder = UriComponentsBuilder.fromUriString(provider.getAuthorizationUri())
@@ -156,6 +156,14 @@ public class AuthService {
             log.warn("[AUTH] state 검증 실패 provider={} statePresent={}", provider, StringUtils.hasText(state));
             throw new ProjectException(AuthErrorCode.INVALID_OAUTH_STATE);
         }
+    }
+
+    /**
+     * 쿼리 파라미터로 들어온 값이라 개행·제어 문자가 섞이면 가짜 로그 라인을 끼워 넣을 수 있다.
+     * 원인 파악에는 값 자체가 필요하므로 버리지 않고 제어 문자만 치환해 남긴다.
+     */
+    private String sanitizeForLog(String value) {
+        return value.replaceAll("\\p{Cntrl}", "_");
     }
 
     private AuthNextStep resolveNextStep(User user) {
