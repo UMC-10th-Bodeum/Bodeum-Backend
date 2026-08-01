@@ -102,13 +102,17 @@ class RedisAuthStoreIntegrationTest {
         OAuthStateStore store = new OAuthStateStore(
                 mock(OAuthStateRepository.class), properties, redisTemplate);
 
-        String state = store.issue(SocialProvider.KAKAO);
+        String state = store.issue(SocialProvider.KAKAO, "http://localhost:5173/auth/callback");
 
         assertThat(redisTemplate.hasKey("bodeum:auth:oauth-state:" + state)).isTrue();
         assertThat(redisTemplate.getExpire("bodeum:auth:oauth-state:" + state))
                 .isBetween(1L, 600L);
+        // 프론트 콜백 URL은 소비 전에만 읽을 수 있어야 한다(콜백 실패 시 목적지 확보용).
+        assertThat(store.findFrontCallbackUrl(state))
+                .contains("http://localhost:5173/auth/callback");
 
         assertThat(store.consume(SocialProvider.KAKAO, state)).isTrue();
+        assertThat(store.findFrontCallbackUrl(state)).isEmpty();
         // 소비 후 키가 삭제되어 재사용 불가(getAndDelete)
         assertThat(store.consume(SocialProvider.KAKAO, state)).isFalse();
         assertThat(redisTemplate.hasKey("bodeum:auth:oauth-state:" + state)).isFalse();
@@ -119,7 +123,7 @@ class RedisAuthStoreIntegrationTest {
         OAuthStateStore store = new OAuthStateStore(
                 mock(OAuthStateRepository.class), properties, redisTemplate);
 
-        String state = store.issue(SocialProvider.KAKAO);
+        String state = store.issue(SocialProvider.KAKAO, "http://localhost:5173/auth/callback");
 
         assertThat(store.consume(SocialProvider.NAVER, state)).isFalse();
     }

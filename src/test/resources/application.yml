@@ -23,6 +23,8 @@ spring:
 bodeum:
   front:
     callback-url: http://localhost:3000/auth/callback
+    allowed-callback-origins:
+      - http://localhost:*
   aws:
     s3:
       bucket: test-bucket
