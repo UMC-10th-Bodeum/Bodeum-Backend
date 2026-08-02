@@ -12,7 +12,7 @@ public record InfoReviewResponse(
         Long infoReviewId,
         Long userId,
         String userNickname,
-        int rating,
+        int rating, // 정수형 유지 (1~5점)
         String content,
         List<String> imageUrls,
         int helpfulCount,
@@ -23,7 +23,6 @@ public record InfoReviewResponse(
                 .map(InfoReviewImage::getImageUrl)
                 .toList();
 
-        // 리뷰는 보존하되, 작성자가 탈퇴 회원이면 userId를 숨기고 '탈퇴한 사용자'로 익명화한다.
         User author = entity.getUser();
         boolean withdrawn = author.isWithdrawn();
         Long userId = withdrawn ? null : author.getId();

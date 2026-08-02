@@ -19,6 +19,10 @@ public interface InfoReviewRepository extends JpaRepository<InfoReview, Long> {
             "WHERE r.infoItem.id = :infoItemId")
     Page<InfoReview> findByInfoItemId(@Param("infoItemId") Long infoItemId, Pageable pageable);
 
+    // 특정 정보 항목의 전체 리뷰 평균 평점 계산 (리뷰가 없을 경우 0.0 반환)
+    @Query("SELECT COALESCE(AVG(r.rating), 0.0) FROM InfoReview r WHERE r.infoItem.id = :infoItemId")
+    Double findAverageRatingByInfoItemId(@Param("infoItemId") Long infoItemId);
+
     // 단건 조회 시 작성자 및 첨부 이미지 Fetch Join
     @Query("SELECT r FROM InfoReview r " +
             "JOIN FETCH r.user " +
@@ -26,7 +30,7 @@ public interface InfoReviewRepository extends JpaRepository<InfoReview, Long> {
             "WHERE r.id = :infoReviewId")
     Optional<InfoReview> findByIdWithUserAndImages(@Param("infoReviewId") Long infoReviewId);
 
-    // 동시성 처리를 위해 PESSIMISTIC_WRITE 락 적용 메서드 추가
+    // 동시성 처리를 위해 PESSIMISTIC_WRITE 락 적용 메서드
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT r FROM InfoReview r WHERE r.id = :id")
     Optional<InfoReview> findByIdWithPessimisticLock(@Param("id") Long id);

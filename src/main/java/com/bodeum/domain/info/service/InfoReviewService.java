@@ -2,6 +2,7 @@ package com.bodeum.domain.info.service;
 
 import com.bodeum.domain.info.dto.request.CreateInfoReviewRequest;
 import com.bodeum.domain.info.dto.request.UpdateInfoReviewRequest;
+import com.bodeum.domain.info.dto.response.InfoReviewListResponse;
 import com.bodeum.domain.info.dto.response.InfoReviewResponse;
 import com.bodeum.domain.info.entity.InfoItem;
 import com.bodeum.domain.info.entity.InfoReview;
@@ -28,14 +29,20 @@ public class InfoReviewService {
     private final InfoItemRepository infoItemRepository;
     private final UserRepository userRepository;
 
-    // 1. 정보 후기 목록 조회 (비회원 가능)
-    public Page<InfoReviewResponse> getReviews(Long infoId, Pageable pageable) {
-        // 정보 항목 존재 여부 확인
+    // 1. 정보 후기 목록 및 평균 평점 조회 (비회원 가능)
+    public InfoReviewListResponse getReviews(Long infoId, Pageable pageable) {
         if (!infoItemRepository.existsById(infoId)) {
             throw new InfoException(InfoErrorCode.INFO_ITEM_NOT_FOUND);
         }
-        return infoReviewRepository.findByInfoItemId(infoId, pageable)
+
+        // 전체 평균 평점 (실수형)
+        Double averageRating = infoReviewRepository.findAverageRatingByInfoItemId(infoId);
+
+        // 개별 리뷰 목록 (개별 별점은 정수형)
+        Page<InfoReviewResponse> reviewPage = infoReviewRepository.findByInfoItemId(infoId, pageable)
                 .map(InfoReviewResponse::from);
+
+        return InfoReviewListResponse.of(averageRating, reviewPage);
     }
 
     // 2. 정보 후기 작성 (회원)
@@ -51,10 +58,12 @@ public class InfoReviewService {
                 .content(request.content())
                 .build();
 
-        // 첨부 이미지가 있는 경우 도메인 메서드로 연관관계 매핑
         if (request.imageUrls() != null && !request.imageUrls().isEmpty()) {
             review.updateReview(request.content(), request.rating(), request.imageUrls());
         }
+
+        // InfoItem의 reviewCount 카운트 증가
+        infoItem.updateReviewCount(1);
 
         InfoReview savedReview = infoReviewRepository.save(review);
         return InfoReviewResponse.from(savedReview);
@@ -64,13 +73,9 @@ public class InfoReviewService {
     @Transactional
     public InfoReviewResponse updateReview(Long infoReviewId, Long userId, UpdateInfoReviewRequest request) {
         InfoReview review = getInfoReviewByIdWithImages(infoReviewId);
-
-        // 수정 권한 검증 (FORBIDDEN_REVIEW_UPDATE)
         validateReviewOwner(review, userId, InfoErrorCode.FORBIDDEN_REVIEW_UPDATE);
 
-        // 도메인 메서드로 내용/별점/이미지 일괄 업데이트
         review.updateReview(request.content(), request.rating(), request.imageUrls());
-
         return InfoReviewResponse.from(review);
     }
 
@@ -78,14 +83,14 @@ public class InfoReviewService {
     @Transactional
     public void deleteReview(Long infoReviewId, Long userId) {
         InfoReview review = getInfoReviewByIdWithImages(infoReviewId);
-
-        // 삭제 권한 검증 (FORBIDDEN_REVIEW_DELETE)
         validateReviewOwner(review, userId, InfoErrorCode.FORBIDDEN_REVIEW_DELETE);
+
+        // InfoItem의 reviewCount 카운트 차감
+        review.getInfoItem().updateReviewCount(-1);
 
         infoReviewRepository.delete(review);
     }
 
-    // 헬퍼 함수
     private User getUserById(Long userId) {
         return userRepository.findById(userId)
                 .orElseThrow(() -> new ProjectException(UserErrorCode.USER_NOT_FOUND));
