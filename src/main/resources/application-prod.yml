@@ -25,8 +25,16 @@ spring:
 
 bodeum:
   front:
-    # 운영 프론트(Vercel) 콜백 URL. 소셜 로그인 완료 후 일회용 code를 붙여 이 주소로 리다이렉트한다.
+    # 운영 프론트(Vercel) 콜백 URL. 프론트가 콜백 URL을 지정하지 않으면 이 주소로 리다이렉트한다.
     callback-url: ${FRONT_CALLBACK_URL:https://bodeum-site.vercel.app/auth/callback}
+    # 프론트가 로그인 시작 시 직접 지정할 수 있는 콜백 origin 허용 목록.
+    # 로컬 개발자가 붙을 때 EC2 환경변수를 바꾸지 않아도 되도록 localhost를 포트 무관으로 허용한다.
+    allowed-callback-origins:
+      - https://bodeum.site
+      - https://bodeum-site.vercel.app
+      - https://bodeum-site-*.vercel.app
+      - http://localhost:*
+      - http://127.0.0.1:*
   cors:
     # 커스텀 도메인(프론트 컷오버 대비) + 프론트(Vercel) 운영 도메인 + 프리뷰 배포 + 통합 초기 로컬 개발용
     allowed-origins:

@@ -38,7 +38,10 @@ public class AuthController {
 
     private final AuthService authService;
 
-    @Operation(summary = "소셜 로그인 리다이렉트", description = "소셜 인증 페이지로 리다이렉트할 URL(302)을 반환한다.")
+    @Operation(summary = "소셜 로그인 리다이렉트",
+            description = "소셜 인증 페이지로 리다이렉트할 URL(302)을 반환한다. "
+                    + "frontCallbackUrl을 넘기면 로그인 완료 후 그 주소로 돌아온다(프론트 로컬 개발용). "
+                    + "생략하거나 허용 목록에 없는 값이면 서버 기본 콜백 URL을 쓴다.")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "302", description = "소셜 인증 페이지로 리다이렉트"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
@@ -54,9 +57,12 @@ public class AuthController {
     @GetMapping("/login/{provider}")
     public ResponseEntity<Void> redirectSocialLogin(
             @Parameter(description = "소셜 로그인 제공자", required = true, example = "kakao")
-            @PathVariable String provider
+            @PathVariable String provider,
+            @Parameter(description = "로그인 완료 후 돌아갈 프론트 콜백 URL(선택)",
+                    example = "http://localhost:5173/auth/callback")
+            @RequestParam(required = false) String frontCallbackUrl
     ) {
-        URI redirectUri = authService.createLoginRedirectUri(SocialProvider.from(provider));
+        URI redirectUri = authService.createLoginRedirectUri(SocialProvider.from(provider), frontCallbackUrl);
 
         return ResponseEntity.status(302)
                 .header(HttpHeaders.LOCATION, redirectUri.toString())
@@ -87,12 +93,15 @@ public class AuthController {
             @RequestParam(required = false) String code,
             @RequestParam(required = false) String state
     ) {
+        // state는 loginWithCallback 안에서 소비되므로, 실패 시에도 쓸 목적지를 미리 확보한다.
+        String frontCallbackUrl = authService.resolveFrontCallbackUrl(state);
+
         URI redirectUri;
         try {
-            redirectUri = authService.loginWithCallback(SocialProvider.from(provider), code, state);
+            redirectUri = authService.loginWithCallback(SocialProvider.from(provider), code, state, frontCallbackUrl);
         } catch (ProjectException e) {
             // 콜백은 브라우저 전체 네비게이션이라 실패도 JSON 대신 프론트로 에러 리다이렉트한다.
-            redirectUri = authService.buildFrontErrorRedirectUri(e.getErrorCode());
+            redirectUri = authService.buildFrontErrorRedirectUri(e.getErrorCode(), frontCallbackUrl);
         }
 
         return ResponseEntity.status(302)

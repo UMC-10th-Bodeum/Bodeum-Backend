@@ -31,7 +31,7 @@ public class AuthService {
     private final AuthLoginCodeStore authLoginCodeStore;
     private final FrontProperties frontProperties;
 
-    public URI createLoginRedirectUri(SocialProvider provider) {
+    public URI createLoginRedirectUri(SocialProvider provider, String requestedFrontCallbackUrl) {
         OAuthProperties.ProviderRegistration registration = oAuthProperties.getRegistration(provider);
         if (registration == null || !registration.isConfigured()) {
             throw new ProjectException(AuthErrorCode.PROVIDER_NOT_CONFIGURED);
@@ -42,11 +42,20 @@ public class AuthService {
                 ? registration.getScope()
                 : provider.getDefaultScope();
 
+        // 소셜 제공자에게 넘기는 redirect_uri는 콘솔 등록값이라 항상 고정이고,
+        // 요청마다 달라지는 것은 그 뒤에 이어지는 "우리 서버 → 프론트" 구간뿐이다.
+        String frontCallbackUrl = frontProperties.resolveCallbackUrl(requestedFrontCallbackUrl);
+        if (StringUtils.hasText(requestedFrontCallbackUrl)
+                && !requestedFrontCallbackUrl.equals(frontCallbackUrl)) {
+            log.warn("[AUTH] 허용되지 않은 프론트 콜백 URL 요청 provider={} requested={}",
+                    provider, sanitizeForLog(requestedFrontCallbackUrl));
+        }
+
         UriComponentsBuilder builder = UriComponentsBuilder.fromUriString(provider.getAuthorizationUri())
                 .queryParam("response_type", "code")
                 .queryParam("client_id", registration.getClientId())
                 .queryParam("redirect_uri", redirectUri)
-                .queryParam("state", oAuthStateStore.issue(provider));
+                .queryParam("state", oAuthStateStore.issue(provider, frontCallbackUrl));
 
         if (StringUtils.hasText(scope)) {
             builder.queryParam("scope", scope);
@@ -55,8 +64,17 @@ public class AuthService {
         return builder.encode().build().toUri();
     }
 
+    /**
+     * 로그인 시작 시 state에 실어 둔 프론트 콜백 URL을 돌려준다.
+     * state가 없거나 값이 비어 있으면 서버 기본 콜백 URL을 쓴다.
+     */
+    public String resolveFrontCallbackUrl(String state) {
+        return oAuthStateStore.findFrontCallbackUrl(state)
+                .orElseGet(frontProperties::getCallbackUrl);
+    }
+
     @Transactional
-    public URI loginWithCallback(SocialProvider provider, String code, String state) {
+    public URI loginWithCallback(SocialProvider provider, String code, String state, String frontCallbackUrl) {
         if (!StringUtils.hasText(code)) {
             throw new ProjectException(AuthErrorCode.MISSING_AUTH_CODE);
         }
@@ -76,7 +94,7 @@ public class AuthService {
         // 실제 토큰은 프론트가 code를 교환(exchange)할 때 발급한다(토큰이 URL/로그/히스토리에 남지 않도록).
         String loginCode = authLoginCodeStore.issue(userCreationResult.userId(), userCreationResult.created());
 
-        return buildFrontRedirectUri(loginCode);
+        return buildFrontRedirectUri(frontCallbackUrl, loginCode);
     }
 
     @Transactional
@@ -108,21 +126,21 @@ public class AuthService {
         authTokenService.revokeAccessToken(accessToken);
     }
 
-    private URI buildFrontRedirectUri(String loginCode) {
+    private URI buildFrontRedirectUri(String frontCallbackUrl, String loginCode) {
         // code는 60초·1회용이라 교환 즉시 폐기되므로 쿼리 파라미터로 전달해도 안전하다.
-        return buildFrontRedirectUri("code", loginCode);
+        return buildFrontRedirectUri(frontCallbackUrl, "code", loginCode);
     }
 
     /**
      * 콜백 실패 시에도 브라우저 전체 네비게이션이라 JSON 대신 프론트 콜백 URL로 리다이렉트한다.
      * 프론트는 code 없이 error가 오면 로그인 화면으로 안내한다.
      */
-    public URI buildFrontErrorRedirectUri(BaseErrorCode errorCode) {
-        return buildFrontRedirectUri("error", errorCode.getCode());
+    public URI buildFrontErrorRedirectUri(BaseErrorCode errorCode, String frontCallbackUrl) {
+        return buildFrontRedirectUri(frontCallbackUrl, "error", errorCode.getCode());
     }
 
-    private URI buildFrontRedirectUri(String paramName, String paramValue) {
-        return UriComponentsBuilder.fromUriString(frontProperties.getCallbackUrl())
+    private URI buildFrontRedirectUri(String frontCallbackUrl, String paramName, String paramValue) {
+        return UriComponentsBuilder.fromUriString(frontCallbackUrl)
                 .queryParam(paramName, paramValue)
                 .encode()
                 .build()
@@ -138,6 +156,14 @@ public class AuthService {
             log.warn("[AUTH] state 검증 실패 provider={} statePresent={}", provider, StringUtils.hasText(state));
             throw new ProjectException(AuthErrorCode.INVALID_OAUTH_STATE);
         }
+    }
+
+    /**
+     * 쿼리 파라미터로 들어온 값이라 개행·제어 문자가 섞이면 가짜 로그 라인을 끼워 넣을 수 있다.
+     * 원인 파악에는 값 자체가 필요하므로 버리지 않고 제어 문자만 치환해 남긴다.
+     */
+    private String sanitizeForLog(String value) {
+        return value.replaceAll("\\p{Cntrl}", "_");
     }
 
     private AuthNextStep resolveNextStep(User user) {

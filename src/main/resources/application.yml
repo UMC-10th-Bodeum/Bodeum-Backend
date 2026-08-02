@@ -118,9 +118,14 @@ bodeum:
       lock-timeout-seconds: ${AI_INDEXING_LOCK_TIMEOUT:60} # 기본 60초 대기
       max-retries: ${AI_INDEXING_MAX_RETRIES:3}             # 락 획득 실패 시 3회 재시도
   front:
-    # 소셜 로그인 완료 후 일회용 code를 붙여 리다이렉트할 프론트 콜백 URL.
+    # 소셜 로그인 완료 후 일회용 code를 붙여 리다이렉트할 기본 프론트 콜백 URL.
     # 운영 값은 application-prod.yml에서 오버라이드한다.
-    callback-url: ${FRONT_CALLBACK_URL:http://localhost:3000/auth/callback}
+    callback-url: ${FRONT_CALLBACK_URL:http://localhost:5173/auth/callback}
+    # 프론트가 /auth/login/{provider}?frontCallbackUrl= 로 직접 지정할 수 있는 origin 허용 목록.
+    # 목록에 없으면 위 기본 콜백 URL로 폴백한다(오픈 리다이렉트 방지).
+    allowed-callback-origins:
+      - http://localhost:*
+      - http://127.0.0.1:*
   auth:
     jwt-secret: ${JWT_SECRET:}
     access-token-ttl: ${AUTH_ACCESS_TOKEN_TTL:1h}

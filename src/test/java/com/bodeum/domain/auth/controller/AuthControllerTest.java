@@ -8,6 +8,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.bodeum.domain.auth.entity.OAuthState;
+import com.bodeum.domain.auth.enums.SocialProvider;
 import com.bodeum.domain.auth.repository.AuthLoginCodeRepository;
 import com.bodeum.domain.auth.repository.OAuthStateRepository;
 import com.bodeum.domain.auth.repository.RefreshTokenSessionRepository;
@@ -16,7 +18,9 @@ import com.bodeum.domain.user.repository.UserRepository;
 import com.bodeum.domain.user.service.UserService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.time.Instant;
 import java.util.Map;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -38,6 +42,7 @@ import org.springframework.web.util.UriComponentsBuilder;
 class AuthControllerTest {
 
     private static final String FRONT_CALLBACK_URL = "http://localhost:3000/auth/callback";
+    private static final String LOCAL_FRONT_CALLBACK_URL = "http://localhost:5173/auth/callback";
 
     @Autowired
     private MockMvc mockMvc;
@@ -200,6 +205,95 @@ class AuthControllerTest {
                 .startsWith("https://nid.naver.com/oauth2.0/authorize")
                 .contains("client_id=test-naver-client")
                 .contains("state=");
+    }
+
+    @Test
+    void loginRedirectStoresAllowedFrontCallbackUrl() throws Exception {
+        MvcResult result = mockMvc.perform(get("/api/v1/auth/login/naver")
+                        .param("frontCallbackUrl", LOCAL_FRONT_CALLBACK_URL))
+                .andExpect(status().isFound())
+                .andReturn();
+
+        String state = UriComponentsBuilder.fromUriString(result.getResponse().getHeader(HttpHeaders.LOCATION))
+                .build()
+                .getQueryParams()
+                .getFirst("state");
+
+        assertThat(oAuthStateRepository.findById(state))
+                .get()
+                .extracting(OAuthState::getFrontCallbackUrl)
+                .isEqualTo(LOCAL_FRONT_CALLBACK_URL);
+    }
+
+    @Test
+    void loginRedirectFallsBackWhenFrontCallbackUrlIsNotAllowed() throws Exception {
+        MvcResult result = mockMvc.perform(get("/api/v1/auth/login/naver")
+                        .param("frontCallbackUrl", "https://evil.example.com/auth/callback"))
+                .andExpect(status().isFound())
+                .andReturn();
+
+        String state = UriComponentsBuilder.fromUriString(result.getResponse().getHeader(HttpHeaders.LOCATION))
+                .build()
+                .getQueryParams()
+                .getFirst("state");
+
+        assertThat(oAuthStateRepository.findById(state))
+                .get()
+                .extracting(OAuthState::getFrontCallbackUrl)
+                .isEqualTo(FRONT_CALLBACK_URL);
+    }
+
+    /**
+     * 허용 origin이라도 path·query가 길면 front_callback_url(VARCHAR(255))을 넘겨
+     * state 저장 시점에 500으로 실패했다. 길이 검증 후 기본값으로 폴백하는지 확인한다.
+     */
+    @Test
+    void loginRedirectFallsBackWhenFrontCallbackUrlIsTooLong() throws Exception {
+        String tooLongUrl = "http://localhost:5173/auth/callback?x=" + "a".repeat(300);
+
+        MvcResult result = mockMvc.perform(get("/api/v1/auth/login/naver")
+                        .param("frontCallbackUrl", tooLongUrl))
+                .andExpect(status().isFound())
+                .andReturn();
+
+        String state = UriComponentsBuilder.fromUriString(result.getResponse().getHeader(HttpHeaders.LOCATION))
+                .build()
+                .getQueryParams()
+                .getFirst("state");
+
+        assertThat(oAuthStateRepository.findById(state))
+                .get()
+                .extracting(OAuthState::getFrontCallbackUrl)
+                .isEqualTo(FRONT_CALLBACK_URL);
+    }
+
+    @Test
+    void callbackRedirectsToFrontCallbackUrlStoredInState() throws Exception {
+        String state = seedState(LOCAL_FRONT_CALLBACK_URL);
+
+        MvcResult result = mockMvc.perform(get("/api/v1/auth/callback/kakao")
+                        .param("code", "local-front-code")
+                        .param("state", state))
+                .andExpect(status().isFound())
+                .andReturn();
+
+        assertThat(result.getResponse().getHeader(HttpHeaders.LOCATION))
+                .startsWith(LOCAL_FRONT_CALLBACK_URL)
+                .contains("code=");
+    }
+
+    @Test
+    void callbackErrorRedirectsToFrontCallbackUrlStoredInState() throws Exception {
+        String state = seedState(LOCAL_FRONT_CALLBACK_URL);
+
+        MvcResult result = mockMvc.perform(get("/api/v1/auth/callback/kakao")
+                        .param("state", state))
+                .andExpect(status().isFound())
+                .andReturn();
+
+        assertThat(result.getResponse().getHeader(HttpHeaders.LOCATION))
+                .startsWith(LOCAL_FRONT_CALLBACK_URL)
+                .contains("error=AUTH400_2");
     }
 
     @Test
@@ -569,6 +663,22 @@ class AuthControllerTest {
                                 """))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("AUTH401_1"));
+    }
+
+    /**
+     * 모의 로그인(kakao)은 리다이렉트 없이 콜백만 호출하므로, state에 실린 프론트 콜백 URL을
+     * 검증하려면 로그인 시작 단계가 저장했을 state 행을 직접 넣어 준다.
+     */
+    private String seedState(String frontCallbackUrl) {
+        String state = UUID.randomUUID().toString();
+        oAuthStateRepository.save(OAuthState.create(
+                state,
+                SocialProvider.KAKAO,
+                Instant.now().plusSeconds(600),
+                frontCallbackUrl
+        ));
+
+        return state;
     }
 
     /**
