@@ -101,8 +101,7 @@ class HomeCommunityRepositoryIntegrationTest {
                 PostBoardType.FREE_COMMUNICATION,
                 PostAnonymityType.PROFILE_TAG_VISIBLE,
                 title,
-                title + " 내용",
-                false
+                title + " 내용"
         );
     }
 }

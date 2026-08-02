@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.bodeum.domain.community.dto.request.CreatePostRequest;
+import com.bodeum.domain.community.dto.request.UpdatePostRequest;
 import com.bodeum.domain.community.dto.response.PostResponse;
 import com.bodeum.domain.community.entity.Comment;
 import com.bodeum.domain.community.entity.CommentLike;
@@ -75,8 +76,7 @@ class PostServiceIntegrationTest {
                             "익명 게시글 내용",
                             List.of(DisabilityType.AUTISM, DisabilityType.AUTISM, DisabilityType.ADHD),
                             List.of("육아", "정보공유"),
-                            List.of("https://example.com/1.jpg", "https://example.com/2.jpg"),
-                            true
+                            List.of("https://example.com/1.jpg", "https://example.com/2.jpg")
                     )
             );
             postId = created.postId();
@@ -85,7 +85,7 @@ class PostServiceIntegrationTest {
 
             assertThat(created.authorId()).isNull();
             assertThat(created.isMine()).isTrue();
-            assertThat(created.isQuestion()).isTrue();
+            assertThat(created.isQuestion()).isFalse();
             assertThat(viewed.authorId()).isNull();
             assertThat(viewed.isMine()).isFalse();
             assertThat(viewed.viewCount()).isEqualTo(1);
@@ -107,8 +107,7 @@ class PostServiceIntegrationTest {
                 PostBoardType.INFORMATION_QUESTION,
                 PostAnonymityType.PROFILE_TAG_VISIBLE,
                 "삭제할 게시글",
-                "삭제할 게시글 내용",
-                true
+                "삭제할 게시글 내용"
         ));
         Comment rootComment = commentRepository.saveAndFlush(Comment.create(post, 20L, "댓글"));
         Comment reply = commentRepository.saveAndFlush(Comment.createReply(rootComment, 30L, "답글"));
@@ -131,6 +130,40 @@ class PostServiceIntegrationTest {
     }
 
     @Test
+    void updateQuestionPostRejectsBoardChangeWhenActiveAdoptedCommentExists() {
+        Post post = postRepository.saveAndFlush(Post.create(
+                10L,
+                PostBoardType.INFORMATION_QUESTION,
+                PostAnonymityType.PROFILE_TAG_VISIBLE,
+                "채택된 댓글이 있는 질문글",
+                "일반 게시판으로 변경할 수 없습니다."
+        ));
+        Comment comment = Comment.create(post, 20L, "채택된 답변");
+        comment.accept();
+        commentRepository.saveAndFlush(comment);
+
+        assertThatThrownBy(() -> postService.updatePost(
+                10L,
+                post.getId(),
+                new UpdatePostRequest(
+                        PostBoardType.FREE_COMMUNICATION,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null
+                )
+        ))
+                .isInstanceOf(CommunityException.class)
+                .extracting(exception -> ((CommunityException) exception).getErrorCode())
+                .isEqualTo(CommunityErrorCode.POST_BOARD_CHANGE_BLOCKED_BY_ADOPTED_COMMENT);
+
+        assertThat(post.getBoardType()).isEqualTo(PostBoardType.INFORMATION_QUESTION);
+        assertThat(comment.isAccepted()).isTrue();
+    }
+
+    @Test
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     void likeAndScrapRequestsAreIdempotentAndReflectedInPostDetail() {
         Long postId = null;
@@ -140,8 +173,7 @@ class PostServiceIntegrationTest {
                     PostBoardType.FREE_COMMUNICATION,
                     PostAnonymityType.PROFILE_TAG_VISIBLE,
                     "반응 테스트 게시글",
-                    "좋아요와 스크랩을 테스트합니다.",
-                    false
+                    "좋아요와 스크랩을 테스트합니다."
             ));
             postId = post.getId();
 
@@ -181,8 +213,7 @@ class PostServiceIntegrationTest {
                 PostBoardType.FREE_COMMUNICATION,
                 PostAnonymityType.PROFILE_TAG_VISIBLE,
                 "삭제된 게시글",
-                "삭제된 게시글에는 반응할 수 없습니다.",
-                false
+                "삭제된 게시글에는 반응할 수 없습니다."
         ));
         postService.deletePost(10L, post.getId());
         postRepository.flush();
@@ -204,8 +235,7 @@ class PostServiceIntegrationTest {
                 PostBoardType.FREE_COMMUNICATION,
                 PostAnonymityType.PROFILE_TAG_VISIBLE,
                 "댓글 삭제 테스트",
-                "댓글 논리 삭제 상태를 검증합니다.",
-                false
+                "댓글 논리 삭제 상태를 검증합니다."
         ));
         Comment comment = commentRepository.save(Comment.create(post, 20L, "삭제할 댓글"));
 

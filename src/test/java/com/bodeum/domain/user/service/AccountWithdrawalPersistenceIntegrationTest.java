@@ -293,7 +293,7 @@ class AccountWithdrawalPersistenceIntegrationTest {
 
     private Post persistPost(Long userId) {
         Post post = Post.create(userId, PostBoardType.FREE_COMMUNICATION,
-                PostAnonymityType.PROFILE_TAG_VISIBLE, "제목", "내용", false);
+                PostAnonymityType.PROFILE_TAG_VISIBLE, "제목", "내용");
         em.persist(post);
         return post;
     }

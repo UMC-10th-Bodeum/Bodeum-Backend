@@ -14,7 +14,7 @@ class CommentResponseTest {
 
     private Comment comment() {
         Post post = Post.create(1L, PostBoardType.FREE_COMMUNICATION,
-                PostAnonymityType.PROFILE_TAG_VISIBLE, "제목", "내용", false);
+                PostAnonymityType.PROFILE_TAG_VISIBLE, "제목", "내용");
         Comment comment = Comment.create(post, 10L, "댓글");
         ReflectionTestUtils.setField(comment, "id", 5L);
         return comment;

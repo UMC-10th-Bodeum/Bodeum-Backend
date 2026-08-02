@@ -80,6 +80,18 @@ public class CommentController {
         return ApiResponse.of(GeneralSuccessCode.OK, commentService.updateComment(userId, commentId, request));
     }
 
+    @Operation(summary = "댓글 채택 및 채택 취소", description = "게시글 작성자가 댓글의 채택 상태를 토글한다.")
+    @PostMapping("/comments/{commentId}/adopt")
+    public ApiResponse<CommentResponse> toggleCommentAdoption(
+            @LoginUser Long userId,
+            @PathVariable Long commentId
+    ) {
+        return ApiResponse.of(
+                GeneralSuccessCode.OK,
+                commentService.toggleCommentAdoption(userId, commentId)
+        );
+    }
+
     @Operation(summary = "댓글 삭제", description = "작성자가 댓글을 논리 삭제한다.")
     @DeleteMapping("/comments/{commentId}")
     public ApiResponse<Void> deleteComment(

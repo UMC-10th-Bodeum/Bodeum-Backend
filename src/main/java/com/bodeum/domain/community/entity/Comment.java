@@ -97,6 +97,10 @@ public class Comment extends BaseCreatedUpdatedDeletedEntity {
         this.accepted = true;
     }
 
+    public void cancelAcceptance() {
+        this.accepted = false;
+    }
+
     public void increaseLikeCount() {
         this.likeCount++;
     }

@@ -91,6 +91,26 @@ public class CommentService {
     }
 
     @Transactional
+    public CommentResponse toggleCommentAdoption(Long userId, Long commentId) {
+        validateAuthenticatedUser(userId);
+        Comment comment = findActiveCommentForUpdate(commentId);
+        Post post = lockPost(comment.getPost().getId());
+        validatePostOwner(userId, post);
+        validateQuestionPost(post);
+
+        if (comment.isAccepted()) {
+            comment.cancelAcceptance();
+        } else {
+            validateNoAcceptedComment(post.getId());
+            comment.accept();
+        }
+
+        commentRepository.flush();
+        boolean liked = commentLikeRepository.existsByComment_IdAndUserId(commentId, userId);
+        return getCommentResponse(comment, userId, liked);
+    }
+
+    @Transactional
     public void deleteComment(Long userId, Long commentId) {
         Comment comment = getOwnedActiveCommentForUpdate(userId, commentId);
         lockPost(comment.getPost().getId());
@@ -160,8 +180,45 @@ public class CommentService {
                 .orElseThrow(() -> new CommunityException(CommunityErrorCode.POST_NOT_FOUND));
     }
 
-    private void lockPost(Long postId) {
-        findPostForUpdate(postId);
+    private Post lockPost(Long postId) {
+        return findPostForUpdate(postId);
+    }
+
+    private void validatePostOwner(Long userId, Post post) {
+        if (!Objects.equals(post.getUserId(), userId)) {
+            throw new CommunityException(CommunityErrorCode.COMMENT_ADOPTION_FORBIDDEN);
+        }
+    }
+
+    private void validateQuestionPost(Post post) {
+        if (!post.isQuestion()) {
+            throw new CommunityException(CommunityErrorCode.POST_NOT_QUESTION);
+        }
+    }
+
+    private void validateNoAcceptedComment(Long postId) {
+        if (commentRepository.existsByPost_IdAndAcceptedTrueAndStatusAndDeletedAtIsNull(
+                postId,
+                CommentStatus.ACTIVE
+        )) {
+            throw new CommunityException(CommunityErrorCode.COMMENT_ALREADY_ADOPTED);
+        }
+    }
+
+    private CommentResponse getCommentResponse(Comment comment, Long viewerId, boolean liked) {
+        boolean authorWithdrawn = !userRepository
+                .findWithdrawnUserIdsByIdIn(List.of(comment.getUserId()))
+                .isEmpty();
+        Long parentCommentId = comment.getParent() == null ? null : comment.getParent().getId();
+
+        return CommentResponse.of(
+                comment,
+                parentCommentId,
+                viewerId,
+                liked,
+                authorWithdrawn,
+                List.of()
+        );
     }
 
     private Set<Long> findLikedCommentIds(Long userId, List<Comment> comments) {

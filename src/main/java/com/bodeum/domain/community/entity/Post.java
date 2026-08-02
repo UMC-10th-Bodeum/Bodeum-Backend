@@ -75,8 +75,7 @@ public class Post extends BaseCreatedUpdatedDeletedEntity {
             PostBoardType boardType,
             PostAnonymityType anonymityType,
             String title,
-            String content,
-            boolean question
+            String content
     ) {
         validateTitle(title);
         validateContent(content);
@@ -86,7 +85,7 @@ public class Post extends BaseCreatedUpdatedDeletedEntity {
         this.anonymityType = anonymityType;
         this.title = title;
         this.content = content;
-        this.question = question;
+        this.question = boardType == PostBoardType.INFORMATION_QUESTION;
         this.status = PostStatus.ACTIVE;
     }
 
@@ -95,8 +94,7 @@ public class Post extends BaseCreatedUpdatedDeletedEntity {
             PostBoardType boardType,
             PostAnonymityType anonymityType,
             String title,
-            String content,
-            boolean question
+            String content
     ) {
         return Post.builder()
                 .userId(userId)
@@ -104,7 +102,6 @@ public class Post extends BaseCreatedUpdatedDeletedEntity {
                 .anonymityType(anonymityType)
                 .title(title)
                 .content(content)
-                .question(question)
                 .build();
     }
 
@@ -112,8 +109,7 @@ public class Post extends BaseCreatedUpdatedDeletedEntity {
             PostBoardType boardType,
             PostAnonymityType anonymityType,
             String title,
-            String content,
-            boolean question
+            String content
     ) {
         validateTitle(title);
         validateContent(content);
@@ -122,7 +118,7 @@ public class Post extends BaseCreatedUpdatedDeletedEntity {
         this.anonymityType = anonymityType;
         this.title = title;
         this.content = content;
-        this.question = question;
+        this.question = boardType == PostBoardType.INFORMATION_QUESTION;
     }
 
     public void increaseLikeCount() {

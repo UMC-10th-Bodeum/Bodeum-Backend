@@ -199,8 +199,7 @@ class PostListServiceTest {
                 PostBoardType.FREE_COMMUNICATION,
                 anonymityType,
                 "게시글 제목",
-                "게시글 내용",
-                false
+                "게시글 내용"
         );
         ReflectionTestUtils.setField(post, "id", postId);
         ReflectionTestUtils.setField(post, "viewCount", 3);

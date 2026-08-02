@@ -37,8 +37,7 @@ class PostListItemResponseTest {
                 PostBoardType.FREE_COMMUNICATION,
                 PostAnonymityType.FULLY_ANONYMOUS,
                 "게시글 제목",
-                content,
-                false
+                content
         );
     }
 }

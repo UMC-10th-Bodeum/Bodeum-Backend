@@ -13,6 +13,11 @@ import org.springframework.data.repository.query.Param;
 
 public interface CommentRepository extends JpaRepository<Comment, Long> {
 
+    boolean existsByPost_IdAndAcceptedTrueAndStatusAndDeletedAtIsNull(
+            Long postId,
+            CommentStatus status
+    );
+
     @Query("""
             select c from Comment c
             left join fetch c.parent

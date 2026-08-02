@@ -12,7 +12,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 class PostResponseTest {
 
     private Post post(PostAnonymityType anonymityType) {
-        Post post = Post.create(10L, PostBoardType.FREE_COMMUNICATION, anonymityType, "제목", "내용", false);
+        Post post = Post.create(10L, PostBoardType.FREE_COMMUNICATION, anonymityType, "제목", "내용");
         ReflectionTestUtils.setField(post, "id", 1L);
         return post;
     }

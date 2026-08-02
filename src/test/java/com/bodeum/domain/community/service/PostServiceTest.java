@@ -20,6 +20,7 @@ import com.bodeum.domain.community.enums.PostBoardType;
 import com.bodeum.domain.community.enums.PostStatus;
 import com.bodeum.domain.community.exception.CommunityErrorCode;
 import com.bodeum.domain.community.exception.CommunityException;
+import com.bodeum.domain.community.repository.CommentRepository;
 import com.bodeum.domain.community.repository.HashtagRepository;
 import com.bodeum.domain.community.repository.PostDisabilityTagRepository;
 import com.bodeum.domain.community.repository.PostHashtagRepository;
@@ -42,6 +43,8 @@ class PostServiceTest {
 
     @Mock
     private PostRepository postRepository;
+    @Mock
+    private CommentRepository commentRepository;
     @Mock
     private HashtagRepository hashtagRepository;
     @Mock
@@ -88,14 +91,13 @@ class PostServiceTest {
                 10L,
                 1L,
                 new UpdatePostRequest(
-                        null,
+                        PostBoardType.INFORMATION_QUESTION,
                         PostAnonymityType.FULLY_ANONYMOUS,
                         "수정 제목",
                         null,
                         null,
                         null,
-                        null,
-                        false
+                        null
                 )
         );
 
@@ -104,6 +106,7 @@ class PostServiceTest {
         assertThat(response.anonymityType()).isEqualTo(PostAnonymityType.FULLY_ANONYMOUS);
         assertThat(response.authorId()).isNull();
         assertThat(response.isMine()).isTrue();
+        assertThat(response.isQuestion()).isTrue();
     }
 
     @Test
@@ -114,7 +117,7 @@ class PostServiceTest {
         assertThatThrownBy(() -> postService.updatePost(
                 20L,
                 1L,
-                new UpdatePostRequest(null, null, "수정 제목", null, null, null, null, null)
+                new UpdatePostRequest(null, null, "수정 제목", null, null, null, null)
         ))
                 .isInstanceOf(CommunityException.class)
                 .extracting(exception -> ((CommunityException) exception).getErrorCode())
@@ -148,8 +151,7 @@ class PostServiceTest {
                 PostBoardType.FREE_COMMUNICATION,
                 PostAnonymityType.FULLY_ANONYMOUS,
                 "익명 게시글",
-                "익명 게시글 내용",
-                false
+                "익명 게시글 내용"
         );
         ReflectionTestUtils.setField(post, "id", 1L);
         given(postRepository.findByIdAndStatusAndDeletedAtIsNull(1L, PostStatus.ACTIVE))
@@ -250,14 +252,13 @@ class PostServiceTest {
 
     private CreatePostRequest createRequest() {
         return new CreatePostRequest(
-                PostBoardType.FREE_COMMUNICATION,
+                PostBoardType.INFORMATION_QUESTION,
                 PostAnonymityType.PROFILE_TAG_VISIBLE,
                 "게시글 제목",
                 "게시글 내용",
                 List.of(DisabilityType.AUTISM),
                 List.of("육아"),
-                List.of("https://example.com/image.jpg"),
-                true
+                List.of("https://example.com/image.jpg")
         );
     }
 
@@ -267,8 +268,7 @@ class PostServiceTest {
                 PostBoardType.FREE_COMMUNICATION,
                 PostAnonymityType.PROFILE_TAG_VISIBLE,
                 "게시글 제목",
-                "게시글 내용",
-                false
+                "게시글 내용"
         );
         ReflectionTestUtils.setField(post, "id", postId);
         return post;

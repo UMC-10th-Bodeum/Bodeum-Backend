@@ -219,14 +219,103 @@ class CommentServiceTest {
         then(commentLikeRepository).should().delete(commentLike);
     }
 
+    @Test
+    void toggleCommentAdoptionAdoptsAndCancelsCommentOnOwnedQuestionPost() {
+        Post post = post(1L, 10L, PostBoardType.INFORMATION_QUESTION);
+        Comment comment = comment(1L, post, 20L, null, "채택할 답변");
+        given(commentRepository.findActiveByIdForUpdate(1L, CommentStatus.ACTIVE, PostStatus.ACTIVE))
+                .willReturn(Optional.of(comment));
+        given(postRepository.findByIdAndStatusForUpdate(1L, PostStatus.ACTIVE))
+                .willReturn(Optional.of(post));
+        given(commentRepository.existsByPost_IdAndAcceptedTrueAndStatusAndDeletedAtIsNull(
+                1L,
+                CommentStatus.ACTIVE
+        )).willReturn(false);
+
+        var adopted = commentService.toggleCommentAdoption(10L, 1L);
+        var canceled = commentService.toggleCommentAdoption(10L, 1L);
+
+        assertThat(adopted.isAccepted()).isTrue();
+        assertThat(canceled.isAccepted()).isFalse();
+        assertThat(comment.isAccepted()).isFalse();
+    }
+
+    @Test
+    void toggleCommentAdoptionRejectsNonPostOwner() {
+        Post post = post(1L, 10L, PostBoardType.INFORMATION_QUESTION);
+        Comment comment = comment(1L, post, 20L, null, "채택할 답변");
+        given(commentRepository.findActiveByIdForUpdate(1L, CommentStatus.ACTIVE, PostStatus.ACTIVE))
+                .willReturn(Optional.of(comment));
+        given(postRepository.findByIdAndStatusForUpdate(1L, PostStatus.ACTIVE))
+                .willReturn(Optional.of(post));
+
+        assertThatThrownBy(() -> commentService.toggleCommentAdoption(30L, 1L))
+                .isInstanceOf(CommunityException.class)
+                .extracting(exception -> ((CommunityException) exception).getErrorCode())
+                .isEqualTo(CommunityErrorCode.COMMENT_ADOPTION_FORBIDDEN);
+    }
+
+    @Test
+    void toggleCommentAdoptionRejectsNonQuestionPost() {
+        Post post = post(1L, 10L);
+        Comment comment = comment(1L, post, 20L, null, "일반 게시글 댓글");
+        given(commentRepository.findActiveByIdForUpdate(1L, CommentStatus.ACTIVE, PostStatus.ACTIVE))
+                .willReturn(Optional.of(comment));
+        given(postRepository.findByIdAndStatusForUpdate(1L, PostStatus.ACTIVE))
+                .willReturn(Optional.of(post));
+
+        assertThatThrownBy(() -> commentService.toggleCommentAdoption(10L, 1L))
+                .isInstanceOf(CommunityException.class)
+                .extracting(exception -> ((CommunityException) exception).getErrorCode())
+                .isEqualTo(CommunityErrorCode.POST_NOT_QUESTION);
+    }
+
+    @Test
+    void toggleCommentAdoptionRejectsWhenAnotherCommentIsAlreadyAccepted() {
+        Post post = post(1L, 10L, PostBoardType.INFORMATION_QUESTION);
+        Comment comment = comment(1L, post, 20L, null, "새로 채택할 답변");
+        given(commentRepository.findActiveByIdForUpdate(1L, CommentStatus.ACTIVE, PostStatus.ACTIVE))
+                .willReturn(Optional.of(comment));
+        given(postRepository.findByIdAndStatusForUpdate(1L, PostStatus.ACTIVE))
+                .willReturn(Optional.of(post));
+        given(commentRepository.existsByPost_IdAndAcceptedTrueAndStatusAndDeletedAtIsNull(
+                1L,
+                CommentStatus.ACTIVE
+        )).willReturn(true);
+
+        assertThatThrownBy(() -> commentService.toggleCommentAdoption(10L, 1L))
+                .isInstanceOf(CommunityException.class)
+                .extracting(exception -> ((CommunityException) exception).getErrorCode())
+                .isEqualTo(CommunityErrorCode.COMMENT_ALREADY_ADOPTED);
+    }
+
+    @Test
+    void toggleCommentAdoptionAnonymizesWithdrawnCommentAuthor() {
+        Post post = post(1L, 10L, PostBoardType.INFORMATION_QUESTION);
+        Comment comment = comment(1L, post, 20L, null, "탈퇴 회원의 답변");
+        given(commentRepository.findActiveByIdForUpdate(1L, CommentStatus.ACTIVE, PostStatus.ACTIVE))
+                .willReturn(Optional.of(comment));
+        given(postRepository.findByIdAndStatusForUpdate(1L, PostStatus.ACTIVE))
+                .willReturn(Optional.of(post));
+        given(userRepository.findWithdrawnUserIdsByIdIn(List.of(20L))).willReturn(List.of(20L));
+
+        var response = commentService.toggleCommentAdoption(10L, 1L);
+
+        assertThat(response.authorId()).isNull();
+        assertThat(response.authorNickname()).isEqualTo("탈퇴한 사용자");
+    }
+
     private Post post(Long postId, Long userId) {
+        return post(postId, userId, PostBoardType.FREE_COMMUNICATION);
+    }
+
+    private Post post(Long postId, Long userId, PostBoardType boardType) {
         Post post = Post.create(
                 userId,
-                PostBoardType.FREE_COMMUNICATION,
+                boardType,
                 PostAnonymityType.PROFILE_TAG_VISIBLE,
                 "게시글 제목",
-                "게시글 내용",
-                false
+                "게시글 내용"
         );
         ReflectionTestUtils.setField(post, "id", postId);
         return post;

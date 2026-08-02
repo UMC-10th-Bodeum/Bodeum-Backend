@@ -7,6 +7,7 @@ import com.bodeum.domain.community.dto.request.CreateCommentRequest;
 import com.bodeum.domain.community.dto.request.UpdateCommentRequest;
 import com.bodeum.domain.community.dto.response.CommentListResponse;
 import com.bodeum.domain.community.dto.response.CommentResponse;
+import com.bodeum.domain.community.entity.Comment;
 import com.bodeum.domain.community.entity.Post;
 import com.bodeum.domain.community.enums.PostAnonymityType;
 import com.bodeum.domain.community.enums.PostBoardType;
@@ -163,14 +164,63 @@ class CommentServiceIntegrationTest {
                 .isEqualTo(CommunityErrorCode.COMMENT_NOT_FOUND);
     }
 
+    @Test
+    void adoptsAndCancelsOneCommentPerQuestionPost() {
+        Post post = savePost(PostBoardType.INFORMATION_QUESTION);
+        CommentResponse firstComment = commentService.createComment(
+                20L,
+                post.getId(),
+                new CreateCommentRequest("첫 번째 답변")
+        );
+        CommentResponse secondComment = commentService.createComment(
+                30L,
+                post.getId(),
+                new CreateCommentRequest("두 번째 답변")
+        );
+
+        CommentResponse adopted = commentService.toggleCommentAdoption(10L, firstComment.commentId());
+
+        assertThat(adopted.isAccepted()).isTrue();
+        assertThat(commentRepository.findById(firstComment.commentId()).orElseThrow().isAccepted())
+                .isTrue();
+
+        CommentResponse canceled = commentService.toggleCommentAdoption(10L, firstComment.commentId());
+        CommentResponse secondAdopted = commentService.toggleCommentAdoption(10L, secondComment.commentId());
+
+        assertThat(canceled.isAccepted()).isFalse();
+        assertThat(secondAdopted.isAccepted()).isTrue();
+        assertThatThrownBy(() -> commentService.toggleCommentAdoption(10L, firstComment.commentId()))
+                .isInstanceOf(CommunityException.class)
+                .extracting(exception -> ((CommunityException) exception).getErrorCode())
+                .isEqualTo(CommunityErrorCode.COMMENT_ALREADY_ADOPTED);
+    }
+
+    @Test
+    void cannotCancelAcceptedCommentOnNonQuestionPost() {
+        Post post = savePost(PostBoardType.FREE_COMMUNICATION);
+        Comment comment = Comment.create(post, 20L, "일반 게시글의 채택 댓글");
+        comment.accept();
+        commentRepository.saveAndFlush(comment);
+
+        assertThatThrownBy(() -> commentService.toggleCommentAdoption(10L, comment.getId()))
+                .isInstanceOf(CommunityException.class)
+                .extracting(exception -> ((CommunityException) exception).getErrorCode())
+                .isEqualTo(CommunityErrorCode.POST_NOT_QUESTION);
+
+        assertThat(comment.isAccepted()).isTrue();
+    }
+
     private Post savePost() {
+        return savePost(PostBoardType.FREE_COMMUNICATION);
+    }
+
+    private Post savePost(PostBoardType boardType) {
         return postRepository.saveAndFlush(Post.create(
                 10L,
-                PostBoardType.FREE_COMMUNICATION,
+                boardType,
                 PostAnonymityType.PROFILE_TAG_VISIBLE,
                 "댓글 테스트 게시글",
-                "댓글과 중첩 답글을 테스트합니다.",
-                false
+                "댓글과 중첩 답글을 테스트합니다."
         ));
     }
 }

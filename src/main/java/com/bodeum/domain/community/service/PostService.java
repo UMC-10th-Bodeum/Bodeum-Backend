@@ -12,10 +12,13 @@ import com.bodeum.domain.community.entity.PostHashtag;
 import com.bodeum.domain.community.entity.PostImage;
 import com.bodeum.domain.community.entity.PostLike;
 import com.bodeum.domain.community.entity.PostScrap;
+import com.bodeum.domain.community.enums.CommentStatus;
 import com.bodeum.domain.community.enums.DisabilityType;
+import com.bodeum.domain.community.enums.PostBoardType;
 import com.bodeum.domain.community.enums.PostStatus;
 import com.bodeum.domain.community.exception.CommunityErrorCode;
 import com.bodeum.domain.community.exception.CommunityException;
+import com.bodeum.domain.community.repository.CommentRepository;
 import com.bodeum.domain.community.repository.HashtagRepository;
 import com.bodeum.domain.community.repository.PostDisabilityTagRepository;
 import com.bodeum.domain.community.repository.PostHashtagRepository;
@@ -36,6 +39,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class PostService {
 
     private final PostRepository postRepository;
+    private final CommentRepository commentRepository;
     private final HashtagRepository hashtagRepository;
     private final PostHashtagRepository postHashtagRepository;
     private final PostImageRepository postImageRepository;
@@ -53,8 +57,7 @@ public class PostService {
                 request.boardType(),
                 request.anonymityType(),
                 request.title(),
-                request.content(),
-                request.isQuestion()
+                request.content()
         ));
 
         saveDisabilityTags(post, safeList(request.disabilityTypes()));
@@ -67,12 +70,16 @@ public class PostService {
     @Transactional
     public PostResponse updatePost(Long userId, Long postId, UpdatePostRequest request) {
         Post post = getOwnedPost(userId, postId);
+        PostBoardType targetBoardType = request.boardType() == null
+                ? post.getBoardType()
+                : request.boardType();
+        validateBoardTypeChange(post, targetBoardType);
+
         post.update(
-                request.boardType() == null ? post.getBoardType() : request.boardType(),
+                targetBoardType,
                 request.anonymityType() == null ? post.getAnonymityType() : request.anonymityType(),
                 request.title() == null ? post.getTitle() : request.title(),
-                request.content() == null ? post.getContent() : request.content(),
-                request.isQuestion() == null ? post.isQuestion() : request.isQuestion()
+                request.content() == null ? post.getContent() : request.content()
         );
 
         if (request.disabilityTypes() != null) {
@@ -172,6 +179,21 @@ public class PostService {
             throw new CommunityException(CommunityErrorCode.POST_FORBIDDEN);
         }
         return post;
+    }
+
+    private void validateBoardTypeChange(Post post, PostBoardType targetBoardType) {
+        if (!post.isQuestion() || targetBoardType == PostBoardType.INFORMATION_QUESTION) {
+            return;
+        }
+
+        if (commentRepository.existsByPost_IdAndAcceptedTrueAndStatusAndDeletedAtIsNull(
+                post.getId(),
+                CommentStatus.ACTIVE
+        )) {
+            throw new CommunityException(
+                    CommunityErrorCode.POST_BOARD_CHANGE_BLOCKED_BY_ADOPTED_COMMENT
+            );
+        }
     }
 
     private Post findPost(Long postId) {
