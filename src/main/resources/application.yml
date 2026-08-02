@@ -73,6 +73,8 @@ open-api:
   service-key: ${OPEN_API_SERVICE_KEY:}
 
 bodeum:
+  http:
+    response-timeout: ${HTTP_RESPONSE_TIMEOUT:20s}
   public-data:
     odcloud:
       base-url: ${ODCLOUD_BASE_URL:https://api.odcloud.kr/api}
@@ -111,7 +113,7 @@ bodeum:
     indexing:
       run-once: ${AI_INDEXING_RUN_ONCE:false}
       chunk-size: 500
-      write-batch-size: 50
+      write-batch-size: ${AI_INDEXING_WRITE_BATCH_SIZE:50}
       source-time-zone: Asia/Seoul
       lock-timeout-seconds: ${AI_INDEXING_LOCK_TIMEOUT:60} # 기본 60초 대기
       max-retries: ${AI_INDEXING_MAX_RETRIES:3}             # 락 획득 실패 시 3회 재시도
