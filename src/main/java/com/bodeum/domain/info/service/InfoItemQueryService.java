@@ -159,7 +159,7 @@ public class InfoItemQueryService {
                 .orElseThrow(() -> new InfoException(InfoErrorCode.INFO_SHARE_LINK_NOT_FOUND));
 
         String shareUrl = UriComponentsBuilder.fromUriString(shareBaseUrl)
-                .pathSegment("info", String.valueOf(infoItem.getId()))
+                .pathSegment("info", infoItem.getInfoCategory().getMainCategory().name(), String.valueOf(infoItem.getId()))
                 .build()
                 .toUriString();
 

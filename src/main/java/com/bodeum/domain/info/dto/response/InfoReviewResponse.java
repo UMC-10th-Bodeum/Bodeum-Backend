@@ -12,13 +12,18 @@ public record InfoReviewResponse(
         Long infoReviewId,
         Long userId,
         String userNickname,
-        int rating, // 정수형 유지 (1~5점)
+        int rating,
         String content,
         List<String> imageUrls,
         int helpfulCount,
+        boolean isHelpful, // 로그인 유저가 이 후기에 도움돼요를 눌렀는지 여부
         Instant createdAt
 ) {
     public static InfoReviewResponse from(InfoReview entity) {
+        return from(entity, false);
+    }
+
+    public static InfoReviewResponse from(InfoReview entity, boolean isHelpful) {
         List<String> imageUrls = entity.getImages().stream()
                 .map(InfoReviewImage::getImageUrl)
                 .toList();
@@ -36,6 +41,7 @@ public record InfoReviewResponse(
                 entity.getContent(),
                 imageUrls,
                 entity.getHelpfulCount(),
+                isHelpful,
                 entity.getCreatedAt()
         );
     }

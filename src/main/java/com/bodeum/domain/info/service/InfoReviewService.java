@@ -9,6 +9,7 @@ import com.bodeum.domain.info.entity.InfoReview;
 import com.bodeum.domain.info.exception.InfoErrorCode;
 import com.bodeum.domain.info.exception.InfoException;
 import com.bodeum.domain.info.repository.InfoItemRepository;
+import com.bodeum.domain.info.repository.InfoReviewHelpfulRepository;
 import com.bodeum.domain.info.repository.InfoReviewRepository;
 import com.bodeum.domain.user.entity.User;
 import com.bodeum.domain.user.exception.UserErrorCode;
@@ -20,6 +21,9 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
+import java.util.Set;
+
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -28,19 +32,26 @@ public class InfoReviewService {
     private final InfoReviewRepository infoReviewRepository;
     private final InfoItemRepository infoItemRepository;
     private final UserRepository userRepository;
+    private final InfoReviewHelpfulRepository infoReviewHelpfulRepository;
 
     // 1. 정보 후기 목록 및 평균 평점 조회 (비회원 가능)
-    public InfoReviewListResponse getReviews(Long infoId, Pageable pageable) {
+    public InfoReviewListResponse getReviews(Long userId, Long infoId, Pageable pageable) {
         if (!infoItemRepository.existsById(infoId)) {
             throw new InfoException(InfoErrorCode.INFO_ITEM_NOT_FOUND);
         }
 
-        // 전체 평균 평점 (실수형)
         Double averageRating = infoReviewRepository.findAverageRatingByInfoItemId(infoId);
 
-        // 개별 리뷰 목록 (개별 별점은 정수형)
-        Page<InfoReviewResponse> reviewPage = infoReviewRepository.findByInfoItemId(infoId, pageable)
-                .map(InfoReviewResponse::from);
+        Page<InfoReview> reviews = infoReviewRepository.findByInfoItemId(infoId, pageable);
+
+        List<Long> reviewIds = reviews.getContent().stream().map(InfoReview::getId).toList();
+        Set<Long> helpfulReviewIds = (userId != null && !reviewIds.isEmpty())
+                ? infoReviewHelpfulRepository.findInfoReviewIdsByUserIdAndInfoReviewIdIn(userId, reviewIds)
+                : Set.of();
+
+        Page<InfoReviewResponse> reviewPage = reviews.map(review ->
+                InfoReviewResponse.from(review, helpfulReviewIds.contains(review.getId()))
+        );
 
         return InfoReviewListResponse.of(averageRating, reviewPage);
     }
