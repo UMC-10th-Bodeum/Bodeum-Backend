@@ -2,6 +2,7 @@ package com.bodeum.domain.info.controller;
 
 import com.bodeum.domain.info.dto.request.CreateInfoReviewRequest;
 import com.bodeum.domain.info.dto.request.UpdateInfoReviewRequest;
+import com.bodeum.domain.info.dto.response.InfoReviewListResponse;
 import com.bodeum.domain.info.dto.response.InfoReviewResponse;
 import com.bodeum.domain.info.service.InfoReviewService;
 import com.bodeum.global.apiPayload.ApiResponse;
@@ -15,7 +16,6 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
@@ -32,17 +32,17 @@ public class InfoReviewController {
 
     @Operation(
             summary = "정보 후기 목록 조회",
-            description = "특정 정보 항목에 대한 후기 목록을 페이징 조회한다. 비회원 및 로그인 사용자 모두 접근 가능하다."
+            description = "특정 정보 항목에 대한 전체 평균 평점 및 후기 목록을 페이징 조회한다. 비회원 및 로그인 사용자 모두 접근 가능하다."
     )
     @SecurityRequirements
     @GetMapping
-    public ApiResponse<Page<InfoReviewResponse>> getReviews(
+    public ApiResponse<InfoReviewListResponse> getReviews(
             @Parameter(description = "정보 항목 ID", example = "1")
             @PathVariable Long infoItemId,
             @Parameter(description = "페이징 파라미터 (page, size, sort)")
             @PageableDefault(size = 10) Pageable pageable
     ) {
-        Page<InfoReviewResponse> response = infoReviewService.getReviews(infoItemId, pageable);
+        InfoReviewListResponse response = infoReviewService.getReviews(infoItemId, pageable);
         return ApiResponse.of(GeneralSuccessCode.OK, response);
     }
 
@@ -94,9 +94,6 @@ public class InfoReviewController {
         return ApiResponse.of(GeneralSuccessCode.OK, null);
     }
 
-    /**
-     * JSON 파싱 및 데이터 타입 변환 실패 예외 처리
-     */
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<ApiResponse<String>> handleMessageNotReadableException(
             HttpMessageNotReadableException e
