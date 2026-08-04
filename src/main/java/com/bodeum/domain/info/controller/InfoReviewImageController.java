@@ -13,6 +13,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.Locale;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.MediaType;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -39,7 +40,7 @@ public class InfoReviewImageController {
             description = "정보 후기 작성/수정 시 첨부할 이미지를 업로드하고 공개 접근 URL을 반환한다. "
                     + "발급받은 URL을 CreateInfoReviewRequest.imageUrls에 담아 후기 작성/수정 API를 호출한다."
     )
-    @PostMapping
+    @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ApiResponse<ImageUploadResponse> uploadImage(
             @LoginUser Long userId,
             @Parameter(description = "업로드할 이미지 파일 (jpg, png만 허용)")
