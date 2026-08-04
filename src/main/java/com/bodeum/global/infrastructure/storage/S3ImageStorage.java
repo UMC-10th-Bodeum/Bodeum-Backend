@@ -48,7 +48,10 @@ public class S3ImageStorage {
                             .build(),
                     RequestBody.fromInputStream(file.getInputStream(), file.getSize())
             );
-        } catch (IOException | SdkException e) {
+        } catch (IOException | SdkException e)
+        {
+            log.error("S3 이미지 업로드 실패 key={}", key, e);  // ← 이 줄 추가
+
             throw new ProjectException(StorageErrorCode.IMAGE_UPLOAD_FAILED);
         }
 
