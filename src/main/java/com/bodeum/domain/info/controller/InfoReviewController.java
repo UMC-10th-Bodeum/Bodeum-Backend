@@ -39,10 +39,11 @@ public class InfoReviewController {
     public ApiResponse<InfoReviewListResponse> getReviews(
             @Parameter(description = "정보 항목 ID", example = "1")
             @PathVariable Long infoItemId,
+            @LoginUser Long userId,
             @Parameter(description = "페이징 파라미터 (page, size, sort)")
             @PageableDefault(size = 10) Pageable pageable
     ) {
-        InfoReviewListResponse response = infoReviewService.getReviews(infoItemId, pageable);
+        InfoReviewListResponse response = infoReviewService.getReviews(userId, infoItemId, pageable);
         return ApiResponse.of(GeneralSuccessCode.OK, response);
     }
 
