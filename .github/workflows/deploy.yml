@@ -67,6 +67,30 @@ jobs:
             cd ~/bodeum
             docker compose pull
             docker compose up -d
+
+            # up -d 는 컨테이너를 띄우기만 하고 앱 기동 성공 여부는 보지 않는다.
+            # 헬스 체크로 실제 기동을 확인해야 Flyway 검증 실패나 DB 접속 실패가
+            # 배포 초록불에 묻히지 않는다.
+            # 컨테이너 상시 감시(Dockerfile HEALTHCHECK)는 readiness만 보지만,
+            # 배포 직후 1회 검증은 Redis까지 포함한 전체 health로 엄격하게 본다.
+            echo "헬스 체크 대기 (최대 150초)"
+            HEALTHY=0
+            for i in $(seq 1 30); do
+              if curl -fsS http://127.0.0.1:8080/actuator/health > /dev/null 2>&1; then
+                echo "앱 기동 확인 ($((i * 5))초)"
+                HEALTHY=1
+                break
+              fi
+              sleep 5
+            done
+
+            if [ "$HEALTHY" != "1" ]; then
+              echo "헬스 체크 실패 - 앱이 기동하지 못했다. 아래 로그로 원인 확인 후 재배포할 것."
+              docker compose logs --tail=200 app || true
+              docker logout ghcr.io || true
+              exit 1
+            fi
+
             docker image prune -f
             docker logout ghcr.io
         env:

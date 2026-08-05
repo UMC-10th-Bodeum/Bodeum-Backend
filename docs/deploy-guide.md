@@ -202,17 +202,37 @@ develop에 push/머지되면 워크플로우가 자동 실행된다. 수동 실�
 ```bash
 # EC2에서
 cd ~/bodeum
-docker compose ps
+docker compose ps                 # STATUS의 (healthy) 여부 확인
 docker compose logs -f app        # 부팅 로그, DB 연결/validate 확인
 ```
 ```bash
 # 외부에서
+curl https://<도메인>/actuator/health           # {"status":"UP"} 이면 정상
 curl -I https://<도메인>/swagger-ui/index.html   # 200 이면 정상
 ```
 
 ### F-4. 스모크 테스트
+- 헬스 체크: `https://<도메인>/actuator/health`
 - Swagger: `https://<도메인>/swagger-ui/index.html`
 - 소셜 로그인 리다이렉트: `https://<도메인>/api/v1/auth/login/kakao`
+
+---
+
+## 헬스 체크
+
+인증 없이 열려 있는 경로다. 세 군데에서 쓴다.
+
+| 경로 | 보는 것 | 쓰는 곳 |
+|---|---|---|
+| `/actuator/health` | 기동 상태 + DB + Redis(운영) + 디스크 | 배포 워크플로 검증, 외부 모니터링 |
+| `/actuator/health/liveness` | 프로세스 생존만 | 외부 의존성과 무관한 생존 확인 |
+| `/actuator/health/readiness` | 기동 상태 + DB | Dockerfile `HEALTHCHECK` |
+
+- 응답은 `{"status":"UP"}` 뿐이다(`show-details: never`). DB 접속 실패 사유 같은 내부 정보는 공개 경로로 새면 안 되므로 감춘다.
+- `health` 외의 actuator 엔드포인트(`/actuator/env` 등)는 노출하지 않는다. 열면 환경변수까지 그대로 보인다.
+- 배포 워크플로는 `up -d` 뒤 최대 150초 동안 헬스를 폴링한다. 실패하면 앱 로그 200줄을 출력하고 job을 실패시킨다.
+  즉 **Actions가 초록불이면 앱이 실제로 떠 있다는 뜻**이고, 빨간불이면 Actions 로그에 원인이 남아 있다.
+- Redis는 `REDIS_ENABLED=true`일 때만 헬스 지표가 생긴다. 운영에서 이 값을 `false`로 두면 Redis 장애를 헬스로 감지하지 못한다.
 
 ---
 
@@ -225,6 +245,8 @@ curl -I https://<도메인>/swagger-ui/index.html   # 200 이면 정상
 | 앱이 DB 연결 실패 | RDS 보안그룹(3306, EC2 소스), `DB_URL` 엔드포인트/스키마명 확인 |
 | `Schema validation: missing table/column` | Part A-3 스키마 부트스트랩 재수행 |
 | 502 Bad Gateway | 앱 컨테이너 미기동 or 8080 미바인딩. `docker compose logs app` |
+| 배포 job이 "헬스 체크 실패"로 종료 | Actions 로그에 찍힌 앱 로그 200줄에서 원인 확인. 대개 스키마 validate 실패 or DB/Redis 접속 불가 |
+| `docker compose ps`가 계속 `(unhealthy)` | `curl localhost:8080/actuator/health` 로 상태 확인 후 `docker compose logs app` |
 | OAuth `redirect_uri_mismatch` | 콘솔 등록값과 `.env` 리다이렉트 URI 불일치 |
 | 크롤링(Selenium) 시 Chrome 오류 | 런타임 이미지에 Chrome 포함됨. 메모리 부족이면 인스턴스 사양 상향 |
 

@@ -41,5 +41,12 @@ ENV SPRING_PROFILES_ACTIVE=prod
 ENV JAVA_OPTS="-XX:MaxRAMPercentage=75.0"
 
 EXPOSE 8080
+
+# 헬스 체크. readiness(기동 상태 + DB)를 보므로 부팅 실패나 DB 연결 불가를 `docker ps`에서 바로 알 수 있다.
+# start-period 동안의 실패는 재시도로만 계산되므로 부팅이 느려도 unhealthy로 떨어지지 않는다.
+# wget은 위 Chrome 설치 단계에서 이미 깔려 있다.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=90s --retries=3 \
+  CMD wget -q -O /dev/null http://127.0.0.1:8080/actuator/health/readiness || exit 1
+
 # exec로 실행해야 쉘이 java로 대체되어 컨테이너 종료 시 SIGTERM이 앱에 전달된다(graceful shutdown)
 ENTRYPOINT ["sh", "-c", "exec java $JAVA_OPTS -jar app.jar"]
