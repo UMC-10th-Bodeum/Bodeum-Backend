@@ -17,6 +17,7 @@ import com.bodeum.domain.ai.infrastructure.retrieval.AiReferenceDocumentResolver
 import com.bodeum.domain.ai.service.port.AiAnswerGenerator;
 import com.bodeum.domain.ai.service.port.AiDocumentRetriever;
 import com.bodeum.domain.ai.service.port.AiExternalAnswerProvider;
+import com.bodeum.domain.ai.service.port.AiStarterQuestionClassifier;
 import com.bodeum.domain.ai.repository.AiChatRoomRepository;
 import com.bodeum.domain.ai.repository.AiMessageRepository;
 import com.bodeum.domain.ai.repository.AiSourceReviewRepository;
@@ -62,6 +63,7 @@ public class AiMessageService {
     private final AiRequestGuard requestGuard;
     private final AiReferenceDocumentResolver referenceDocumentResolver;
     private final AiStarterQuestionRouter starterQuestionRouter;
+    private final AiStarterQuestionClassifier starterQuestionClassifier;
 
     public CreateAiMessageResponse createMessage(Long userId, String content) {
         AiChatRoom chatRoom = aiChatRoomRepository.findByUserId(userId)
@@ -186,9 +188,15 @@ public class AiMessageService {
             return new StarterContext(profile, questionType);
         }
 
-        return resolveRegionFollowUp(chatRoomId, content)
-                .map(region -> localRehabContext(profile, region))
-                .orElseGet(() -> new StarterContext(profile, Optional.empty()));
+        Optional<Region> followUpRegion = resolveRegionFollowUp(chatRoomId, content);
+        if (followUpRegion.isPresent()) {
+            return localRehabContext(profile, followUpRegion.get());
+        }
+
+        return new StarterContext(
+                profile,
+                starterQuestionClassifier.classify(content)
+        );
     }
 
     private StarterContext localRehabContext(

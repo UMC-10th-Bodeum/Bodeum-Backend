@@ -22,6 +22,7 @@ import com.bodeum.domain.ai.infrastructure.retrieval.AiReferenceDocumentResolver
 import com.bodeum.domain.ai.service.port.AiAnswerGenerator;
 import com.bodeum.domain.ai.service.port.AiDocumentRetriever;
 import com.bodeum.domain.ai.service.port.AiExternalAnswerProvider;
+import com.bodeum.domain.ai.service.port.AiStarterQuestionClassifier;
 import com.bodeum.domain.ai.model.rag.AiReferenceDocument;
 import com.bodeum.domain.ai.model.rag.AiSourceKey;
 import com.bodeum.domain.ai.model.answer.GeneratedAiAnswer;
@@ -62,6 +63,7 @@ class AiMessageServiceTest {
     @Mock AiRequestGuard requestGuard;
     @Mock AiReferenceDocumentResolver referenceDocumentResolver;
     @Mock AiStarterQuestionRouter starterQuestionRouter;
+    @Mock AiStarterQuestionClassifier starterQuestionClassifier;
 
     private AiMessageService service;
     private AiChatRoom chatRoom;
@@ -73,7 +75,8 @@ class AiMessageServiceTest {
                 aiChatRoomRepository, aiMessageRepository, userRepository, regionRepository,
                 documentRetriever, answerGenerator, externalAnswerProvider,
                 persistenceService, failureService, aiSourceReviewRepository, requestGuard,
-                referenceDocumentResolver, starterQuestionRouter);
+                referenceDocumentResolver, starterQuestionRouter,
+                starterQuestionClassifier);
         user = User.createSocialUser(SocialProvider.KAKAO, "provider-id", "a@b.com", "보호자");
         chatRoom = AiChatRoom.create(user);
         lenient().when(aiChatRoomRepository.findByUserId(1L)).thenReturn(Optional.of(chatRoom));
@@ -85,6 +88,8 @@ class AiMessageServiceTest {
         lenient().when(referenceDocumentResolver.resolve(any()))
                 .thenAnswer(invocation -> invocation.getArgument(0));
         lenient().when(starterQuestionRouter.route(any(), any()))
+                .thenReturn(Optional.empty());
+        lenient().when(starterQuestionClassifier.classify(any()))
                 .thenReturn(Optional.empty());
         AiMessage userMessage = mock(AiMessage.class);
         lenient().when(userMessage.getId()).thenReturn(11L);
@@ -167,6 +172,45 @@ class AiMessageServiceTest {
 
         assertThat(result.aiMessage().answerStatus()).isEqualTo(AiAnswerStatus.ANSWERED);
         assertThat(result.aiMessage().sources()).hasSize(1);
+        verify(documentRetriever, never()).retrieve(any(), any());
+        verify(answerGenerator, never()).generate(any(), any(), any());
+        verify(externalAnswerProvider, never()).search(any(), any());
+    }
+
+    @Test
+    void routesSemanticallySimilarQuestionToReviewedStarterAnswer() {
+        String question = "장애 진단을 받았는데 이제 뭘 먼저 해야 해?";
+        when(starterQuestionClassifier.classify(question))
+                .thenReturn(Optional.of(AiStarterQuestionType.DIAGNOSIS_FIRST_STEPS));
+
+        AiReferenceDocument source = new AiReferenceDocument(
+                "SITE-1",
+                "장애 진단 이후 안내",
+                AiResponseSourceType.SITE,
+                1L,
+                "장애 진단 이후 안내",
+                "https://example.com/guide",
+                null
+        );
+        when(starterQuestionRouter.route(
+                eq(AiStarterQuestionType.DIAGNOSIS_FIRST_STEPS),
+                any()
+        )).thenReturn(Optional.of(
+                AiStarterQuestionAnswer.answered("진단 이후 안내", List.of(source))
+        ));
+        AiMessage saved = savedAiMessage("진단 이후 안내");
+        when(persistenceService.saveAiMessageAndComplete(
+                11L,
+                chatRoom,
+                "진단 이후 안내",
+                false,
+                AiAnswerStatus.ANSWERED,
+                List.of(source)
+        )).thenReturn(saved);
+
+        var result = service.createMessage(1L, question);
+
+        assertThat(result.aiMessage().content()).isEqualTo("진단 이후 안내");
         verify(documentRetriever, never()).retrieve(any(), any());
         verify(answerGenerator, never()).generate(any(), any(), any());
         verify(externalAnswerProvider, never()).search(any(), any());
