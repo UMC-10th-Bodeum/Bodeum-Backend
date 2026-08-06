@@ -45,10 +45,20 @@ public interface InfoItemRepository extends JpaRepository<InfoItem, Long>, InfoI
                                             @Param("regionLevel2") String regionLevel2,
                                             Pageable pageable);
 
-    // 온보딩 유저의 지역(sido, sigungu)과 관심사 목록(interests) 조건에 맞는 아이템 조회
+    /**
+     * 온보딩 유저 맞춤 추천 데이터 조회
+     * - 지역(sido, sigungu) 및 관심사(interest IN) 필터링
+     * - 가중치 점수 내림차순 정렬: (스크랩수 * 5 + 리뷰수 * 3 + 조회수 * 1)
+     * - 점수가 동일할 경우 최신 생성 ID 내림차순
+     */
+    @Query("SELECT i FROM InfoItem i " +
+            "WHERE i.sido = :sido " +
+            "  AND i.sigungu = :sigungu " +
+            "  AND i.interest IN :interests " +
+            "ORDER BY (i.scrapCount * 5 + i.reviewCount * 3 + i.viewCount) DESC, i.id DESC")
     List<InfoItem> findBySidoAndSigunguAndInterestIn(
-            String sido,
-            String sigungu,
-            Collection<InterestCategory> interests
+            @Param("sido") String sido,
+            @Param("sigungu") String sigungu,
+            @Param("interests") Collection<InterestCategory> interests
     );
 }
