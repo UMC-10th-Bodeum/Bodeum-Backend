@@ -62,12 +62,29 @@ jobs:
         with:
           context: .
           push: true
-          # EC2의 docker-compose.prod.yml은 :latest를 pull한다. main이 아닌 브랜치에서
-          # 수동 실행한 이미지가 :latest를 덮으면 다음 재시작 때 그 이미지가 운영에 올라가므로,
-          # :latest는 main에서 빌드할 때만 붙인다. SHA 태그는 항상 남겨 롤백에 쓴다.
-          tags: ${{ github.ref == 'refs/heads/main' && format('{0}:{1},{0}:latest', env.IMAGE, github.sha) || format('{0}:{1}', env.IMAGE, github.sha) }}
+          # 빌드 단계에서는 불변인 SHA 태그만 올린다.
+          # EC2의 docker-compose.prod.yml이 pull하는 :latest 승격은 아래 단계에서
+          # main 최신 여부를 다시 확인한 뒤에만 수행한다.
+          tags: ${{ env.IMAGE }}:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      # 빌드가 도는 몇 분 사이에 main에 새 커밋이 올라올 수 있다. 그대로 두면 늦게 끝난
+      # 이전 실행이 오래된 이미지를 :latest로 승격해 운영에 올린다.
+      # concurrency는 실행 순서만 정리할 뿐 이 승격을 막지 못하므로 여기서 다시 확인한다.
+      # 이미 올라간 SHA 태그는 남으므로, 필요하면 수동 롤백/배포에 그대로 쓸 수 있다.
+      - name: main 최신인지 재확인 후 :latest 승격
+        if: github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          HEAD_SHA=$(gh api "repos/${{ github.repository }}/commits/main" --jq .sha)
+          if [ "$HEAD_SHA" != "${{ github.sha }}" ]; then
+            echo "빌드 중 main이 $HEAD_SHA 로 이동했다. 이 실행은 :latest를 승격하지 않는다."
+            echo "최신 커밋의 실행이 배포를 이어받는다."
+            exit 1
+          fi
+          docker buildx imagetools create -t "$IMAGE:latest" "$IMAGE:${{ github.sha }}"
 
   deploy:
     needs: build-and-push
@@ -75,8 +92,21 @@ jobs:
     # 자동 배포(SSH)는 main에 반영됐을 때만. 다른 브랜치에서 수동 실행 시엔 이미지 빌드까지만 수행한다.
     if: github.ref == 'refs/heads/main'
     permissions:
+      contents: read # main HEAD 재확인용 API 호출 권한
       packages: read # EC2에서 GHCR pull 시 쓸 GITHUB_TOKEN 권한
     steps:
+      # build job이 끝나고 이 job이 시작되기까지의 간격에도 main이 움직일 수 있다.
+      # SSH 직전에 한 번 더 확인해, 이미 뒤처진 실행이 EC2를 되돌리지 않게 한다.
+      - name: main 최신인지 배포 직전 재확인
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          HEAD_SHA=$(gh api "repos/${{ github.repository }}/commits/main" --jq .sha)
+          if [ "$HEAD_SHA" != "${{ github.sha }}" ]; then
+            echo "배포 직전 main이 $HEAD_SHA 로 이동했다. 이 실행은 배포하지 않는다."
+            exit 1
+          fi
+
       # EC2 SSH 키를 넘기는 서드파티 액션이라 태그가 아닌 commit SHA로 고정한다.
       # 태그는 옮겨 붙을 수 있어, 태그 고정만으로는 공급망 변경을 막지 못한다.
       # 버전을 올릴 때는 GitHub에서 해당 태그의 commit SHA를 다시 확인하고 교체할 것.
@@ -87,6 +117,11 @@ jobs:
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
           port: ${{ secrets.EC2_PORT }} # 비어 있으면 기본 22
+          # 호스트 키 검증. 값이 비어 있으면 검증을 건너뛰므로(액션 기본 동작) 시크릿을
+          # 등록하기 전에도 배포는 그대로 동작한다. 등록하면 MITM 서버에 EC2_SSH_KEY와
+          # GHCR_TOKEN이 넘어가는 것을 막는다.
+          # 값 확인: ssh <host> ssh-keygen -l -f /etc/ssh/ssh_host_ed25519_key.pub | cut -d' ' -f2
+          fingerprint: ${{ secrets.EC2_HOST_FINGERPRINT }}
           # GITHUB_TOKEN은 이 job 실행 동안만 유효하며 GHCR pull 권한이 있다.
           envs: GHCR_USER,GHCR_TOKEN,IMAGE
           script: |
