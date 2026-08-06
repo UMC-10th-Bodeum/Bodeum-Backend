@@ -1,0 +1,192 @@
+spring:
+  config:
+    import: optional:file:.env[.properties]
+
+  application:
+    name: bodeum
+
+  jackson:
+    time-zone: UTC
+    deserialization:
+      accept-float-as-int: false
+
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: ${DB_URL}
+    username: ${DB_USER}
+    password: ${DB_PW}
+
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      username: ${REDIS_USERNAME:default}
+      password: ${REDIS_PASSWORD:}
+      ssl:
+        enabled: ${REDIS_SSL:false}
+      connect-timeout: ${REDIS_CONNECT_TIMEOUT:2s}
+      timeout: ${REDIS_TIMEOUT:2s}
+
+  jpa:
+    database: mysql
+    database-platform: org.hibernate.dialect.MySQLDialect
+    show-sql: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        format_sql: true
+        jdbc:
+          time_zone: UTC
+        default_batch_fetch_size: 100
+
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 5MB
+
+  # Flyway는 운영(prod)에서만 켠다. 로컬은 ddl-auto=update, 테스트는 H2라 기본 비활성화.
+  flyway:
+    enabled: false
+
+  ai:
+    retry:
+      max-attempts: 1
+    openai:
+      api-key: ${OPENAI_API_KEY}
+      timeout: ${OPENAI_REQUEST_TIMEOUT:20s}
+      max-retries: 0
+      chat:
+        options:
+          model: ${OPENAI_CHAT_MODEL:gpt-5.4-mini}
+      embedding:
+        options:
+          model: ${OPENAI_EMBEDDING_MODEL:text-embedding-3-small}
+    vectorstore:
+      chroma:
+        client:
+          port: 8000
+        collection-name: bodeum-rag
+        initialize-schema: true
+
+# 헬스 체크(Actuator). health 하나만 노출한다 — 나머지 엔드포인트는 인증 없이 열리면
+# 환경변수/빈 목록까지 새어나가므로 열지 않는다.
+# ⚠️ 이 블록을 고치면 src/test/resources/application.yml의 같은 블록도 함께 고칠 것.
+#    테스트 리소스가 이 파일을 통째로 가려서, 한쪽만 바꾸면 테스트가 검증하는 값이 달라진다.
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      # 외부에 공개되는 경로라 DB 접속 실패 사유 같은 내부 정보는 숨긴다.
+      show-details: never
+      probes:
+        enabled: true
+      group:
+        # liveness: 프로세스가 살아 있는가. 외부 의존성은 보지 않는다(DB 장애로 컨테이너가 재시작되면 안 됨).
+        # readiness: 트래픽을 받아도 되는가. DB까지 확인한다.
+        # Redis는 여기 넣지 않는다 — REDIS_ENABLED=false면 지표 자체가 없어서
+        # 그룹이 참조하는 순간 부팅이 실패한다. Redis 상태는 /actuator/health 전체 응답에 나온다.
+        readiness:
+          include: readinessState,db
+  health:
+    # Redis는 REDIS_ENABLED=true인 환경(운영)에서만 실제 의존성이다.
+    # 끄지 않으면 로컬/테스트에서 없는 Redis를 찔러 헬스가 DOWN으로 뜬다.
+    redis:
+      enabled: ${REDIS_ENABLED:false}
+
+open-api:
+  service-key: ${OPEN_API_SERVICE_KEY:}
+
+bodeum:
+  http:
+    response-timeout: ${HTTP_RESPONSE_TIMEOUT:20s}
+  public-data:
+    odcloud:
+      base-url: ${ODCLOUD_BASE_URL:https://api.odcloud.kr/api}
+      service-key: ${OPENAPI_SECRET_ODCLOUD:}
+    datago:
+      base-url: ${DATAGO_OPENAPI_BASE_URL:https://api.data.go.kr/openapi}
+      service-key: ${OPENAPI_SECRET_DATAGO:${OPENAPI_SECRET_ODCLOUD:}}
+      connect-timeout: ${DATAGO_OPENAPI_CONNECT_TIMEOUT:5s}
+      read-timeout: ${DATAGO_OPENAPI_READ_TIMEOUT:30s}
+    gg:
+      base-url: ${GG_OPENAPI_BASE_URL:https://openapi.gg.go.kr}
+      service-key: ${OPENAPI_SECRET_GG:}
+  share:
+    base-url: ${SHARE_BASE_URL:https://bodeum.site}
+  news:
+    public-data:
+      sync-on-startup: ${NEWS_PUBLIC_DATA_SYNC_ON_STARTUP:false}
+      sources:
+        busan-sasang:
+          enabled: ${NEWS_PUBLIC_DATA_BUSAN_SASANG_ENABLED:false}
+        gyeonggi:
+          enabled: ${NEWS_PUBLIC_DATA_GYEONGGI_ENABLED:false}
+  ai:
+    rag:
+      top-k: ${AI_RAG_TOP_K:5}
+      similarity-threshold: ${AI_RAG_SIMILARITY_THRESHOLD:0.4}
+    web-search:
+      model: ${OPENAI_WEB_SEARCH_MODEL:gpt-5.4-mini}
+      max-output-tokens: ${OPENAI_WEB_SEARCH_MAX_OUTPUT_TOKENS:1200}
+      connect-timeout: ${OPENAI_WEB_SEARCH_CONNECT_TIMEOUT:3s}
+      read-timeout: ${OPENAI_WEB_SEARCH_READ_TIMEOUT:30s}
+    request-limit:
+      per-minute: ${AI_REQUEST_LIMIT_PER_MINUTE:5}
+      per-day: ${AI_REQUEST_LIMIT_PER_DAY:50}
+      time-zone: ${AI_REQUEST_LIMIT_TIME_ZONE:Asia/Seoul}
+    indexing:
+      run-once: ${AI_INDEXING_RUN_ONCE:false}
+      chunk-size: 500
+      write-batch-size: ${AI_INDEXING_WRITE_BATCH_SIZE:50}
+      source-time-zone: Asia/Seoul
+      lock-timeout-seconds: ${AI_INDEXING_LOCK_TIMEOUT:60} # 기본 60초 대기
+      max-retries: ${AI_INDEXING_MAX_RETRIES:3}             # 락 획득 실패 시 3회 재시도
+  front:
+    # 소셜 로그인 완료 후 일회용 code를 붙여 리다이렉트할 기본 프론트 콜백 URL.
+    # 운영 값은 application-prod.yml에서 오버라이드한다.
+    callback-url: ${FRONT_CALLBACK_URL:http://localhost:5173/auth/callback}
+    # 프론트가 /auth/login/{provider}?frontCallbackUrl= 로 직접 지정할 수 있는 origin 허용 목록.
+    # 목록에 없으면 위 기본 콜백 URL로 폴백한다(오픈 리다이렉트 방지).
+    allowed-callback-origins:
+      - http://localhost:*
+      - http://127.0.0.1:*
+  auth:
+    jwt-secret: ${JWT_SECRET:}
+    access-token-ttl: ${AUTH_ACCESS_TOKEN_TTL:1h}
+    refresh-token-ttl: ${AUTH_REFRESH_TOKEN_TTL:14d}
+    # 프론트가 콜백 code를 교환할 때까지의 짧은 핸드오프 창.
+    login-code-ttl: ${AUTH_LOGIN_CODE_TTL:60s}
+    redis-enabled: ${REDIS_ENABLED:false}
+  oauth:
+    base-url: ${BODEUM_BASE_URL:http://localhost:8080}
+    mock-enabled: ${OAUTH_MOCK_ENABLED:false}
+    kakao:
+      client-id: ${KAKAO_CLIENT_ID:}
+      client-secret: ${KAKAO_CLIENT_SECRET:}
+      redirect-uri: ${KAKAO_REDIRECT_URI:}
+      scope: ${KAKAO_SCOPE:}
+      token-uri: ${KAKAO_TOKEN_URI:}
+      user-info-uri: ${KAKAO_USER_INFO_URI:}
+    naver:
+      client-id: ${NAVER_CLIENT_ID:}
+      client-secret: ${NAVER_CLIENT_SECRET:}
+      redirect-uri: ${NAVER_REDIRECT_URI:}
+      token-uri: ${NAVER_TOKEN_URI:}
+      user-info-uri: ${NAVER_USER_INFO_URI:}
+  aws:
+    s3:
+      bucket: ${AWS_S3_BUCKET:}
+      region: ${AWS_S3_REGION:ap-northeast-2}
+      access-key: ${AWS_ACCESS_KEY:}
+      secret-key: ${AWS_SECRET_KEY:}
+      public-base-url: ${AWS_S3_PUBLIC_BASE_URL:}
+
+openapi:
+  secret:
+    datago: ${OPENAPI_SECRET_DATAGO:${OPENAPI_SECRET_ODCLOUD:}}
+    odcloud: ${OPENAPI_SECRET_ODCLOUD:}
+    gg: ${OPENAPI_SECRET_GG:}

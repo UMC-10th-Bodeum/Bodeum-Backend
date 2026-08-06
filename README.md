@@ -32,8 +32,8 @@ main ← develop ← feat/*
 
 | 브랜치 | 역할 | 규칙 |
 |---|---|---|
-| `main` | 배포 가능한 안정 버전 | 직접 push 금지, PR로만 병합 |
-| `develop` | 기능 통합 및 개발 기준 브랜치 | 작업 브랜치는 반드시 여기서 분기 |
+| `main` | 운영 배포 기준 브랜치 | 직접 push 금지, PR로만 병합. push 시 EC2 자동 배포가 실행됨 |
+| `develop` | 기능 통합 및 개발 기준 브랜치 | 작업 브랜치는 반드시 여기서 분기. 머지만으로는 배포되지 않음 |
 | `feat/*` | 새로운 기능 개발 | 기능 단위로 생성 |
 | `fix/*` | 일반 버그 수정 | 버그 단위로 생성 |
 | `refactor/*` | 기능 변경 없는 구조 개선 | 리팩터링 범위가 명확해야 함 |
@@ -599,6 +599,32 @@ PR을 만들기 전 아래 항목을 확인합니다.
 - 배포 PR에는 포함 기능, 확인된 변경 사항, 배포 시 주의 사항을 작성합니다.
 - DB 스키마 변경이 있다면 마이그레이션 순서와 롤백 가능 여부를 함께 기록합니다.
 - 배포 전 주요 API의 스모크 테스트 항목을 확인합니다.
+- 배포 PR은 **Merge commit**으로 병합합니다. Squash로 병합하면 `develop`과 `main`의 커밋 계보가 갈라져, 이후 배포 PR마다 이미 반영된 변경까지 diff에 다시 올라옵니다.
+- `main`에 머지되는 즉시 EC2 자동 배포가 실행됩니다. Actions의 헬스 체크 통과 여부까지 확인한 뒤 배포 완료로 간주합니다.
+
+#### 최초 1회: `main` 계보 복구 절차 (예외)
+
+`main`은 과거에 머지 커밋을 revert한 이력이 있어, `develop`과 계보가 어긋나 있습니다. 머지 커밋을 revert하면 그 머지가 가져온 변경 전체가 취소되므로, git은 해당 파일들을 `main`이 의도적으로 삭제했다고 판단합니다. 그대로 배포 PR을 올리면 149건의 충돌이 발생하고, 대부분은 `develop`의 파일이 삭제된 것으로 처리됩니다.
+
+**첫 배포 PR에 한해** 아래 절차로 계보를 복구합니다. 이후의 배포 PR은 위 일반 규칙만 따르면 됩니다.
+
+```bash
+git fetch origin
+git worktree add -b release/main-sync ../bodeum-release origin/main
+cd ../bodeum-release
+git merge --no-commit --no-ff origin/develop      # 충돌 발생 (정상)
+git read-tree -u --reset origin/develop           # 최종 트리를 develop과 동일하게 고정
+git commit -m "merge: develop → main 최초 릴리스"
+git diff --stat origin/develop                    # 출력이 비어야 정상
+git push -u origin release/main-sync
+```
+
+- `git worktree add -b`로 **브랜치를 만들면서** worktree를 생성합니다. `--detach`를 쓰면 HEAD가 분리되어 push할 브랜치가 없습니다.
+- `read-tree -u --reset`은 `MERGE_HEAD`를 유지한 채 인덱스와 워킹트리를 `develop` 트리로 맞춥니다. 충돌을 하나씩 풀지 않고도 부모가 둘인 정상 머지 커밋이 만들어집니다.
+- `git diff --stat origin/develop`이 비어 있어야 합니다. 한 줄이라도 나오면 트리가 `develop`과 다르므로 push하지 말고 원인을 확인합니다.
+- 이 절차는 `main`에만 있던 `src/main/resources/application.properties`를 삭제합니다. `develop`이 `application.yml`로 대체했으므로 의도된 삭제입니다.
+- 워킹트리가 깨끗하지 않을 수 있으므로 반드시 별도 worktree에서 수행하고, 끝난 뒤 `git worktree remove ../bodeum-release`로 정리합니다.
+- push한 `release/main-sync`로 `main` 대상 PR을 만들고, **Merge commit**으로 병합합니다.
 
 ---
 
