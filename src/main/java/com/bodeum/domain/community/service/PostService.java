@@ -26,6 +26,8 @@ import com.bodeum.domain.community.repository.PostImageRepository;
 import com.bodeum.domain.community.repository.PostLikeRepository;
 import com.bodeum.domain.community.repository.PostRepository;
 import com.bodeum.domain.community.repository.PostScrapRepository;
+import com.bodeum.domain.point.enums.PointEventType;
+import com.bodeum.domain.point.service.PointService;
 import com.bodeum.domain.user.repository.UserRepository;
 import java.util.List;
 import java.util.Objects;
@@ -47,6 +49,7 @@ public class PostService {
     private final PostLikeRepository postLikeRepository;
     private final PostScrapRepository postScrapRepository;
     private final UserRepository userRepository;
+    private final PointService pointService;
 
     @Transactional
     public PostResponse createPost(Long userId, CreatePostRequest request) {
@@ -63,6 +66,12 @@ public class PostService {
         saveDisabilityTags(post, safeList(request.disabilityTypes()));
         saveHashtags(post, normalizeHashtags(request.hashtags()));
         saveImages(post, safeList(request.imageUrls()));
+        pointService.grantActivityPoint(
+                userId,
+                PointEventType.COMMUNITY_POST_CREATED,
+                post.getId(),
+                userId
+        );
 
         return getPostResponse(post, userId);
     }
@@ -116,6 +125,7 @@ public class PostService {
         if (!postLikeRepository.existsByPost_IdAndUserId(postId, userId)) {
             postLikeRepository.save(PostLike.create(post, userId));
             post.increaseLikeCount();
+            grantPostLikePoint(post, userId);
         }
 
         return new PostLikeResponse(true, post.getLikeCount());
@@ -130,6 +140,7 @@ public class PostService {
         if (postLike.isPresent()) {
             postLikeRepository.delete(postLike.get());
             post.decreaseLikeCount();
+            revokePostLikePoint(post, userId);
         }
 
         return new PostLikeResponse(false, post.getLikeCount());
@@ -166,10 +177,43 @@ public class PostService {
     // 게시글 본문은 보존 대상이므로 삭제하지 않는다. 카운트 감소를 삭제보다 먼저 수행한다.
     @Transactional
     public void deleteUserScrapsAndLikes(Long userId) {
+        postLikeRepository.findPointRewardReferencesByUserId(userId)
+                .forEach(reference -> pointService.revokeActivityPoint(
+                        reference.getRecipientUserId(),
+                        PointEventType.COMMUNITY_POST_LIKE_RECEIVED,
+                        reference.getReferenceId(),
+                        userId
+                ));
         postScrapRepository.decreaseScrapCountForUserScraps(userId);
         postScrapRepository.deleteByUserId(userId);
         postLikeRepository.decreaseLikeCountForUserLikes(userId);
         postLikeRepository.deleteByUserId(userId);
+    }
+
+    private void grantPostLikePoint(Post post, Long actorUserId) {
+        if (Objects.equals(post.getUserId(), actorUserId)) {
+            return;
+        }
+
+        pointService.grantActivityPoint(
+                post.getUserId(),
+                PointEventType.COMMUNITY_POST_LIKE_RECEIVED,
+                post.getId(),
+                actorUserId
+        );
+    }
+
+    private void revokePostLikePoint(Post post, Long actorUserId) {
+        if (Objects.equals(post.getUserId(), actorUserId)) {
+            return;
+        }
+
+        pointService.revokeActivityPoint(
+                post.getUserId(),
+                PointEventType.COMMUNITY_POST_LIKE_RECEIVED,
+                post.getId(),
+                actorUserId
+        );
     }
 
     private Post getOwnedPost(Long userId, Long postId) {

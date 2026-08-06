@@ -24,6 +24,17 @@ public interface PostLikeRepository extends JpaRepository<PostLike, Long> {
             @Param("userId") Long userId
     );
 
+    @Query("""
+            SELECT postLike.post.id AS referenceId,
+                   postLike.post.userId AS recipientUserId
+            FROM PostLike postLike
+            WHERE postLike.userId = :userId
+            ORDER BY postLike.post.userId, postLike.post.id
+            """)
+    List<PointRewardReference> findPointRewardReferencesByUserId(
+            @Param("userId") Long userId
+    );
+
     void deleteAllByPost_Id(Long postId);
 
     // 회원 탈퇴 시: 해당 회원이 좋아요한 게시글의 likeCount를 1 감소시킨다.
@@ -40,4 +51,11 @@ public interface PostLikeRepository extends JpaRepository<PostLike, Long> {
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("DELETE FROM PostLike l WHERE l.userId = :userId")
     int deleteByUserId(@Param("userId") Long userId);
+
+    interface PointRewardReference {
+
+        Long getReferenceId();
+
+        Long getRecipientUserId();
+    }
 }
