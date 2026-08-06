@@ -1,0 +1,750 @@
+package com.bodeum.domain.auth.controller;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import com.bodeum.domain.auth.entity.OAuthState;
+import com.bodeum.domain.auth.enums.SocialProvider;
+import com.bodeum.domain.auth.repository.AuthLoginCodeRepository;
+import com.bodeum.domain.auth.repository.OAuthStateRepository;
+import com.bodeum.domain.auth.repository.RefreshTokenSessionRepository;
+import com.bodeum.domain.user.entity.User;
+import com.bodeum.domain.user.repository.UserRepository;
+import com.bodeum.domain.user.service.UserService;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.time.Instant;
+import java.util.Map;
+import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.web.util.UriComponentsBuilder;
+
+@SpringBootTest(properties = {
+        "bodeum.auth.jwt-secret=test-jwt-secret-32-bytes-minimum-value",
+        "bodeum.oauth.mock-enabled=true",
+        "bodeum.oauth.naver.client-id=test-naver-client",
+        "bodeum.oauth.naver.client-secret=test-naver-secret"
+})
+@AutoConfigureMockMvc
+class AuthControllerTest {
+
+    private static final String FRONT_CALLBACK_URL = "http://localhost:3000/auth/callback";
+    private static final String LOCAL_FRONT_CALLBACK_URL = "http://localhost:5173/auth/callback";
+
+    @Autowired
+    private MockMvc mockMvc;
+
+    private final ObjectMapper objectMapper = new ObjectMapper();
+
+    @Autowired
+    private UserRepository userRepository;
+
+    @Autowired
+    private RefreshTokenSessionRepository refreshTokenSessionRepository;
+
+    @Autowired
+    private OAuthStateRepository oAuthStateRepository;
+
+    @Autowired
+    private AuthLoginCodeRepository authLoginCodeRepository;
+
+    @Autowired
+    private UserService userService;
+
+    @BeforeEach
+    void setUp() {
+        refreshTokenSessionRepository.deleteAll();
+        oAuthStateRepository.deleteAll();
+        authLoginCodeRepository.deleteAll();
+        userRepository.deleteAll();
+    }
+
+    @Test
+    void mockCallbackIssuesTokenThatAuthenticatesProtectedEndpoint() throws Exception {
+        JsonNode loginBody = login("mock-code");
+        assertThat(loginBody.at("/result/accessToken").asText()).isNotEmpty();
+        assertThat(loginBody.at("/result/refreshToken").asText()).isNotEmpty();
+        String accessToken = loginBody.at("/result/accessToken").asText();
+
+        mockMvc.perform(get("/api/v1/users/me/profile")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.userId").isNumber())
+                .andExpect(jsonPath("$.result.provider").value("kakao"))
+                .andExpect(jsonPath("$.result.level").isNumber());
+    }
+
+    @Test
+    void callbackRedirectsToFrontWithOneTimeCode() throws Exception {
+        MvcResult result = mockMvc.perform(get("/api/v1/auth/callback/kakao")
+                        .param("code", "redirect-code"))
+                .andExpect(status().isFound())
+                .andReturn();
+
+        String location = result.getResponse().getHeader(HttpHeaders.LOCATION);
+        assertThat(location)
+                .startsWith(FRONT_CALLBACK_URL)
+                .contains("code=");
+    }
+
+    @Test
+    void exchangeWithUnknownCodeIsUnauthorized() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/exchange")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of("code", "does-not-exist"))))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("AUTH401_7"));
+    }
+
+    @Test
+    void exchangeWithoutCodeIsBadRequest() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/exchange")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void oneTimeCodeCannotBeExchangedTwice() throws Exception {
+        String oneTimeCode = issueLoginCode("single-use-code");
+        String requestBody = objectMapper.writeValueAsString(Map.of("code", oneTimeCode));
+
+        mockMvc.perform(post("/api/v1/auth/exchange")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/v1/auth/exchange")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("AUTH401_7"));
+    }
+
+    @Test
+    void refreshRotatesRefreshTokenAndRejectsOldToken() throws Exception {
+        JsonNode loginBody = login("refresh-code");
+        String refreshToken = loginBody.at("/result/refreshToken").asText();
+
+        String refreshBody = objectMapper.writeValueAsString(Map.of("refreshToken", refreshToken));
+        MvcResult refreshResult = mockMvc.perform(post("/api/v1/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(refreshBody))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        JsonNode refreshedBody = readBody(refreshResult);
+        assertThat(refreshedBody.at("/result/refreshToken").asText()).isNotEqualTo(refreshToken);
+
+        mockMvc.perform(post("/api/v1/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(refreshBody))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void logoutRevokesOnlyRequestedDeviceSession() throws Exception {
+        JsonNode firstDevice = login("multi-device-code");
+        JsonNode secondDevice = login("multi-device-code");
+
+        mockMvc.perform(post("/api/v1/auth/logout")
+                        .header(
+                                HttpHeaders.AUTHORIZATION,
+                                "Bearer " + firstDevice.at("/result/accessToken").asText()
+                        )
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "refreshToken", firstDevice.at("/result/refreshToken").asText()
+                        ))))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/v1/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "refreshToken", secondDevice.at("/result/refreshToken").asText()
+                        ))))
+                .andExpect(status().isOk());
+
+        // 다른 기기의 access token은 계속 인증에 사용할 수 있다(인증이 필요한 임의의 조회로 확인).
+        mockMvc.perform(get("/api/v1/users/me/onboarding-status")
+                        .header(
+                                HttpHeaders.AUTHORIZATION,
+                                "Bearer " + secondDevice.at("/result/accessToken").asText()
+                        ))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/v1/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "refreshToken", firstDevice.at("/result/refreshToken").asText()
+                        ))))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void loginRedirectForConfiguredProviderIncludesState() throws Exception {
+        MvcResult result = mockMvc.perform(get("/api/v1/auth/login/naver"))
+                .andExpect(status().isFound())
+                .andReturn();
+
+        String location = result.getResponse().getHeader(HttpHeaders.LOCATION);
+        assertThat(location)
+                .startsWith("https://nid.naver.com/oauth2.0/authorize")
+                .contains("client_id=test-naver-client")
+                .contains("state=");
+    }
+
+    @Test
+    void loginRedirectStoresAllowedFrontCallbackUrl() throws Exception {
+        MvcResult result = mockMvc.perform(get("/api/v1/auth/login/naver")
+                        .param("frontCallbackUrl", LOCAL_FRONT_CALLBACK_URL))
+                .andExpect(status().isFound())
+                .andReturn();
+
+        String state = UriComponentsBuilder.fromUriString(result.getResponse().getHeader(HttpHeaders.LOCATION))
+                .build()
+                .getQueryParams()
+                .getFirst("state");
+
+        assertThat(oAuthStateRepository.findById(state))
+                .get()
+                .extracting(OAuthState::getFrontCallbackUrl)
+                .isEqualTo(LOCAL_FRONT_CALLBACK_URL);
+    }
+
+    @Test
+    void loginRedirectFallsBackWhenFrontCallbackUrlIsNotAllowed() throws Exception {
+        MvcResult result = mockMvc.perform(get("/api/v1/auth/login/naver")
+                        .param("frontCallbackUrl", "https://evil.example.com/auth/callback"))
+                .andExpect(status().isFound())
+                .andReturn();
+
+        String state = UriComponentsBuilder.fromUriString(result.getResponse().getHeader(HttpHeaders.LOCATION))
+                .build()
+                .getQueryParams()
+                .getFirst("state");
+
+        assertThat(oAuthStateRepository.findById(state))
+                .get()
+                .extracting(OAuthState::getFrontCallbackUrl)
+                .isEqualTo(FRONT_CALLBACK_URL);
+    }
+
+    /**
+     * 허용 origin이라도 path·query가 길면 front_callback_url(VARCHAR(255))을 넘겨
+     * state 저장 시점에 500으로 실패했다. 길이 검증 후 기본값으로 폴백하는지 확인한다.
+     */
+    @Test
+    void loginRedirectFallsBackWhenFrontCallbackUrlIsTooLong() throws Exception {
+        String tooLongUrl = "http://localhost:5173/auth/callback?x=" + "a".repeat(300);
+
+        MvcResult result = mockMvc.perform(get("/api/v1/auth/login/naver")
+                        .param("frontCallbackUrl", tooLongUrl))
+                .andExpect(status().isFound())
+                .andReturn();
+
+        String state = UriComponentsBuilder.fromUriString(result.getResponse().getHeader(HttpHeaders.LOCATION))
+                .build()
+                .getQueryParams()
+                .getFirst("state");
+
+        assertThat(oAuthStateRepository.findById(state))
+                .get()
+                .extracting(OAuthState::getFrontCallbackUrl)
+                .isEqualTo(FRONT_CALLBACK_URL);
+    }
+
+    @Test
+    void callbackRedirectsToFrontCallbackUrlStoredInState() throws Exception {
+        String state = seedState(LOCAL_FRONT_CALLBACK_URL);
+
+        MvcResult result = mockMvc.perform(get("/api/v1/auth/callback/kakao")
+                        .param("code", "local-front-code")
+                        .param("state", state))
+                .andExpect(status().isFound())
+                .andReturn();
+
+        assertThat(result.getResponse().getHeader(HttpHeaders.LOCATION))
+                .startsWith(LOCAL_FRONT_CALLBACK_URL)
+                .contains("code=");
+    }
+
+    @Test
+    void callbackErrorRedirectsToFrontCallbackUrlStoredInState() throws Exception {
+        String state = seedState(LOCAL_FRONT_CALLBACK_URL);
+
+        MvcResult result = mockMvc.perform(get("/api/v1/auth/callback/kakao")
+                        .param("state", state))
+                .andExpect(status().isFound())
+                .andReturn();
+
+        assertThat(result.getResponse().getHeader(HttpHeaders.LOCATION))
+                .startsWith(LOCAL_FRONT_CALLBACK_URL)
+                .contains("error=AUTH400_2");
+    }
+
+    @Test
+    void configuredProviderCallbackWithoutStateRedirectsWithError() throws Exception {
+        MvcResult result = mockMvc.perform(get("/api/v1/auth/callback/naver")
+                        .param("code", "provider-code"))
+                .andExpect(status().isFound())
+                .andReturn();
+
+        assertThat(result.getResponse().getHeader(HttpHeaders.LOCATION))
+                .startsWith(FRONT_CALLBACK_URL)
+                .contains("error=AUTH401_6");
+    }
+
+    @Test
+    void callbackWithoutCodeRedirectsWithError() throws Exception {
+        MvcResult result = mockMvc.perform(get("/api/v1/auth/callback/kakao"))
+                .andExpect(status().isFound())
+                .andReturn();
+
+        assertThat(result.getResponse().getHeader(HttpHeaders.LOCATION))
+                .startsWith(FRONT_CALLBACK_URL)
+                .contains("error=AUTH400_2");
+    }
+
+    @Test
+    void agreementCanBeRegisteredThroughPluralPath() throws Exception {
+        String accessToken = login("agreement-code").at("/result/accessToken").asText();
+
+        mockMvc.perform(post("/api/v1/users/me/agreements")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "serviceTermsAgreed": true,
+                                  "privacyPolicyAgreed": true,
+                                  "aiTermsAgreed": false
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.serviceTermsAgreed").value(true))
+                .andExpect(jsonPath("$.result.privacyPolicyAgreed").value(true));
+    }
+
+    @Test
+    void agreementWithoutRequiredTermsReturnsError() throws Exception {
+        String accessToken = login("agreement-required-code").at("/result/accessToken").asText();
+
+        mockMvc.perform(post("/api/v1/users/me/agreements")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "serviceTermsAgreed": true,
+                                  "privacyPolicyAgreed": false,
+                                  "aiTermsAgreed": false
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("AUTH400_4"));
+    }
+
+    @Test
+    void profileCanBeUpdatedThroughProfilePath() throws Exception {
+        String accessToken = login("profile-path-code").at("/result/accessToken").asText();
+
+        mockMvc.perform(patch("/api/v1/users/me/profile")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "nickname": "민준맘",
+                                  "childNickname": "민준",
+                                  "childBirth": "2020-03",
+                                  "disabilityTypes": ["AUTISM", "CEREBRAL_PALSY"]
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.updated").value(true));
+    }
+
+    @Test
+    void dashboardCanBeReadWithAccessToken() throws Exception {
+        String accessToken = login("dashboard-path-code").at("/result/accessToken").asText();
+
+        mockMvc.perform(get("/api/v1/users/me/dashboard")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("COMMON200_1"))
+                .andExpect(jsonPath("$.result.userId").isNumber())
+                .andExpect(jsonPath("$.result.point").isNumber())
+                .andExpect(jsonPath("$.result.level").isNumber())
+                .andExpect(jsonPath("$.result.activitySummary.savedInfoCount").value(0))
+                .andExpect(jsonPath("$.result.activitySummary.myPostCount").value(0))
+                .andExpect(jsonPath("$.result.activitySummary.myCommentCount").value(0));
+    }
+
+    @Test
+    void dashboardRejectsAnonymousRequest() throws Exception {
+        mockMvc.perform(get("/api/v1/users/me/dashboard"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("AUTH401_1"));
+    }
+
+    @Test
+    void scrapsCanBeReadThroughMyScrapsPath() throws Exception {
+        String accessToken = login("my-scraps-path-code").at("/result/accessToken").asText();
+
+        mockMvc.perform(get("/api/v1/users/me/scraps")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.isSuccess").value(true))
+                .andExpect(jsonPath("$.code").value("COMMON200_1"))
+                .andExpect(jsonPath("$.result.totalCount").value(0))
+                .andExpect(jsonPath("$.result.infoScraps").isArray())
+                .andExpect(jsonPath("$.result.infoScraps").isEmpty())
+                .andExpect(jsonPath("$.result.newsScraps").isArray())
+                .andExpect(jsonPath("$.result.newsScraps").isEmpty());
+    }
+
+    @Test
+    void postsCanBeReadThroughMyPostsPath() throws Exception {
+        String accessToken = login("my-posts-path-code").at("/result/accessToken").asText();
+
+        mockMvc.perform(get("/api/v1/users/me/posts")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                        .param("page", "0")
+                        .param("size", "10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.isSuccess").value(true))
+                .andExpect(jsonPath("$.code").value("COMMON200_1"))
+                .andExpect(jsonPath("$.result.totalCount").value(0))
+                .andExpect(jsonPath("$.result.page").value(0))
+                .andExpect(jsonPath("$.result.size").value(10))
+                .andExpect(jsonPath("$.result.totalPages").value(0))
+                .andExpect(jsonPath("$.result.hasNext").value(false))
+                .andExpect(jsonPath("$.result.posts").isArray())
+                .andExpect(jsonPath("$.result.posts").isEmpty());
+    }
+
+    @Test
+    void postsRejectNegativePage() throws Exception {
+        String accessToken = login("my-posts-invalid-page-code").at("/result/accessToken").asText();
+
+        mockMvc.perform(get("/api/v1/users/me/posts")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                        .param("page", "-1")
+                        .param("size", "10"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("COMMON400_1"));
+    }
+
+    @Test
+    void commentsCanBeReadThroughMyCommentsPath() throws Exception {
+        String accessToken = login("my-comments-path-code").at("/result/accessToken").asText();
+
+        mockMvc.perform(get("/api/v1/users/me/comments")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                        .param("page", "0")
+                        .param("size", "10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.isSuccess").value(true))
+                .andExpect(jsonPath("$.code").value("COMMON200_1"))
+                .andExpect(jsonPath("$.result.totalCount").value(0))
+                .andExpect(jsonPath("$.result.page").value(0))
+                .andExpect(jsonPath("$.result.size").value(10))
+                .andExpect(jsonPath("$.result.totalPages").value(0))
+                .andExpect(jsonPath("$.result.hasNext").value(false))
+                .andExpect(jsonPath("$.result.comments").isArray())
+                .andExpect(jsonPath("$.result.comments").isEmpty());
+    }
+
+    @Test
+    void commentsRejectNonPositiveSize() throws Exception {
+        String accessToken = login("my-comments-invalid-size-code").at("/result/accessToken").asText();
+
+        mockMvc.perform(get("/api/v1/users/me/comments")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                        .param("page", "0")
+                        .param("size", "0"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("COMMON400_1"));
+    }
+
+    @Test
+    void pointsCanBeReadThroughMyPointsPath() throws Exception {
+        JsonNode loginBody = login("my-points-path-code");
+        String accessToken = loginBody.at("/result/accessToken").asText();
+        User user = userRepository.findById(loginBody.at("/result/userId").asLong())
+                .orElseThrow();
+        user.skipOnboarding();
+        user.markRegisteredIfResolved();
+        userRepository.saveAndFlush(user);
+
+        mockMvc.perform(get("/api/v1/users/me/points")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.isSuccess").value(true))
+                .andExpect(jsonPath("$.code").value("COMMON200_1"))
+                .andExpect(jsonPath("$.result.totalPoint").value(0))
+                .andExpect(jsonPath("$.result.activities.length()")
+                        .value(4))
+                .andExpect(jsonPath("$.result.activities[0].pointType")
+                        .value("POST_CREATED"))
+                .andExpect(jsonPath("$.result.activities[0].pointPerAction")
+                        .value(5))
+                .andExpect(jsonPath("$.result.activities[0].earnedPoint")
+                        .value(0))
+                .andExpect(jsonPath("$.result.activities[0].activityCount")
+                        .value(0));
+    }
+
+    @Test
+    void pointsRejectIncompleteSignup() throws Exception {
+        String accessToken = login("my-points-incomplete-signup-code")
+                .at("/result/accessToken")
+                .asText();
+
+        mockMvc.perform(get("/api/v1/users/me/points")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("AUTH403_1"));
+    }
+
+    @Test
+    void pointsRequireAccessToken() throws Exception {
+        mockMvc.perform(get("/api/v1/users/me/points"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("AUTH401_1"));
+    }
+
+    @Test
+    void briefReturnsLoggedOutWhenAnonymous() throws Exception {
+        mockMvc.perform(get("/api/v1/users/me/brief"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.isLoggedIn").value(false));
+    }
+
+    @Test
+    void protectedEndpointRejectsWithdrawnUserTokenAsInvalidAccessToken() throws Exception {
+        String accessToken = login("withdrawn-token-code").at("/result/accessToken").asText();
+
+        userService.withdraw(userRepository.findAll().getFirst().getId());
+
+        mockMvc.perform(get("/api/v1/users/me/dashboard")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("AUTH401_1"));
+    }
+
+    @Test
+    void withdrawSucceedsWithoutRequestBody() throws Exception {
+        String accessToken = login("withdraw-no-body-code").at("/result/accessToken").asText();
+
+        mockMvc.perform(delete("/api/v1/users/me")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.success").value(true));
+
+        assertThat(userRepository.findAll().getFirst().isWithdrawn()).isTrue();
+    }
+
+    @Test
+    void withdrawStillSucceedsWhenLegacyReasonBodyProvided() throws Exception {
+        // 탈퇴 사유 필드는 폐지됐지만, 구버전 클라이언트가 보내던 {"reason":...} 바디가 와도
+        // 무시하고 정상 탈퇴되어야 한다(하위 호환).
+        String accessToken = login("withdraw-legacy-body-code").at("/result/accessToken").asText();
+
+        mockMvc.perform(delete("/api/v1/users/me")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\":\"더 이상 이용하지 않습니다\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.success").value(true));
+
+        assertThat(userRepository.findAll().getFirst().isWithdrawn()).isTrue();
+    }
+
+    @Test
+    void withdrawnUserGetsFreshAccountOnSocialRelogin() throws Exception {
+        JsonNode firstLogin = login("withdrawn-user-code");
+        long firstUserId = firstLogin.at("/result/userId").asLong();
+
+        userService.withdraw(firstUserId);
+        assertThat(userRepository.findById(firstUserId).orElseThrow().isWithdrawn()).isTrue();
+
+        // 탈퇴 후 같은 소셜 계정으로 다시 로그인하면 복구가 아니라 새 회원으로 가입된다.
+        JsonNode secondLogin = login("withdrawn-user-code");
+        assertThat(secondLogin.at("/result/isNewUser").asBoolean()).isTrue();
+        assertThat(secondLogin.at("/result/userId").asLong()).isNotEqualTo(firstUserId);
+        // 기존 탈퇴 회원은 그대로 탈퇴 상태로 남는다.
+        assertThat(userRepository.findById(firstUserId).orElseThrow().isWithdrawn()).isTrue();
+    }
+
+    @Test
+    void swaggerDocumentsOnlyClientInputFields() throws Exception {
+        JsonNode openApi = readBody(mockMvc.perform(get("/v3/api-docs"))
+                .andExpect(status().isOk())
+                .andReturn());
+
+        JsonNode codeParameter = findCallbackParameter(openApi, "code");
+        assertThat(codeParameter).isNotNull();
+        assertThat(codeParameter.path("required").asBoolean()).isTrue();
+        assertThat(openApi.at("/paths/~1api~1v1~1users~1me~1summary").isMissingNode())
+                .isTrue();
+        assertThat(openApi.at("/paths/~1api~1v1~1users~1me~1profile/get").isMissingNode())
+                .isFalse();
+        assertThat(hasParameter(openApi, "/paths/~1api~1v1~1users~1me~1profile/get/parameters", "userId"))
+                .isFalse();
+        assertThat(hasParameter(openApi, "/paths/~1api~1v1~1users~1me~1profile/patch/parameters", "userId"))
+                .isFalse();
+        assertThat(hasParameter(openApi, "/paths/~1api~1v1~1onboarding~1child-profile/post/parameters", "userId"))
+                .isFalse();
+        assertThat(openApi.at("/components/schemas/UpdateUserProfileRequest/properties/childBirth/example").asText())
+                .isEqualTo("2020-03");
+        assertThat(openApi.at("/components/schemas/CreateChildProfileRequest/properties/birth/example").asText())
+                .isEqualTo("2020-03");
+        assertThat(openApi.at("/components/schemas/CreateChildProfileRequest/properties/birthValid").isMissingNode())
+                .isTrue();
+        assertThat(openApi.at("/components/schemas/CreateUserAgreementRequest/properties/requiredAgreementCompleted").isMissingNode())
+                .isTrue();
+        assertThat(openApi.at("/components/schemas/CreateUserAgreementRequest/properties/aiTermsAgreedValue").isMissingNode())
+                .isTrue();
+    }
+
+    @Test
+    void invalidProviderCallbackRedirectsWithError() throws Exception {
+        MvcResult result = mockMvc.perform(get("/api/v1/auth/callback/google")
+                        .param("code", "provider-code"))
+                .andExpect(status().isFound())
+                .andReturn();
+
+        assertThat(result.getResponse().getHeader(HttpHeaders.LOCATION))
+                .startsWith(FRONT_CALLBACK_URL)
+                .contains("error=AUTH400_1");
+    }
+
+    @Test
+    void malformedRefreshBodyIsBadRequest() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("잘못된 요청입니다."))
+                .andExpect(jsonPath("$.result").doesNotExist());
+    }
+
+    @Test
+    void logoutWithoutRefreshTokenIsBadRequest() throws Exception {
+        String accessToken = login("logout-validation-code").at("/result/accessToken").asText();
+
+        mockMvc.perform(post("/api/v1/auth/logout")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void logoutRequiresAccessToken() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/logout")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "refreshToken": "refresh-token"
+                                }
+                                """))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("AUTH401_1"));
+    }
+
+    /**
+     * 모의 로그인(kakao)은 리다이렉트 없이 콜백만 호출하므로, state에 실린 프론트 콜백 URL을
+     * 검증하려면 로그인 시작 단계가 저장했을 state 행을 직접 넣어 준다.
+     */
+    private String seedState(String frontCallbackUrl) {
+        String state = UUID.randomUUID().toString();
+        oAuthStateRepository.save(OAuthState.create(
+                state,
+                SocialProvider.KAKAO,
+                Instant.now().plusSeconds(600),
+                frontCallbackUrl
+        ));
+
+        return state;
+    }
+
+    /**
+     * 모의 소셜 로그인 콜백(302)으로 일회용 code를 발급받아 반환한다.
+     */
+    private String issueLoginCode(String authorizationCode) throws Exception {
+        MvcResult callbackResult = mockMvc.perform(get("/api/v1/auth/callback/kakao")
+                        .param("code", authorizationCode))
+                .andExpect(status().isFound())
+                .andReturn();
+
+        String location = callbackResult.getResponse().getHeader(HttpHeaders.LOCATION);
+        assertThat(location).startsWith(FRONT_CALLBACK_URL);
+
+        return UriComponentsBuilder.fromUriString(location).build().getQueryParams().getFirst("code");
+    }
+
+    /**
+     * 콜백(302) → 일회용 code 교환(exchange)의 2단계를 수행하고 교환 응답 body를 반환한다.
+     */
+    private JsonNode login(String authorizationCode) throws Exception {
+        String oneTimeCode = issueLoginCode(authorizationCode);
+
+        MvcResult exchangeResult = mockMvc.perform(post("/api/v1/auth/exchange")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of("code", oneTimeCode))))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        return readBody(exchangeResult);
+    }
+
+    private JsonNode readBody(MvcResult result) throws Exception {
+        return objectMapper.readTree(result.getResponse().getContentAsString());
+    }
+
+    private JsonNode findCallbackParameter(JsonNode openApi, String name) {
+        for (JsonNode parameter : openApi.at("/paths/~1api~1v1~1auth~1callback~1{provider}/get/parameters")) {
+            if (name.equals(parameter.path("name").asText())) {
+                return parameter;
+            }
+        }
+
+        return null;
+    }
+
+    private boolean hasParameter(JsonNode openApi, String parametersPath, String name) {
+        JsonNode parameters = openApi.at(parametersPath);
+        if (parameters.isMissingNode()) {
+            String operationPath = parametersPath.substring(0, parametersPath.lastIndexOf("/parameters"));
+            assertThat(openApi.at(operationPath).isMissingNode())
+                    .as("OpenAPI operation path must exist: %s", operationPath)
+                    .isFalse();
+            return false;
+        }
+
+        assertThat(parameters.isArray())
+                .as("OpenAPI parameters must be an array: %s", parametersPath)
+                .isTrue();
+
+        for (JsonNode parameter : parameters) {
+            if (name.equals(parameter.path("name").asText())) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+}

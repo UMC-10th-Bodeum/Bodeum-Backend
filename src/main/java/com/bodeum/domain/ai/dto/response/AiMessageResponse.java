@@ -1,0 +1,160 @@
+package com.bodeum.domain.ai.dto.response;
+
+import com.bodeum.domain.ai.enums.SenderType;
+import com.bodeum.domain.ai.enums.AiAnswerStatus;
+import java.time.Instant;
+import java.util.List;
+import java.util.Objects;
+
+public record AiMessageResponse(
+        Long aiMessageId,
+        SenderType senderType,
+        AiAnswerStatus answerStatus,
+        String content,
+        Instant createdAt,
+        List<AiMessageSourceResponse> sources,
+        AiMessageWarningResponse warning,
+        AiMessageFeedbackResponse feedback
+) {
+
+    public AiMessageResponse {
+        Objects.requireNonNull(senderType, "senderType must not be null");
+        sources = sources == null ? List.of() : List.copyOf(sources);
+        if (senderType == SenderType.USER) {
+            if (answerStatus != null || !sources.isEmpty() || warning != null
+                    || feedback != null) {
+                throw new IllegalArgumentException(
+                        "USER message must not have answerStatus, sources, warning, or feedback");
+            }
+        } else {
+            Objects.requireNonNull(answerStatus, "AI message answerStatus must not be null");
+            if ((answerStatus == AiAnswerStatus.ANSWERED
+                    || answerStatus == AiAnswerStatus.LINK_GUIDANCE) && sources.isEmpty()) {
+                throw new IllegalArgumentException(
+                        "ANSWERED or LINK_GUIDANCE message must have at least one source");
+            }
+            if (answerStatus == AiAnswerStatus.NO_EVIDENCE && !sources.isEmpty()) {
+                throw new IllegalArgumentException("NO_EVIDENCE message must not have sources");
+            }
+            if (answerStatus == AiAnswerStatus.REGION_REQUIRED
+                    && !sources.isEmpty()) {
+                throw new IllegalArgumentException(
+                        "REGION_REQUIRED message must not have sources");
+            }
+            if (answerStatus == AiAnswerStatus.GREETING
+                    && (!sources.isEmpty() || warning != null)) {
+                throw new IllegalArgumentException(
+                        "GREETING message must not have sources or warning");
+            }
+        }
+    }
+
+    public static AiMessageResponse user(
+            Long aiMessageId,
+            String content,
+            Instant createdAt
+    ) {
+        return new AiMessageResponse(
+                aiMessageId,
+                SenderType.USER,
+                null,
+                content,
+                createdAt,
+                List.of(),
+                null,
+                null
+        );
+    }
+
+    public static AiMessageResponse sourceBacked(
+            Long aiMessageId,
+            SenderType senderType,
+            AiAnswerStatus answerStatus,
+            String content,
+            Instant createdAt,
+            List<AiMessageSourceResponse> sources,
+            AiMessageWarningResponse warning
+    ) {
+        if (answerStatus == AiAnswerStatus.NO_EVIDENCE) {
+            throw new IllegalArgumentException(
+                    "source-backed response cannot have NO_EVIDENCE status");
+        }
+        return new AiMessageResponse(
+                aiMessageId,
+                senderType,
+                answerStatus,
+                content,
+                createdAt,
+                sources,
+                warning,
+                null
+        );
+    }
+
+    public static AiMessageResponse noEvidence(
+            Long aiMessageId,
+            SenderType senderType,
+            String content,
+            Instant createdAt
+    ) {
+        return new AiMessageResponse(
+                aiMessageId,
+                senderType,
+                AiAnswerStatus.NO_EVIDENCE,
+                content,
+                createdAt,
+                List.of(),
+                null,
+                null
+        );
+    }
+
+    public static AiMessageResponse regionRequired(
+            Long aiMessageId,
+            SenderType senderType,
+            String content,
+            Instant createdAt
+    ) {
+        return new AiMessageResponse(
+                aiMessageId,
+                senderType,
+                AiAnswerStatus.REGION_REQUIRED,
+                content,
+                createdAt,
+                List.of(),
+                null,
+                null
+        );
+    }
+
+    public AiMessageResponse withFeedback(AiMessageFeedbackResponse feedback) {
+        return new AiMessageResponse(
+                aiMessageId,
+                senderType,
+                answerStatus,
+                content,
+                createdAt,
+                sources,
+                warning,
+                feedback
+        );
+    }
+
+    public static AiMessageResponse greeting(
+            Long aiMessageId,
+            SenderType senderType,
+            String content,
+            Instant createdAt
+    ) {
+        return new AiMessageResponse(
+                aiMessageId,
+                senderType,
+                AiAnswerStatus.GREETING,
+                content,
+                createdAt,
+                List.of(),
+                null,
+                null
+        );
+    }
+}

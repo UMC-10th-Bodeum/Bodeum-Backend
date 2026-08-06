@@ -1,0 +1,685 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2240" height="1440" viewBox="0 0 2240 1440">
+<defs>
+<marker id="crow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto" markerUnits="strokeWidth">
+<path d="M2,2 L10,6 L2,10" fill="none" stroke="#e8aabe" stroke-width="2"/>
+</marker>
+<marker id="dot" markerWidth="8" markerHeight="8" refX="4" refY="4" markerUnits="strokeWidth">
+<circle cx="4" cy="4" r="3" fill="#e8aabe"/>
+</marker>
+</defs>
+<rect width="2240" height="1440" fill="#202020"/>
+<text x="50" y="24" fill="#f4f7fb" font-size="20" font-weight="700" text-anchor="start" style="">보듬 User 중심 논리 ERD - 상세 컬럼 버전</text>
+<polyline points="740,235 650,235 650,170 810,170" fill="none" stroke="#e8aabe" stroke-width="3" stroke-dasharray="8 6" marker-start="url(#dot)" marker-end="url(#crow)"/><text x="720.5" y="194.5" fill="#ffc1d2" font-size="12" font-weight="700" text-anchor="start" style="">N:1</text>
+<polyline points="1430,210 1360,210 1360,210 1500,210" fill="none" stroke="#e8aabe" stroke-width="3" stroke-dasharray="8 6" marker-start="url(#dot)" marker-end="url(#crow)"/><text x="1420.5" y="202.0" fill="#ffc1d2" font-size="12" font-weight="700" text-anchor="start" style="">1:1</text>
+<polyline points="1430,530 1360,530 1360,330 1500,330" fill="none" stroke="#e8aabe" stroke-width="3" stroke-dasharray="8 6" marker-start="url(#dot)" marker-end="url(#crow)"/><text x="1420.5" y="422.0" fill="#ffc1d2" font-size="12" font-weight="700" text-anchor="start" style="">1:1</text>
+<polyline points="1120,760 1120,700 1120,700 1120,620" fill="none" stroke="#e8aabe" stroke-width="3" stroke-dasharray="8 6" marker-start="url(#dot)" marker-end="url(#crow)"/><text x="1128.0" y="687.0" fill="#ffc1d2" font-size="12" font-weight="700" text-anchor="start" style="">1:1</text>
+<polyline points="1430,850 1360,850 1360,420 1500,420" fill="none" stroke="#e8aabe" stroke-width="3" stroke-dasharray="8 6" marker-start="url(#dot)" marker-end="url(#crow)"/><text x="1420.5" y="627.0" fill="#ffc1d2" font-size="12" font-weight="700" text-anchor="start" style="">1:1</text>
+<polyline points="430,1110 430,1030 430,1030 740,930" fill="none" stroke="#e8aabe" stroke-width="3" stroke-dasharray="8 6" marker-start="url(#dot)" marker-end="url(#crow)"/><text x="515.5" y="1017.0" fill="#ffc1d2" font-size="12" font-weight="700" text-anchor="start" style="">N:M</text>
+<polyline points="260,1110 260,1030 260,1030 260,970" fill="none" stroke="#e8aabe" stroke-width="3" stroke-dasharray="8 6" marker-start="url(#dot)" marker-end="url(#crow)"/><text x="268.0" y="1027.0" fill="#ffc1d2" font-size="12" font-weight="700" text-anchor="start" style="">N:M</text>
+<polyline points="1430,1200 1360,1200 1360,520 1500,520" fill="none" stroke="#e8aabe" stroke-width="3" stroke-dasharray="8 6" marker-start="url(#dot)" marker-end="url(#crow)"/><text x="1420.5" y="852.0" fill="#ffc1d2" font-size="12" font-weight="700" text-anchor="start" style="">N:M</text>
+<polyline points="1430,1235 1340,1235 1340,1215 1500,1215" fill="none" stroke="#e8aabe" stroke-width="3" stroke-dasharray="8 6" marker-start="url(#dot)" marker-end="url(#crow)"/><text x="1410.5" y="1217.0" fill="#ffc1d2" font-size="12" font-weight="700" text-anchor="start" style="">N:M</text>
+<rect x="50" y="40" width="760" height="190" rx="4" fill="#26353d" stroke="#1f6f8b" stroke-width="3"/>
+<rect x="50" y="40" width="760" height="46" rx="4" fill="#1f6f8b"/>
+<text x="64" y="70" fill="#f4f7fb" font-size="19" font-weight="700" text-anchor="start" style="">지역</text>
+<text x="796" y="70" fill="#f4f7fb" font-size="18" font-weight="700" text-anchor="end" style="">regions</text>
+<rect x="50" y="86" width="760" height="36" fill="#3a82ad" stroke="#17252d" stroke-width="1"/>
+<line x1="98" y1="86" x2="98" y2="122" stroke="#17252d" stroke-width="1"/>
+<line x1="274" y1="86" x2="274" y2="122" stroke="#17252d" stroke-width="1"/>
+<line x1="452" y1="86" x2="452" y2="122" stroke="#17252d" stroke-width="1"/>
+<line x1="556" y1="86" x2="556" y2="122" stroke="#17252d" stroke-width="1"/>
+<line x1="648" y1="86" x2="648" y2="122" stroke="#17252d" stroke-width="1"/>
+<text x="72" y="110" fill="#f7d34a" font-size="11" font-weight="700" text-anchor="middle" style="">PK</text>
+<text x="106" y="110" fill="#f4f7fb" font-size="13" font-weight="700" text-anchor="start" style="">지역 ID</text>
+<text x="282" y="110" fill="#f4f7fb" font-size="13" font-weight="600" text-anchor="start" style="">id</text>
+<text x="460" y="110" fill="#f4f7fb" font-size="13" font-weight="500" text-anchor="start" style="">BIGINT</text>
+<text x="564" y="110" fill="#f4f7fb" font-size="13" font-weight="700" text-anchor="start" style="">NOT NULL</text>
+<text x="656" y="110" fill="#d7dde2" font-size="12" font-weight="500" text-anchor="start" style="font-style:italic;">AUTO_INCREMENT</text>
+<text x="816" y="110" fill="#f4f7fb" font-size="12" font-weight="500" text-anchor="start" style="">지역 고유 식별자</text>
+<rect x="50" y="122" width="760" height="36" fill="#293942" stroke="#17252d" stroke-width="1"/>
+<line x1="98" y1="122" x2="98" y2="158" stroke="#17252d" stroke-width="1"/>
+<line x1="274" y1="122" x2="274" y2="158" stroke="#17252d" stroke-width="1"/>
+<line x1="452" y1="122" x2="452" y2="158" stroke="#17252d" stroke-width="1"/>
+<line x1="556" y1="122" x2="556" y2="158" stroke="#17252d" stroke-width="1"/>
+<line x1="648" y1="122" x2="648" y2="158" stroke="#17252d" stroke-width="1"/>
+<text x="72" y="146" fill="#b9c6ce" font-size="11" font-weight="700" text-anchor="middle" style=""></text>
+<text x="106" y="146" fill="#f4f7fb" font-size="13" font-weight="700" text-anchor="start" style="">시/도</text>
+<text x="282" y="146" fill="#f4f7fb" font-size="13" font-weight="600" text-anchor="start" style="">region_level_1</text>
+<text x="460" y="146" fill="#f4f7fb" font-size="13" font-weight="500" text-anchor="start" style="">VARCHAR(50)</text>
+<text x="564" y="146" fill="#f4f7fb" font-size="13" font-weight="700" text-anchor="start" style="">NOT NULL</text>
+<text x="656" y="146" fill="#d7dde2" font-size="12" font-weight="500" text-anchor="start" style="font-style:italic;"></text>
+<text x="816" y="146" fill="#f4f7fb" font-size="12" font-weight="500" text-anchor="start" style="">예: 서울특별시</text>
+<rect x="50" y="158" width="760" height="36" fill="#2f414b" stroke="#17252d" stroke-width="1"/>
+<line x1="98" y1="158" x2="98" y2="194" stroke="#17252d" stroke-width="1"/>
+<line x1="274" y1="158" x2="274" y2="194" stroke="#17252d" stroke-width="1"/>
+<line x1="452" y1="158" x2="452" y2="194" stroke="#17252d" stroke-width="1"/>
+<line x1="556" y1="158" x2="556" y2="194" stroke="#17252d" stroke-width="1"/>
+<line x1="648" y1="158" x2="648" y2="194" stroke="#17252d" stroke-width="1"/>
+<text x="72" y="182" fill="#b9c6ce" font-size="11" font-weight="700" text-anchor="middle" style=""></text>
+<text x="106" y="182" fill="#f4f7fb" font-size="13" font-weight="700" text-anchor="start" style="">시/군/구</text>
+<text x="282" y="182" fill="#f4f7fb" font-size="13" font-weight="600" text-anchor="start" style="">region_level_2</text>
+<text x="460" y="182" fill="#f4f7fb" font-size="13" font-weight="500" text-anchor="start" style="">VARCHAR(50)</text>
+<text x="564" y="182" fill="#f4f7fb" font-size="13" font-weight="700" text-anchor="start" style="">NOT NULL</text>
+<text x="656" y="182" fill="#d7dde2" font-size="12" font-weight="500" text-anchor="start" style="font-style:italic;"></text>
+<text x="816" y="182" fill="#f4f7fb" font-size="12" font-weight="500" text-anchor="start" style="">예: 강남구</text>
+<rect x="50" y="194" width="760" height="36" fill="#293942" stroke="#17252d" stroke-width="1"/>
+<line x1="98" y1="194" x2="98" y2="230" stroke="#17252d" stroke-width="1"/>
+<line x1="274" y1="194" x2="274" y2="230" stroke="#17252d" stroke-width="1"/>
+<line x1="452" y1="194" x2="452" y2="230" stroke="#17252d" stroke-width="1"/>
+<line x1="556" y1="194" x2="556" y2="230" stroke="#17252d" stroke-width="1"/>
+<line x1="648" y1="194" x2="648" y2="230" stroke="#17252d" stroke-width="1"/>
+<text x="72" y="218" fill="#b9c6ce" font-size="11" font-weight="700" text-anchor="middle" style=""></text>
+<text x="106" y="218" fill="#f4f7fb" font-size="13" font-weight="700" text-anchor="start" style="">전체 지역명</text>
+<text x="282" y="218" fill="#f4f7fb" font-size="13" font-weight="600" text-anchor="start" style="">full_name</text>
+<text x="460" y="218" fill="#f4f7fb" font-size="13" font-weight="500" text-anchor="start" style="">VARCHAR(100)</text>
+<text x="564" y="218" fill="#f4f7fb" font-size="13" font-weight="700" text-anchor="start" style="">NOT NULL</text>
+<text x="656" y="218" fill="#d7dde2" font-size="12" font-weight="500" text-anchor="start" style="font-style:italic;"></text>
+<text x="816" y="218" fill="#f4f7fb" font-size="12" font-weight="500" text-anchor="start" style="">시/도 + 시/군/구</text>
+<rect x="740" y="40" width="760" height="550" rx="4" fill="#26353d" stroke="#155a7a" stroke-width="3"/>
+<rect x="740" y="40" width="760" height="46" rx="4" fill="#155a7a"/>
+<text x="754" y="70" fill="#f4f7fb" font-size="19" font-weight="700" text-anchor="start" style="">사용자</text>
+<text x="1486" y="70" fill="#f4f7fb" font-size="18" font-weight="700" text-anchor="end" style="">users</text>
+<rect x="740" y="86" width="760" height="36" fill="#3a82ad" stroke="#17252d" stroke-width="1"/>
+<line x1="788" y1="86" x2="788" y2="122" stroke="#17252d" stroke-width="1"/>
+<line x1="964" y1="86" x2="964" y2="122" stroke="#17252d" stroke-width="1"/>
+<line x1="1142" y1="86" x2="1142" y2="122" stroke="#17252d" stroke-width="1"/>
+<line x1="1246" y1="86" x2="1246" y2="122" stroke="#17252d" stroke-width="1"/>
+<line x1="1338" y1="86" x2="1338" y2="122" stroke="#17252d" stroke-width="1"/>
+<text x="762" y="110" fill="#f7d34a" font-size="11" font-weight="700" text-anchor="middle" style="">PK</text>
+<text x="796" y="110" fill="#f4f7fb" font-size="13" font-weight="700" text-anchor="start" style="">사용자 ID</text>
+<text x="972" y="110" fill="#f4f7fb" font-size="13" font-weight="600" text-anchor="start" style="">id</text>
+<text x="1150" y="110" fill="#f4f7fb" font-size="13" font-weight="500" text-anchor="start" style="">BIGINT</text>
+<text x="1254" y="110" fill="#f4f7fb" font-size="13" font-weight="700" text-anchor="start" style="">NOT NULL</text>
+<text x="1346" y="110" fill="#d7dde2" font-size="12" font-weight="500" text-anchor="start" style="font-style:italic;">AUTO_INCREMENT</text>
+<text x="1506" y="110" fill="#f4f7fb" font-size="12" font-weight="500" text-anchor="start" style="">사용자 고유 식별자</text>
+<rect x="740" y="122" width="760" height="36" fill="#293942" stroke="#17252d" stroke-width="1"/>
+<line x1="788" y1="122" x2="788" y2="158" stroke="#17252d" stroke-width="1"/>
+<line x1="964" y1="122" x2="964" y2="158" stroke="#17252d" stroke-width="1"/>
+<line x1="1142" y1="122" x2="1142" y2="158" stroke="#17252d" stroke-width="1"/>
+<line x1="1246" y1="122" x2="1246" y2="158" stroke="#17252d" stroke-width="1"/>
+<line x1="1338" y1="122" x2="1338" y2="158" stroke="#17252d" stroke-width="1"/>
+<text x="762" y="146" fill="#b9c6ce" font-size="11" font-weight="700" text-anchor="middle" style=""></text>
+<text x="796" y="146" fill="#f4f7fb" font-size="13" font-weight="700" text-anchor="start" style="">소셜 로그인 제공자</text>
+<text x="972" y="146" fill="#f4f7fb" font-size="13" font-weight="600" text-anchor="start" style="">provider</text>
+<text x="1150" y="146" fill="#f4f7fb" font-size="13" font-weight="500" text-anchor="start" style="">VARCHAR(20)</text>
+<text x="1254" y="146" fill="#f4f7fb" font-size="13" font-weight="700" text-anchor="start" style="">NOT NULL</text>
+<text x="1346" y="146" fill="#d7dde2" font-size="12" font-weight="500" text-anchor="start" style="font-style:italic;"></text>
+<text x="1506" y="146" fill="#f4f7fb" font-size="12" font-weight="500" text-anchor="start" style="">KAKAO, NAVER</text>
+<rect x="740" y="158" width="760" height="36" fill="#2f414b" stroke="#17252d" stroke-width="1"/>
+<line x1="788" y1="158" x2="788" y2="194" stroke="#17252d" stroke-width="1"/>
+<line x1="964" y1="158" x2="964" y2="194" stroke="#17252d" stroke-width="1"/>
+<line x1="1142" y1="158" x2="1142" y2="194" stroke="#17252d" stroke-width="1"/>
+<line x1="1246" y1="158" x2="1246" y2="194" stroke="#17252d" stroke-width="1"/>
+<line x1="1338" y1="158" x2="1338" y2="194" stroke="#17252d" stroke-width="1"/>
+<text x="762" y="182" fill="#b9c6ce" font-size="11" font-weight="700" text-anchor="middle" style="">UK</text>
+<text x="796" y="182" fill="#f4f7fb" font-size="13" font-weight="700" text-anchor="start" style="">소셜 제공자 사용자 ID</text>
+<text x="972" y="182" fill="#f4f7fb" font-size="13" font-weight="600" text-anchor="start" style="">provider_user_id</text>
+<text x="1150" y="182" fill="#f4f7fb" font-size="13" font-weight="500" text-anchor="start" style="">VARCHAR(128)</text>
+<text x="1254" y="182" fill="#f4f7fb" font-size="13" font-weight="700" text-anchor="start" style="">NOT NULL</text>
+<text x="1346" y="182" fill="#d7dde2" font-size="12" font-weight="500" text-anchor="start" style="font-style:italic;"></text>
+<text x="1506" y="182" fill="#f4f7fb" font-size="12" font-weight="500" text-anchor="start" style="">소셜 플랫폼 사용자 식별자</text>
+<rect x="740" y="194" width="760" height="36" fill="#293942" stroke="#17252d" stroke-width="1"/>
+<line x1="788" y1="194" x2="788" y2="230" stroke="#17252d" stroke-width="1"/>
+<line x1="964" y1="194" x2="964" y2="230" stroke="#17252d" stroke-width="1"/>
+<line x1="1142" y1="194" x2="1142" y2="230" stroke="#17252d" stroke-width="1"/>
+<line x1="1246" y1="194" x2="1246" y2="230" stroke="#17252d" stroke-width="1"/>
+<line x1="1338" y1="194" x2="1338" y2="230" stroke="#17252d" stroke-width="1"/>
+<text x="762" y="218" fill="#b9c6ce" font-size="11" font-weight="700" text-anchor="middle" style="">UK</text>
+<text x="796" y="218" fill="#f4f7fb" font-size="13" font-weight="700" text-anchor="start" style="">인증 주체 UUID</text>
+<text x="972" y="218" fill="#f4f7fb" font-size="13" font-weight="600" text-anchor="start" style="">auth_subject</text>
+<text x="1150" y="218" fill="#f4f7fb" font-size="13" font-weight="500" text-anchor="start" style="">VARCHAR(36)</text>
+<text x="1254" y="218" fill="#f4f7fb" font-size="13" font-weight="700" text-anchor="start" style="">NOT NULL</text>
+<text x="1346" y="218" fill="#d7dde2" font-size="12" font-weight="500" text-anchor="start" style="font-style:italic;"></text>
+<text x="1506" y="218" fill="#f4f7fb" font-size="12" font-weight="500" text-anchor="start" style="">서비스 내부 인증용 UUID</text>
+<rect x="740" y="230" width="760" height="36" fill="#2f414b" stroke="#17252d" stroke-width="1"/>
+<line x1="788" y1="230" x2="788" y2="266" stroke="#17252d" stroke-width="1"/>
+<line x1="964" y1="230" x2="964" y2="266" stroke="#17252d" stroke-width="1"/>
+<line x1="1142" y1="230" x2="1142" y2="266" stroke="#17252d" stroke-width="1"/>
+<line x1="1246" y1="230" x2="1246" y2="266" stroke="#17252d" stroke-width="1"/>
+<line x1="1338" y1="230" x2="1338" y2="266" stroke="#17252d" stroke-width="1"/>
+<text x="762" y="254" fill="#b9c6ce" font-size="11" font-weight="700" text-anchor="middle" style=""></text>
+<text x="796" y="254" fill="#f4f7fb" font-size="13" font-weight="700" text-anchor="start" style="">이메일</text>
+<text x="972" y="254" fill="#f4f7fb" font-size="13" font-weight="600" text-anchor="start" style="">email</text>
+<text x="1150" y="254" fill="#f4f7fb" font-size="13" font-weight="500" text-anchor="start" style="">VARCHAR(255)</text>
+<text x="1254" y="254" fill="#ff6565" font-size="13" font-weight="700" text-anchor="start" style="">NULL</text>
+<text x="1346" y="254" fill="#d7dde2" font-size="12" font-weight="500" text-anchor="start" style="font-style:italic;"></text>
+<text x="1506" y="254" fill="#f4f7fb" font-size="12" font-weight="500" text-anchor="start" style="">소셜 계정 이메일</text>
+<rect x="740" y="266" width="760" height="36" fill="#293942" stroke="#17252d" stroke-width="1"/>
+<line x1="788" y1="266" x2="788" y2="302" stroke="#17252d" stroke-width="1"/>
+<line x1="964" y1="266" x2="964" y2="302" stroke="#17252d" stroke-width="1"/>
+<line x1="1142" y1="266" x2="1142" y2="302" stroke="#17252d" stroke-width="1"/>
+<line x1="1246" y1="266" x2="1246" y2="302" stroke="#17252d" stroke-width="1"/>
+<line x1="1338" y1="266" x2="1338" y2="302" stroke="#17252d" stroke-width="1"/>
+<text x="762" y="290" fill="#b9c6ce" font-size="11" font-weight="700" text-anchor="middle" style=""></text>
+<text x="796" y="290" fill="#f4f7fb" font-size="13" font-weight="700" text-anchor="start" style="">닉네임</text>
+<text x="972" y="290" fill="#f4f7fb" font-size="13" font-weight="600" text-anchor="start" style="">nickname</text>
+<text x="1150" y="290" fill="#f4f7fb" font-size="13" font-weight="500" text-anchor="start" style="">VARCHAR(100)</text>
+<text x="1254" y="290" fill="#ff6565" font-size="13" font-weight="700" text-anchor="start" style="">NULL</text>
+<text x="1346" y="290" fill="#d7dde2" font-size="12" font-weight="500" text-anchor="start" style="font-style:italic;"></text>
+<text x="1506" y="290" fill="#f4f7fb" font-size="12" font-weight="500" text-anchor="start" style="">서비스 내 사용자 닉네임</text>
+<rect x="740" y="302" width="760" height="36" fill="#2f414b" stroke="#17252d" stroke-width="1"/>
+<line x1="788" y1="302" x2="788" y2="338" stroke="#17252d" stroke-width="1"/>
+<line x1="964" y1="302" x2="964" y2="338" stroke="#17252d" stroke-width="1"/>
+<line x1="1142" y1="302" x2="1142" y2="338" stroke="#17252d" stroke-width="1"/>
+<line x1="1246" y1="302" x2="1246" y2="338" stroke="#17252d" stroke-width="1"/>
+<line x1="1338" y1="302" x2="1338" y2="338" stroke="#17252d" stroke-width="1"/>
+<text x="762" y="326" fill="#b9c6ce" font-size="11" font-weight="700" text-anchor="middle" style=""></text>
+<text x="796" y="326" fill="#f4f7fb" font-size="13" font-weight="700" text-anchor="start" style="">프로필 이미지 URL</text>
+<text x="972" y="326" fill="#f4f7fb" font-size="13" font-weight="600" text-anchor="start" style="">profile_image_url</text>
+<text x="1150" y="326" fill="#f4f7fb" font-size="13" font-weight="500" text-anchor="start" style="">VARCHAR(512)</text>
+<text x="1254" y="326" fill="#ff6565" font-size="13" font-weight="700" text-anchor="start" style="">NULL</text>
+<text x="1346" y="326" fill="#d7dde2" font-size="12" font-weight="500" text-anchor="start" style="font-style:italic;"></text>
+<text x="1506" y="326" fill="#f4f7fb" font-size="12" font-weight="500" text-anchor="start" style="">사용자 프로필 이미지 주소</text>
+<rect x="740" y="338" width="760" height="36" fill="#293942" stroke="#17252d" stroke-width="1"/>
+<line x1="788" y1="338" x2="788" y2="374" stroke="#17252d" stroke-width="1"/>
+<line x1="964" y1="338" x2="964" y2="374" stroke="#17252d" stroke-width="1"/>
+<line x1="1142" y1="338" x2="1142" y2="374" stroke="#17252d" stroke-width="1"/>
+<line x1="1246" y1="338" x2="1246" y2="374" stroke="#17252d" stroke-width="1"/>
+<line x1="1338" y1="338" x2="1338" y2="374" stroke="#17252d" stroke-width="1"/>
+<text x="762" y="362" fill="#f0a2c7" font-size="11" font-weight="700" text-anchor="middle" style="">FK</text>
+<text x="796" y="362" fill="#f4f7fb" font-size="13" font-weight="700" text-anchor="start" style="">지역 ID</text>
+<text x="972" y="362" fill="#f4f7fb" font-size="13" font-weight="600" text-anchor="start" style="">region_id</text>
+<text x="1150" y="362" fill="#f4f7fb" font-size="13" font-weight="500" text-anchor="start" style="">BIGINT</text>
+<text x="1254" y="362" fill="#ff6565" font-size="13" font-weight="700" text-anchor="start" style="">NULL</text>
+<text x="1346" y="362" fill="#d7dde2" font-size="12" font-weight="500" text-anchor="start" style="font-style:italic;"></text>
+<text x="1506" y="362" fill="#f4f7fb" font-size="12" font-weight="500" text-anchor="start" style="">regions.id 참조</text>
+<rect x="740" y="374" width="760" height="36" fill="#2f414b" stroke="#17252d" stroke-width="1"/>
+<line x1="788" y1="374" x2="788" y2="410" stroke="#17252d" stroke-width="1"/>
+<line x1="964" y1="374" x2="964" y2="410" stroke="#17252d" stroke-width="1"/>
+<line x1="1142" y1="374" x2="1142" y2="410" stroke="#17252d" stroke-width="1"/>
+<line x1="1246" y1="374" x2="1246" y2="410" stroke="#17252d" stroke-width="1"/>
+<line x1="1338" y1="374" x2="1338" y2="410" stroke="#17252d" stroke-width="1"/>
+<text x="762" y="398" fill="#b9c6ce" font-size="11" font-weight="700" text-anchor="middle" style=""></text>
+<text x="796" y="398" fill="#f4f7fb" font-size="13" font-weight="700" text-anchor="start" style="">포인트</text>
+<text x="972" y="398" fill="#f4f7fb" font-size="13" font-weight="600" text-anchor="start" style="">point</text>
+<text x="1150" y="398" fill="#f4f7fb" font-size="13" font-weight="500" text-anchor="start" style="">INT</text>
+<text x="1254" y="398" fill="#f4f7fb" font-size="13" font-weight="700" text-anchor="start" style="">NOT NULL</text>
+<text x="1346" y="398" fill="#d7dde2" font-size="12" font-weight="500" text-anchor="start" style="font-style:italic;">DEFAULT 0</text>
+<text x="1506" y="398" fill="#f4f7fb" font-size="12" font-weight="500" text-anchor="start" style="">보호자 활동 포인트</text>
+<rect x="740" y="410" width="760" height="36" fill="#293942" stroke="#17252d" stroke-width="1"/>
+<line x1="788" y1="410" x2="788" y2="446" stroke="#17252d" stroke-width="1"/>
+<line x1="964" y1="410" x2="964" y2="446" stroke="#17252d" stroke-width="1"/>
+<line x1="1142" y1="410" x2="1142" y2="446" stroke="#17252d" stroke-width="1"/>
+<line x1="1246" y1="410" x2="1246" y2="446" stroke="#17252d" stroke-width="1"/>
+<line x1="1338" y1="410" x2="1338" y2="446" stroke="#17252d" stroke-width="1"/>
+<text x="762" y="434" fill="#b9c6ce" font-size="11" font-weight="700" text-anchor="middle" style=""></text>
+<text x="796" y="434" fill="#f4f7fb" font-size="13" font-weight="700" text-anchor="start" style="">사용자 상태</text>
+<text x="972" y="434" fill="#f4f7fb" font-size="13" font-weight="600" text-anchor="start" style="">status</text>
+<text x="1150" y="434" fill="#f4f7fb" font-size="13" font-weight="500" text-anchor="start" style="">VARCHAR(20)</text>
+<text x="1254" y="434" fill="#f4f7fb" font-size="13" font-weight="700" text-anchor="start" style="">NOT NULL</text>
+<text x="1346" y="434" fill="#d7dde2" font-size="12" font-weight="500" text-anchor="start" style="font-style:italic;">DEFAULT ACTIVE</text>
+<text x="1506" y="434" fill="#f4f7fb" font-size="12" font-weight="500" text-anchor="start" style="">ACTIVE, HIDDEN, DELETED</text>
+<rect x="740" y="446" width="760" height="36" fill="#2f414b" stroke="#17252d" stroke-width="1"/>
+<line x1="788" y1="446" x2="788" y2="482" stroke="#17252d" stroke-width="1"/>
+<line x1="964" y1="446" x2="964" y2="482" stroke="#17252d" stroke-width="1"/>
+<line x1="1142" y1="446" x2="1142" y2="482" stroke="#17252d" stroke-width="1"/>
+<line x1="1246" y1="446" x2="1246" y2="482" stroke="#17252d" stroke-width="1"/>
+<line x1="1338" y1="446" x2="1338" y2="482" stroke="#17252d" stroke-width="1"/>
+<text x="762" y="470" fill="#b9c6ce" font-size="11" font-weight="700" text-anchor="middle" style=""></text>
+<text x="796" y="470" fill="#f4f7fb" font-size="13" font-weight="700" text-anchor="start" style="">탈퇴 사유</text>
+<text x="972" y="470" fill="#f4f7fb" font-size="13" font-weight="600" text-anchor="start" style="">withdrawal_reason</text>
+<text x="1150" y="470" fill="#f4f7fb" font-size="13" font-weight="500" text-anchor="start" style="">VARCHAR(255)</text>
+<text x="1254" y="470" fill="#ff6565" font-size="13" font-weight="700" text-anchor="start" style="">NULL</text>
+<text x="1346" y="470" fill="#d7dde2" font-size="12" font-weight="500" text-anchor="start" style="font-style:italic;"></text>
+<text x="1506" y="470" fill="#f4f7fb" font-size="12" font-weight="500" text-anchor="start" style="">사용자가 입력한 탈퇴 사유</text>
+<rect x="740" y="482" width="760" height="36" fill="#293942" stroke="#17252d" stroke-width="1"/>
+<line x1="788" y1="482" x2="788" y2="518" stroke="#17252d" stroke-width="1"/>
+<line x1="964" y1="482" x2="964" y2="518" stroke="#17252d" stroke-width="1"/>
+<line x1="1142" y1="482" x2="1142" y2="518" stroke="#17252d" stroke-width="1"/>
+<line x1="1246" y1="482" x2="1246" y2="518" stroke="#17252d" stroke-width="1"/>
+<line x1="1338" y1="482" x2="1338" y2="518" stroke="#17252d" stroke-width="1"/>
+<text x="762" y="506" fill="#b9c6ce" font-size="11" font-weight="700" text-anchor="middle" style=""></text>
+<text x="796" y="506" fill="#f4f7fb" font-size="13" font-weight="700" text-anchor="start" style="">탈퇴/삭제 시각</text>
+<text x="972" y="506" fill="#f4f7fb" font-size="13" font-weight="600" text-anchor="start" style="">deleted_at</text>
+<text x="1150" y="506" fill="#f4f7fb" font-size="13" font-weight="500" text-anchor="start" style="">TIMESTAMP</text>
+<text x="1254" y="506" fill="#ff6565" font-size="13" font-weight="700" text-anchor="start" style="">NULL</text>
+<text x="1346" y="506" fill="#d7dde2" font-size="12" font-weight="500" text-anchor="start" style="font-style:italic;"></text>
+<text x="1506" y="506" fill="#f4f7fb" font-size="12" font-weight="500" text-anchor="start" style="">탈퇴 또는 삭제 처리 시각</text>
+<rect x="740" y="518" width="760" height="36" fill="#2f414b" stroke="#17252d" stroke-width="1"/>
+<line x1="788" y1="518" x2="788" y2="554" stroke="#17252d" stroke-width="1"/>
+<line x1="964" y1="518" x2="964" y2="554" stroke="#17252d" stroke-width="1"/>
+<line x1="1142" y1="518" x2="1142" y2="554" stroke="#17252d" stroke-width="1"/>
+<line x1="1246" y1="518" x2="1246" y2="554" stroke="#17252d" stroke-width="1"/>
+<line x1="1338" y1="518" x2="1338" y2="554" stroke="#17252d" stroke-width="1"/>
+<text x="762" y="542" fill="#b9c6ce" font-size="11" font-weight="700" text-anchor="middle" style=""></text>
+<text x="796" y="542" fill="#f4f7fb" font-size="13" font-weight="700" text-anchor="start" style="">생성 시각</text>
+<text x="972" y="542" fill="#f4f7fb" font-size="13" font-weight="600" text-anchor="start" style="">created_at</text>
+<text x="1150" y="542" fill="#f4f7fb" font-size="13" font-weight="500" text-anchor="start" style="">TIMESTAMP</text>
+<text x="1254" y="542" fill="#f4f7fb" font-size="13" font-weight="700" text-anchor="start" style="">NOT NULL</text>
+<text x="1346" y="542" fill="#d7dde2" font-size="12" font-weight="500" text-anchor="start" style="font-style:italic;">CURRENT_TIMESTAMP</text>
+<text x="1506" y="542" fill="#f4f7fb" font-size="12" font-weight="500" text-anchor="start" style="">사용자 생성 시각</text>
+<rect x="740" y="554" width="760" height="36" fill="#293942" stroke="#17252d" stroke-width="1"/>
+<line x1="788" y1="554" x2="788" y2="590" stroke="#17252d" stroke-width="1"/>
+<line x1="964" y1="554" x2="964" y2="590" stroke="#17252d" stroke-width="1"/>
+<line x1="1142" y1="554" x2="1142" y2="590" stroke="#17252d" stroke-width="1"/>
+<line x1="1246" y1="554" x2="1246" y2="590" stroke="#17252d" stroke-width="1"/>
+<line x1="1338" y1="554" x2="1338" y2="590" stroke="#17252d" stroke-width="1"/>
+<text x="762" y="578" fill="#b9c6ce" font-size="11" font-weight="700" text-anchor="middle" style=""></text>
+<text x="796" y="578" fill="#f4f7fb" font-size="13" font-weight="700" text-anchor="start" style="">수정 시각</text>
+<text x="972" y="578" fill="#f4f7fb" font-size="13" font-weight="600" text-anchor="start" style="">updated_at</text>
+<text x="1150" y="578" fill="#f4f7fb" font-size="13" font-weight="500" text-anchor="start" style="">TIMESTAMP</text>
+<text x="1254" y="578" fill="#f4f7fb" font-size="13" font-weight="700" text-anchor="start" style="">NOT NULL</text>
+<text x="1346" y="578" fill="#d7dde2" font-size="12" font-weight="500" text-anchor="start" style="font-style:italic;">CURRENT_TIMESTAMP</text>
+<text x="1506" y="578" fill="#f4f7fb" font-size="12" font-weight="500" text-anchor="start" style="">사용자 정보 수정 시각</text>
+<rect x="1430" y="40" width="760" height="262" rx="4" fill="#26353d" stroke="#2f7d5c" stroke-width="3"/>
+<rect x="1430" y="40" width="760" height="46" rx="4" fill="#2f7d5c"/>
+<text x="1444" y="70" fill="#f4f7fb" font-size="19" font-weight="700" text-anchor="start" style="">약관 동의</text>
+<text x="2176" y="70" fill="#f4f7fb" font-size="18" font-weight="700" text-anchor="end" style="">user_agreement</text>
+<rect x="1430" y="86" width="760" height="36" fill="#3a82ad" stroke="#17252d" stroke-width="1"/>
+<line x1="1478" y1="86" x2="1478" y2="122" stroke="#17252d" stroke-width="1"/>
+<line x1="1654" y1="86" x2="1654" y2="122" stroke="#17252d" stroke-width="1"/>
+<line x1="1832" y1="86" x2="1832" y2="122" stroke="#17252d" stroke-width="1"/>
+<line x1="1936" y1="86" x2="1936" y2="122" stroke="#17252d" stroke-width="1"/>
+<line x1="2028" y1="86" x2="2028" y2="122" stroke="#17252d" stroke-width="1"/>
+<text x="1452" y="110" fill="#f7d34a" font-size="11" font-weight="700" text-anchor="middle" style="">PK</text>
+<text x="1486" y="110" fill="#f4f7fb" font-size="13" font-weight="700" text-anchor="start" style="">약관 동의 ID</text>
+<text x="1662" y="110" fill="#f4f7fb" font-size="13" font-weight="600" text-anchor="start" style="">id</text>
+<text x="1840" y="110" fill="#f4f7fb" font-size="13" font-weight="500" text-anchor="start" style="">BIGINT</text>
+<text x="1944" y="110" fill="#f4f7fb" font-size="13" font-weight="700" text-anchor="start" style="">NOT NULL</text>
+<text x="2036" y="110" fill="#d7dde2" font-size="12" font-weight="500" text-anchor="start" style="font-style:italic;">AUTO_INCREMENT</text>
+<text x="2196" y="110" fill="#f4f7fb" font-size="12" font-weight="500" text-anchor="start" style="">약관 동의 고유 식별자</text>
+<rect x="1430" y="122" width="760" height="36" fill="#293942" stroke="#17252d" stroke-width="1"/>
+<line x1="1478" y1="122" x2="1478" y2="158" stroke="#17252d" stroke-width="1"/>
+<line x1="1654" y1="122" x2="1654" y2="158" stroke="#17252d" stroke-width="1"/>
+<line x1="1832" y1="122" x2="1832" y2="158" stroke="#17252d" stroke-width="1"/>
+<line x1="1936" y1="122" x2="1936" y2="158" stroke="#17252d" stroke-width="1"/>
+<line x1="2028" y1="122" x2="2028" y2="158" stroke="#17252d" stroke-width="1"/>
+<text x="1452" y="146" fill="#f0a2c7" font-size="11" font-weight="700" text-anchor="middle" style="">FK/UK</text>
+<text x="1486" y="146" fill="#f4f7fb" font-size="13" font-weight="700" text-anchor="start" style="">사용자 ID</text>
+<text x="1662" y="146" fill="#f4f7fb" font-size="13" font-weight="600" text-anchor="start" style="">user_id</text>
+<text x="1840" y="146" fill="#f4f7fb" font-size="13" font-weight="500" text-anchor="start" style="">BIGINT</text>
+<text x="1944" y="146" fill="#f4f7fb" font-size="13" font-weight="700" text-anchor="start" style="">NOT NULL</text>
+<text x="2036" y="146" fill="#d7dde2" font-size="12" font-weight="500" text-anchor="start" style="font-style:italic;"></text>
+<text x="2196" y="146" fill="#f4f7fb" font-size="12" font-weight="500" text-anchor="start" style="">users.id 참조, 사용자당 1개</text>
+<rect x="1430" y="158" width="760" height="36" fill="#2f414b" stroke="#17252d" stroke-width="1"/>
+<line x1="1478" y1="158" x2="1478" y2="194" stroke="#17252d" stroke-width="1"/>
+<line x1="1654" y1="158" x2="1654" y2="194" stroke="#17252d" stroke-width="1"/>
+<line x1="1832" y1="158" x2="1832" y2="194" stroke="#17252d" stroke-width="1"/>
+<line x1="1936" y1="158" x2="1936" y2="194" stroke="#17252d" stroke-width="1"/>
+<line x1="2028" y1="158" x2="2028" y2="194" stroke="#17252d" stroke-width="1"/>
+<text x="1452" y="182" fill="#b9c6ce" font-size="11" font-weight="700" text-anchor="middle" style=""></text>
+<text x="1486" y="182" fill="#f4f7fb" font-size="13" font-weight="700" text-anchor="start" style="">서비스 이용약관 동의 여부</text>
+<text x="1662" y="182" fill="#f4f7fb" font-size="13" font-weight="600" text-anchor="start" style="">service_terms_agreed</text>
+<text x="1840" y="182" fill="#f4f7fb" font-size="13" font-weight="500" text-anchor="start" style="">BOOLEAN</text>
+<text x="1944" y="182" fill="#f4f7fb" font-size="13" font-weight="700" text-anchor="start" style="">NOT NULL</text>
+<text x="2036" y="182" fill="#d7dde2" font-size="12" font-weight="500" text-anchor="start" style="font-style:italic;">DEFAULT FALSE</text>
+<text x="2196" y="182" fill="#f4f7fb" font-size="12" font-weight="500" text-anchor="start" style="">필수 약관</text>
+<rect x="1430" y="194" width="760" height="36" fill="#293942" stroke="#17252d" stroke-width="1"/>
+<line x1="1478" y1="194" x2="1478" y2="230" stroke="#17252d" stroke-width="1"/>
+<line x1="1654" y1="194" x2="1654" y2="230" stroke="#17252d" stroke-width="1"/>
+<line x1="1832" y1="194" x2="1832" y2="230" stroke="#17252d" stroke-width="1"/>
+<line x1="1936" y1="194" x2="1936" y2="230" stroke="#17252d" stroke-width="1"/>
+<line x1="2028" y1="194" x2="2028" y2="230" stroke="#17252d" stroke-width="1"/>
+<text x="1452" y="218" fill="#b9c6ce" font-size="11" font-weight="700" text-anchor="middle" style=""></text>
+<text x="1486" y="218" fill="#f4f7fb" font-size="13" font-weight="700" text-anchor="start" style="">개인정보처리방침 동의 여부</text>
+<text x="1662" y="218" fill="#f4f7fb" font-size="13" font-weight="600" text-anchor="start" style="">privacy_policy_agreed</text>
+<text x="1840" y="218" fill="#f4f7fb" font-size="13" font-weight="500" text-anchor="start" style="">BOOLEAN</text>
+<text x="1944" y="218" fill="#f4f7fb" font-size="13" font-weight="700" text-anchor="start" style="">NOT NULL</text>
+<text x="2036" y="218" fill="#d7dde2" font-size="12" font-weight="500" text-anchor="start" style="font-style:italic;">DEFAULT FALSE</text>
+<text x="2196" y="218" fill="#f4f7fb" font-size="12" font-weight="500" text-anchor="start" style="">필수 약관</text>
+<rect x="1430" y="230" width="760" height="36" fill="#2f414b" stroke="#17252d" stroke-width="1"/>
+<line x1="1478" y1="230" x2="1478" y2="266" stroke="#17252d" stroke-width="1"/>
+<line x1="1654" y1="230" x2="1654" y2="266" stroke="#17252d" stroke-width="1"/>
+<line x1="1832" y1="230" x2="1832" y2="266" stroke="#17252d" stroke-width="1"/>
+<line x1="1936" y1="230" x2="1936" y2="266" stroke="#17252d" stroke-width="1"/>
+<line x1="2028" y1="230" x2="2028" y2="266" stroke="#17252d" stroke-width="1"/>
+<text x="1452" y="254" fill="#b9c6ce" font-size="11" font-weight="700" text-anchor="middle" style=""></text>
+<text x="1486" y="254" fill="#f4f7fb" font-size="13" font-weight="700" text-anchor="start" style="">AI 챗봇 이용 동의 여부</text>
+<text x="1662" y="254" fill="#f4f7fb" font-size="13" font-weight="600" text-anchor="start" style="">ai_terms_agreed</text>
+<text x="1840" y="254" fill="#f4f7fb" font-size="13" font-weight="500" text-anchor="start" style="">BOOLEAN</text>
+<text x="1944" y="254" fill="#f4f7fb" font-size="13" font-weight="700" text-anchor="start" style="">NOT NULL</text>
+<text x="2036" y="254" fill="#d7dde2" font-size="12" font-weight="500" text-anchor="start" style="font-style:italic;">DEFAULT FALSE</text>
+<text x="2196" y="254" fill="#f4f7fb" font-size="12" font-weight="500" text-anchor="start" style="">선택 약관</text>
+<rect x="1430" y="266" width="760" height="36" fill="#293942" stroke="#17252d" stroke-width="1"/>
+<line x1="1478" y1="266" x2="1478" y2="302" stroke="#17252d" stroke-width="1"/>
+<line x1="1654" y1="266" x2="1654" y2="302" stroke="#17252d" stroke-width="1"/>
+<line x1="1832" y1="266" x2="1832" y2="302" stroke="#17252d" stroke-width="1"/>
+<line x1="1936" y1="266" x2="1936" y2="302" stroke="#17252d" stroke-width="1"/>
+<line x1="2028" y1="266" x2="2028" y2="302" stroke="#17252d" stroke-width="1"/>
+<text x="1452" y="290" fill="#b9c6ce" font-size="11" font-weight="700" text-anchor="middle" style=""></text>
+<text x="1486" y="290" fill="#f4f7fb" font-size="13" font-weight="700" text-anchor="start" style="">약관 동의 시각</text>
+<text x="1662" y="290" fill="#f4f7fb" font-size="13" font-weight="600" text-anchor="start" style="">agreed_at</text>
+<text x="1840" y="290" fill="#f4f7fb" font-size="13" font-weight="500" text-anchor="start" style="">TIMESTAMP</text>
+<text x="1944" y="290" fill="#ff6565" font-size="13" font-weight="700" text-anchor="start" style="">NULL</text>
+<text x="2036" y="290" fill="#d7dde2" font-size="12" font-weight="500" text-anchor="start" style="font-style:italic;"></text>
+<text x="2196" y="290" fill="#f4f7fb" font-size="12" font-weight="500" text-anchor="start" style="">약관 동의 완료 시각</text>
+<rect x="1430" y="430" width="760" height="154" rx="4" fill="#26353d" stroke="#6d5a9c" stroke-width="3"/>
+<rect x="1430" y="430" width="760" height="46" rx="4" fill="#6d5a9c"/>
+<text x="1444" y="460" fill="#f4f7fb" font-size="19" font-weight="700" text-anchor="start" style="">온보딩</text>
+<text x="2176" y="460" fill="#f4f7fb" font-size="18" font-weight="700" text-anchor="end" style="">user_onboarding</text>
+<rect x="1430" y="476" width="760" height="36" fill="#3a82ad" stroke="#17252d" stroke-width="1"/>
+<line x1="1478" y1="476" x2="1478" y2="512" stroke="#17252d" stroke-width="1"/>
+<line x1="1654" y1="476" x2="1654" y2="512" stroke="#17252d" stroke-width="1"/>
+<line x1="1832" y1="476" x2="1832" y2="512" stroke="#17252d" stroke-width="1"/>
+<line x1="1936" y1="476" x2="1936" y2="512" stroke="#17252d" stroke-width="1"/>
+<line x1="2028" y1="476" x2="2028" y2="512" stroke="#17252d" stroke-width="1"/>
+<text x="1452" y="500" fill="#f7d34a" font-size="11" font-weight="700" text-anchor="middle" style="">PK</text>
+<text x="1486" y="500" fill="#f4f7fb" font-size="13" font-weight="700" text-anchor="start" style="">온보딩 ID</text>
+<text x="1662" y="500" fill="#f4f7fb" font-size="13" font-weight="600" text-anchor="start" style="">id</text>
+<text x="1840" y="500" fill="#f4f7fb" font-size="13" font-weight="500" text-anchor="start" style="">BIGINT</text>
+<text x="1944" y="500" fill="#f4f7fb" font-size="13" font-weight="700" text-anchor="start" style="">NOT NULL</text>
+<text x="2036" y="500" fill="#d7dde2" font-size="12" font-weight="500" text-anchor="start" style="font-style:italic;">AUTO_INCREMENT</text>
+<text x="2196" y="500" fill="#f4f7fb" font-size="12" font-weight="500" text-anchor="start" style="">온보딩 고유 식별자</text>
+<rect x="1430" y="512" width="760" height="36" fill="#293942" stroke="#17252d" stroke-width="1"/>
+<line x1="1478" y1="512" x2="1478" y2="548" stroke="#17252d" stroke-width="1"/>
+<line x1="1654" y1="512" x2="1654" y2="548" stroke="#17252d" stroke-width="1"/>
+<line x1="1832" y1="512" x2="1832" y2="548" stroke="#17252d" stroke-width="1"/>
+<line x1="1936" y1="512" x2="1936" y2="548" stroke="#17252d" stroke-width="1"/>
+<line x1="2028" y1="512" x2="2028" y2="548" stroke="#17252d" stroke-width="1"/>
+<text x="1452" y="536" fill="#f0a2c7" font-size="11" font-weight="700" text-anchor="middle" style="">FK/UK</text>
+<text x="1486" y="536" fill="#f4f7fb" font-size="13" font-weight="700" text-anchor="start" style="">사용자 ID</text>
+<text x="1662" y="536" fill="#f4f7fb" font-size="13" font-weight="600" text-anchor="start" style="">user_id</text>
+<text x="1840" y="536" fill="#f4f7fb" font-size="13" font-weight="500" text-anchor="start" style="">BIGINT</text>
+<text x="1944" y="536" fill="#f4f7fb" font-size="13" font-weight="700" text-anchor="start" style="">NOT NULL</text>
+<text x="2036" y="536" fill="#d7dde2" font-size="12" font-weight="500" text-anchor="start" style="font-style:italic;"></text>
+<text x="2196" y="536" fill="#f4f7fb" font-size="12" font-weight="500" text-anchor="start" style="">users.id 참조, 사용자당 1개</text>
+<rect x="1430" y="548" width="760" height="36" fill="#2f414b" stroke="#17252d" stroke-width="1"/>
+<line x1="1478" y1="548" x2="1478" y2="584" stroke="#17252d" stroke-width="1"/>
+<line x1="1654" y1="548" x2="1654" y2="584" stroke="#17252d" stroke-width="1"/>
+<line x1="1832" y1="548" x2="1832" y2="584" stroke="#17252d" stroke-width="1"/>
+<line x1="1936" y1="548" x2="1936" y2="584" stroke="#17252d" stroke-width="1"/>
+<line x1="2028" y1="548" x2="2028" y2="584" stroke="#17252d" stroke-width="1"/>
+<text x="1452" y="572" fill="#b9c6ce" font-size="11" font-weight="700" text-anchor="middle" style=""></text>
+<text x="1486" y="572" fill="#f4f7fb" font-size="13" font-weight="700" text-anchor="start" style="">온보딩 건너뛰기 여부</text>
+<text x="1662" y="572" fill="#f4f7fb" font-size="13" font-weight="600" text-anchor="start" style="">onboarding_skipped</text>
+<text x="1840" y="572" fill="#f4f7fb" font-size="13" font-weight="500" text-anchor="start" style="">BOOLEAN</text>
+<text x="1944" y="572" fill="#f4f7fb" font-size="13" font-weight="700" text-anchor="start" style="">NOT NULL</text>
+<text x="2036" y="572" fill="#d7dde2" font-size="12" font-weight="500" text-anchor="start" style="font-style:italic;">DEFAULT FALSE</text>
+<text x="2196" y="572" fill="#f4f7fb" font-size="12" font-weight="500" text-anchor="start" style="">그만하기/건너뛰기 여부</text>
+<rect x="740" y="760" width="760" height="226" rx="4" fill="#26353d" stroke="#1f6f8b" stroke-width="3"/>
+<rect x="740" y="760" width="760" height="46" rx="4" fill="#1f6f8b"/>
+<text x="754" y="790" fill="#f4f7fb" font-size="19" font-weight="700" text-anchor="start" style="">자녀 프로필</text>
+<text x="1486" y="790" fill="#f4f7fb" font-size="18" font-weight="700" text-anchor="end" style="">child_profile</text>
+<rect x="740" y="806" width="760" height="36" fill="#3a82ad" stroke="#17252d" stroke-width="1"/>
+<line x1="788" y1="806" x2="788" y2="842" stroke="#17252d" stroke-width="1"/>
+<line x1="964" y1="806" x2="964" y2="842" stroke="#17252d" stroke-width="1"/>
+<line x1="1142" y1="806" x2="1142" y2="842" stroke="#17252d" stroke-width="1"/>
+<line x1="1246" y1="806" x2="1246" y2="842" stroke="#17252d" stroke-width="1"/>
+<line x1="1338" y1="806" x2="1338" y2="842" stroke="#17252d" stroke-width="1"/>
+<text x="762" y="830" fill="#f7d34a" font-size="11" font-weight="700" text-anchor="middle" style="">PK</text>
+<text x="796" y="830" fill="#f4f7fb" font-size="13" font-weight="700" text-anchor="start" style="">자녀 프로필 ID</text>
+<text x="972" y="830" fill="#f4f7fb" font-size="13" font-weight="600" text-anchor="start" style="">id</text>
+<text x="1150" y="830" fill="#f4f7fb" font-size="13" font-weight="500" text-anchor="start" style="">BIGINT</text>
+<text x="1254" y="830" fill="#f4f7fb" font-size="13" font-weight="700" text-anchor="start" style="">NOT NULL</text>
+<text x="1346" y="830" fill="#d7dde2" font-size="12" font-weight="500" text-anchor="start" style="font-style:italic;">AUTO_INCREMENT</text>
+<text x="1506" y="830" fill="#f4f7fb" font-size="12" font-weight="500" text-anchor="start" style="">자녀 프로필 고유 식별자</text>
+<rect x="740" y="842" width="760" height="36" fill="#293942" stroke="#17252d" stroke-width="1"/>
+<line x1="788" y1="842" x2="788" y2="878" stroke="#17252d" stroke-width="1"/>
+<line x1="964" y1="842" x2="964" y2="878" stroke="#17252d" stroke-width="1"/>
+<line x1="1142" y1="842" x2="1142" y2="878" stroke="#17252d" stroke-width="1"/>
+<line x1="1246" y1="842" x2="1246" y2="878" stroke="#17252d" stroke-width="1"/>
+<line x1="1338" y1="842" x2="1338" y2="878" stroke="#17252d" stroke-width="1"/>
+<text x="762" y="866" fill="#f0a2c7" font-size="11" font-weight="700" text-anchor="middle" style="">FK/UK</text>
+<text x="796" y="866" fill="#f4f7fb" font-size="13" font-weight="700" text-anchor="start" style="">사용자 ID</text>
+<text x="972" y="866" fill="#f4f7fb" font-size="13" font-weight="600" text-anchor="start" style="">user_id</text>
+<text x="1150" y="866" fill="#f4f7fb" font-size="13" font-weight="500" text-anchor="start" style="">BIGINT</text>
+<text x="1254" y="866" fill="#f4f7fb" font-size="13" font-weight="700" text-anchor="start" style="">NOT NULL</text>
+<text x="1346" y="866" fill="#d7dde2" font-size="12" font-weight="500" text-anchor="start" style="font-style:italic;"></text>
+<text x="1506" y="866" fill="#f4f7fb" font-size="12" font-weight="500" text-anchor="start" style="">users.id 참조, 사용자당 1개</text>
+<rect x="740" y="878" width="760" height="36" fill="#2f414b" stroke="#17252d" stroke-width="1"/>
+<line x1="788" y1="878" x2="788" y2="914" stroke="#17252d" stroke-width="1"/>
+<line x1="964" y1="878" x2="964" y2="914" stroke="#17252d" stroke-width="1"/>
+<line x1="1142" y1="878" x2="1142" y2="914" stroke="#17252d" stroke-width="1"/>
+<line x1="1246" y1="878" x2="1246" y2="914" stroke="#17252d" stroke-width="1"/>
+<line x1="1338" y1="878" x2="1338" y2="914" stroke="#17252d" stroke-width="1"/>
+<text x="762" y="902" fill="#b9c6ce" font-size="11" font-weight="700" text-anchor="middle" style=""></text>
+<text x="796" y="902" fill="#f4f7fb" font-size="13" font-weight="700" text-anchor="start" style="">자녀 닉네임</text>
+<text x="972" y="902" fill="#f4f7fb" font-size="13" font-weight="600" text-anchor="start" style="">child_nickname</text>
+<text x="1150" y="902" fill="#f4f7fb" font-size="13" font-weight="500" text-anchor="start" style="">VARCHAR(20)</text>
+<text x="1254" y="902" fill="#ff6565" font-size="13" font-weight="700" text-anchor="start" style="">NULL</text>
+<text x="1346" y="902" fill="#d7dde2" font-size="12" font-weight="500" text-anchor="start" style="font-style:italic;"></text>
+<text x="1506" y="902" fill="#f4f7fb" font-size="12" font-weight="500" text-anchor="start" style="">자녀 표시 이름</text>
+<rect x="740" y="914" width="760" height="36" fill="#293942" stroke="#17252d" stroke-width="1"/>
+<line x1="788" y1="914" x2="788" y2="950" stroke="#17252d" stroke-width="1"/>
+<line x1="964" y1="914" x2="964" y2="950" stroke="#17252d" stroke-width="1"/>
+<line x1="1142" y1="914" x2="1142" y2="950" stroke="#17252d" stroke-width="1"/>
+<line x1="1246" y1="914" x2="1246" y2="950" stroke="#17252d" stroke-width="1"/>
+<line x1="1338" y1="914" x2="1338" y2="950" stroke="#17252d" stroke-width="1"/>
+<text x="762" y="938" fill="#b9c6ce" font-size="11" font-weight="700" text-anchor="middle" style=""></text>
+<text x="796" y="938" fill="#f4f7fb" font-size="13" font-weight="700" text-anchor="start" style="">자녀 생년월</text>
+<text x="972" y="938" fill="#f4f7fb" font-size="13" font-weight="600" text-anchor="start" style="">child_birth</text>
+<text x="1150" y="938" fill="#f4f7fb" font-size="13" font-weight="500" text-anchor="start" style="">VARCHAR(7)</text>
+<text x="1254" y="938" fill="#ff6565" font-size="13" font-weight="700" text-anchor="start" style="">NULL</text>
+<text x="1346" y="938" fill="#d7dde2" font-size="12" font-weight="500" text-anchor="start" style="font-style:italic;"></text>
+<text x="1506" y="938" fill="#f4f7fb" font-size="12" font-weight="500" text-anchor="start" style="">YYYY-MM 형식</text>
+<rect x="740" y="950" width="760" height="36" fill="#2f414b" stroke="#17252d" stroke-width="1"/>
+<line x1="788" y1="950" x2="788" y2="986" stroke="#17252d" stroke-width="1"/>
+<line x1="964" y1="950" x2="964" y2="986" stroke="#17252d" stroke-width="1"/>
+<line x1="1142" y1="950" x2="1142" y2="986" stroke="#17252d" stroke-width="1"/>
+<line x1="1246" y1="950" x2="1246" y2="986" stroke="#17252d" stroke-width="1"/>
+<line x1="1338" y1="950" x2="1338" y2="986" stroke="#17252d" stroke-width="1"/>
+<text x="762" y="974" fill="#b9c6ce" font-size="11" font-weight="700" text-anchor="middle" style=""></text>
+<text x="796" y="974" fill="#f4f7fb" font-size="13" font-weight="700" text-anchor="start" style="">자녀 특징 키워드</text>
+<text x="972" y="974" fill="#f4f7fb" font-size="13" font-weight="600" text-anchor="start" style="">keyword_text</text>
+<text x="1150" y="974" fill="#f4f7fb" font-size="13" font-weight="500" text-anchor="start" style="">VARCHAR(100)</text>
+<text x="1254" y="974" fill="#ff6565" font-size="13" font-weight="700" text-anchor="start" style="">NULL</text>
+<text x="1346" y="974" fill="#d7dde2" font-size="12" font-weight="500" text-anchor="start" style="font-style:italic;"></text>
+<text x="1506" y="974" fill="#f4f7fb" font-size="12" font-weight="500" text-anchor="start" style="">예: 말이 느림</text>
+<rect x="1430" y="760" width="760" height="226" rx="4" fill="#26353d" stroke="#7a4b87" stroke-width="3"/>
+<rect x="1430" y="760" width="760" height="46" rx="4" fill="#7a4b87"/>
+<text x="1444" y="790" fill="#f4f7fb" font-size="19" font-weight="700" text-anchor="start" style="">보호자 프로필</text>
+<text x="2176" y="790" fill="#f4f7fb" font-size="18" font-weight="700" text-anchor="end" style="">guardian_profile</text>
+<rect x="1430" y="806" width="760" height="36" fill="#3a82ad" stroke="#17252d" stroke-width="1"/>
+<line x1="1478" y1="806" x2="1478" y2="842" stroke="#17252d" stroke-width="1"/>
+<line x1="1654" y1="806" x2="1654" y2="842" stroke="#17252d" stroke-width="1"/>
+<line x1="1832" y1="806" x2="1832" y2="842" stroke="#17252d" stroke-width="1"/>
+<line x1="1936" y1="806" x2="1936" y2="842" stroke="#17252d" stroke-width="1"/>
+<line x1="2028" y1="806" x2="2028" y2="842" stroke="#17252d" stroke-width="1"/>
+<text x="1452" y="830" fill="#f7d34a" font-size="11" font-weight="700" text-anchor="middle" style="">PK</text>
+<text x="1486" y="830" fill="#f4f7fb" font-size="13" font-weight="700" text-anchor="start" style="">보호자 프로필 ID</text>
+<text x="1662" y="830" fill="#f4f7fb" font-size="13" font-weight="600" text-anchor="start" style="">id</text>
+<text x="1840" y="830" fill="#f4f7fb" font-size="13" font-weight="500" text-anchor="start" style="">BIGINT</text>
+<text x="1944" y="830" fill="#f4f7fb" font-size="13" font-weight="700" text-anchor="start" style="">NOT NULL</text>
+<text x="2036" y="830" fill="#d7dde2" font-size="12" font-weight="500" text-anchor="start" style="font-style:italic;">AUTO_INCREMENT</text>
+<text x="2196" y="830" fill="#f4f7fb" font-size="12" font-weight="500" text-anchor="start" style="">보호자 프로필 고유 식별자</text>
+<rect x="1430" y="842" width="760" height="36" fill="#293942" stroke="#17252d" stroke-width="1"/>
+<line x1="1478" y1="842" x2="1478" y2="878" stroke="#17252d" stroke-width="1"/>
+<line x1="1654" y1="842" x2="1654" y2="878" stroke="#17252d" stroke-width="1"/>
+<line x1="1832" y1="842" x2="1832" y2="878" stroke="#17252d" stroke-width="1"/>
+<line x1="1936" y1="842" x2="1936" y2="878" stroke="#17252d" stroke-width="1"/>
+<line x1="2028" y1="842" x2="2028" y2="878" stroke="#17252d" stroke-width="1"/>
+<text x="1452" y="866" fill="#f0a2c7" font-size="11" font-weight="700" text-anchor="middle" style="">FK/UK</text>
+<text x="1486" y="866" fill="#f4f7fb" font-size="13" font-weight="700" text-anchor="start" style="">사용자 ID</text>
+<text x="1662" y="866" fill="#f4f7fb" font-size="13" font-weight="600" text-anchor="start" style="">user_id</text>
+<text x="1840" y="866" fill="#f4f7fb" font-size="13" font-weight="500" text-anchor="start" style="">BIGINT</text>
+<text x="1944" y="866" fill="#f4f7fb" font-size="13" font-weight="700" text-anchor="start" style="">NOT NULL</text>
+<text x="2036" y="866" fill="#d7dde2" font-size="12" font-weight="500" text-anchor="start" style="font-style:italic;"></text>
+<text x="2196" y="866" fill="#f4f7fb" font-size="12" font-weight="500" text-anchor="start" style="">users.id 참조, 사용자당 1개</text>
+<rect x="1430" y="878" width="760" height="36" fill="#2f414b" stroke="#17252d" stroke-width="1"/>
+<line x1="1478" y1="878" x2="1478" y2="914" stroke="#17252d" stroke-width="1"/>
+<line x1="1654" y1="878" x2="1654" y2="914" stroke="#17252d" stroke-width="1"/>
+<line x1="1832" y1="878" x2="1832" y2="914" stroke="#17252d" stroke-width="1"/>
+<line x1="1936" y1="878" x2="1936" y2="914" stroke="#17252d" stroke-width="1"/>
+<line x1="2028" y1="878" x2="2028" y2="914" stroke="#17252d" stroke-width="1"/>
+<text x="1452" y="902" fill="#b9c6ce" font-size="11" font-weight="700" text-anchor="middle" style=""></text>
+<text x="1486" y="902" fill="#f4f7fb" font-size="13" font-weight="700" text-anchor="start" style="">보호자 닉네임</text>
+<text x="1662" y="902" fill="#f4f7fb" font-size="13" font-weight="600" text-anchor="start" style="">guardian_nickname</text>
+<text x="1840" y="902" fill="#f4f7fb" font-size="13" font-weight="500" text-anchor="start" style="">VARCHAR(20)</text>
+<text x="1944" y="902" fill="#ff6565" font-size="13" font-weight="700" text-anchor="start" style="">NULL</text>
+<text x="2036" y="902" fill="#d7dde2" font-size="12" font-weight="500" text-anchor="start" style="font-style:italic;"></text>
+<text x="2196" y="902" fill="#f4f7fb" font-size="12" font-weight="500" text-anchor="start" style="">커뮤니티 표시 닉네임</text>
+<rect x="1430" y="914" width="760" height="36" fill="#293942" stroke="#17252d" stroke-width="1"/>
+<line x1="1478" y1="914" x2="1478" y2="950" stroke="#17252d" stroke-width="1"/>
+<line x1="1654" y1="914" x2="1654" y2="950" stroke="#17252d" stroke-width="1"/>
+<line x1="1832" y1="914" x2="1832" y2="950" stroke="#17252d" stroke-width="1"/>
+<line x1="1936" y1="914" x2="1936" y2="950" stroke="#17252d" stroke-width="1"/>
+<line x1="2028" y1="914" x2="2028" y2="950" stroke="#17252d" stroke-width="1"/>
+<text x="1452" y="938" fill="#b9c6ce" font-size="11" font-weight="700" text-anchor="middle" style=""></text>
+<text x="1486" y="938" fill="#f4f7fb" font-size="13" font-weight="700" text-anchor="start" style="">보호자 유형</text>
+<text x="1662" y="938" fill="#f4f7fb" font-size="13" font-weight="600" text-anchor="start" style="">guardian_type</text>
+<text x="1840" y="938" fill="#f4f7fb" font-size="13" font-weight="500" text-anchor="start" style="">VARCHAR(50)</text>
+<text x="1944" y="938" fill="#ff6565" font-size="13" font-weight="700" text-anchor="start" style="">NULL</text>
+<text x="2036" y="938" fill="#d7dde2" font-size="12" font-weight="500" text-anchor="start" style="font-style:italic;"></text>
+<text x="2196" y="938" fill="#f4f7fb" font-size="12" font-weight="500" text-anchor="start" style="">PARENT, GRANDPARENT, SIBLING, OTHER</text>
+<rect x="1430" y="950" width="760" height="36" fill="#2f414b" stroke="#17252d" stroke-width="1"/>
+<line x1="1478" y1="950" x2="1478" y2="986" stroke="#17252d" stroke-width="1"/>
+<line x1="1654" y1="950" x2="1654" y2="986" stroke="#17252d" stroke-width="1"/>
+<line x1="1832" y1="950" x2="1832" y2="986" stroke="#17252d" stroke-width="1"/>
+<line x1="1936" y1="950" x2="1936" y2="986" stroke="#17252d" stroke-width="1"/>
+<line x1="2028" y1="950" x2="2028" y2="986" stroke="#17252d" stroke-width="1"/>
+<text x="1452" y="974" fill="#b9c6ce" font-size="11" font-weight="700" text-anchor="middle" style=""></text>
+<text x="1486" y="974" fill="#f4f7fb" font-size="13" font-weight="700" text-anchor="start" style="">커뮤니티 역할 유형</text>
+<text x="1662" y="974" fill="#f4f7fb" font-size="13" font-weight="600" text-anchor="start" style="">community_role_type</text>
+<text x="1840" y="974" fill="#f4f7fb" font-size="13" font-weight="500" text-anchor="start" style="">VARCHAR(50)</text>
+<text x="1944" y="974" fill="#ff6565" font-size="13" font-weight="700" text-anchor="start" style="">NULL</text>
+<text x="2036" y="974" fill="#d7dde2" font-size="12" font-weight="500" text-anchor="start" style="font-style:italic;"></text>
+<text x="2196" y="974" fill="#f4f7fb" font-size="12" font-weight="500" text-anchor="start" style="">INFO_SEEKER, EXPERIENCE_SHARER, WISDOM_HELPER</text>
+<rect x="50" y="760" width="760" height="154" rx="4" fill="#26353d" stroke="#2f7d5c" stroke-width="3"/>
+<rect x="50" y="760" width="760" height="46" rx="4" fill="#2f7d5c"/>
+<text x="64" y="790" fill="#f4f7fb" font-size="19" font-weight="700" text-anchor="start" style="">장애/케어 영역</text>
+<text x="796" y="790" fill="#f4f7fb" font-size="18" font-weight="700" text-anchor="end" style="">disability_type</text>
+<rect x="50" y="806" width="760" height="36" fill="#3a82ad" stroke="#17252d" stroke-width="1"/>
+<line x1="98" y1="806" x2="98" y2="842" stroke="#17252d" stroke-width="1"/>
+<line x1="274" y1="806" x2="274" y2="842" stroke="#17252d" stroke-width="1"/>
+<line x1="452" y1="806" x2="452" y2="842" stroke="#17252d" stroke-width="1"/>
+<line x1="556" y1="806" x2="556" y2="842" stroke="#17252d" stroke-width="1"/>
+<line x1="648" y1="806" x2="648" y2="842" stroke="#17252d" stroke-width="1"/>
+<text x="72" y="830" fill="#f7d34a" font-size="11" font-weight="700" text-anchor="middle" style="">PK</text>
+<text x="106" y="830" fill="#f4f7fb" font-size="13" font-weight="700" text-anchor="start" style="">장애/케어 영역 ID</text>
+<text x="282" y="830" fill="#f4f7fb" font-size="13" font-weight="600" text-anchor="start" style="">id</text>
+<text x="460" y="830" fill="#f4f7fb" font-size="13" font-weight="500" text-anchor="start" style="">INT</text>
+<text x="564" y="830" fill="#f4f7fb" font-size="13" font-weight="700" text-anchor="start" style="">NOT NULL</text>
+<text x="656" y="830" fill="#d7dde2" font-size="12" font-weight="500" text-anchor="start" style="font-style:italic;"></text>
+<text x="816" y="830" fill="#f4f7fb" font-size="12" font-weight="500" text-anchor="start" style="">케어 영역 고유 식별자</text>
+<rect x="50" y="842" width="760" height="36" fill="#293942" stroke="#17252d" stroke-width="1"/>
+<line x1="98" y1="842" x2="98" y2="878" stroke="#17252d" stroke-width="1"/>
+<line x1="274" y1="842" x2="274" y2="878" stroke="#17252d" stroke-width="1"/>
+<line x1="452" y1="842" x2="452" y2="878" stroke="#17252d" stroke-width="1"/>
+<line x1="556" y1="842" x2="556" y2="878" stroke="#17252d" stroke-width="1"/>
+<line x1="648" y1="842" x2="648" y2="878" stroke="#17252d" stroke-width="1"/>
+<text x="72" y="866" fill="#b9c6ce" font-size="11" font-weight="700" text-anchor="middle" style=""></text>
+<text x="106" y="866" fill="#f4f7fb" font-size="13" font-weight="700" text-anchor="start" style="">장애/케어 영역명</text>
+<text x="282" y="866" fill="#f4f7fb" font-size="13" font-weight="600" text-anchor="start" style="">name</text>
+<text x="460" y="866" fill="#f4f7fb" font-size="13" font-weight="500" text-anchor="start" style="">VARCHAR(50)</text>
+<text x="564" y="866" fill="#f4f7fb" font-size="13" font-weight="700" text-anchor="start" style="">NOT NULL</text>
+<text x="656" y="866" fill="#d7dde2" font-size="12" font-weight="500" text-anchor="start" style="font-style:italic;"></text>
+<text x="816" y="866" fill="#f4f7fb" font-size="12" font-weight="500" text-anchor="start" style="">화면 표시 이름</text>
+<rect x="50" y="878" width="760" height="36" fill="#2f414b" stroke="#17252d" stroke-width="1"/>
+<line x1="98" y1="878" x2="98" y2="914" stroke="#17252d" stroke-width="1"/>
+<line x1="274" y1="878" x2="274" y2="914" stroke="#17252d" stroke-width="1"/>
+<line x1="452" y1="878" x2="452" y2="914" stroke="#17252d" stroke-width="1"/>
+<line x1="556" y1="878" x2="556" y2="914" stroke="#17252d" stroke-width="1"/>
+<line x1="648" y1="878" x2="648" y2="914" stroke="#17252d" stroke-width="1"/>
+<text x="72" y="902" fill="#b9c6ce" font-size="11" font-weight="700" text-anchor="middle" style="">UK</text>
+<text x="106" y="902" fill="#f4f7fb" font-size="13" font-weight="700" text-anchor="start" style="">장애/케어 영역 코드</text>
+<text x="282" y="902" fill="#f4f7fb" font-size="13" font-weight="600" text-anchor="start" style="">code</text>
+<text x="460" y="902" fill="#f4f7fb" font-size="13" font-weight="500" text-anchor="start" style="">VARCHAR(50)</text>
+<text x="564" y="902" fill="#f4f7fb" font-size="13" font-weight="700" text-anchor="start" style="">NOT NULL</text>
+<text x="656" y="902" fill="#d7dde2" font-size="12" font-weight="500" text-anchor="start" style="font-style:italic;"></text>
+<text x="816" y="902" fill="#f4f7fb" font-size="12" font-weight="500" text-anchor="start" style="">시스템 식별 코드</text>
+<rect x="50" y="1110" width="760" height="118" rx="4" fill="#26353d" stroke="#4e7a8f" stroke-width="3"/>
+<rect x="50" y="1110" width="760" height="46" rx="4" fill="#4e7a8f"/>
+<text x="64" y="1140" fill="#f4f7fb" font-size="19" font-weight="700" text-anchor="start" style="">자녀 장애/케어 매핑</text>
+<text x="796" y="1140" fill="#f4f7fb" font-size="18" font-weight="700" text-anchor="end" style="">child_disability</text>
+<rect x="50" y="1156" width="760" height="36" fill="#3a82ad" stroke="#17252d" stroke-width="1"/>
+<line x1="98" y1="1156" x2="98" y2="1192" stroke="#17252d" stroke-width="1"/>
+<line x1="274" y1="1156" x2="274" y2="1192" stroke="#17252d" stroke-width="1"/>
+<line x1="452" y1="1156" x2="452" y2="1192" stroke="#17252d" stroke-width="1"/>
+<line x1="556" y1="1156" x2="556" y2="1192" stroke="#17252d" stroke-width="1"/>
+<line x1="648" y1="1156" x2="648" y2="1192" stroke="#17252d" stroke-width="1"/>
+<text x="72" y="1180" fill="#f7d34a" font-size="11" font-weight="700" text-anchor="middle" style="">PK/FK</text>
+<text x="106" y="1180" fill="#f4f7fb" font-size="13" font-weight="700" text-anchor="start" style="">자녀 프로필 ID</text>
+<text x="282" y="1180" fill="#f4f7fb" font-size="13" font-weight="600" text-anchor="start" style="">child_profile_id</text>
+<text x="460" y="1180" fill="#f4f7fb" font-size="13" font-weight="500" text-anchor="start" style="">BIGINT</text>
+<text x="564" y="1180" fill="#f4f7fb" font-size="13" font-weight="700" text-anchor="start" style="">NOT NULL</text>
+<text x="656" y="1180" fill="#d7dde2" font-size="12" font-weight="500" text-anchor="start" style="font-style:italic;"></text>
+<text x="816" y="1180" fill="#f4f7fb" font-size="12" font-weight="500" text-anchor="start" style="">child_profile.id 참조</text>
+<rect x="50" y="1192" width="760" height="36" fill="#293942" stroke="#17252d" stroke-width="1"/>
+<line x1="98" y1="1192" x2="98" y2="1228" stroke="#17252d" stroke-width="1"/>
+<line x1="274" y1="1192" x2="274" y2="1228" stroke="#17252d" stroke-width="1"/>
+<line x1="452" y1="1192" x2="452" y2="1228" stroke="#17252d" stroke-width="1"/>
+<line x1="556" y1="1192" x2="556" y2="1228" stroke="#17252d" stroke-width="1"/>
+<line x1="648" y1="1192" x2="648" y2="1228" stroke="#17252d" stroke-width="1"/>
+<text x="72" y="1216" fill="#f7d34a" font-size="11" font-weight="700" text-anchor="middle" style="">PK/FK</text>
+<text x="106" y="1216" fill="#f4f7fb" font-size="13" font-weight="700" text-anchor="start" style="">장애/케어 영역 ID</text>
+<text x="282" y="1216" fill="#f4f7fb" font-size="13" font-weight="600" text-anchor="start" style="">disability_type_id</text>
+<text x="460" y="1216" fill="#f4f7fb" font-size="13" font-weight="500" text-anchor="start" style="">INT</text>
+<text x="564" y="1216" fill="#f4f7fb" font-size="13" font-weight="700" text-anchor="start" style="">NOT NULL</text>
+<text x="656" y="1216" fill="#d7dde2" font-size="12" font-weight="500" text-anchor="start" style="font-style:italic;"></text>
+<text x="816" y="1216" fill="#f4f7fb" font-size="12" font-weight="500" text-anchor="start" style="">disability_type.id 참조</text>
+<rect x="740" y="1110" width="760" height="190" rx="4" fill="#26353d" stroke="#8a6f2a" stroke-width="3"/>
+<rect x="740" y="1110" width="760" height="46" rx="4" fill="#8a6f2a"/>
+<text x="754" y="1140" fill="#f4f7fb" font-size="19" font-weight="700" text-anchor="start" style="">관심사 카테고리</text>
+<text x="1486" y="1140" fill="#f4f7fb" font-size="18" font-weight="700" text-anchor="end" style="">interest_category</text>
+<rect x="740" y="1156" width="760" height="36" fill="#3a82ad" stroke="#17252d" stroke-width="1"/>
+<line x1="788" y1="1156" x2="788" y2="1192" stroke="#17252d" stroke-width="1"/>
+<line x1="964" y1="1156" x2="964" y2="1192" stroke="#17252d" stroke-width="1"/>
+<line x1="1142" y1="1156" x2="1142" y2="1192" stroke="#17252d" stroke-width="1"/>
+<line x1="1246" y1="1156" x2="1246" y2="1192" stroke="#17252d" stroke-width="1"/>
+<line x1="1338" y1="1156" x2="1338" y2="1192" stroke="#17252d" stroke-width="1"/>
+<text x="762" y="1180" fill="#f7d34a" font-size="11" font-weight="700" text-anchor="middle" style="">PK</text>
+<text x="796" y="1180" fill="#f4f7fb" font-size="13" font-weight="700" text-anchor="start" style="">관심사 카테고리 ID</text>
+<text x="972" y="1180" fill="#f4f7fb" font-size="13" font-weight="600" text-anchor="start" style="">id</text>
+<text x="1150" y="1180" fill="#f4f7fb" font-size="13" font-weight="500" text-anchor="start" style="">INT</text>
+<text x="1254" y="1180" fill="#f4f7fb" font-size="13" font-weight="700" text-anchor="start" style="">NOT NULL</text>
+<text x="1346" y="1180" fill="#d7dde2" font-size="12" font-weight="500" text-anchor="start" style="font-style:italic;"></text>
+<text x="1506" y="1180" fill="#f4f7fb" font-size="12" font-weight="500" text-anchor="start" style="">관심사 고유 식별자</text>
+<rect x="740" y="1192" width="760" height="36" fill="#293942" stroke="#17252d" stroke-width="1"/>
+<line x1="788" y1="1192" x2="788" y2="1228" stroke="#17252d" stroke-width="1"/>
+<line x1="964" y1="1192" x2="964" y2="1228" stroke="#17252d" stroke-width="1"/>
+<line x1="1142" y1="1192" x2="1142" y2="1228" stroke="#17252d" stroke-width="1"/>
+<line x1="1246" y1="1192" x2="1246" y2="1228" stroke="#17252d" stroke-width="1"/>
+<line x1="1338" y1="1192" x2="1338" y2="1228" stroke="#17252d" stroke-width="1"/>
+<text x="762" y="1216" fill="#b9c6ce" font-size="11" font-weight="700" text-anchor="middle" style=""></text>
+<text x="796" y="1216" fill="#f4f7fb" font-size="13" font-weight="700" text-anchor="start" style="">관심사명</text>
+<text x="972" y="1216" fill="#f4f7fb" font-size="13" font-weight="600" text-anchor="start" style="">name</text>
+<text x="1150" y="1216" fill="#f4f7fb" font-size="13" font-weight="500" text-anchor="start" style="">VARCHAR(50)</text>
+<text x="1254" y="1216" fill="#f4f7fb" font-size="13" font-weight="700" text-anchor="start" style="">NOT NULL</text>
+<text x="1346" y="1216" fill="#d7dde2" font-size="12" font-weight="500" text-anchor="start" style="font-style:italic;"></text>
+<text x="1506" y="1216" fill="#f4f7fb" font-size="12" font-weight="500" text-anchor="start" style="">화면 표시 이름</text>
+<rect x="740" y="1228" width="760" height="36" fill="#2f414b" stroke="#17252d" stroke-width="1"/>
+<line x1="788" y1="1228" x2="788" y2="1264" stroke="#17252d" stroke-width="1"/>
+<line x1="964" y1="1228" x2="964" y2="1264" stroke="#17252d" stroke-width="1"/>
+<line x1="1142" y1="1228" x2="1142" y2="1264" stroke="#17252d" stroke-width="1"/>
+<line x1="1246" y1="1228" x2="1246" y2="1264" stroke="#17252d" stroke-width="1"/>
+<line x1="1338" y1="1228" x2="1338" y2="1264" stroke="#17252d" stroke-width="1"/>
+<text x="762" y="1252" fill="#b9c6ce" font-size="11" font-weight="700" text-anchor="middle" style="">UK</text>
+<text x="796" y="1252" fill="#f4f7fb" font-size="13" font-weight="700" text-anchor="start" style="">관심사 코드</text>
+<text x="972" y="1252" fill="#f4f7fb" font-size="13" font-weight="600" text-anchor="start" style="">code</text>
+<text x="1150" y="1252" fill="#f4f7fb" font-size="13" font-weight="500" text-anchor="start" style="">VARCHAR(50)</text>
+<text x="1254" y="1252" fill="#f4f7fb" font-size="13" font-weight="700" text-anchor="start" style="">NOT NULL</text>
+<text x="1346" y="1252" fill="#d7dde2" font-size="12" font-weight="500" text-anchor="start" style="font-style:italic;"></text>
+<text x="1506" y="1252" fill="#f4f7fb" font-size="12" font-weight="500" text-anchor="start" style="">시스템 식별 코드</text>
+<rect x="740" y="1264" width="760" height="36" fill="#293942" stroke="#17252d" stroke-width="1"/>
+<line x1="788" y1="1264" x2="788" y2="1300" stroke="#17252d" stroke-width="1"/>
+<line x1="964" y1="1264" x2="964" y2="1300" stroke="#17252d" stroke-width="1"/>
+<line x1="1142" y1="1264" x2="1142" y2="1300" stroke="#17252d" stroke-width="1"/>
+<line x1="1246" y1="1264" x2="1246" y2="1300" stroke="#17252d" stroke-width="1"/>
+<line x1="1338" y1="1264" x2="1338" y2="1300" stroke="#17252d" stroke-width="1"/>
+<text x="762" y="1288" fill="#b9c6ce" font-size="11" font-weight="700" text-anchor="middle" style=""></text>
+<text x="796" y="1288" fill="#f4f7fb" font-size="13" font-weight="700" text-anchor="start" style="">정렬 순서</text>
+<text x="972" y="1288" fill="#f4f7fb" font-size="13" font-weight="600" text-anchor="start" style="">sort_order</text>
+<text x="1150" y="1288" fill="#f4f7fb" font-size="13" font-weight="500" text-anchor="start" style="">INT</text>
+<text x="1254" y="1288" fill="#f4f7fb" font-size="13" font-weight="700" text-anchor="start" style="">NOT NULL</text>
+<text x="1346" y="1288" fill="#d7dde2" font-size="12" font-weight="500" text-anchor="start" style="font-style:italic;">DEFAULT 0</text>
+<text x="1506" y="1288" fill="#f4f7fb" font-size="12" font-weight="500" text-anchor="start" style="">표시 정렬 순서</text>
+<rect x="1430" y="1110" width="760" height="118" rx="4" fill="#26353d" stroke="#8a6f2a" stroke-width="3"/>
+<rect x="1430" y="1110" width="760" height="46" rx="4" fill="#8a6f2a"/>
+<text x="1444" y="1140" fill="#f4f7fb" font-size="19" font-weight="700" text-anchor="start" style="">사용자 관심사</text>
+<text x="2176" y="1140" fill="#f4f7fb" font-size="18" font-weight="700" text-anchor="end" style="">user_interest</text>
+<rect x="1430" y="1156" width="760" height="36" fill="#3a82ad" stroke="#17252d" stroke-width="1"/>
+<line x1="1478" y1="1156" x2="1478" y2="1192" stroke="#17252d" stroke-width="1"/>
+<line x1="1654" y1="1156" x2="1654" y2="1192" stroke="#17252d" stroke-width="1"/>
+<line x1="1832" y1="1156" x2="1832" y2="1192" stroke="#17252d" stroke-width="1"/>
+<line x1="1936" y1="1156" x2="1936" y2="1192" stroke="#17252d" stroke-width="1"/>
+<line x1="2028" y1="1156" x2="2028" y2="1192" stroke="#17252d" stroke-width="1"/>
+<text x="1452" y="1180" fill="#f7d34a" font-size="11" font-weight="700" text-anchor="middle" style="">PK/FK</text>
+<text x="1486" y="1180" fill="#f4f7fb" font-size="13" font-weight="700" text-anchor="start" style="">사용자 ID</text>
+<text x="1662" y="1180" fill="#f4f7fb" font-size="13" font-weight="600" text-anchor="start" style="">user_id</text>
+<text x="1840" y="1180" fill="#f4f7fb" font-size="13" font-weight="500" text-anchor="start" style="">BIGINT</text>
+<text x="1944" y="1180" fill="#f4f7fb" font-size="13" font-weight="700" text-anchor="start" style="">NOT NULL</text>
+<text x="2036" y="1180" fill="#d7dde2" font-size="12" font-weight="500" text-anchor="start" style="font-style:italic;"></text>
+<text x="2196" y="1180" fill="#f4f7fb" font-size="12" font-weight="500" text-anchor="start" style="">users.id 참조</text>
+<rect x="1430" y="1192" width="760" height="36" fill="#293942" stroke="#17252d" stroke-width="1"/>
+<line x1="1478" y1="1192" x2="1478" y2="1228" stroke="#17252d" stroke-width="1"/>
+<line x1="1654" y1="1192" x2="1654" y2="1228" stroke="#17252d" stroke-width="1"/>
+<line x1="1832" y1="1192" x2="1832" y2="1228" stroke="#17252d" stroke-width="1"/>
+<line x1="1936" y1="1192" x2="1936" y2="1228" stroke="#17252d" stroke-width="1"/>
+<line x1="2028" y1="1192" x2="2028" y2="1228" stroke="#17252d" stroke-width="1"/>
+<text x="1452" y="1216" fill="#f7d34a" font-size="11" font-weight="700" text-anchor="middle" style="">PK/FK</text>
+<text x="1486" y="1216" fill="#f4f7fb" font-size="13" font-weight="700" text-anchor="start" style="">관심사 카테고리 ID</text>
+<text x="1662" y="1216" fill="#f4f7fb" font-size="13" font-weight="600" text-anchor="start" style="">interest_category_id</text>
+<text x="1840" y="1216" fill="#f4f7fb" font-size="13" font-weight="500" text-anchor="start" style="">INT</text>
+<text x="1944" y="1216" fill="#f4f7fb" font-size="13" font-weight="700" text-anchor="start" style="">NOT NULL</text>
+<text x="2036" y="1216" fill="#d7dde2" font-size="12" font-weight="500" text-anchor="start" style="font-style:italic;"></text>
+<text x="2196" y="1216" fill="#f4f7fb" font-size="12" font-weight="500" text-anchor="start" style="">interest_category.id 참조</text>
+</svg>

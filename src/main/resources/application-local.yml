@@ -1,0 +1,17 @@
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: update
+
+  ai:
+    vectorstore:
+      chroma:
+        client:
+          host: http://localhost
+
+bodeum:
+  cors:
+    # 로컬 프론트 개발 서버(포트 무관)
+    allowed-origins:
+      - http://localhost:*
+      - http://127.0.0.1:*
