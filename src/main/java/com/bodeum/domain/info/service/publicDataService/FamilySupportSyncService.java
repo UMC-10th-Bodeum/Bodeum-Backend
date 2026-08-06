@@ -75,6 +75,7 @@ public class FamilySupportSyncService {
                     .orElseGet(() -> InfoItem.builder()
                             .externalId(externalId)
                             .infoCategory(category)
+                            .interest(InterestCategory.PARENTING_COMMUNICATION)
                             .regionId(regionId)
                             .name(name)
                             .introduction(introduction)

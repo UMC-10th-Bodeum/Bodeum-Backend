@@ -94,6 +94,7 @@ public class DisabledWelfareCenterSyncService {
                 InfoItem newItem = InfoItem.builder()
                         .externalId(externalId)
                         .infoCategory(category)
+                        .interest(InterestCategory.PARENTING_COMMUNICATION)
                         .regionId(regionId)
                         .name(name)
                         .introduction(introduction)

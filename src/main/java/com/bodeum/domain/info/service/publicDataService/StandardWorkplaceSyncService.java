@@ -98,6 +98,7 @@ public class StandardWorkplaceSyncService {
                     .orElseGet(() -> InfoItem.builder()
                             .externalId(externalId)
                             .infoCategory(category)
+                            .interest(InterestCategory.WELFARE_SUBSIDY)
                             .regionId(regionId)
                             .name(displayName)
                             .introduction(introduction)

@@ -116,6 +116,7 @@ public class DisabilityJobSyncService {
                 InfoItem newItem = InfoItem.builder()
                         .externalId(externalId)
                         .infoCategory(category)
+                        .interest(InterestCategory.WELFARE_SUBSIDY)
                         .regionId(regionId)
                         .name(displayName)
                         .introduction(introduction)

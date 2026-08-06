@@ -86,6 +86,7 @@ public class LifelongEduCenterSyncService {
                     .orElseGet(() -> InfoItem.builder()
                             .externalId(externalId)
                             .infoCategory(category)
+                            .interest(InterestCategory.GROWTH_EDUCATION)
                             .regionId(regionId)
                             .name(displayName)
                             .introduction(introduction)

@@ -78,6 +78,7 @@ public class EmergencyMsgSyncService {
                     .orElseGet(() -> InfoItem.builder()
                             .externalId(externalId)
                             .infoCategory(category)
+                            .interest(InterestCategory.HOSPITAL_HEALTH)
                             .regionId(regionId)
                             .name(dutyName)
                             .introduction(introduction)

@@ -81,6 +81,7 @@ public class NationalWelfareSyncService {
                     .orElseGet(() -> InfoItem.builder()
                             .externalId(externalId)
                             .infoCategory(category)
+                            .interest(InterestCategory.WELFARE_SUBSIDY)
                             .regionId(null)
                             .name(displayName)
                             .introduction(introduction)
