@@ -626,6 +626,39 @@ git push -u origin release/main-sync
 - 워킹트리가 깨끗하지 않을 수 있으므로 반드시 별도 worktree에서 수행하고, 끝난 뒤 `git worktree remove ../bodeum-release`로 정리합니다.
 - push한 `release/main-sync`로 `main` 대상 PR을 만들고, **Merge commit**으로 병합합니다.
 
+### 긴급 배포(hotfix) 절차
+
+정기 릴리스를 기다릴 수 없는 운영 장애에만 사용합니다. 그 외에는 평소대로 `develop`을 대상으로 PR을 올립니다.
+
+`hotfix`는 **`develop`이 아니라 `main`에서 분기해 `main`으로 병합**합니다. `develop`에는 아직 릴리스되지 않은 변경이 쌓여 있어, 그 위에서 수정하면 검증되지 않은 코드까지 함께 배포됩니다.
+
+```text
+main ──→ hotfix/#N-xxx ──→ main   (병합 시 즉시 배포)
+                            │
+                            └──→ develop  (back-merge, 필수)
+```
+
+1. GitHub Issue를 생성합니다. 장애 상황이라도 이력은 남겨야 합니다.
+2. **`main`에서** 작업 브랜치를 만듭니다.
+   ```bash
+   git fetch origin
+   git checkout -b hotfix/#N-xxx origin/main
+   ```
+3. 수정 후 `main`을 대상으로 PR을 생성합니다. 승인 1명과 CI 통과는 그대로 요구합니다.
+4. 병합하면 즉시 배포됩니다. Actions의 헬스 체크 통과까지 확인합니다.
+5. **병합 직후 `develop`으로 back-merge합니다.**
+   ```bash
+   git checkout develop
+   git pull origin develop
+   git merge origin/main
+   git push origin develop
+   ```
+
+> ⚠️ **back-merge를 빠뜨리면 안 됩니다.** `develop`에 수정이 반영되지 않은 채 다음 릴리스가 나가면 그 수정이 되돌아가, 같은 장애가 재발합니다. hotfix 병합과 back-merge는 한 묶음으로 처리합니다.
+
+- back-merge는 `merge` 커밋으로 남깁니다(`merge: hotfix #N 반영`). Squash하면 계보가 어긋납니다.
+- 대응이 급해 back-merge를 미뤘다면 늦어도 그날 안에 처리하고 팀에 공유합니다.
+
 ---
 
 # 5. 코드 리뷰 규칙
