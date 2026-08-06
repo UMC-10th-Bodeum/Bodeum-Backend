@@ -163,6 +163,22 @@ class UserControllerTest {
     }
 
     @Test
+    void deleteMyPostReturnsNoContent() throws Exception {
+        mockMvc.perform(delete("/api/v1/users/me/posts/3"))
+                .andExpect(status().isNoContent());
+
+        then(myPageService).should().deletePost(10L, 3L);
+    }
+
+    @Test
+    void deleteMyCommentReturnsNoContent() throws Exception {
+        mockMvc.perform(delete("/api/v1/users/me/comments/4"))
+                .andExpect(status().isNoContent());
+
+        then(myPageService).should().deleteComment(10L, 4L);
+    }
+
+    @Test
     void deleteScrapRejectsMissingScrapType() throws Exception {
         mockMvc.perform(delete("/api/v1/users/me/scraps/1"))
                 .andExpect(status().isBadRequest())

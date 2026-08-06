@@ -5,6 +5,8 @@ import com.bodeum.domain.community.entity.Post;
 import com.bodeum.domain.community.entity.PostScrap;
 import com.bodeum.domain.community.enums.CommentStatus;
 import com.bodeum.domain.community.enums.PostStatus;
+import com.bodeum.domain.community.service.CommentService;
+import com.bodeum.domain.community.service.PostService;
 import com.bodeum.domain.info.entity.InfoScrap;
 import com.bodeum.domain.mypage.dto.response.MyCommentListResponse;
 import com.bodeum.domain.mypage.dto.response.MyPageDashboardResponse;
@@ -39,6 +41,8 @@ public class MyPageService {
     private final MyPagePostScrapRepository postScrapRepository;
     private final MyPagePostRepository postRepository;
     private final MyPageCommentRepository commentRepository;
+    private final PostService postService;
+    private final CommentService commentService;
 
     @Transactional(readOnly = true)
     public MyPageDashboardResponse getDashboard(Long userId) {
@@ -135,6 +139,11 @@ public class MyPageService {
         return MyPostListResponse.from(posts);
     }
 
+    @Transactional
+    public void deletePost(Long userId, Long postId) {
+        postService.deletePost(userId, postId);
+    }
+
     @Transactional(readOnly = true)
     public MyCommentListResponse getComments(
             Long userId,
@@ -153,6 +162,11 @@ public class MyPageService {
                         );
 
         return MyCommentListResponse.from(comments);
+    }
+
+    @Transactional
+    public void deleteComment(Long userId, Long commentId) {
+        commentService.deleteComment(userId, commentId);
     }
 
     private void deleteInfoScrap(Long userId, Long scrapId) {
