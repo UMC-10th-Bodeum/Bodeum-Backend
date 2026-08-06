@@ -4,7 +4,7 @@
 
 ## 아키텍처
 
-```
+```text
 develop → main 머지
       │
       ▼

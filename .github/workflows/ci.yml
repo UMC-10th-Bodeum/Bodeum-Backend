@@ -1,7 +1,10 @@
 name: CI
 
 # 배포 이미지는 Dockerfile에서 `bootJar -x test`로 빌드되어 테스트를 건너뛴다.
-# 따라서 테스트 게이트는 이 워크플로가 유일하다. main 규칙셋의 필수 체크로 지정할 것.
+# 따라서 코드가 운영에 나가기 전 테스트가 도는 지점은 이 워크플로가 유일하다.
+# 이 체크는 PR에 결과를 표시할 뿐 병합을 막지는 않는다. 팀 합의(리뷰 1인 승인,
+# 배포 PR은 Merge commit)로 운영하며, 강제가 필요해지면 main 규칙셋의
+# 필수 상태 체크로 `test`를 등록하면 된다.
 on:
   pull_request:
     branches: [develop, main]

@@ -610,19 +610,21 @@ PR을 만들기 전 아래 항목을 확인합니다.
 
 ```bash
 git fetch origin
-git worktree add --detach ../bodeum-release origin/main
+git worktree add -b release/main-sync ../bodeum-release origin/main
 cd ../bodeum-release
 git merge --no-commit --no-ff origin/develop      # 충돌 발생 (정상)
 git read-tree -u --reset origin/develop           # 최종 트리를 develop과 동일하게 고정
 git commit -m "merge: develop → main 최초 릴리스"
 git diff --stat origin/develop                    # 출력이 비어야 정상
+git push -u origin release/main-sync
 ```
 
+- `git worktree add -b`로 **브랜치를 만들면서** worktree를 생성합니다. `--detach`를 쓰면 HEAD가 분리되어 push할 브랜치가 없습니다.
 - `read-tree -u --reset`은 `MERGE_HEAD`를 유지한 채 인덱스와 워킹트리를 `develop` 트리로 맞춥니다. 충돌을 하나씩 풀지 않고도 부모가 둘인 정상 머지 커밋이 만들어집니다.
-- 마지막 `git diff --stat origin/develop`이 비어 있어야 합니다. 한 줄이라도 나오면 트리가 `develop`과 다르므로 커밋하지 말고 원인을 확인합니다.
+- `git diff --stat origin/develop`이 비어 있어야 합니다. 한 줄이라도 나오면 트리가 `develop`과 다르므로 push하지 말고 원인을 확인합니다.
 - 이 절차는 `main`에만 있던 `src/main/resources/application.properties`를 삭제합니다. `develop`이 `application.yml`로 대체했으므로 의도된 삭제입니다.
 - 워킹트리가 깨끗하지 않을 수 있으므로 반드시 별도 worktree에서 수행하고, 끝난 뒤 `git worktree remove ../bodeum-release`로 정리합니다.
-- 이 커밋을 브랜치로 push해 `main` 대상 PR을 만들고, **Merge commit**으로 병합합니다.
+- push한 `release/main-sync`로 `main` 대상 PR을 만들고, **Merge commit**으로 병합합니다.
 
 ---
 
