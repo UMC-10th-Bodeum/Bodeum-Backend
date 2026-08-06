@@ -8,6 +8,7 @@ import com.bodeum.domain.news.dto.response.NewsScrapResponse;
 import com.bodeum.domain.news.dto.response.NewsSearchSuggestionsResponse;
 import com.bodeum.domain.news.dto.response.RelatedRecruitingNewsResponse;
 import com.bodeum.domain.news.entity.NewsCategoryCode;
+import com.bodeum.domain.news.entity.NewsType;
 import com.bodeum.domain.news.service.NewsQueryService;
 import com.bodeum.domain.news.service.NewsScrapService;
 import com.bodeum.global.apiPayload.ApiResponse;
@@ -54,6 +55,12 @@ public class NewsController {
             @RequestParam(defaultValue = "10") @Min(1) @Max(100) int size,
             @Parameter(description = "정렬 기준", schema = @Schema(allowableValues = {"VIEW", "SCRAP"}))
             @RequestParam(defaultValue = "VIEW") NewsSort sort,
+            @Parameter(
+                    description = "소식 유형",
+                    example = "ACTIVITY",
+                    schema = @Schema(allowableValues = {"LOCAL", "ACTIVITY"})
+            )
+            @RequestParam(required = false) NewsType newsType,
             @Parameter(description = "시/군/구 지역 ID(regionLevel1보다 우선)", example = "1")
             @RequestParam(required = false) @Positive Long regionId,
             @Parameter(description = "시/도 이름. regionId가 없으면 해당 시/도 전체 조회", example = "경기도")
@@ -69,6 +76,7 @@ public class NewsController {
                         page,
                         size,
                         sort,
+                        newsType,
                         regionId,
                         regionLevel1,
                         category,
@@ -88,6 +96,12 @@ public class NewsController {
             @RequestParam(defaultValue = "10") @Min(1) @Max(100) int size,
             @Parameter(description = "정렬 기준", schema = @Schema(allowableValues = {"VIEW", "SCRAP"}))
             @RequestParam(defaultValue = "VIEW") NewsSort sort,
+            @Parameter(
+                    description = "소식 유형",
+                    example = "ACTIVITY",
+                    schema = @Schema(allowableValues = {"LOCAL", "ACTIVITY"})
+            )
+            @RequestParam(required = false) NewsType newsType,
             @Parameter(description = "시/군/구 지역 ID(regionLevel1보다 우선)", example = "1")
             @RequestParam(required = false) @Positive Long regionId,
             @Parameter(description = "시/도 이름. regionId가 없으면 해당 시/도 전체 조회", example = "경기도")
@@ -104,6 +118,7 @@ public class NewsController {
                         page,
                         size,
                         sort,
+                        newsType,
                         regionId,
                         regionLevel1,
                         category,
