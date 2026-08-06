@@ -1,11 +1,11 @@
 # 보듬 백엔드 AWS 배포 가이드
 
-`develop` 브랜치를 **EC2 + Docker / RDS MySQL / GHCR / GitHub Actions 자동배포 / Nginx HTTPS** 구성으로 배포한다.
+`main` 브랜치를 **EC2 + Docker / RDS MySQL / GHCR / GitHub Actions 자동배포 / Nginx HTTPS** 구성으로 배포한다.
 
 ## 아키텍처
 
 ```
-개발자 push (develop)
+develop → main 머지
       │
       ▼
 GitHub Actions ──build──▶ GHCR (ghcr.io/umc-10th-bodeum/bodeum-backend)
@@ -21,6 +21,7 @@ GitHub Actions ──build──▶ GHCR (ghcr.io/umc-10th-bodeum/bodeum-backend
 - 앱 컨테이너는 `127.0.0.1:8080`에만 바인딩 → 외부에는 Nginx(80/443)만 노출.
 - DB는 RDS. 앱은 `.env`의 `DB_URL`로 접속.
 - 이미지 태그는 `latest`(+커밋 SHA). EC2는 `latest`를 pull.
+  `latest`는 **main에서 빌드할 때만** 붙는다. 다른 브랜치에서 수동 실행하면 SHA 태그만 push되므로, 운영 이미지가 덮이지 않는다.
 
 리포지토리에 추가된 파일:
 - `.github/workflows/deploy.yml` — CI/CD 워크플로우
@@ -191,12 +192,13 @@ certbot이 자동 갱신 타이머를 등록한다(`systemctl status certbot.tim
 
 ## Part F. 첫 배포 & 검증
 
-### F-1. 배포 파일을 develop에 반영
-`.github/workflows/deploy.yml` 등은 **GitHub의 develop 브랜치에 있어야** Actions가 실행된다.
-현재 `chore/deploy` 브랜치에서 작업했으므로 PR → develop 머지(팀 컨벤션: Squash Merge, 1인 승인) 후 동작한다.
+### F-1. 배포 파일을 main에 반영
+`.github/workflows/deploy.yml` 등은 **GitHub의 main 브랜치에 있어야** Actions가 실행된다.
+작업 브랜치 → develop 머지(팀 컨벤션: Squash Merge, 1인 승인) 후, develop → main 배포 PR로 main에 반영해야 동작한다.
 
 ### F-2. 자동 배포 트리거
-develop에 push/머지되면 워크플로우가 자동 실행된다. 수동 실행도 가능(Actions 탭 → Deploy to EC2 → Run workflow).
+main에 push/머지되면 워크플로우가 자동 실행된다. develop 머지만으로는 배포되지 않는다.
+수동 실행도 가능(Actions 탭 → Deploy to EC2 → Run workflow)하지만, main이 아닌 브랜치에서 실행하면 이미지 빌드까지만 수행하고 EC2 배포 단계는 건너뛴다.
 
 ### F-3. 상태 확인
 ```bash
