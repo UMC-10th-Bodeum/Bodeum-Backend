@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 import static org.mockito.Mockito.never;
@@ -12,6 +13,7 @@ import com.bodeum.domain.community.dto.request.CreatePostRequest;
 import com.bodeum.domain.community.dto.request.UpdatePostRequest;
 import com.bodeum.domain.community.dto.response.PostResponse;
 import com.bodeum.domain.community.entity.Post;
+import com.bodeum.domain.community.entity.PostImage;
 import com.bodeum.domain.community.entity.PostLike;
 import com.bodeum.domain.community.entity.PostScrap;
 import com.bodeum.domain.community.enums.DisabilityType;
@@ -33,6 +35,7 @@ import com.bodeum.domain.point.service.PointService;
 import com.bodeum.domain.user.repository.UserRepository;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.StreamSupport;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -117,6 +120,34 @@ class PostServiceTest {
         assertThat(response.authorId()).isNull();
         assertThat(response.isMine()).isTrue();
         assertThat(response.isQuestion()).isTrue();
+        then(postImageRepository).should(never()).deleteAllByPost_Id(any());
+        then(postImageRepository).should(never()).saveAll(anyList());
+    }
+
+    @Test
+    void updatePostReplacesImagesWithRequestedFinalList() {
+        Post post = post(1L, 10L);
+        List<String> finalImageUrls = List.of(
+                "https://example.com/existing-1.jpg",
+                "https://example.com/existing-2.jpg",
+                "https://example.com/new-1.jpg"
+        );
+        given(postRepository.findByIdAndStatusForUpdate(1L, PostStatus.ACTIVE))
+                .willReturn(Optional.of(post));
+
+        postService.updatePost(
+                10L,
+                1L,
+                new UpdatePostRequest(null, null, null, null, null, null, finalImageUrls)
+        );
+
+        then(postImageRepository).should().deleteAllByPost_Id(1L);
+        then(postImageRepository).should().flush();
+        then(postImageRepository).should().saveAll(argThat(images -> {
+            List<PostImage> savedImages = StreamSupport.stream(images.spliterator(), false).toList();
+            return savedImages.stream().map(PostImage::getImageUrl).toList().equals(finalImageUrls)
+                    && savedImages.stream().map(PostImage::getSortOrder).toList().equals(List.of(0, 1, 2));
+        }));
     }
 
     @Test
