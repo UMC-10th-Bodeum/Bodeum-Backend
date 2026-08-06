@@ -1,5 +1,6 @@
 package com.bodeum.domain.info.entity;
 
+import com.bodeum.domain.user.enums.InterestCategory;
 import com.bodeum.global.common.entity.BaseCreatedUpdatedEntity;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
@@ -31,6 +32,11 @@ public class InfoItem extends BaseCreatedUpdatedEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "info_category_id", nullable = false)
     private InfoCategory infoCategory;
+
+    // 온보딩 관심사
+    @Enumerated(EnumType.STRING)
+    @Column(name = "interest", length = 50)
+    private InterestCategory interest;
 
     // region 마스터 테이블의 PK ID 값 단순 저장 (FK 미설정)
     @Column(name = "region_id")
@@ -94,10 +100,11 @@ public class InfoItem extends BaseCreatedUpdatedEntity {
         this.syncedAt = syncedAt;
     }
 
-    public void updateInformation(String name, InfoCategory infoCategory, Long regionId, String introduction, String address,
+    public void updateInformation(String name, InfoCategory infoCategory, InterestCategory interest, Long regionId, String introduction, String address,
                                   String sido, String sigungu, String phone, String homepageUrl, String imageUrl) {
         this.name = name;
         this.infoCategory = infoCategory;
+        this.interest = interest;
         this.regionId = regionId;
         this.introduction = introduction;
         this.address = address;
