@@ -31,10 +31,14 @@ public class S3Properties {
      */
     @PostConstruct
     public void validate() {
+        // bucket은 application.yml에 기본값이 없어(${AWS_S3_BUCKET:}) 환경변수 누락이 여기서 걸린다.
         if (!StringUtils.hasText(bucket)) {
             throw new IllegalStateException("S3 버킷이 설정되지 않았다. AWS_S3_BUCKET을 확인할 것.");
         }
 
+        // region은 ${AWS_S3_REGION:ap-northeast-2}로 기본값이 있어 환경변수를 아예 안 넣은 경우는
+        // 걸리지 않는다. ap-northeast-2는 플레이스홀더가 아니라 이 프로젝트의 의도된 값이므로 유지한다.
+        // 값을 빈 문자열로 지운 경우(AWS_S3_REGION=)는 기본값으로 대체되지 않으므로 여기서 걸린다.
         if (!StringUtils.hasText(region)) {
             throw new IllegalStateException("S3 리전이 설정되지 않았다. AWS_S3_REGION을 확인할 것.");
         }
