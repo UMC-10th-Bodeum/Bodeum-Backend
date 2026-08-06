@@ -69,6 +69,34 @@ spring:
         collection-name: bodeum-rag
         initialize-schema: true
 
+# 헬스 체크(Actuator). health 하나만 노출한다 — 나머지 엔드포인트는 인증 없이 열리면
+# 환경변수/빈 목록까지 새어나가므로 열지 않는다.
+# ⚠️ 이 블록을 고치면 src/test/resources/application.yml의 같은 블록도 함께 고칠 것.
+#    테스트 리소스가 이 파일을 통째로 가려서, 한쪽만 바꾸면 테스트가 검증하는 값이 달라진다.
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      # 외부에 공개되는 경로라 DB 접속 실패 사유 같은 내부 정보는 숨긴다.
+      show-details: never
+      probes:
+        enabled: true
+      group:
+        # liveness: 프로세스가 살아 있는가. 외부 의존성은 보지 않는다(DB 장애로 컨테이너가 재시작되면 안 됨).
+        # readiness: 트래픽을 받아도 되는가. DB까지 확인한다.
+        # Redis는 여기 넣지 않는다 — REDIS_ENABLED=false면 지표 자체가 없어서
+        # 그룹이 참조하는 순간 부팅이 실패한다. Redis 상태는 /actuator/health 전체 응답에 나온다.
+        readiness:
+          include: readinessState,db
+  health:
+    # Redis는 REDIS_ENABLED=true인 환경(운영)에서만 실제 의존성이다.
+    # 끄지 않으면 로컬/테스트에서 없는 Redis를 찔러 헬스가 DOWN으로 뜬다.
+    redis:
+      enabled: ${REDIS_ENABLED:false}
+
 open-api:
   service-key: ${OPEN_API_SERVICE_KEY:}
 

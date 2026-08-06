@@ -32,6 +32,9 @@ public class SecurityConfig {
 
     // HTTP Method 상관없이 모두 허용할 URI (로그인, Swagger, 공통 정적 URI 등)
     private final String[] allowUris = {
+            // 헬스 체크(Docker HEALTHCHECK, 배포 검증, 외부 모니터링에서 인증 없이 호출한다)
+            "/actuator/health",
+            "/actuator/health/**",
             // Swagger 허용
             "/swagger-ui/**",
             "/swagger-resources/**",
