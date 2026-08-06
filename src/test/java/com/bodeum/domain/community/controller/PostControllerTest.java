@@ -215,6 +215,55 @@ class PostControllerTest {
     }
 
     @Test
+    void updatePostAcceptsTenImages() throws Exception {
+        List<String> imageUrls = IntStream.rangeClosed(1, 10)
+                .mapToObj(index -> "https://example.com/" + index + ".jpg")
+                .toList();
+        UpdatePostRequest request = new UpdatePostRequest(
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                imageUrls
+        );
+        given(postService.updatePost(any(), any(), any(UpdatePostRequest.class))).willReturn(postResponse());
+
+        mockMvc.perform(patch("/api/v1/community/posts/1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.postId").value(1));
+
+        then(postService).should().updatePost(any(), any(), any(UpdatePostRequest.class));
+    }
+
+    @Test
+    void updatePostRejectsMoreThanTenImages() throws Exception {
+        List<String> imageUrls = IntStream.rangeClosed(1, 11)
+                .mapToObj(index -> "https://example.com/" + index + ".jpg")
+                .toList();
+        UpdatePostRequest request = new UpdatePostRequest(
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                imageUrls
+        );
+
+        mockMvc.perform(patch("/api/v1/community/posts/1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("COMMON400_1"));
+
+        then(postService).should(never()).updatePost(any(), any(), any(UpdatePostRequest.class));
+    }
+
+    @Test
     void deletePostUsesPostPath() throws Exception {
         mockMvc.perform(delete("/api/v1/community/posts/1"))
                 .andExpect(status().isOk())
