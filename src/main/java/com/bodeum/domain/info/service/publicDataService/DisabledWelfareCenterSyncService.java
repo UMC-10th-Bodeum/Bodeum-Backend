@@ -9,6 +9,7 @@ import com.bodeum.domain.info.repository.InfoCategoryRepository;
 import com.bodeum.domain.info.repository.InfoItemRepository;
 import com.bodeum.domain.info.service.InfoTagMappingService;
 import com.bodeum.domain.info.util.RegionMapper;
+import com.bodeum.domain.user.enums.InterestCategory;
 import com.bodeum.global.infrastructure.openapi.publicDataApi.DisabledWelfareCenterApiClient;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
@@ -85,7 +86,7 @@ public class DisabledWelfareCenterSyncService {
             if (existingOpt.isPresent()) {
                 savedItem = existingOpt.get();
                 savedItem.updateInformation(
-                        name, category, regionId, introduction, address,
+                        name, category, InterestCategory.PARENTING_COMMUNICATION, regionId, introduction, address,
                         sido, sigungu, phone, null, null
                 );
                 updatedCount++;
@@ -93,6 +94,7 @@ public class DisabledWelfareCenterSyncService {
                 InfoItem newItem = InfoItem.builder()
                         .externalId(externalId)
                         .infoCategory(category)
+                        .interest(InterestCategory.PARENTING_COMMUNICATION)
                         .regionId(regionId)
                         .name(name)
                         .introduction(introduction)

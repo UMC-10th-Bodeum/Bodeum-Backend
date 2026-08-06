@@ -15,6 +15,7 @@ import com.bodeum.domain.info.exception.InfoException;
 import com.bodeum.domain.info.repository.*;
 import com.bodeum.domain.region.entity.Region;
 import com.bodeum.domain.user.entity.User;
+import com.bodeum.domain.user.enums.InterestCategory;
 import com.bodeum.domain.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -181,5 +182,53 @@ public class InfoItemQueryService {
         String kakaoMapUrl = "https://map.kakao.com/link/search/" + encodedQuery;
 
         return KakaoMapUrlResponse.from(kakaoMapUrl);
+    }
+
+    /**
+     * 온보딩 유저 맞춤 추천 목록 조회 API
+     */
+    public List<InfoItemResponse> getRecommendedInfoItems(Long userId) {
+        // 1. 비로그인 유저 -> 빈 리스트 (비노출)
+        if (userId == null) {
+            return List.of();
+        }
+
+        // 2. 로그인 유저 조회
+        User loginUser = userRepository.findAiProfileById(userId).orElse(null);
+
+        // 3. 유저가 없거나, 온보딩을 미완료했거나, 지역/관심사 정보가 없으면 빈 리스트 (비노출)
+        if (loginUser == null || !loginUser.isOnboardingCompleted()) {
+            return List.of();
+        }
+
+        Region region = loginUser.getRegion();
+        List<InterestCategory> interestCategories = loginUser.getInterestCategories();
+
+        if (region == null || interestCategories.isEmpty()) {
+            return List.of();
+        }
+
+        // 4. 유저 지역(sido, sigungu) + 관심사 카테고리 기반 추천 아이템 DB 조회
+        List<InfoItem> recommendedItems = infoItemRepository.findBySidoAndSigunguAndInterestIn(
+                region.getRegionLevel1(), // 예: 서울특별시 / 경기도 등
+                region.getRegionLevel2(), // 예: 강남구 / 수원시 등
+                interestCategories
+        );
+
+        if (recommendedItems.isEmpty()) {
+            return List.of();
+        }
+
+        // 5. N+1 방지를 위한 태그 배치 조회 및 DTO 변환
+        List<Long> itemIds = recommendedItems.stream().map(InfoItem::getId).toList();
+        Map<Long, List<String>> tagMap = infoItemTagRepository.findAllByInfoItemIdIn(itemIds).stream()
+                .collect(Collectors.groupingBy(
+                        itemTag -> itemTag.getInfoItem().getId(),
+                        Collectors.mapping(itemTag -> itemTag.getInfoTag().getName(), Collectors.toList())
+                ));
+
+        return recommendedItems.stream()
+                .map(item -> InfoItemResponse.of(item, tagMap.getOrDefault(item.getId(), List.of())))
+                .toList();
     }
 }

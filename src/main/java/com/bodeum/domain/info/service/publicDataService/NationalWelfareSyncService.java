@@ -8,6 +8,7 @@ import com.bodeum.domain.info.exception.InfoException;
 import com.bodeum.domain.info.repository.InfoCategoryRepository;
 import com.bodeum.domain.info.repository.InfoItemRepository;
 import com.bodeum.domain.info.service.InfoTagMappingService;
+import com.bodeum.domain.user.enums.InterestCategory;
 import com.bodeum.global.infrastructure.openapi.publicDataApi.NationalWelfareApiClient;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -72,7 +73,7 @@ public class NationalWelfareSyncService {
             InfoItem infoItem = infoItemRepository.findFirstByExternalId(externalId)
                     .map(existingItem -> {
                         existingItem.updateInformation(
-                                displayName, category, null, introduction, null,
+                                displayName, category, InterestCategory.WELFARE_SUBSIDY, null, introduction, null,
                                 null, null, phone, homepageUrl, null
                         );
                         return existingItem;
@@ -80,6 +81,7 @@ public class NationalWelfareSyncService {
                     .orElseGet(() -> InfoItem.builder()
                             .externalId(externalId)
                             .infoCategory(category)
+                            .interest(InterestCategory.WELFARE_SUBSIDY)
                             .regionId(null)
                             .name(displayName)
                             .introduction(introduction)
