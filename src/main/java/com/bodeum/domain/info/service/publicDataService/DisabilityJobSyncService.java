@@ -9,6 +9,7 @@ import com.bodeum.domain.info.repository.InfoCategoryRepository;
 import com.bodeum.domain.info.repository.InfoItemRepository;
 import com.bodeum.domain.info.service.InfoTagMappingService;
 import com.bodeum.domain.info.util.RegionMapper;
+import com.bodeum.domain.user.enums.InterestCategory;
 import com.bodeum.global.infrastructure.openapi.publicDataApi.DisabilityJobApiClient;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
@@ -107,7 +108,7 @@ public class DisabilityJobSyncService {
             if (existingOpt.isPresent()) {
                 savedItem = existingOpt.get();
                 savedItem.updateInformation(
-                        displayName, category, regionId, introduction, rawAddress,
+                        displayName, category, InterestCategory.WELFARE_SUBSIDY, regionId, introduction, rawAddress,
                         sido, sigungu, phone, null, null
                 );
                 updatedCount++;

@@ -9,6 +9,7 @@ import com.bodeum.domain.info.repository.InfoCategoryRepository;
 import com.bodeum.domain.info.repository.InfoItemRepository;
 import com.bodeum.domain.info.service.InfoTagMappingService;
 import com.bodeum.domain.info.util.RegionMapper;
+import com.bodeum.domain.user.enums.InterestCategory;
 import com.bodeum.global.infrastructure.openapi.publicDataApi.EmergencyMsgApiClient;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -69,7 +70,7 @@ public class EmergencyMsgSyncService {
             InfoItem infoItem = infoItemRepository.findFirstByExternalId(externalId)
                     .map(existingItem -> {
                         existingItem.updateInformation(
-                                dutyName, category, regionId, introduction, address,
+                                dutyName, category, InterestCategory.HOSPITAL_HEALTH,regionId, introduction, address,
                                 sido, sigungu, null, null, null
                         );
                         return existingItem;
