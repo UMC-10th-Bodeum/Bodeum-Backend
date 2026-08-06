@@ -1,6 +1,7 @@
 package com.bodeum.domain.info.repository;
 
 import com.bodeum.domain.info.entity.InfoItem;
+import com.bodeum.domain.user.enums.InterestCategory;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -44,4 +45,11 @@ public interface InfoItemRepository extends JpaRepository<InfoItem, Long>, InfoI
     List<InfoItem> findRehabCentersByRegion(@Param("regionLevel1") String regionLevel1,
                                             @Param("regionLevel2") String regionLevel2,
                                             Pageable pageable);
+
+    // 온보딩 유저의 지역(sido, sigungu)과 관심사 목록(interests) 조건에 맞는 아이템 조회
+    List<InfoItem> findBySidoAndSigunguAndInterestIn(
+            String sido,
+            String sigungu,
+            Collection<InterestCategory> interests
+    );
 }
