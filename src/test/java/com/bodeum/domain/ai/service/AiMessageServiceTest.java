@@ -180,6 +180,47 @@ class AiMessageServiceTest {
     }
 
     @Test
+    void fallsBackToGeneralFlowWhenStarterAnswerHasNoEvidence() {
+        String question = AiStarterQuestionType.WELFARE_SITES.getContent();
+        when(starterQuestionRouter.route(
+                eq(AiStarterQuestionType.WELFARE_SITES),
+                any()
+        )).thenReturn(Optional.of(AiStarterQuestionAnswer.noEvidence()));
+        when(documentRetriever.retrieve(eq(question), any())).thenReturn(List.of());
+
+        AiReferenceDocument source = new AiReferenceDocument(
+                "SITE-1",
+                "복지로",
+                AiResponseSourceType.SITE,
+                1L,
+                "복지로",
+                "https://www.bokjiro.go.kr",
+                null
+        );
+        when(externalAnswerProvider.search(eq(question), any())).thenReturn(
+                new ExternalAiAnswer("외부 검색 복지 사이트 안내", List.of(source))
+        );
+        AiMessage saved = savedAiMessage("외부 검색 복지 사이트 안내");
+        when(persistenceService.saveAiMessageAndComplete(
+                11L,
+                chatRoom,
+                "외부 검색 복지 사이트 안내",
+                false,
+                AiAnswerStatus.ANSWERED,
+                List.of(source)
+        )).thenReturn(saved);
+
+        var result = service.createMessage(1L, question);
+
+        assertThat(result.aiMessage().content()).isEqualTo("외부 검색 복지 사이트 안내");
+        assertThat(result.aiMessage().answerStatus()).isEqualTo(AiAnswerStatus.ANSWERED);
+        assertThat(result.aiMessage().sources()).hasSize(1);
+        verify(documentRetriever).retrieve(eq(question), any());
+        verify(externalAnswerProvider).search(eq(question), any());
+        verify(answerGenerator, never()).generate(any(), any(), any());
+    }
+
+    @Test
     void routesSemanticallySimilarQuestionToReviewedStarterAnswer() {
         String question = "장애 진단을 받았는데 이제 뭘 먼저 해야 해?";
         when(starterQuestionClassifier.classify(question))

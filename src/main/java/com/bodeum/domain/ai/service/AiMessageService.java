@@ -123,7 +123,11 @@ public class AiMessageService {
                 starterContext.questionType()
                         .flatMap(type -> starterQuestionRouter.route(type, profile));
         if (starterAnswer.isPresent()) {
-            return saveStarterAnswer(chatRoom, userMessage, starterAnswer.get());
+            AiStarterQuestionAnswer answer = starterAnswer.get();
+            if (answer.isRegionRequired() || answer.hasEvidence()) {
+                return saveStarterAnswer(chatRoom, userMessage, answer);
+            }
+            log.info("[AI] 추천 질문 출처 없음, 일반 질문 흐름으로 전환");
         }
 
         log.debug("[AI] 문서 검색 시작");
