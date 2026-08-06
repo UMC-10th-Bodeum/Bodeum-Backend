@@ -154,6 +154,45 @@ class NewsControllerIntegrationTest {
     }
 
     @Test
+    void getNewsFiltersByNewsType() throws Exception {
+        NewsCategory activityCategory = newsCategoryRepository.save(
+                NewsCategory.create(NewsCategoryCode.RECRUITMENT_PARTICIPATION)
+        );
+        NewsCategory localCategory = newsCategoryRepository.save(
+                NewsCategory.create(NewsCategoryCode.LOCAL_NEWS)
+        );
+        NewsSource source = newsSourceRepository.save(source());
+        News activityNews = newsRepository.save(news(
+                activityCategory,
+                source,
+                null,
+                "activity-news-type",
+                "활동소식",
+                LocalDateTime.of(2026, 7, 2, 10, 0),
+                RecruitmentStatus.OPEN
+        ));
+        News localNews = newsRepository.save(news(
+                localCategory,
+                source,
+                null,
+                "local-news-type",
+                "지역소식",
+                LocalDateTime.of(2026, 7, 1, 10, 0),
+                RecruitmentStatus.OPEN
+        ));
+
+        mockMvc.perform(get("/api/v1/news").param("newsType", "ACTIVITY"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.totalElements").value(1))
+                .andExpect(jsonPath("$.result.items[0].newsId").value(activityNews.getId()));
+
+        mockMvc.perform(get("/api/v1/news").param("newsType", "LOCAL"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.totalElements").value(1))
+                .andExpect(jsonPath("$.result.items[0].newsId").value(localNews.getId()));
+    }
+
+    @Test
     void getNewsFiltersAllCitiesByRegionLevel1() throws Exception {
         Region suwon = regionRepository.save(Region.create("경기도", "수원시"));
         Region guri = regionRepository.save(Region.create("경기도", "구리시"));
@@ -436,6 +475,13 @@ class NewsControllerIntegrationTest {
     }
 
     @Test
+    void getNewsRejectsUnknownNewsType() throws Exception {
+        mockMvc.perform(get("/api/v1/news").param("newsType", "UNKNOWN"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("COMMON400_1"));
+    }
+
+    @Test
     void searchNewsMatchesTitleContentSourceNameAndRegionAndSortsByViewCountByDefault() throws Exception {
         Region seoul = regionRepository.save(Region.create("서울특별시", "강남구"));
         Region suwon = regionRepository.save(Region.create("경기도", "수원시"));
@@ -571,6 +617,42 @@ class NewsControllerIntegrationTest {
                         .param("regionId", seoul.getId().toString())
                         .param("category", "RECRUITMENT_PARTICIPATION")
                         .param("status", "RECRUITING"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.totalElements").value(1))
+                .andExpect(jsonPath("$.result.items[0].newsId").value(expected.getId()));
+    }
+
+    @Test
+    void searchNewsFiltersByNewsType() throws Exception {
+        NewsCategory activityCategory = newsCategoryRepository.save(
+                NewsCategory.create(NewsCategoryCode.EDUCATION_SEMINAR)
+        );
+        NewsCategory localCategory = newsCategoryRepository.save(
+                NewsCategory.create(NewsCategoryCode.LOCAL_POLICY)
+        );
+        NewsSource source = newsSourceRepository.save(source());
+        newsRepository.save(news(
+                activityCategory,
+                source,
+                null,
+                "activity-search-news-type",
+                "발달 교육 프로그램",
+                LocalDateTime.of(2026, 7, 2, 10, 0),
+                RecruitmentStatus.OPEN
+        ));
+        News expected = newsRepository.save(news(
+                localCategory,
+                source,
+                null,
+                "local-search-news-type",
+                "발달 지원 정책",
+                LocalDateTime.of(2026, 7, 1, 10, 0),
+                RecruitmentStatus.OPEN
+        ));
+
+        mockMvc.perform(get("/api/v1/news/search")
+                        .param("keyword", "발달")
+                        .param("newsType", "LOCAL"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.result.totalElements").value(1))
                 .andExpect(jsonPath("$.result.items[0].newsId").value(expected.getId()));

@@ -10,6 +10,8 @@ import org.springframework.data.repository.query.Param;
 
 public interface GuardianPointRepository extends JpaRepository<GuardianPoint, Long> {
 
+    Optional<GuardianPoint> findByGuardianProfileId(Long guardianProfileId);
+
     @Query("""
             SELECT guardianPoint
             FROM GuardianPoint guardianPoint

@@ -9,6 +9,7 @@ import com.bodeum.domain.news.dto.response.NewsSearchSuggestionsResponse;
 import com.bodeum.domain.news.dto.response.RelatedRecruitingNewsResponse;
 import com.bodeum.domain.news.entity.News;
 import com.bodeum.domain.news.entity.NewsCategoryCode;
+import com.bodeum.domain.news.entity.NewsType;
 import com.bodeum.domain.news.entity.RecruitmentStatus;
 import com.bodeum.domain.news.repository.NewsRepository;
 import com.bodeum.domain.news.repository.NewsScrapRepository;
@@ -49,6 +50,7 @@ public class NewsQueryService {
             int page,
             int size,
             NewsSort sort,
+            NewsType newsType,
             Long regionId,
             String regionLevel1,
             NewsCategoryCode category,
@@ -68,6 +70,7 @@ public class NewsQueryService {
                 resolveSort(sort)
         );
         Page<News> result = newsRepository.findVisibleNews(
+                newsType,
                 category == null ? null : category.name(),
                 status == null ? null : status.toEntity(),
                 regionFilter.applied(),
@@ -84,6 +87,7 @@ public class NewsQueryService {
             int page,
             int size,
             NewsSort sort,
+            NewsType newsType,
             Long regionId,
             String regionLevel1,
             NewsCategoryCode category,
@@ -108,6 +112,7 @@ public class NewsQueryService {
                 "%" + normalizedKeyword + "%",
                 !keywordRegionIds.isEmpty(),
                 keywordRegionIds.isEmpty() ? NO_REGION_IDS : keywordRegionIds,
+                newsType,
                 category == null ? null : category.name(),
                 status == null ? null : status.toEntity(),
                 regionFilter.applied(),

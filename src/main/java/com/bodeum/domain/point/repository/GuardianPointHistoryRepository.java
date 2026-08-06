@@ -1,14 +1,30 @@
 package com.bodeum.domain.point.repository;
 
 import com.bodeum.domain.point.entity.GuardianPointHistory;
+import com.bodeum.domain.point.enums.PointEventType;
 import com.bodeum.domain.point.enums.PointType;
 import java.util.List;
+import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface GuardianPointHistoryRepository extends JpaRepository<GuardianPointHistory, Long> {
+
+    boolean existsByGuardianPoint_IdAndEventTypeAndReferenceIdAndActorUserId(
+            Long guardianPointId,
+            PointEventType eventType,
+            Long referenceId,
+            Long actorUserId
+    );
+
+    Optional<GuardianPointHistory> findByGuardianPoint_IdAndEventTypeAndReferenceIdAndActorUserId(
+            Long guardianPointId,
+            PointEventType eventType,
+            Long referenceId,
+            Long actorUserId
+    );
 
     @Query("""
             SELECT history.pointType AS pointType,

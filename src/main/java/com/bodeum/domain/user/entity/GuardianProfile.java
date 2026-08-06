@@ -70,6 +70,10 @@ public class GuardianProfile {
         return new GuardianProfile(user, nickname, region, guardianType, communityRoleType);
     }
 
+    public Long getId() {
+        return id;
+    }
+
     public void updateGuardian(
             String nickname,
             GuardianType guardianType,

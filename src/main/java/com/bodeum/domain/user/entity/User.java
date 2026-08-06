@@ -236,6 +236,10 @@ public class User extends BaseCreatedUpdatedDeletedEntity {
         return guardianProfile;
     }
 
+    public GuardianProfile ensureGuardianProfile() {
+        return guardianProfile();
+    }
+
     private void replaceUserInterests(List<InterestCategory> interestCategories) {
         userInterests.clear();
         if (interestCategories == null) {
