@@ -64,7 +64,7 @@ public class TherapyRehabSyncService {
             InfoItem infoItem = infoItemRepository.findFirstByExternalId(externalId)
                     .map(existingItem -> {
                         existingItem.updateInformation(
-                                name, category, InterestCategory.PARENTING_COMMUNICATION ,regionId, null, address,
+                                name, category, InterestCategory.HOSPITAL_HEALTH ,regionId, null, address,
                                 sido, sigungu, null, null, null
                         );
                         return existingItem;
@@ -72,7 +72,7 @@ public class TherapyRehabSyncService {
                     .orElseGet(() -> InfoItem.builder()
                             .externalId(externalId)
                             .infoCategory(category)
-                            .interest(InterestCategory.PARENTING_COMMUNICATION)
+                            .interest(InterestCategory.HOSPITAL_HEALTH)
                             .regionId(regionId)
                             .name(name)
                             .address(address)
