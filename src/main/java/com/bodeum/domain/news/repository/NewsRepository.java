@@ -2,6 +2,7 @@ package com.bodeum.domain.news.repository;
 
 import com.bodeum.domain.news.entity.News;
 import com.bodeum.domain.news.entity.NewsSource;
+import com.bodeum.domain.news.entity.NewsType;
 import com.bodeum.domain.news.entity.RecruitmentStatus;
 import jakarta.persistence.LockModeType;
 import java.util.Collection;
@@ -24,11 +25,13 @@ public interface NewsRepository extends JpaRepository<News, Long> {
             from News news
             where news.active = true
               and news.deletedAt is null
+              and (:newsType is null or news.newsType = :newsType)
               and (:category is null or lower(news.newsCategory.name) = lower(:category))
               and (:status is null or news.recruitmentStatus = :status)
               and (:filterByRegion = false or news.regionId in :regionIds)
             """)
     Page<News> findVisibleNews(
+            @Param("newsType") NewsType newsType,
             @Param("category") String category,
             @Param("status") RecruitmentStatus status,
             @Param("filterByRegion") boolean filterByRegion,
@@ -49,6 +52,7 @@ public interface NewsRepository extends JpaRepository<News, Long> {
                     or (news.sourceName is not null and lower(news.sourceName) like :keyword)
                     or (:filterByKeywordRegion = true and news.regionId in :keywordRegionIds)
               )
+              and (:newsType is null or news.newsType = :newsType)
               and (:category is null or lower(news.newsCategory.name) = lower(:category))
               and (:status is null or news.recruitmentStatus = :status)
               and (:filterByRegion = false or news.regionId in :regionIds)
@@ -57,6 +61,7 @@ public interface NewsRepository extends JpaRepository<News, Long> {
             @Param("keyword") String keyword,
             @Param("filterByKeywordRegion") boolean filterByKeywordRegion,
             @Param("keywordRegionIds") Collection<Long> keywordRegionIds,
+            @Param("newsType") NewsType newsType,
             @Param("category") String category,
             @Param("status") RecruitmentStatus status,
             @Param("filterByRegion") boolean filterByRegion,
