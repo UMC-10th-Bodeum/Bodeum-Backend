@@ -15,6 +15,8 @@ import com.bodeum.domain.community.exception.CommunityException;
 import com.bodeum.domain.community.repository.CommentLikeRepository;
 import com.bodeum.domain.community.repository.CommentRepository;
 import com.bodeum.domain.community.repository.PostRepository;
+import com.bodeum.domain.point.enums.PointEventType;
+import com.bodeum.domain.point.service.PointService;
 import com.bodeum.domain.user.repository.UserRepository;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -41,12 +43,21 @@ public class CommentService {
     private final CommentLikeRepository commentLikeRepository;
     private final PostRepository postRepository;
     private final UserRepository userRepository;
+    private final PointService pointService;
 
     @Transactional
     public CommentResponse createComment(Long userId, Long postId, CreateCommentRequest request) {
         validateAuthenticatedUser(userId);
         Post post = findPostForUpdate(postId);
         Comment comment = commentRepository.save(Comment.create(post, userId, request.content()));
+        if (post.isQuestion()) {
+            pointService.grantActivityPoint(
+                    userId,
+                    PointEventType.COMMUNITY_ANSWER_CREATED,
+                    comment.getId(),
+                    userId
+            );
+        }
 
         return CommentResponse.of(comment, userId, false, List.of());
     }
@@ -100,9 +111,21 @@ public class CommentService {
 
         if (comment.isAccepted()) {
             comment.cancelAcceptance();
+            pointService.revokeActivityPoint(
+                    comment.getUserId(),
+                    PointEventType.COMMUNITY_ANSWER_ACCEPTED,
+                    comment.getId(),
+                    userId
+            );
         } else {
             validateNoAcceptedComment(post.getId());
             comment.accept();
+            pointService.grantActivityPoint(
+                    comment.getUserId(),
+                    PointEventType.COMMUNITY_ANSWER_ACCEPTED,
+                    comment.getId(),
+                    userId
+            );
         }
 
         commentRepository.flush();
@@ -125,6 +148,7 @@ public class CommentService {
         if (!commentLikeRepository.existsByComment_IdAndUserId(commentId, userId)) {
             commentLikeRepository.save(CommentLike.create(comment, userId));
             comment.increaseLikeCount();
+            grantCommentLikePoint(comment, userId);
         }
 
         return new CommentLikeResponse(true, comment.getLikeCount());
@@ -139,6 +163,7 @@ public class CommentService {
         if (commentLike.isPresent()) {
             commentLikeRepository.delete(commentLike.get());
             comment.decreaseLikeCount();
+            revokeCommentLikePoint(comment, userId);
         }
 
         return new CommentLikeResponse(false, comment.getLikeCount());
@@ -148,8 +173,41 @@ public class CommentService {
     // 댓글·답글 본문은 보존 대상이므로 삭제하지 않는다. 카운트 감소를 삭제보다 먼저 수행한다.
     @Transactional
     public void deleteUserCommentLikes(Long userId) {
+        commentLikeRepository.findPointRewardReferencesByUserId(userId)
+                .forEach(reference -> pointService.revokeActivityPoint(
+                        reference.getRecipientUserId(),
+                        PointEventType.COMMUNITY_ANSWER_LIKE_RECEIVED,
+                        reference.getReferenceId(),
+                        userId
+                ));
         commentLikeRepository.decreaseLikeCountForUserLikes(userId);
         commentLikeRepository.deleteByUserId(userId);
+    }
+
+    private void grantCommentLikePoint(Comment comment, Long actorUserId) {
+        if (Objects.equals(comment.getUserId(), actorUserId)) {
+            return;
+        }
+
+        pointService.grantActivityPoint(
+                comment.getUserId(),
+                PointEventType.COMMUNITY_ANSWER_LIKE_RECEIVED,
+                comment.getId(),
+                actorUserId
+        );
+    }
+
+    private void revokeCommentLikePoint(Comment comment, Long actorUserId) {
+        if (Objects.equals(comment.getUserId(), actorUserId)) {
+            return;
+        }
+
+        pointService.revokeActivityPoint(
+                comment.getUserId(),
+                PointEventType.COMMUNITY_ANSWER_LIKE_RECEIVED,
+                comment.getId(),
+                actorUserId
+        );
     }
 
     private Comment getOwnedActiveCommentForUpdate(Long userId, Long commentId) {

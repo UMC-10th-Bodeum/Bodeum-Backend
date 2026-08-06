@@ -7,14 +7,21 @@ import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.EntityGraph;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+
+import jakarta.persistence.LockModeType;
 
 public interface UserRepository extends JpaRepository<User, Long> {
 
     Optional<User> findByProviderAndProviderUserId(SocialProvider provider, String providerUserId);
 
     Optional<User> findByAuthSubject(String authSubject);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT u FROM User u WHERE u.id = :id")
+    Optional<User> findByIdForUpdate(@Param("id") Long id);
 
     // 보존 콘텐츠(게시글·댓글)의 작성자 익명화용. 주어진 id 중 탈퇴(DELETED) 상태인 회원 id만 반환한다.
     @Query("""

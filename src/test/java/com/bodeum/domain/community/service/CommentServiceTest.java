@@ -22,6 +22,8 @@ import com.bodeum.domain.community.exception.CommunityException;
 import com.bodeum.domain.community.repository.CommentLikeRepository;
 import com.bodeum.domain.community.repository.CommentRepository;
 import com.bodeum.domain.community.repository.PostRepository;
+import com.bodeum.domain.point.enums.PointEventType;
+import com.bodeum.domain.point.service.PointService;
 import com.bodeum.domain.user.repository.UserRepository;
 import java.util.List;
 import java.util.Optional;
@@ -43,6 +45,8 @@ class CommentServiceTest {
     private PostRepository postRepository;
     @Mock
     private UserRepository userRepository;
+    @Mock
+    private PointService pointService;
     @InjectMocks
     private CommentService commentService;
 
@@ -62,6 +66,7 @@ class CommentServiceTest {
         assertThat(response.commentId()).isEqualTo(1L);
         assertThat(response.isMine()).isTrue();
         assertThat(post.getCommentCount()).isOne();
+        then(pointService).shouldHaveNoInteractions();
     }
 
     @Test
@@ -74,6 +79,27 @@ class CommentServiceTest {
                 .isInstanceOf(CommunityException.class)
                 .extracting(exception -> ((CommunityException) exception).getErrorCode())
                 .isEqualTo(CommunityErrorCode.AUTHENTICATION_REQUIRED);
+    }
+
+    @Test
+    void createCommentOnQuestionPostGrantsAnswerPoint() {
+        Post post = post(1L, 10L, PostBoardType.INFORMATION_QUESTION);
+        given(postRepository.findByIdAndStatusForUpdate(1L, PostStatus.ACTIVE))
+                .willReturn(Optional.of(post));
+        given(commentRepository.save(any(Comment.class))).willAnswer(invocation -> {
+            Comment comment = invocation.getArgument(0);
+            ReflectionTestUtils.setField(comment, "id", 2L);
+            return comment;
+        });
+
+        commentService.createComment(20L, 1L, new CreateCommentRequest("답변"));
+
+        then(pointService).should().grantActivityPoint(
+                20L,
+                PointEventType.COMMUNITY_ANSWER_CREATED,
+                2L,
+                20L
+        );
     }
 
     @Test
@@ -200,6 +226,25 @@ class CommentServiceTest {
 
         assertThat(response.likeCount()).isOne();
         then(commentLikeRepository).should(never()).save(any(CommentLike.class));
+        then(pointService).shouldHaveNoInteractions();
+    }
+
+    @Test
+    void likeCommentGrantsPointToCommentAuthor() {
+        Post post = post(1L, 10L);
+        Comment comment = comment(1L, post, 20L, null, "댓글");
+        given(commentRepository.findActiveByIdForUpdate(1L, CommentStatus.ACTIVE, PostStatus.ACTIVE))
+                .willReturn(Optional.of(comment));
+
+        commentService.likeComment(30L, 1L);
+
+        assertThat(comment.getLikeCount()).isOne();
+        then(pointService).should().grantActivityPoint(
+                20L,
+                PointEventType.COMMUNITY_ANSWER_LIKE_RECEIVED,
+                1L,
+                30L
+        );
     }
 
     @Test
@@ -217,6 +262,12 @@ class CommentServiceTest {
 
         assertThat(response.likeCount()).isZero();
         then(commentLikeRepository).should().delete(commentLike);
+        then(pointService).should().revokeActivityPoint(
+                20L,
+                PointEventType.COMMUNITY_ANSWER_LIKE_RECEIVED,
+                1L,
+                30L
+        );
     }
 
     @Test
@@ -238,6 +289,18 @@ class CommentServiceTest {
         assertThat(adopted.isAccepted()).isTrue();
         assertThat(canceled.isAccepted()).isFalse();
         assertThat(comment.isAccepted()).isFalse();
+        then(pointService).should().grantActivityPoint(
+                20L,
+                PointEventType.COMMUNITY_ANSWER_ACCEPTED,
+                1L,
+                10L
+        );
+        then(pointService).should().revokeActivityPoint(
+                20L,
+                PointEventType.COMMUNITY_ANSWER_ACCEPTED,
+                1L,
+                10L
+        );
     }
 
     @Test

@@ -46,12 +46,30 @@ public class GuardianPoint extends BaseCreatedUpdatedEntity {
     @Column(name = "badge_level", nullable = false, length = 30)
     private BadgeLevel badgeLevel = BadgeLevel.SPROUT;
 
+    private GuardianPoint(Long guardianProfileId) {
+        this.guardianProfileId = guardianProfileId;
+        this.totalPoint = MIN_POINT;
+        this.badgeLevel = BadgeLevel.SPROUT;
+    }
+
+    public static GuardianPoint create(Long guardianProfileId) {
+        return new GuardianPoint(guardianProfileId);
+    }
+
     public void increasePoint(int point) {
         if (point <= MIN_POINT) {
             return;
         }
 
         this.totalPoint += point;
+    }
+
+    public void decreasePoint(int point) {
+        if (point <= MIN_POINT) {
+            return;
+        }
+
+        this.totalPoint = Math.max(MIN_POINT, this.totalPoint - point);
     }
 
     public void updateBadgeLevel(BadgeLevel badgeLevel) {

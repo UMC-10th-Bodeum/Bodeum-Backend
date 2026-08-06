@@ -3,11 +3,16 @@ package com.bodeum.domain.point.service;
 import com.bodeum.domain.point.dto.response.MyPointResponse;
 import com.bodeum.domain.point.dto.response.MyPointResponse.PointActivity;
 import com.bodeum.domain.point.entity.GuardianPoint;
+import com.bodeum.domain.point.entity.GuardianPointHistory;
+import com.bodeum.domain.point.enums.PointEventType;
 import com.bodeum.domain.point.enums.PointType;
 import com.bodeum.domain.point.repository.GuardianPointHistoryRepository;
 import com.bodeum.domain.point.repository.GuardianPointHistoryRepository.PointActivitySummary;
 import com.bodeum.domain.point.repository.GuardianPointRepository;
 import com.bodeum.domain.point.repository.GuardianPointRepository.UserTotalPoint;
+import com.bodeum.domain.user.entity.GuardianProfile;
+import com.bodeum.domain.user.entity.User;
+import com.bodeum.domain.user.repository.UserRepository;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.EnumMap;
@@ -25,6 +30,83 @@ public class PointService {
 
     private final GuardianPointRepository guardianPointRepository;
     private final GuardianPointHistoryRepository pointHistoryRepository;
+    private final UserRepository userRepository;
+
+    @Transactional
+    public boolean grantActivityPoint(
+            Long recipientUserId,
+            PointEventType eventType,
+            Long referenceId,
+            Long actorUserId
+    ) {
+        Optional<User> recipient = findActiveUserForUpdate(recipientUserId);
+        if (recipient.isEmpty()) {
+            return false;
+        }
+
+        GuardianProfile guardianProfile = recipient.get().ensureGuardianProfile();
+        userRepository.flush();
+
+        GuardianPoint guardianPoint = guardianPointRepository
+                .findByGuardianProfileId(guardianProfile.getId())
+                .orElseGet(() -> guardianPointRepository.save(
+                        GuardianPoint.create(guardianProfile.getId())
+                ));
+
+        if (pointHistoryRepository
+                .existsByGuardianPoint_IdAndEventTypeAndReferenceIdAndActorUserId(
+                        guardianPoint.getId(),
+                        eventType,
+                        referenceId,
+                        actorUserId
+                )) {
+            return false;
+        }
+
+        GuardianPointHistory history = GuardianPointHistory.create(
+                guardianPoint,
+                eventType,
+                referenceId,
+                actorUserId
+        );
+        guardianPoint.increasePoint(history.getPointValue());
+        pointHistoryRepository.save(history);
+        return true;
+    }
+
+    @Transactional
+    public boolean revokeActivityPoint(
+            Long recipientUserId,
+            PointEventType eventType,
+            Long referenceId,
+            Long actorUserId
+    ) {
+        Optional<User> recipient = findActiveUserForUpdate(recipientUserId);
+        if (recipient.isEmpty()) {
+            return false;
+        }
+
+        Optional<GuardianPoint> guardianPoint = guardianPointRepository
+                .findByUserId(recipientUserId);
+        if (guardianPoint.isEmpty()) {
+            return false;
+        }
+
+        Optional<GuardianPointHistory> history = pointHistoryRepository
+                .findByGuardianPoint_IdAndEventTypeAndReferenceIdAndActorUserId(
+                        guardianPoint.get().getId(),
+                        eventType,
+                        referenceId,
+                        actorUserId
+                );
+        if (history.isEmpty()) {
+            return false;
+        }
+
+        guardianPoint.get().decreasePoint(history.get().getPointValue());
+        pointHistoryRepository.delete(history.get());
+        return true;
+    }
 
     @Transactional(readOnly = true)
     public MyPointResponse getMyPoints(Long userId) {
@@ -111,5 +193,10 @@ public class PointService {
                 summary.getEarnedPoint(),
                 summary.getActivityCount()
         );
+    }
+
+    private Optional<User> findActiveUserForUpdate(Long userId) {
+        return userRepository.findByIdForUpdate(userId)
+                .filter(User::isActive);
     }
 }

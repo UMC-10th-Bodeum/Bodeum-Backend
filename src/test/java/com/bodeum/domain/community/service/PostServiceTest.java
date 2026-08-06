@@ -28,6 +28,8 @@ import com.bodeum.domain.community.repository.PostImageRepository;
 import com.bodeum.domain.community.repository.PostLikeRepository;
 import com.bodeum.domain.community.repository.PostRepository;
 import com.bodeum.domain.community.repository.PostScrapRepository;
+import com.bodeum.domain.point.enums.PointEventType;
+import com.bodeum.domain.point.service.PointService;
 import com.bodeum.domain.user.repository.UserRepository;
 import java.util.List;
 import java.util.Optional;
@@ -59,6 +61,8 @@ class PostServiceTest {
     private PostScrapRepository postScrapRepository;
     @Mock
     private UserRepository userRepository;
+    @Mock
+    private PointService pointService;
     @InjectMocks
     private PostService postService;
 
@@ -79,6 +83,12 @@ class PostServiceTest {
         then(postDisabilityTagRepository).should().saveAll(anyList());
         then(postHashtagRepository).should().saveAll(anyList());
         then(postImageRepository).should().saveAll(anyList());
+        then(pointService).should().grantActivityPoint(
+                10L,
+                PointEventType.COMMUNITY_POST_CREATED,
+                1L,
+                10L
+        );
     }
 
     @Test
@@ -188,6 +198,12 @@ class PostServiceTest {
         assertThat(response.likeCount()).isOne();
         assertThat(post.getLikeCount()).isOne();
         then(postLikeRepository).should().save(any(PostLike.class));
+        then(pointService).should().grantActivityPoint(
+                10L,
+                PointEventType.COMMUNITY_POST_LIKE_RECEIVED,
+                1L,
+                20L
+        );
     }
 
     @Test
@@ -202,6 +218,7 @@ class PostServiceTest {
 
         assertThat(response.likeCount()).isOne();
         then(postLikeRepository).should(never()).save(any(PostLike.class));
+        then(pointService).shouldHaveNoInteractions();
     }
 
     @Test
@@ -218,6 +235,24 @@ class PostServiceTest {
         assertThat(response.isLiked()).isFalse();
         assertThat(response.likeCount()).isZero();
         then(postLikeRepository).should().delete(postLike);
+        then(pointService).should().revokeActivityPoint(
+                10L,
+                PointEventType.COMMUNITY_POST_LIKE_RECEIVED,
+                1L,
+                20L
+        );
+    }
+
+    @Test
+    void likeOwnPostDoesNotGrantPoint() {
+        Post post = post(1L, 10L);
+        given(postRepository.findByIdAndStatusForUpdate(1L, PostStatus.ACTIVE))
+                .willReturn(Optional.of(post));
+
+        postService.likePost(10L, 1L);
+
+        assertThat(post.getLikeCount()).isOne();
+        then(pointService).shouldHaveNoInteractions();
     }
 
     @Test
