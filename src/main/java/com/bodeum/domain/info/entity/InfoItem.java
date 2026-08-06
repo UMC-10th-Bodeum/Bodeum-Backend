@@ -83,11 +83,12 @@ public class InfoItem extends BaseCreatedUpdatedEntity {
     private List<InfoItemTag> infoItemTags = new ArrayList<>();
 
     @Builder
-    public InfoItem(String externalId, InfoCategory infoCategory, Long regionId, String name, String introduction,
+    public InfoItem(String externalId, InfoCategory infoCategory, InterestCategory interest, Long regionId, String name, String introduction,
                     String address, String sido, String sigungu, String phone, String homepageUrl,
                     String imageUrl, LocalDateTime syncedAt) {
         this.externalId = externalId;
         this.infoCategory = infoCategory;
+        this.interest = interest;
         this.regionId = regionId;
         this.name = name;
         this.introduction = introduction;
