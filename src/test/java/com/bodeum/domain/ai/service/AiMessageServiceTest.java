@@ -44,6 +44,8 @@ import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -333,8 +335,14 @@ class AiMessageServiceTest {
         verify(documentRetriever).retrieve(eq(question), any());
     }
 
-    @Test
-    void routesRegionOnlyFollowUpToLocalRehabCenters() {
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "  경기도   수원시  ",
+            "경기도 수원시야.",
+            "경기도 수원시입니다.",
+            "경기도 수원시예요."
+    })
+    void routesRegionOnlyFollowUpToLocalRehabCenters(String regionAnswer) {
         AiMessage previousAiMessage = mock(AiMessage.class);
         when(previousAiMessage.getAiAnswerStatus())
                 .thenReturn(AiAnswerStatus.REGION_REQUIRED);
@@ -379,7 +387,7 @@ class AiMessageServiceTest {
                 List.of(source)
         )).thenReturn(saved);
 
-        var result = service.createMessage(1L, "  경기도   수원시  ");
+        var result = service.createMessage(1L, regionAnswer);
 
         assertThat(result.aiMessage().answerStatus()).isEqualTo(AiAnswerStatus.ANSWERED);
         assertThat(result.aiMessage().sources()).hasSize(1);

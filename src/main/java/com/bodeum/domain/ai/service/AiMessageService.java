@@ -266,7 +266,9 @@ public class AiMessageService {
             return Optional.empty();
         }
 
-        String regionName = normalizeSpacing(content);
+        String regionName = normalizeSpacing(content)
+                .replaceFirst("(입니다|이에요|예요|이야|야)$", "")
+                .trim();
         if (regionName.isEmpty()) {
             return Optional.empty();
         }
