@@ -645,18 +645,20 @@ main ──→ hotfix/#N-xxx ──→ main   (병합 시 즉시 배포)
    git checkout -b hotfix/#N-xxx origin/main
    ```
 3. 수정 후 `main`을 대상으로 PR을 생성합니다. 승인 1명과 CI 통과는 그대로 요구합니다.
-4. 병합하면 즉시 배포됩니다. Actions의 헬스 체크 통과까지 확인합니다.
-5. **병합 직후 `develop`으로 back-merge합니다.**
+4. 병합하면 `main` push로 배포 workflow가 **시작**됩니다. 다른 배포가 실행 중이면 대기하므로, 해당 실행이 끝나고 헬스 체크를 통과했는지 Actions에서 확인합니다.
+5. **배포 확인 후 `develop`으로 back-merge합니다.**
    ```bash
+   git fetch origin
    git checkout develop
    git pull origin develop
-   git merge origin/main
+   git merge --no-ff -m "merge: hotfix #N 반영" origin/main
    git push origin develop
    ```
 
 > ⚠️ **back-merge를 빠뜨리면 안 됩니다.** `develop`에 수정이 반영되지 않은 채 다음 릴리스가 나가면 그 수정이 되돌아가, 같은 장애가 재발합니다. hotfix 병합과 back-merge는 한 묶음으로 처리합니다.
 
-- back-merge는 `merge` 커밋으로 남깁니다(`merge: hotfix #N 반영`). Squash하면 계보가 어긋납니다.
+- `git fetch origin`을 먼저 실행해야 합니다. 2번에서 fetch한 뒤 GitHub에서 PR을 병합했으므로, 로컬 `origin/main`은 hotfix가 없는 상태입니다. `git pull origin develop`은 `origin/develop`만 갱신하므로 이것만으로는 부족합니다.
+- `--no-ff`로 병합합니다. `develop`이 `main`과 같은 계보면 fast-forward되어 merge 커밋이 남지 않고, 그러면 back-merge 여부를 이력에서 확인할 수 없습니다.
 - 대응이 급해 back-merge를 미뤘다면 늦어도 그날 안에 처리하고 팀에 공유합니다.
 
 ---
