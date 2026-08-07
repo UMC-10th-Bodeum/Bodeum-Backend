@@ -25,6 +25,7 @@ import com.bodeum.domain.ai.service.port.AiDocumentRetriever;
 import com.bodeum.domain.ai.service.port.AiExternalAnswerProvider;
 import com.bodeum.domain.ai.service.port.AiQuestionIntentClassifier;
 import com.bodeum.domain.ai.model.rag.AiReferenceDocument;
+import com.bodeum.domain.ai.model.rag.AiScrapInterests;
 import com.bodeum.domain.ai.model.rag.AiSourceKey;
 import com.bodeum.domain.ai.model.answer.GeneratedAiAnswer;
 import com.bodeum.domain.ai.model.answer.ExternalAiAnswer;
@@ -68,6 +69,7 @@ class AiMessageServiceTest {
     @Mock AiReferenceDocumentResolver referenceDocumentResolver;
     @Mock AiStarterQuestionRouter starterQuestionRouter;
     @Mock AiQuestionIntentClassifier questionIntentClassifier;
+    @Mock AiScrapInterestService scrapInterestService;
 
     private AiMessageService service;
     private AiChatRoom chatRoom;
@@ -80,7 +82,7 @@ class AiMessageServiceTest {
                 documentRetriever, answerGenerator, externalAnswerProvider,
                 persistenceService, failureService, aiSourceReviewRepository, requestGuard,
                 referenceDocumentResolver, starterQuestionRouter,
-                questionIntentClassifier);
+                questionIntentClassifier, scrapInterestService);
         user = User.createSocialUser(SocialProvider.KAKAO, "provider-id", "a@b.com", "보호자");
         chatRoom = AiChatRoom.create(user);
         lenient().when(aiChatRoomRepository.findByUserId(1L)).thenReturn(Optional.of(chatRoom));
@@ -95,6 +97,8 @@ class AiMessageServiceTest {
                 .thenReturn(Optional.empty());
         lenient().when(questionIntentClassifier.classify(any()))
                 .thenReturn(AiQuestionIntent.NONE);
+        lenient().when(scrapInterestService.findRecentInterests(1L))
+                .thenReturn(AiScrapInterests.empty());
         AiMessage userMessage = mock(AiMessage.class);
         lenient().when(userMessage.getId()).thenReturn(11L);
         lenient().when(persistenceService.saveProcessingUserMessage(eq(chatRoom), any()))
@@ -142,6 +146,35 @@ class AiMessageServiceTest {
         assertThat(result.aiMessage().answerStatus()).isEqualTo(AiAnswerStatus.NO_EVIDENCE);
         assertThat(result.aiMessage().sources()).isEmpty();
         verify(answerGenerator, never()).generate(any(), any(), any());
+    }
+
+    @Test
+    void passesRecentScrapInterestsAsPersonalizationContext() {
+        String question = "우리 지역 특수학교 알려줘";
+        when(scrapInterestService.findRecentInterests(1L)).thenReturn(
+                new AiScrapInterests(
+                        List.of("수원시 특수교육 기관"),
+                        List.of("특수학교 입학 안내"),
+                        List.of("특수학교 정보 (게시판: INFORMATION_QUESTION)")
+                )
+        );
+        when(documentRetriever.retrieve(
+                eq(question),
+                org.mockito.ArgumentMatchers.argThat(profile ->
+                        profile.scrappedInfoTitles().contains("수원시 특수교육 기관")
+                                && profile.scrappedNewsTitles().contains("특수학교 입학 안내")
+                                && profile.scrappedCommunityTopics()
+                                .contains("특수학교 정보 (게시판: INFORMATION_QUESTION)"))
+        )).thenReturn(List.of());
+        AiMessage saved = savedAiMessage("관련 정보를 찾을 수 없습니다.");
+        when(persistenceService.saveAiMessageAndComplete(
+                eq(11L), eq(chatRoom), eq("관련 정보를 찾을 수 없습니다."),
+                eq(false), eq(AiAnswerStatus.NO_EVIDENCE), eq(List.of())
+        )).thenReturn(saved);
+
+        service.createMessage(1L, question);
+
+        verify(documentRetriever).retrieve(eq(question), any());
     }
 
     @ParameterizedTest

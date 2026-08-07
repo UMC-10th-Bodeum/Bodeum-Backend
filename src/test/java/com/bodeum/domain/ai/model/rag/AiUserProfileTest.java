@@ -13,5 +13,8 @@ class AiUserProfileTest {
 
         assertThat(profile.disabilityTypes()).isEmpty();
         assertThat(profile.interests()).isEmpty();
+        assertThat(profile.scrappedInfoTitles()).isEmpty();
+        assertThat(profile.scrappedNewsTitles()).isEmpty();
+        assertThat(profile.scrappedCommunityTopics()).isEmpty();
     }
 }

@@ -4,6 +4,7 @@ import com.bodeum.domain.news.entity.NewsScrap;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -32,6 +33,21 @@ public interface MyPageNewsScrapRepository
             """)
     List<NewsScrap> findAllVisibleByUserIdOrderByCreatedAtDesc(
             @Param("userId") Long userId
+    );
+
+    @Query("""
+            select scrap
+            from NewsScrap scrap
+            join fetch scrap.news news
+            left join fetch news.newsCategory newsCategory
+            where scrap.userId = :userId
+              and news.active = true
+              and news.deletedAt is null
+            order by scrap.createdAt desc
+            """)
+    List<NewsScrap> findRecentVisibleByUserId(
+            @Param("userId") Long userId,
+            Pageable pageable
     );
 
     @Query("""

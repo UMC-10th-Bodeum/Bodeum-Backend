@@ -9,6 +9,7 @@ import com.bodeum.domain.ai.enums.AiStarterQuestionType;
 import com.bodeum.domain.ai.enums.SenderType;
 import com.bodeum.domain.ai.exception.AiErrorCode;
 import com.bodeum.domain.ai.model.rag.AiReferenceDocument;
+import com.bodeum.domain.ai.model.rag.AiScrapInterests;
 import com.bodeum.domain.ai.model.rag.AiSourceKey;
 import com.bodeum.domain.ai.model.rag.AiUserProfile;
 import com.bodeum.domain.ai.model.answer.GeneratedAiAnswer;
@@ -65,6 +66,7 @@ public class AiMessageService {
     private final AiReferenceDocumentResolver referenceDocumentResolver;
     private final AiStarterQuestionRouter starterQuestionRouter;
     private final AiQuestionIntentClassifier questionIntentClassifier;
+    private final AiScrapInterestService scrapInterestService;
 
     public CreateAiMessageResponse createMessage(Long userId, String content) {
         AiChatRoom chatRoom = aiChatRoomRepository.findByUserId(userId)
@@ -87,6 +89,8 @@ public class AiMessageService {
         User userWithDisabilities = userRepository.findAiDisabilityProfileById(userId)
                 .orElseThrow(() -> new ProjectException(UserErrorCode.USER_NOT_FOUND));
 
+        AiScrapInterests scrapInterests = loadScrapInterestsSafely(userId);
+
         log.debug("[AI] 사용자 프로필 조회 완료");
 
         AiMessage userMessage = persistenceService.saveProcessingUserMessage(chatRoom, content);
@@ -97,7 +101,8 @@ public class AiMessageService {
                     userMessage,
                     content,
                     user,
-                    userWithDisabilities
+                    userWithDisabilities,
+                    scrapInterests
             );
         } catch (Exception e) {
             logResponseGenerationFailure(userId, chatRoom.getId(), userMessage.getId(), e);
@@ -111,13 +116,14 @@ public class AiMessageService {
             AiMessage userMessage,
             String content,
             User user,
-            User userWithDisabilities
+            User userWithDisabilities,
+            AiScrapInterests scrapInterests
     ) {
 
         QuestionContext questionContext = resolveQuestionContext(
                 chatRoom.getId(),
                 content,
-                toProfile(user, userWithDisabilities)
+                toProfile(user, userWithDisabilities, scrapInterests)
         );
         if (questionContext.safetyGuidance().isPresent()) {
             log.info("[AI] 안전 응답 안내로 전환");
@@ -453,7 +459,8 @@ public class AiMessageService {
 
     private AiUserProfile toProfile(
             User user,
-            User disabilityProfileUser
+            User disabilityProfileUser,
+            AiScrapInterests scrapInterests
     ) {
         Region region = user.getRegion();
         return new AiUserProfile(
@@ -467,8 +474,20 @@ public class AiMessageService {
                 user.getInterestCategories().stream()
                         .map(Enum::name)
                         .toList(),
-                user.getKeywordText()
+                user.getKeywordText(),
+                scrapInterests.infoTitles(),
+                scrapInterests.newsTitles(),
+                scrapInterests.communityTopics()
         );
+    }
+
+    private AiScrapInterests loadScrapInterestsSafely(Long userId) {
+        try {
+            return scrapInterestService.findRecentInterests(userId);
+        } catch (Exception e) {
+            log.warn("[AI] 최근 스크랩 관심 정보 조회 실패, 기본 프로필로 처리합니다.", e);
+            return AiScrapInterests.empty();
+        }
     }
 
     private CreateAiMessageResponse sourceBackedResponse(

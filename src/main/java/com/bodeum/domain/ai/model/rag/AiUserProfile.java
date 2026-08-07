@@ -9,12 +9,41 @@ public record AiUserProfile(
         Integer childAge,
         List<String> disabilityTypes,
         List<String> interests,
-        String keywordText
+        String keywordText,
+        List<String> scrappedInfoTitles,
+        List<String> scrappedNewsTitles,
+        List<String> scrappedCommunityTopics
 ) {
 
     public AiUserProfile {
         disabilityTypes = disabilityTypes == null ? List.of() : List.copyOf(disabilityTypes);
         interests = interests == null ? List.of() : List.copyOf(interests);
+        scrappedInfoTitles = copyOfNullable(scrappedInfoTitles);
+        scrappedNewsTitles = copyOfNullable(scrappedNewsTitles);
+        scrappedCommunityTopics = copyOfNullable(scrappedCommunityTopics);
+    }
+
+    public AiUserProfile(
+            String region,
+            String regionLevel1,
+            String regionLevel2,
+            Integer childAge,
+            List<String> disabilityTypes,
+            List<String> interests,
+            String keywordText
+    ) {
+        this(
+                region,
+                regionLevel1,
+                regionLevel2,
+                childAge,
+                disabilityTypes,
+                interests,
+                keywordText,
+                List.of(),
+                List.of(),
+                List.of()
+        );
     }
 
     public AiUserProfile withRegion(
@@ -29,7 +58,14 @@ public record AiUserProfile(
                 childAge,
                 disabilityTypes,
                 interests,
-                keywordText
+                keywordText,
+                scrappedInfoTitles,
+                scrappedNewsTitles,
+                scrappedCommunityTopics
         );
+    }
+
+    private static List<String> copyOfNullable(List<String> values) {
+        return values == null ? List.of() : List.copyOf(values);
     }
 }
