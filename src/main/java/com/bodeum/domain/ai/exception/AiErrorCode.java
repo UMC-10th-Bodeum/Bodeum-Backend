@@ -19,6 +19,11 @@ public enum AiErrorCode implements BaseErrorCode {
             "AI404_1",
             "AI 채팅방을 찾을 수 없습니다."
     ),
+    AI_CHAT_ROOM_ALREADY_EXISTS(
+            HttpStatus.CONFLICT,
+            "AI409_1",
+            "이미 AI 채팅방이 존재합니다."
+    ),
     AI_INVALID_HISTORY_CURSOR(
             HttpStatus.BAD_REQUEST,
             "AI400_1",
