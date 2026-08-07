@@ -29,6 +29,11 @@ public enum AiErrorCode implements BaseErrorCode {
             "AI400_2",
             "AI 메시지에만 피드백을 등록할 수 있습니다."
     ),
+    AI_FEEDBACK_NOT_ALLOWED(
+            HttpStatus.FORBIDDEN,
+            "AI403_3",
+            "초기 안내 메시지에는 피드백을 등록할 수 없습니다."
+    ),
     AI_MESSAGE_FORBIDDEN(
             HttpStatus.FORBIDDEN,
             "AI403_2",

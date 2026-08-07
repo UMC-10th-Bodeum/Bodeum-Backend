@@ -47,6 +47,9 @@ public class AiFeedbackService {
         if (message.getSenderType() != SenderType.AI) {
             throw new ProjectException(AiErrorCode.AI_FEEDBACK_AI_MESSAGE_ONLY);
         }
+        if (message.getAiAnswerStatus() == AiAnswerStatus.GREETING) {
+            throw new ProjectException(AiErrorCode.AI_FEEDBACK_NOT_ALLOWED);
+        }
         if (aiFeedbackRepository.existsByAiMessageId(aiMessageId)) {
             throw new ProjectException(AiErrorCode.ALREADY_FEEDBACK);
         }
