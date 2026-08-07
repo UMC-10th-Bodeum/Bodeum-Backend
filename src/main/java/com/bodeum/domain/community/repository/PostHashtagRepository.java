@@ -8,5 +8,7 @@ public interface PostHashtagRepository extends JpaRepository<PostHashtag, Long> 
 
     List<PostHashtag> findAllByPost_IdOrderByIdAsc(Long postId);
 
+    List<PostHashtag> findAllByPost_IdIn(List<Long> postIds);
+
     void deleteAllByPost_Id(Long postId);
 }

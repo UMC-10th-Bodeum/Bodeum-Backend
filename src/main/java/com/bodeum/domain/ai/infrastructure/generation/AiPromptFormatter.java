@@ -17,12 +17,20 @@ public class AiPromptFormatter {
                 자녀 나이: %s
                 집중 케어 영역: %s
                 자녀 관련 키워드: %s
+
+                [최근 스크랩 관심 정보]
+                정보: %s
+                소식: %s
+                커뮤니티 주제: %s
                 """.formatted(
                 valueOrNotProvided(profile.region()),
                 valueOrNotProvided(profile.interests()),
                 valueOrNotProvided(profile.childAge()),
                 valueOrNotProvided(profile.disabilityTypes()),
-                valueOrNotProvided(profile.keywordText())
+                valueOrNotProvided(profile.keywordText()),
+                valueOrNotProvided(profile.scrappedInfoTitles()),
+                valueOrNotProvided(profile.scrappedNewsTitles()),
+                valueOrNotProvided(profile.scrappedCommunityTopics())
         );
     }
 
