@@ -17,6 +17,7 @@ import com.bodeum.domain.ai.infrastructure.retrieval.AiReferenceDocumentResolver
 import com.bodeum.domain.ai.service.port.AiAnswerGenerator;
 import com.bodeum.domain.ai.service.port.AiDocumentRetriever;
 import com.bodeum.domain.ai.service.port.AiExternalAnswerProvider;
+import com.bodeum.domain.ai.service.port.AiStarterQuestionClassifier;
 import com.bodeum.domain.ai.repository.AiChatRoomRepository;
 import com.bodeum.domain.ai.repository.AiMessageRepository;
 import com.bodeum.domain.ai.repository.AiSourceReviewRepository;
@@ -62,6 +63,7 @@ public class AiMessageService {
     private final AiRequestGuard requestGuard;
     private final AiReferenceDocumentResolver referenceDocumentResolver;
     private final AiStarterQuestionRouter starterQuestionRouter;
+    private final AiStarterQuestionClassifier starterQuestionClassifier;
 
     public CreateAiMessageResponse createMessage(Long userId, String content) {
         AiChatRoom chatRoom = aiChatRoomRepository.findByUserId(userId)
@@ -121,7 +123,11 @@ public class AiMessageService {
                 starterContext.questionType()
                         .flatMap(type -> starterQuestionRouter.route(type, profile));
         if (starterAnswer.isPresent()) {
-            return saveStarterAnswer(chatRoom, userMessage, starterAnswer.get());
+            AiStarterQuestionAnswer answer = starterAnswer.get();
+            if (answer.isRegionRequired() || answer.hasEvidence()) {
+                return saveStarterAnswer(chatRoom, userMessage, answer);
+            }
+            log.info("[AI] 추천 질문 출처 없음, 일반 질문 흐름으로 전환");
         }
 
         log.debug("[AI] 문서 검색 시작");
@@ -186,9 +192,15 @@ public class AiMessageService {
             return new StarterContext(profile, questionType);
         }
 
-        return resolveRegionFollowUp(chatRoomId, content)
-                .map(region -> localRehabContext(profile, region))
-                .orElseGet(() -> new StarterContext(profile, Optional.empty()));
+        Optional<Region> followUpRegion = resolveRegionFollowUp(chatRoomId, content);
+        if (followUpRegion.isPresent()) {
+            return localRehabContext(profile, followUpRegion.get());
+        }
+
+        return new StarterContext(
+                profile,
+                starterQuestionClassifier.classify(content)
+        );
     }
 
     private StarterContext localRehabContext(
@@ -258,7 +270,9 @@ public class AiMessageService {
             return Optional.empty();
         }
 
-        String regionName = normalizeSpacing(content);
+        String regionName = normalizeSpacing(content)
+                .replaceFirst("(입니다|이에요|예요|이야|야)$", "")
+                .trim();
         if (regionName.isEmpty()) {
             return Optional.empty();
         }
