@@ -148,6 +148,20 @@ public class UserController {
     }
 
     @Operation(
+            summary = "내 게시글 개별 삭제",
+            description = "현재 로그인한 사용자가 작성한 게시글을 논리 삭제한다."
+    )
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @DeleteMapping("/me/posts/{postId}")
+    public ApiResponse<Void> deletePost(
+            @LoginUser Long userId,
+            @PathVariable @Positive Long postId
+    ) {
+        myPageService.deletePost(userId, postId);
+        return ApiResponse.of(GeneralSuccessCode.NO_CONTENT, null);
+    }
+
+    @Operation(
             summary = "내 댓글 목록 조회",
             description = "현재 로그인한 사용자가 작성한 댓글과 해당 게시글 정보를 최신순으로 조회한다."
     )
@@ -161,6 +175,20 @@ public class UserController {
                 GeneralSuccessCode.OK,
                 myPageService.getComments(userId, page, size)
         );
+    }
+
+    @Operation(
+            summary = "내 댓글 개별 삭제",
+            description = "현재 로그인한 사용자가 작성한 댓글 또는 답글을 논리 삭제한다."
+    )
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @DeleteMapping("/me/comments/{commentId}")
+    public ApiResponse<Void> deleteComment(
+            @LoginUser Long userId,
+            @PathVariable @Positive Long commentId
+    ) {
+        myPageService.deleteComment(userId, commentId);
+        return ApiResponse.of(GeneralSuccessCode.NO_CONTENT, null);
     }
 
     @Operation(
