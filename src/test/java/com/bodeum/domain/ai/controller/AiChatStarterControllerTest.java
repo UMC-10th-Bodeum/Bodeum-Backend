@@ -1,7 +1,7 @@
 package com.bodeum.domain.ai.controller;
 
 import static org.mockito.Mockito.when;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -41,7 +41,7 @@ class AiChatStarterControllerTest {
     }
 
     @Test
-    void getsChatStarter() throws Exception {
+    void createsChatStarter() throws Exception {
         when(aiChatStarterService.getChatStarter(10L))
                 .thenReturn(AiChatStarterResponse.of(
                         "안녕하세요!\n\n민정맘님에게 필요한 정보를 안내해드려요.",
@@ -54,7 +54,7 @@ class AiChatStarterControllerTest {
                         )
                 ));
 
-        mockMvc.perform(get("/api/v1/ai/chat-room/starter"))
+        mockMvc.perform(post("/api/v1/ai/chat-room/starter"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("COMMON200_1"))
                 .andExpect(jsonPath("$.result.greeting")
