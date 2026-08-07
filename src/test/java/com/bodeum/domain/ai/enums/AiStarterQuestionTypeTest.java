@@ -40,8 +40,12 @@ class AiStarterQuestionTypeTest {
         assertThat(AiStarterQuestionType.fromQuestion("장애 진단 후 뭘 먼저 해야 해?"))
                 .contains(AiStarterQuestionType.DIAGNOSIS_FIRST_STEPS);
         assertThat(AiStarterQuestionType.fromQuestion("바우처 신청 방법을 알려주세요."))
-                .contains(AiStarterQuestionType.VOUCHER_APPLICATION);
+                .isEmpty();
+        assertThat(AiStarterQuestionType.fromQuestion("바우처 어떻게 신청해"))
+                .isEmpty();
         assertThat(AiStarterQuestionType.fromQuestion("발달재활서비스 바우처 신청 방법 알려줘"))
+                .contains(AiStarterQuestionType.VOUCHER_APPLICATION);
+        assertThat(AiStarterQuestionType.fromQuestion("발달재활 바우처 어떻게 신청해"))
                 .contains(AiStarterQuestionType.VOUCHER_APPLICATION);
     }
 
