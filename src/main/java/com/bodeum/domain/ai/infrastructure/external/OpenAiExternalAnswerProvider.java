@@ -122,7 +122,7 @@ public class OpenAiExternalAnswerProvider implements AiExternalAnswerProvider {
         }
     }
 
-    private Map<String, Object> requestBody(
+    Map<String, Object> requestBody(
             String question,
             AiUserProfile profile,
             List<String> allowedDomains
@@ -140,17 +140,16 @@ public class OpenAiExternalAnswerProvider implements AiExternalAnswerProvider {
         body.put("tools", List.of(webSearch));
         body.put("tool_choice", "required");
         body.put("include", List.of("web_search_call.action.sources"));
-        body.put("input", externalSearchPrompt(question, profile));
+        body.put("instructions", externalSearchSystemPrompt);
+        body.put("input", externalSearchInput(question, profile));
         return body;
     }
 
-    private String externalSearchPrompt(
+    private String externalSearchInput(
             String question,
             AiUserProfile profile
     ) {
         return """
-                %s
-
                 %s
 
                 [우선 확인할 공식 페이지]
@@ -159,7 +158,6 @@ public class OpenAiExternalAnswerProvider implements AiExternalAnswerProvider {
                 [사용자 질문]
                 %s
                 """.formatted(
-                externalSearchSystemPrompt,
                 promptFormatter.formatProfile(profile),
                 "등록된 허용 도메인에서 관련 상세 페이지를 찾으세요.",
                 question
