@@ -13,6 +13,8 @@ import com.bodeum.domain.community.enums.CommentStatus;
 import com.bodeum.domain.community.enums.PostAnonymityType;
 import com.bodeum.domain.community.enums.PostBoardType;
 import com.bodeum.domain.community.enums.PostStatus;
+import com.bodeum.domain.community.service.CommentService;
+import com.bodeum.domain.community.service.PostService;
 import com.bodeum.domain.info.entity.InfoCategory;
 import com.bodeum.domain.info.entity.InfoItem;
 import com.bodeum.domain.info.entity.InfoScrap;
@@ -72,8 +74,28 @@ class MyPageServiceTest {
     @Mock
     private MyPageCommentRepository commentRepository;
 
+    @Mock
+    private PostService postService;
+
+    @Mock
+    private CommentService commentService;
+
     @InjectMocks
     private MyPageService myPageService;
+
+    @Test
+    void deletePostDelegatesToCommunityPostService() {
+        myPageService.deletePost(1L, 10L);
+
+        verify(postService).deletePost(1L, 10L);
+    }
+
+    @Test
+    void deleteCommentDelegatesToCommunityCommentService() {
+        myPageService.deleteComment(1L, 20L);
+
+        verify(commentService).deleteComment(1L, 20L);
+    }
 
     @Test
     void getDashboardReturnsProfileAndActivitySummary() {
