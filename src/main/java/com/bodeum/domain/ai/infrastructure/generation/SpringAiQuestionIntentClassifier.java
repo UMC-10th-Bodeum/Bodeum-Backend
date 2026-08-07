@@ -1,10 +1,9 @@
 package com.bodeum.domain.ai.infrastructure.generation;
 
-import com.bodeum.domain.ai.enums.AiStarterQuestionType;
-import com.bodeum.domain.ai.service.port.AiStarterQuestionClassifier;
+import com.bodeum.domain.ai.enums.AiQuestionIntent;
+import com.bodeum.domain.ai.service.port.AiQuestionIntentClassifier;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.util.Optional;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.beans.factory.annotation.Value;
@@ -15,22 +14,22 @@ import org.springframework.stereotype.Component;
 @Component
 @Profile("!test")
 @Slf4j
-public class SpringAiStarterQuestionClassifier implements AiStarterQuestionClassifier {
+public class SpringAiQuestionIntentClassifier implements AiQuestionIntentClassifier {
 
     private final ChatClient chatClient;
 
-    public SpringAiStarterQuestionClassifier(
+    public SpringAiQuestionIntentClassifier(
             ChatClient.Builder builder,
-            @Value("classpath:prompts/ai-starter-question-classifier-system-prompt.txt")
+            @Value("classpath:prompts/ai-question-intent-classifier-system-prompt.txt")
             Resource systemPromptResource
     ) {
         this.chatClient = builder.defaultSystem(readPrompt(systemPromptResource)).build();
     }
 
     @Override
-    public Optional<AiStarterQuestionType> classify(String question) {
+    public AiQuestionIntent classify(String question) {
         if (question == null || question.isBlank()) {
-            return Optional.empty();
+            return AiQuestionIntent.NONE;
         }
 
         try {
@@ -40,31 +39,18 @@ public class SpringAiStarterQuestionClassifier implements AiStarterQuestionClass
                     .entity(ClassificationResult.class, spec -> spec
                             .useProviderStructuredOutput()
                             .validateSchema());
-            if (result == null || result.intent() == null
-                    || result.intent() == Intent.NONE) {
-                log.info("[AI] 추천 질문 LLM 분류 결과: NONE");
-                return Optional.empty();
-            }
-
-            AiStarterQuestionType type = AiStarterQuestionType.valueOf(result.intent().name());
-            log.info("[AI] 추천 질문 LLM 분류 결과: {}", type);
-            return Optional.of(type);
+            AiQuestionIntent intent = result == null || result.intent() == null
+                    ? AiQuestionIntent.NONE
+                    : result.intent();
+            log.info("[AI] 질문 LLM 의도 분류 결과: {}", intent);
+            return intent;
         } catch (Exception e) {
-            log.warn("[AI] 추천 질문 LLM 분류 실패, 일반 RAG로 처리합니다.", e);
-            return Optional.empty();
+            log.warn("[AI] 질문 LLM 의도 분류 실패, 일반 RAG로 처리합니다.", e);
+            return AiQuestionIntent.NONE;
         }
     }
 
-    enum Intent {
-        WELFARE_SITES,
-        LOCAL_REHAB_CENTERS,
-        CHILD_MEDICAL_SUPPORT,
-        DIAGNOSIS_FIRST_STEPS,
-        VOUCHER_APPLICATION,
-        NONE
-    }
-
-    record ClassificationResult(Intent intent) {
+    record ClassificationResult(AiQuestionIntent intent) {
     }
 
     private String readPrompt(Resource resource) {
@@ -72,7 +58,7 @@ public class SpringAiStarterQuestionClassifier implements AiStarterQuestionClass
             return resource.getContentAsString(StandardCharsets.UTF_8);
         } catch (IOException e) {
             throw new IllegalStateException(
-                    "추천 질문 의도 분류 시스템 프롬프트를 읽을 수 없습니다.",
+                    "질문 의도 분류 시스템 프롬프트를 읽을 수 없습니다.",
                     e
             );
         }

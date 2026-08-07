@@ -44,9 +44,9 @@ public enum AiStarterQuestionType {
     VOUCHER_APPLICATION(
             true,
             "바우처 신청 방법 알려줘",
-            "바우처 신청 방법을 알려줘",
-            "바우처 어떻게 신청해",
-            "발달재활서비스 바우처 신청 방법 알려줘"
+            "발달재활서비스 바우처 신청 방법 알려줘",
+            "발달재활서비스 바우처 신청 방법을 알려줘",
+            "발달재활 바우처 어떻게 신청해"
     ),
     AUTISM_INFO_SITES(
             false,
