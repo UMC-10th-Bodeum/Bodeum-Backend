@@ -125,6 +125,24 @@ class AiFeedbackServiceTest {
     }
 
     @Test
+    void rejectsGreetingMessage() {
+        prepareOwnedAiMessage();
+        when(message.getAiAnswerStatus()).thenReturn(AiAnswerStatus.GREETING);
+
+        assertThatThrownBy(() -> aiFeedbackService.createFeedback(
+                10L,
+                12L,
+                new CreateAiFeedbackRequest(AiFeedbackType.HELPFUL, null)
+        ))
+                .isInstanceOf(ProjectException.class)
+                .extracting(exception -> ((ProjectException) exception).getErrorCode())
+                .isEqualTo(AiErrorCode.AI_FEEDBACK_NOT_ALLOWED);
+
+        verify(aiFeedbackRepository, never()).existsByAiMessageId(anyLong());
+        verify(aiFeedbackRepository, never()).save(any());
+    }
+
+    @Test
     void rejectsDuplicateFeedback() {
         prepareOwnedAiMessage();
         when(aiFeedbackRepository.existsByAiMessageId(12L)).thenReturn(true);
