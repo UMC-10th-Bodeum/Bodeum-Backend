@@ -9,6 +9,7 @@ import com.bodeum.domain.info.repository.InfoCategoryRepository;
 import com.bodeum.domain.info.repository.InfoItemRepository;
 import com.bodeum.domain.info.service.InfoTagMappingService;
 import com.bodeum.domain.info.util.RegionMapper;
+import com.bodeum.domain.user.enums.InterestCategory;
 import com.bodeum.global.infrastructure.openapi.publicDataApi.SpecialSchoolApiClient;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -86,7 +87,7 @@ public class SpecialSchoolSyncService {
             InfoItem infoItem = infoItemRepository.findFirstByExternalId(externalId)
                     .map(existingItem -> {
                         existingItem.updateInformation(
-                                displayName, category, regionId, introduction, rawAddress,
+                                displayName, category, InterestCategory.GROWTH_EDUCATION,regionId, introduction, rawAddress,
                                 sido, sigungu, phone, homepageUrl, null
                         );
                         return existingItem;
@@ -94,6 +95,7 @@ public class SpecialSchoolSyncService {
                     .orElseGet(() -> InfoItem.builder()
                             .externalId(externalId)
                             .infoCategory(category)
+                            .interest(InterestCategory.GROWTH_EDUCATION)
                             .regionId(regionId)
                             .name(displayName)
                             .introduction(introduction)

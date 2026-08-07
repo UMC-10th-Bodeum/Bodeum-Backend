@@ -9,6 +9,7 @@ import com.bodeum.domain.info.repository.InfoCategoryRepository;
 import com.bodeum.domain.info.repository.InfoItemRepository;
 import com.bodeum.domain.info.service.InfoTagMappingService;
 import com.bodeum.domain.info.util.RegionMapper;
+import com.bodeum.domain.user.enums.InterestCategory;
 import com.bodeum.global.infrastructure.openapi.publicDataApi.TherapyRehabApiClient;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -63,7 +64,7 @@ public class TherapyRehabSyncService {
             InfoItem infoItem = infoItemRepository.findFirstByExternalId(externalId)
                     .map(existingItem -> {
                         existingItem.updateInformation(
-                                name, category, regionId, null, address,
+                                name, category, InterestCategory.HOSPITAL_HEALTH ,regionId, null, address,
                                 sido, sigungu, null, null, null
                         );
                         return existingItem;
@@ -71,6 +72,7 @@ public class TherapyRehabSyncService {
                     .orElseGet(() -> InfoItem.builder()
                             .externalId(externalId)
                             .infoCategory(category)
+                            .interest(InterestCategory.HOSPITAL_HEALTH)
                             .regionId(regionId)
                             .name(name)
                             .address(address)

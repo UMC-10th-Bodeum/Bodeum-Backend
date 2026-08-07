@@ -9,6 +9,7 @@ import com.bodeum.domain.info.repository.InfoCategoryRepository;
 import com.bodeum.domain.info.repository.InfoItemRepository;
 import com.bodeum.domain.info.service.InfoTagMappingService;
 import com.bodeum.domain.info.util.RegionMapper;
+import com.bodeum.domain.user.enums.InterestCategory;
 import com.bodeum.global.infrastructure.openapi.publicDataApi.FamilySupportApiClient;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -66,7 +67,7 @@ public class FamilySupportSyncService {
             InfoItem infoItem = infoItemRepository.findFirstByExternalId(externalId)
                     .map(existingItem -> {
                         existingItem.updateInformation(
-                                name, category, regionId, introduction, fullAddress,
+                                name, category, InterestCategory.PARENTING_COMMUNICATION,regionId, introduction, fullAddress,
                                 sido, sigungu, item.phone(), null, null
                         );
                         return existingItem;
@@ -74,6 +75,7 @@ public class FamilySupportSyncService {
                     .orElseGet(() -> InfoItem.builder()
                             .externalId(externalId)
                             .infoCategory(category)
+                            .interest(InterestCategory.PARENTING_COMMUNICATION)
                             .regionId(regionId)
                             .name(name)
                             .introduction(introduction)

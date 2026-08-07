@@ -31,6 +31,7 @@ public class InfoItemUpsertService {
             savedItem.updateInformation(
                     newItem.getName(),
                     newItem.getInfoCategory(),
+                    newItem.getInterest(),
                     newItem.getRegionId(),
                     newItem.getIntroduction(),
                     newItem.getAddress(),

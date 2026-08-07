@@ -4,6 +4,7 @@ import com.bodeum.domain.ai.dto.response.*;
 import com.bodeum.domain.ai.entity.AiChatRoom;
 import com.bodeum.domain.ai.entity.AiMessage;
 import com.bodeum.domain.ai.enums.AiAnswerStatus;
+import com.bodeum.domain.ai.enums.AiQuestionIntent;
 import com.bodeum.domain.ai.enums.AiStarterQuestionType;
 import com.bodeum.domain.ai.enums.SenderType;
 import com.bodeum.domain.ai.exception.AiErrorCode;
@@ -17,6 +18,7 @@ import com.bodeum.domain.ai.infrastructure.retrieval.AiReferenceDocumentResolver
 import com.bodeum.domain.ai.service.port.AiAnswerGenerator;
 import com.bodeum.domain.ai.service.port.AiDocumentRetriever;
 import com.bodeum.domain.ai.service.port.AiExternalAnswerProvider;
+import com.bodeum.domain.ai.service.port.AiQuestionIntentClassifier;
 import com.bodeum.domain.ai.repository.AiChatRoomRepository;
 import com.bodeum.domain.ai.repository.AiMessageRepository;
 import com.bodeum.domain.ai.repository.AiSourceReviewRepository;
@@ -62,6 +64,7 @@ public class AiMessageService {
     private final AiRequestGuard requestGuard;
     private final AiReferenceDocumentResolver referenceDocumentResolver;
     private final AiStarterQuestionRouter starterQuestionRouter;
+    private final AiQuestionIntentClassifier questionIntentClassifier;
 
     public CreateAiMessageResponse createMessage(Long userId, String content) {
         AiChatRoom chatRoom = aiChatRoomRepository.findByUserId(userId)
@@ -111,17 +114,30 @@ public class AiMessageService {
             User userWithDisabilities
     ) {
 
-        StarterContext starterContext = resolveStarterContext(
+        QuestionContext questionContext = resolveQuestionContext(
                 chatRoom.getId(),
                 content,
                 toProfile(user, userWithDisabilities)
         );
-        AiUserProfile profile = starterContext.profile();
+        if (questionContext.safetyGuidance().isPresent()) {
+            log.info("[AI] 안전 응답 안내로 전환");
+            return createNoEvidenceResponse(
+                    chatRoom,
+                    userMessage,
+                    questionContext.safetyGuidance().get()
+            );
+        }
+
+        AiUserProfile profile = questionContext.profile();
         Optional<AiStarterQuestionAnswer> starterAnswer =
-                starterContext.questionType()
+                questionContext.questionType()
                         .flatMap(type -> starterQuestionRouter.route(type, profile));
         if (starterAnswer.isPresent()) {
-            return saveStarterAnswer(chatRoom, userMessage, starterAnswer.get());
+            AiStarterQuestionAnswer answer = starterAnswer.get();
+            if (answer.isRegionRequired() || answer.hasEvidence()) {
+                return saveStarterAnswer(chatRoom, userMessage, answer);
+            }
+            log.info("[AI] 추천 질문 출처 없음, 일반 질문 흐름으로 전환");
         }
 
         log.debug("[AI] 문서 검색 시작");
@@ -170,7 +186,7 @@ public class AiMessageService {
                 message, citedSources, warningResponse(warning), AiAnswerStatus.ANSWERED);
     }
 
-    private StarterContext resolveStarterContext(
+    private QuestionContext resolveQuestionContext(
             Long chatRoomId,
             String content,
             AiUserProfile profile
@@ -183,15 +199,30 @@ public class AiMessageService {
         Optional<AiStarterQuestionType> questionType =
                 AiStarterQuestionType.fromQuestion(content);
         if (questionType.isPresent()) {
-            return new StarterContext(profile, questionType);
+            return starterQuestionContext(profile, questionType.get());
         }
 
-        return resolveRegionFollowUp(chatRoomId, content)
-                .map(region -> localRehabContext(profile, region))
-                .orElseGet(() -> new StarterContext(profile, Optional.empty()));
+        Optional<Region> followUpRegion = resolveRegionFollowUp(chatRoomId, content);
+        if (followUpRegion.isPresent()) {
+            return localRehabContext(profile, followUpRegion.get());
+        }
+
+        AiQuestionIntent intent = questionIntentClassifier.classify(content);
+        return new QuestionContext(
+                profile,
+                intent.starterQuestionType(),
+                intent.safetyGuidance()
+        );
     }
 
-    private StarterContext localRehabContext(
+    private QuestionContext starterQuestionContext(
+            AiUserProfile profile,
+            AiStarterQuestionType questionType
+    ) {
+        return new QuestionContext(profile, Optional.of(questionType), Optional.empty());
+    }
+
+    private QuestionContext localRehabContext(
             AiUserProfile profile,
             Region region
     ) {
@@ -200,9 +231,9 @@ public class AiMessageService {
                 region.getRegionLevel1(),
                 region.getRegionLevel2()
         );
-        return new StarterContext(
+        return starterQuestionContext(
                 regionalProfile,
-                Optional.of(AiStarterQuestionType.LOCAL_REHAB_CENTERS)
+                AiStarterQuestionType.LOCAL_REHAB_CENTERS
         );
     }
 
@@ -258,7 +289,9 @@ public class AiMessageService {
             return Optional.empty();
         }
 
-        String regionName = normalizeSpacing(content);
+        String regionName = normalizeSpacing(content)
+                .replaceFirst("(입니다|이에요|예요|이야|야)$", "")
+                .trim();
         if (regionName.isEmpty()) {
             return Optional.empty();
         }
@@ -355,8 +388,16 @@ public class AiMessageService {
             AiChatRoom chatRoom,
             AiMessage userMessage
     ) {
+        return createNoEvidenceResponse(chatRoom, userMessage, NO_RESULT_MESSAGE);
+    }
+
+    private CreateAiMessageResponse createNoEvidenceResponse(
+            AiChatRoom chatRoom,
+            AiMessage userMessage,
+            String content
+    ) {
         AiMessage message = persistenceService.saveAiMessageAndComplete(
-                userMessage.getId(), chatRoom, NO_RESULT_MESSAGE, false,
+                userMessage.getId(), chatRoom, content, false,
                 AiAnswerStatus.NO_EVIDENCE, List.of());
         return new CreateAiMessageResponse(AiMessageResponse.noEvidence(
                 message.getId(),
@@ -500,9 +541,10 @@ public class AiMessageService {
         return rootCause;
     }
 
-    private record StarterContext(
+    private record QuestionContext(
             AiUserProfile profile,
-            Optional<AiStarterQuestionType> questionType
+            Optional<AiStarterQuestionType> questionType,
+            Optional<String> safetyGuidance
     ) {
     }
 
