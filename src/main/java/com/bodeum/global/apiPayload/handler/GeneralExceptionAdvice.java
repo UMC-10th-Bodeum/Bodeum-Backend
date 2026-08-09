@@ -4,6 +4,7 @@ import com.bodeum.global.apiPayload.ApiResponse;
 import com.bodeum.global.apiPayload.code.BaseErrorCode;
 import com.bodeum.global.apiPayload.code.GeneralErrorCode;
 import com.bodeum.global.apiPayload.exception.ProjectException;
+import com.bodeum.global.infrastructure.storage.StorageErrorCode;
 import jakarta.validation.ConstraintViolationException;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -107,7 +108,7 @@ public class GeneralExceptionAdvice {
     public ResponseEntity<ApiResponse<Void>> handleMaxUploadSizeExceededException(
             MaxUploadSizeExceededException e
     ) {
-        BaseErrorCode errorCode = GeneralErrorCode.PAYLOAD_TOO_LARGE;
+        BaseErrorCode errorCode = StorageErrorCode.IMAGE_TOO_LARGE;
         return ResponseEntity.status(errorCode.getStatus())
                 .body(ApiResponse.onFailure(errorCode, null));
     }

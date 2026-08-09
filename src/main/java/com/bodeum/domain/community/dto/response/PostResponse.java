@@ -27,6 +27,12 @@ public record PostResponse(
         )
         String authorNickname,
 
+        @Schema(description = "작성자 레벨. 완전 익명 게시글이거나 탈퇴 회원이면 null", example = "2", nullable = true)
+        Integer authorLevel,
+
+        @Schema(description = "작성자 아이의 만 나이. 미등록·완전 익명·탈퇴 회원이면 null", example = "7", nullable = true)
+        Integer childAge,
+
         @Schema(description = "현재 로그인 사용자의 게시글 여부", example = "true")
         boolean isMine,
 
@@ -64,6 +70,8 @@ public record PostResponse(
             boolean liked,
             boolean scrapped,
             boolean authorWithdrawn,
+            Integer authorLevel,
+            Integer childAge,
             List<DisabilityType> disabilityTypes,
             List<String> hashtags,
             List<String> imageUrls
@@ -72,11 +80,15 @@ public record PostResponse(
         // 완전 익명이 우선한다(탈퇴 사실을 드러내지 않음). 실명 게시글의 탈퇴 저자만 '탈퇴한 사용자'로 노출한다.
         Long authorId = anonymous || authorWithdrawn ? null : post.getUserId();
         String authorNickname = (!anonymous && authorWithdrawn) ? WithdrawalConstants.WITHDRAWN_DISPLAY_NAME : null;
+        Integer visibleAuthorLevel = anonymous || authorWithdrawn ? null : authorLevel;
+        Integer visibleChildAge = anonymous || authorWithdrawn ? null : childAge;
 
         return new PostResponse(
                 post.getId(),
                 authorId,
                 authorNickname,
+                visibleAuthorLevel,
+                visibleChildAge,
                 post.getUserId().equals(viewerId),
                 post.getBoardType(),
                 post.getAnonymityType(),

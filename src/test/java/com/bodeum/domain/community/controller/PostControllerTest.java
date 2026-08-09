@@ -18,6 +18,7 @@ import com.bodeum.domain.community.dto.response.PostLikeResponse;
 import com.bodeum.domain.community.dto.response.PostListItemResponse;
 import com.bodeum.domain.community.dto.response.PostResponse;
 import com.bodeum.domain.community.dto.response.PostScrapResponse;
+import com.bodeum.domain.community.dto.response.PostSearchSuggestionsResponse;
 import com.bodeum.domain.community.enums.DisabilityType;
 import com.bodeum.domain.community.enums.PostAnonymityType;
 import com.bodeum.domain.community.enums.PostBoardType;
@@ -77,8 +78,8 @@ class PostControllerTest {
     }
 
     @Test
-    void getPostsReturnsTenItemPageWithDefaultSort() throws Exception {
-        given(postListService.getPosts(10L, 0, "view", null))
+    void getPostsDelegatesMissingSortToService() throws Exception {
+        given(postListService.getPosts(10L, 0, null, null, null))
                 .willReturn(new PageImpl<>(
                         List.of(postListItemResponse()),
                         PageRequest.of(0, 10),
@@ -95,21 +96,49 @@ class PostControllerTest {
                 .andExpect(jsonPath("$.result.size").value(10))
                 .andExpect(jsonPath("$.result.totalElements").value(1));
 
-        then(postListService).should().getPosts(10L, 0, "view", null);
+        then(postListService).should().getPosts(10L, 0, null, null, null);
     }
 
     @Test
     void getPostsPassesSearchAndSortParameters() throws Exception {
-        given(postListService.getPosts(10L, 2, "comment", "언어치료"))
+        given(postListService.getPosts(
+                10L,
+                2,
+                "comment",
+                "언어치료",
+                PostBoardType.TREATMENT_GROWTH_RECORD
+        ))
                 .willReturn(new PageImpl<>(List.of(), PageRequest.of(2, 10), 0));
 
         mockMvc.perform(get("/api/v1/community/posts")
                         .param("page", "2")
                         .param("sort", "comment")
-                        .param("keyword", "언어치료"))
+                        .param("keyword", "언어치료")
+                        .param("categoryCode", "TREATMENT_GROWTH_RECORD"))
                 .andExpect(status().isOk());
 
-        then(postListService).should().getPosts(10L, 2, "comment", "언어치료");
+        then(postListService).should().getPosts(
+                10L,
+                2,
+                "comment",
+                "언어치료",
+                PostBoardType.TREATMENT_GROWTH_RECORD
+        );
+    }
+
+    @Test
+    void getSearchSuggestionsReturnsMatchingPostTitles() throws Exception {
+        given(postListService.getSearchSuggestions("자폐스펙트럼", 10))
+                .willReturn(PostSearchSuggestionsResponse.fromTitles(List.of("자폐스펙트럼 치료 기록")));
+
+        mockMvc.perform(get("/api/v1/community/posts/search/suggestions")
+                        .param("keyword", "자폐스펙트럼"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.suggestions[0].text")
+                        .value("자폐스펙트럼 치료 기록"))
+                .andExpect(jsonPath("$.result.suggestions[0].type").value("POST_TITLE"));
+
+        then(postListService).should().getSearchSuggestions("자폐스펙트럼", 10);
     }
 
     @Test
@@ -279,6 +308,8 @@ class PostControllerTest {
         mockMvc.perform(get("/api/v1/community/posts/1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.result.title").value("게시글 제목"))
+                .andExpect(jsonPath("$.result.authorLevel").value(3))
+                .andExpect(jsonPath("$.result.childAge").value(7))
                 .andExpect(jsonPath("$.result.isMine").value(true))
                 .andExpect(jsonPath("$.result.viewCount").value(3))
                 .andExpect(jsonPath("$.result.likeCount").value(4))
@@ -363,6 +394,8 @@ class PostControllerTest {
                 1L,
                 10L,
                 null,
+                3,
+                7,
                 true,
                 PostBoardType.FREE_COMMUNICATION,
                 PostAnonymityType.PROFILE_TAG_VISIBLE,

@@ -22,15 +22,17 @@ class CommentResponseTest {
 
     @Test
     void exposesAuthorIdWhenAuthorIsActive() {
-        CommentResponse response = CommentResponse.of(comment(), null, 99L, false, false, List.of());
+        CommentResponse response = CommentResponse.of(
+                comment(), null, 99L, false, false, "보듬맘", List.of());
 
         assertThat(response.authorId()).isEqualTo(10L);
-        assertThat(response.authorNickname()).isNull();
+        assertThat(response.authorNickname()).isEqualTo("보듬맘");
     }
 
     @Test
     void anonymizesWithdrawnAuthor() {
-        CommentResponse response = CommentResponse.of(comment(), null, 99L, false, true, List.of());
+        CommentResponse response = CommentResponse.of(
+                comment(), null, 99L, false, true, "보듬맘", List.of());
 
         assertThat(response.authorId()).isNull();
         assertThat(response.authorNickname()).isEqualTo("탈퇴한 사용자");

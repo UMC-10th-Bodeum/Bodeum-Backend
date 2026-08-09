@@ -14,12 +14,14 @@ import com.bodeum.domain.community.entity.PostLike;
 import com.bodeum.domain.community.entity.PostScrap;
 import com.bodeum.domain.community.enums.CommentStatus;
 import com.bodeum.domain.community.enums.DisabilityType;
+import com.bodeum.domain.community.enums.PostAnonymityType;
 import com.bodeum.domain.community.enums.PostBoardType;
 import com.bodeum.domain.community.enums.PostStatus;
 import com.bodeum.domain.community.exception.CommunityErrorCode;
 import com.bodeum.domain.community.exception.CommunityException;
 import com.bodeum.domain.community.repository.CommentRepository;
 import com.bodeum.domain.community.repository.HashtagRepository;
+import com.bodeum.domain.community.repository.PostAuthorRepository;
 import com.bodeum.domain.community.repository.PostDisabilityTagRepository;
 import com.bodeum.domain.community.repository.PostHashtagRepository;
 import com.bodeum.domain.community.repository.PostImageRepository;
@@ -28,6 +30,8 @@ import com.bodeum.domain.community.repository.PostRepository;
 import com.bodeum.domain.community.repository.PostScrapRepository;
 import com.bodeum.domain.point.enums.PointEventType;
 import com.bodeum.domain.point.service.PointService;
+import com.bodeum.domain.user.entity.User;
+import com.bodeum.domain.user.enums.GuardianLevel;
 import com.bodeum.domain.user.repository.UserRepository;
 import java.util.List;
 import java.util.Objects;
@@ -48,6 +52,7 @@ public class PostService {
     private final PostDisabilityTagRepository postDisabilityTagRepository;
     private final PostLikeRepository postLikeRepository;
     private final PostScrapRepository postScrapRepository;
+    private final PostAuthorRepository postAuthorRepository;
     private final UserRepository userRepository;
     private final PointService pointService;
 
@@ -113,7 +118,6 @@ public class PostService {
 
     @Transactional(readOnly = true)
     public PostResponse getPost(Long userId, Long postId) {
-        validateAuthenticatedUser(userId);
         return getPostResponse(findPost(postId), userId);
     }
 
@@ -251,8 +255,10 @@ public class PostService {
     }
 
     private PostResponse getPostResponse(Post post, Long viewerId) {
-        boolean liked = postLikeRepository.existsByPost_IdAndUserId(post.getId(), viewerId);
-        boolean scrapped = postScrapRepository.existsByPost_IdAndUserId(post.getId(), viewerId);
+        boolean liked = viewerId != null
+                && postLikeRepository.existsByPost_IdAndUserId(post.getId(), viewerId);
+        boolean scrapped = viewerId != null
+                && postScrapRepository.existsByPost_IdAndUserId(post.getId(), viewerId);
         List<DisabilityType> disabilityTypes = postDisabilityTagRepository
                 .findAllByPost_IdOrderByIdAsc(post.getId())
                 .stream()
@@ -273,7 +279,18 @@ public class PostService {
                 .findWithdrawnUserIdsByIdIn(List.of(post.getUserId()))
                 .isEmpty();
 
-        return PostResponse.of(post, viewerId, liked, scrapped, authorWithdrawn,
+        User author = null;
+        Integer authorLevel = null;
+        Integer childAge = null;
+        if (!authorWithdrawn && post.getAnonymityType() != PostAnonymityType.FULLY_ANONYMOUS) {
+            author = postAuthorRepository.findById(post.getUserId()).orElse(null);
+        }
+        if (author != null) {
+            authorLevel = GuardianLevel.from(pointService.getTotalPoint(author.getId())).getLevelNumber();
+            childAge = author.getChildAge();
+        }
+
+        return PostResponse.of(post, viewerId, liked, scrapped, authorWithdrawn, authorLevel, childAge,
                 disabilityTypes, hashtags, imageUrls);
     }
 

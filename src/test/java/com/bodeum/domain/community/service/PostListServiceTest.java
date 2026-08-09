@@ -62,6 +62,7 @@ class PostListServiceTest {
         given(postRepository.findActivePosts(
                 eq(PostStatus.ACTIVE),
                 eq("언어치료"),
+                eq(PostBoardType.FREE_COMMUNICATION),
                 any(Pageable.class)
         )).willReturn(new PageImpl<>(List.of(post), PageRequest.of(0, 10), 1));
         given(postAuthorRepository.findAllByIdIn(List.of(10L))).willReturn(List.of(author));
@@ -70,7 +71,13 @@ class PostListServiceTest {
                 .willReturn(List.of(thumbnail));
         given(postLikeRepository.findLikedPostIds(List.of(1L), 20L)).willReturn(List.of(1L));
 
-        var response = postListService.getPosts(20L, 0, "scrap", "  언어치료  ");
+        var response = postListService.getPosts(
+                20L,
+                0,
+                "scrap",
+                "  언어치료  ",
+                PostBoardType.FREE_COMMUNICATION
+        );
 
         assertThat(response.getSize()).isEqualTo(10);
         assertThat(response.getTotalElements()).isOne();
@@ -88,6 +95,7 @@ class PostListServiceTest {
         then(postRepository).should().findActivePosts(
                 eq(PostStatus.ACTIVE),
                 eq("언어치료"),
+                eq(PostBoardType.FREE_COMMUNICATION),
                 pageableCaptor.capture()
         );
         Sort.Order scrapOrder = pageableCaptor.getValue().getSort().getOrderFor("scrapCount");
@@ -100,14 +108,16 @@ class PostListServiceTest {
         given(postRepository.findActivePosts(
                 eq(PostStatus.ACTIVE),
                 eq(null),
+                eq(null),
                 any(Pageable.class)
         )).willReturn(new PageImpl<>(List.of(), PageRequest.of(0, 10), 0));
 
-        var response = postListService.getPosts(10L, 0, "view", " ");
+        var response = postListService.getPosts(10L, 0, "view", " ", null);
 
         assertThat(response).isEmpty();
         then(postRepository).should().findActivePosts(
                 eq(PostStatus.ACTIVE),
+                eq(null),
                 eq(null),
                 any(Pageable.class)
         );
@@ -118,20 +128,98 @@ class PostListServiceTest {
     }
 
     @Test
+    void getPostsDefaultsToLatestSortForAuthenticatedUser() {
+        given(postRepository.findActivePosts(
+                eq(PostStatus.ACTIVE),
+                eq(null),
+                eq(null),
+                any(Pageable.class)
+        )).willReturn(new PageImpl<>(List.of(), PageRequest.of(0, 10), 0));
+
+        postListService.getPosts(10L, 0, null, null, null);
+
+        ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
+        then(postRepository).should().findActivePosts(
+                eq(PostStatus.ACTIVE),
+                eq(null),
+                eq(null),
+                pageableCaptor.capture()
+        );
+        assertThat(pageableCaptor.getValue().getSort())
+                .extracting(Sort.Order::getProperty)
+                .containsExactly("createdAt", "id");
+    }
+
+    @Test
+    void getPostsDefaultsToViewSortForAnonymousUser() {
+        given(postRepository.findActivePosts(
+                eq(PostStatus.ACTIVE),
+                eq(null),
+                eq(null),
+                any(Pageable.class)
+        )).willReturn(new PageImpl<>(List.of(), PageRequest.of(0, 10), 0));
+
+        postListService.getPosts(null, 0, null, null, null);
+
+        ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
+        then(postRepository).should().findActivePosts(
+                eq(PostStatus.ACTIVE),
+                eq(null),
+                eq(null),
+                pageableCaptor.capture()
+        );
+        assertThat(pageableCaptor.getValue().getSort())
+                .extracting(Sort.Order::getProperty)
+                .containsExactly("viewCount", "createdAt", "id");
+    }
+
+    @Test
     void getPostsEscapesLikeWildcardCharactersInKeyword() {
         given(postRepository.findActivePosts(
                 eq(PostStatus.ACTIVE),
                 eq("100!%!_!!"),
+                eq(null),
                 any(Pageable.class)
         )).willReturn(new PageImpl<>(List.of(), PageRequest.of(0, 10), 0));
 
-        postListService.getPosts(10L, 0, "view", "100%_!");
+        postListService.getPosts(10L, 0, "view", "100%_!", null);
 
         then(postRepository).should().findActivePosts(
                 eq(PostStatus.ACTIVE),
                 eq("100!%!_!!"),
+                eq(null),
                 any(Pageable.class)
         );
+    }
+
+    @Test
+    void getSearchSuggestionsReturnsTitlesForTitleAndContentMatches() {
+        Post titleMatch = post(
+                1L,
+                10L,
+                PostAnonymityType.PROFILE_TAG_VISIBLE,
+                "자폐스펙트럼 치료 기록",
+                "치료 정보를 공유합니다."
+        );
+        Post contentMatch = post(
+                2L,
+                11L,
+                PostAnonymityType.PROFILE_TAG_VISIBLE,
+                "언어치료 후기",
+                "자폐스펙트럼 아이의 경험을 공유합니다."
+        );
+        given(postRepository.findActivePosts(
+                eq(PostStatus.ACTIVE),
+                eq("자폐스펙트럼"),
+                eq(null),
+                any(Pageable.class)
+        )).willReturn(new PageImpl<>(List.of(titleMatch, contentMatch), PageRequest.of(0, 10), 2));
+
+        var response = postListService.getSearchSuggestions("  자폐스펙트럼  ", 10);
+
+        assertThat(response.suggestions())
+                .extracting(suggestion -> suggestion.text())
+                .containsExactly("자폐스펙트럼 치료 기록", "언어치료 후기");
     }
 
     @Test
@@ -140,13 +228,14 @@ class PostListServiceTest {
         given(postRepository.findActivePosts(
                 eq(PostStatus.ACTIVE),
                 eq(null),
+                eq(null),
                 any(Pageable.class)
         )).willReturn(new PageImpl<>(List.of(post), PageRequest.of(0, 10), 1));
         given(postImageRepository.findAllByPost_IdInOrderByPost_IdAscSortOrderAsc(List.of(1L)))
                 .willReturn(List.of());
         given(postLikeRepository.findLikedPostIds(List.of(1L), 10L)).willReturn(List.of());
 
-        var response = postListService.getPosts(10L, 0, "comment", null);
+        var response = postListService.getPosts(10L, 0, "comment", null, null);
 
         assertThat(response.getContent()).singleElement().satisfies(item -> {
             assertThat(item.author().authorId()).isNull();
@@ -162,7 +251,7 @@ class PostListServiceTest {
 
     @Test
     void getPostsRejectsUnsupportedSort() {
-        assertThatThrownBy(() -> postListService.getPosts(10L, 0, "latest", null))
+        assertThatThrownBy(() -> postListService.getPosts(10L, 0, "oldest", null, null))
                 .isInstanceOf(CommunityException.class)
                 .extracting(exception -> ((CommunityException) exception).getErrorCode())
                 .isEqualTo(CommunityErrorCode.INVALID_POST_LIST_SORT);
@@ -177,6 +266,7 @@ class PostListServiceTest {
         given(postRepository.findActivePosts(
                 eq(PostStatus.ACTIVE),
                 eq(null),
+                eq(null),
                 any(Pageable.class)
         )).willReturn(new PageImpl<>(List.of(post), PageRequest.of(0, 10), 1));
         given(postAuthorRepository.findAllByIdIn(List.of(10L))).willReturn(List.of(author));
@@ -184,7 +274,7 @@ class PostListServiceTest {
         given(postImageRepository.findAllByPost_IdInOrderByPost_IdAscSortOrderAsc(List.of(1L)))
                 .willReturn(List.of());
 
-        var response = postListService.getPosts(null, 0, "view", null);
+        var response = postListService.getPosts(null, 0, "view", null, null);
 
         assertThat(response.getContent()).singleElement().satisfies(item -> {
             assertThat(item.isLiked()).isFalse();
@@ -194,12 +284,22 @@ class PostListServiceTest {
     }
 
     private Post post(Long postId, Long userId, PostAnonymityType anonymityType) {
+        return post(postId, userId, anonymityType, "게시글 제목", "게시글 내용");
+    }
+
+    private Post post(
+            Long postId,
+            Long userId,
+            PostAnonymityType anonymityType,
+            String title,
+            String content
+    ) {
         Post post = Post.create(
                 userId,
                 PostBoardType.FREE_COMMUNICATION,
                 anonymityType,
-                "게시글 제목",
-                "게시글 내용"
+                title,
+                content
         );
         ReflectionTestUtils.setField(post, "id", postId);
         ReflectionTestUtils.setField(post, "viewCount", 3);

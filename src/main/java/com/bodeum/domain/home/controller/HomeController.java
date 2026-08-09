@@ -14,8 +14,6 @@ import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Pattern;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -76,9 +74,7 @@ public class HomeController {
 
     @GetMapping("/api/v1/home/banner")
     @Operation(summary = "공지사항 배너 조회")
-    public ResponseEntity<ApiResponse<BannerResponse>> getBanner(@LoginUser Long userId) {
-        return homeService.getBanner(userId)
-                .map(banner -> ResponseEntity.ok(ApiResponse.of(GeneralSuccessCode.OK, banner)))
-                .orElseGet(() -> ResponseEntity.status(HttpStatus.NO_CONTENT).build());
+    public ApiResponse<BannerResponse> getBanner(@LoginUser Long userId) {
+        return ApiResponse.of(GeneralSuccessCode.OK, homeService.getBanner(userId).orElse(null));
     }
 }
