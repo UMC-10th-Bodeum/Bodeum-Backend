@@ -7,6 +7,7 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 import static org.mockito.Mockito.never;
 
+import com.bodeum.domain.auth.enums.SocialProvider;
 import com.bodeum.domain.community.dto.request.CreateCommentRequest;
 import com.bodeum.domain.community.dto.request.UpdateCommentRequest;
 import com.bodeum.domain.community.dto.response.CommentListResponse;
@@ -24,6 +25,7 @@ import com.bodeum.domain.community.repository.CommentRepository;
 import com.bodeum.domain.community.repository.PostRepository;
 import com.bodeum.domain.point.enums.PointEventType;
 import com.bodeum.domain.point.service.PointService;
+import com.bodeum.domain.user.entity.User;
 import com.bodeum.domain.user.repository.UserRepository;
 import java.util.List;
 import java.util.Optional;
@@ -161,6 +163,30 @@ class CommentServiceTest {
         assertThat(response.comments().getFirst().isMine()).isFalse();
         assertThat(response.comments().getFirst().isLiked()).isFalse();
         then(commentLikeRepository).should(never()).findLikedCommentIds(any(), any());
+    }
+
+    @Test
+    void getCommentsUsesNicknamesAndNumbersOnlyAnonymousAuthors() {
+        Post post = post(1L, 10L);
+        Comment firstAnonymous = comment(1L, post, 20L, null, "첫 번째 익명 댓글");
+        Comment named = comment(2L, post, 21L, null, "닉네임 댓글");
+        Comment secondAnonymous = comment(3L, post, 22L, null, "두 번째 익명 댓글");
+        Comment sameAsFirst = comment(4L, post, 20L, null, "첫 번째 익명 작성자의 추가 댓글");
+        User anonymousAuthor1 = user(20L, null);
+        User namedAuthor = user(21L, "보듬맘");
+        User anonymousAuthor2 = user(22L, " ");
+        given(postRepository.findByIdAndStatusAndDeletedAtIsNull(1L, PostStatus.ACTIVE))
+                .willReturn(Optional.of(post));
+        given(commentRepository.findAllActiveByPostIdWithParent(1L, CommentStatus.ACTIVE))
+                .willReturn(List.of(firstAnonymous, named, secondAnonymous, sameAsFirst));
+        given(userRepository.findAllById(any()))
+                .willReturn(List.of(anonymousAuthor1, namedAuthor, anonymousAuthor2));
+
+        CommentListResponse response = commentService.getComments(null, 1L);
+
+        assertThat(response.comments())
+                .extracting(comment -> comment.authorNickname())
+                .containsExactly("익명 1", "보듬맘", "익명 2", "익명 1");
     }
 
     @Test
@@ -396,5 +422,16 @@ class CommentServiceTest {
                 : Comment.createReply(parent, userId, content);
         ReflectionTestUtils.setField(comment, "id", commentId);
         return comment;
+    }
+
+    private User user(Long userId, String nickname) {
+        User user = User.createSocialUser(
+                SocialProvider.KAKAO,
+                "provider-user-id-" + userId,
+                "user" + userId + "@example.com",
+                nickname
+        );
+        ReflectionTestUtils.setField(user, "id", userId);
+        return user;
     }
 }

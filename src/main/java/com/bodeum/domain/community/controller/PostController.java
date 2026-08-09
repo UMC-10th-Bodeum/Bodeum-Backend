@@ -6,6 +6,7 @@ import com.bodeum.domain.community.dto.response.PostLikeResponse;
 import com.bodeum.domain.community.dto.response.PostListItemResponse;
 import com.bodeum.domain.community.dto.response.PostResponse;
 import com.bodeum.domain.community.dto.response.PostScrapResponse;
+import com.bodeum.domain.community.dto.response.PostSearchSuggestionsResponse;
 import com.bodeum.domain.community.enums.PostBoardType;
 import com.bodeum.domain.community.enums.PostListSortType;
 import com.bodeum.domain.community.service.PostListService;
@@ -18,7 +19,10 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
@@ -56,10 +60,11 @@ public class PostController {
             @Parameter(description = "페이지 번호(0부터 시작)", example = "0")
             @RequestParam(defaultValue = "0") @Min(0) int page,
             @Parameter(
-                    description = "정렬 기준: view, scrap, comment",
-                    example = PostListSortType.DEFAULT_SORT_VALUE
+                    description = "정렬 기준: latest, view, scrap, comment. "
+                            + "미지정 시 로그인 사용자는 latest, 비회원은 view",
+                    example = PostListSortType.LOGGED_IN_DEFAULT_SORT_VALUE
             )
-            @RequestParam(defaultValue = PostListSortType.DEFAULT_SORT_VALUE) String sort,
+            @RequestParam(required = false) String sort,
             @Parameter(description = "제목 또는 본문 검색어. 생략하거나 공백이면 전체 조회")
             @RequestParam(required = false) String keyword,
             @Parameter(description = "게시판 카테고리 코드. 생략하면 전체 카테고리 조회")
@@ -68,6 +73,23 @@ public class PostController {
         return ApiResponse.of(
                 GeneralSuccessCode.OK,
                 postListService.getPosts(userId, page, sort, keyword, categoryCode)
+        );
+    }
+
+    @Operation(
+            summary = "게시글 검색어 추천 조회",
+            description = "입력한 검색어가 제목 또는 본문에 포함된 활성 게시글의 제목을 추천어로 조회한다."
+    )
+    @GetMapping("/search/suggestions")
+    public ApiResponse<PostSearchSuggestionsResponse> getSearchSuggestions(
+            @Parameter(description = "추천 검색어(2자 이상)", example = "자폐스펙트럼")
+            @RequestParam @NotBlank @Size(min = 2, max = 50) String keyword,
+            @Parameter(description = "조회 개수", example = "10")
+            @RequestParam(defaultValue = "10") @Min(1) @Max(20) int size
+    ) {
+        return ApiResponse.of(
+                GeneralSuccessCode.OK,
+                postListService.getSearchSuggestions(keyword, size)
         );
     }
 

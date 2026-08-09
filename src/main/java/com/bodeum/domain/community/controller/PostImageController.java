@@ -32,7 +32,7 @@ public class PostImageController {
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ApiResponse<PostImageUploadResponse> uploadImage(
             @LoginUser Long userId,
-            @Parameter(description = "업로드할 이미지 파일 (jpg, png, webp 허용)")
+            @Parameter(description = "업로드할 이미지 파일 (jpg, png, webp 허용, 장당 최대 10MB)")
             @RequestParam("image") MultipartFile image
     ) {
         return ApiResponse.of(GeneralSuccessCode.OK, postImageService.uploadImage(image));

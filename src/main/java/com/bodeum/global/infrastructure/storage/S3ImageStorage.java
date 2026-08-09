@@ -21,6 +21,8 @@ import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 @RequiredArgsConstructor
 public class S3ImageStorage {
 
+    static final long MAX_IMAGE_SIZE_BYTES = 10L * 1024 * 1024;
+
     private static final Map<String, String> ALLOWED_CONTENT_TYPES = Map.of(
             "image/jpeg", ".jpg",
             "image/png", ".png",
@@ -124,6 +126,9 @@ public class S3ImageStorage {
     private String validateAndResolveExtension(MultipartFile file) {
         if (file == null || file.isEmpty()) {
             throw new ProjectException(StorageErrorCode.EMPTY_IMAGE_FILE);
+        }
+        if (file.getSize() > MAX_IMAGE_SIZE_BYTES) {
+            throw new ProjectException(StorageErrorCode.IMAGE_TOO_LARGE);
         }
 
         String contentType = file.getContentType();

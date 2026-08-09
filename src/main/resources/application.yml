@@ -42,8 +42,9 @@ spring:
 
   servlet:
     multipart:
-      max-file-size: 5MB
-      max-request-size: 5MB
+      max-file-size: 10MB
+      # 10MB 이미지 파일에 multipart 헤더가 더해져도 요청 전체 한도에 걸리지 않도록 여유를 둔다.
+      max-request-size: 11MB
 
   # Flyway는 운영(prod)에서만 켠다. 로컬은 ddl-auto=update, 테스트는 H2라 기본 비활성화.
   flyway:

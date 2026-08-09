@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.then;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
@@ -66,6 +67,23 @@ class S3ImageStorageTest {
                 .isInstanceOf(ProjectException.class)
                 .extracting(exception -> ((ProjectException) exception).getErrorCode())
                 .isEqualTo(StorageErrorCode.INVALID_IMAGE_TYPE);
+    }
+
+    @Test
+    void rejectsImageLargerThanTenMegabytes() {
+        MockMultipartFile image = new MockMultipartFile(
+                "image",
+                "large.jpg",
+                "image/jpeg",
+                new byte[(int) S3ImageStorage.MAX_IMAGE_SIZE_BYTES + 1]
+        );
+
+        assertThatThrownBy(() -> s3ImageStorage.upload(image, "community-posts"))
+                .isInstanceOf(ProjectException.class)
+                .extracting(exception -> ((ProjectException) exception).getErrorCode())
+                .isEqualTo(StorageErrorCode.IMAGE_TOO_LARGE);
+
+        then(s3Client).shouldHaveNoInteractions();
     }
 
     @Test
