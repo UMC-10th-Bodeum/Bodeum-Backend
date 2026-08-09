@@ -36,6 +36,6 @@ public class AiInfrastructureFallbackConfiguration {
 
     @Bean
     AiQuestionIntentClassifier emptyAiQuestionIntentClassifier() {
-        return question -> AiQuestionAnalysis.fallback();
+        return AiQuestionAnalysis::fallback;
     }
 }

@@ -46,9 +46,11 @@ public class SpringAiQuestionIntentClassifier implements AiQuestionIntentClassif
                     .entity(ClassificationResult.class, spec -> spec
                             .useProviderStructuredOutput()
                             .validateSchema());
-            AiQuestionAnalysis analysis = result == null
-                    ? AiQuestionAnalysis.fallback()
-                    : new AiQuestionAnalysis(result.intent(), result.retrievalQueries());
+            AiQuestionAnalysis analysis = AiQuestionAnalysis.forQuestion(
+                    question,
+                    result == null ? null : result.intent(),
+                    result == null ? List.of() : result.retrievalQueries()
+            );
             log.info(
                     "[AI] 질문 LLM 분석 결과: intent={}, retrievalQueryCount={}",
                     analysis.intent(),
@@ -57,7 +59,7 @@ public class SpringAiQuestionIntentClassifier implements AiQuestionIntentClassif
             return analysis;
         } catch (Exception e) {
             log.warn("[AI] 질문 LLM 분석 실패, 사용자 원문으로 일반 RAG를 수행합니다.", e);
-            return AiQuestionAnalysis.fallback();
+            return AiQuestionAnalysis.fallback(question);
         }
     }
 
