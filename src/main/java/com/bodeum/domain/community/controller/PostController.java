@@ -6,6 +6,7 @@ import com.bodeum.domain.community.dto.response.PostLikeResponse;
 import com.bodeum.domain.community.dto.response.PostListItemResponse;
 import com.bodeum.domain.community.dto.response.PostResponse;
 import com.bodeum.domain.community.dto.response.PostScrapResponse;
+import com.bodeum.domain.community.enums.PostBoardType;
 import com.bodeum.domain.community.enums.PostListSortType;
 import com.bodeum.domain.community.service.PostListService;
 import com.bodeum.domain.community.service.PostQueryFacade;
@@ -60,11 +61,13 @@ public class PostController {
             )
             @RequestParam(defaultValue = PostListSortType.DEFAULT_SORT_VALUE) String sort,
             @Parameter(description = "제목 또는 본문 검색어. 생략하거나 공백이면 전체 조회")
-            @RequestParam(required = false) String keyword
+            @RequestParam(required = false) String keyword,
+            @Parameter(description = "게시판 카테고리 코드. 생략하면 전체 카테고리 조회")
+            @RequestParam(required = false) PostBoardType categoryCode
     ) {
         return ApiResponse.of(
                 GeneralSuccessCode.OK,
-                postListService.getPosts(userId, page, sort, keyword)
+                postListService.getPosts(userId, page, sort, keyword, categoryCode)
         );
     }
 
