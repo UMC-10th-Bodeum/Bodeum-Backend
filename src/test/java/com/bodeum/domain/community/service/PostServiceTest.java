@@ -9,6 +9,7 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 import static org.mockito.Mockito.never;
 
+import com.bodeum.domain.auth.enums.SocialProvider;
 import com.bodeum.domain.community.dto.request.CreatePostRequest;
 import com.bodeum.domain.community.dto.request.UpdatePostRequest;
 import com.bodeum.domain.community.dto.response.PostResponse;
@@ -24,6 +25,7 @@ import com.bodeum.domain.community.exception.CommunityErrorCode;
 import com.bodeum.domain.community.exception.CommunityException;
 import com.bodeum.domain.community.repository.CommentRepository;
 import com.bodeum.domain.community.repository.HashtagRepository;
+import com.bodeum.domain.community.repository.PostAuthorRepository;
 import com.bodeum.domain.community.repository.PostDisabilityTagRepository;
 import com.bodeum.domain.community.repository.PostHashtagRepository;
 import com.bodeum.domain.community.repository.PostImageRepository;
@@ -32,7 +34,9 @@ import com.bodeum.domain.community.repository.PostRepository;
 import com.bodeum.domain.community.repository.PostScrapRepository;
 import com.bodeum.domain.point.enums.PointEventType;
 import com.bodeum.domain.point.service.PointService;
+import com.bodeum.domain.user.entity.User;
 import com.bodeum.domain.user.repository.UserRepository;
+import java.time.YearMonth;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.StreamSupport;
@@ -62,6 +66,8 @@ class PostServiceTest {
     private PostLikeRepository postLikeRepository;
     @Mock
     private PostScrapRepository postScrapRepository;
+    @Mock
+    private PostAuthorRepository postAuthorRepository;
     @Mock
     private UserRepository userRepository;
     @Mock
@@ -206,6 +212,48 @@ class PostServiceTest {
         assertThat(response.isMine()).isFalse();
         assertThat(response.isLiked()).isTrue();
         assertThat(response.isScrapped()).isTrue();
+    }
+
+    @Test
+    void getPostAllowsAnonymousViewerWithoutPersonalizedState() {
+        Post post = post(1L, 10L);
+        given(postRepository.findByIdAndStatusAndDeletedAtIsNull(1L, PostStatus.ACTIVE))
+                .willReturn(Optional.of(post));
+
+        PostResponse response = postService.getPost(null, 1L);
+
+        assertThat(response.isMine()).isFalse();
+        assertThat(response.isLiked()).isFalse();
+        assertThat(response.isScrapped()).isFalse();
+        then(postLikeRepository).shouldHaveNoInteractions();
+        then(postScrapRepository).shouldHaveNoInteractions();
+    }
+
+    @Test
+    void getPostProvidesVisibleAuthorLevelAndChildAge() {
+        Post post = post(1L, 10L);
+        User author = User.createSocialUser(
+                SocialProvider.KAKAO,
+                "provider-user-id",
+                "user@example.com",
+                "보듬맘"
+        );
+        ReflectionTestUtils.setField(author, "id", 10L);
+        author.updateChildProfile(
+                "아이",
+                YearMonth.now().minusYears(7).toString(),
+                List.of(),
+                null
+        );
+        given(postRepository.findByIdAndStatusAndDeletedAtIsNull(1L, PostStatus.ACTIVE))
+                .willReturn(Optional.of(post));
+        given(postAuthorRepository.findById(10L)).willReturn(Optional.of(author));
+        given(pointService.getTotalPoint(10L)).willReturn(200);
+
+        PostResponse response = postService.getPost(null, 1L);
+
+        assertThat(response.authorLevel()).isEqualTo(3);
+        assertThat(response.childAge()).isEqualTo(7);
     }
 
     @Test

@@ -3,6 +3,7 @@ package com.bodeum.domain.community.service;
 import com.bodeum.domain.community.dto.response.PostListItemResponse;
 import com.bodeum.domain.community.entity.Post;
 import com.bodeum.domain.community.enums.PostAnonymityType;
+import com.bodeum.domain.community.enums.PostBoardType;
 import com.bodeum.domain.community.enums.PostListSortType;
 import com.bodeum.domain.community.enums.PostStatus;
 import com.bodeum.domain.community.repository.PostAuthorRepository;
@@ -42,7 +43,8 @@ public class PostListService {
             Long userId,
             int page,
             String sort,
-            String keyword
+            String keyword,
+            PostBoardType categoryCode
     ) {
         PostListSortType sortType = PostListSortType.from(sort);
         String normalizedKeyword = normalizeKeyword(keyword);
@@ -50,6 +52,7 @@ public class PostListService {
         Page<Post> postPage = postRepository.findActivePosts(
                 PostStatus.ACTIVE,
                 normalizedKeyword,
+                categoryCode,
                 pageRequest
         );
 

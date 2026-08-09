@@ -97,6 +97,7 @@ public class SecurityConfig {
 
                         // 4. 그 외 스크랩, 리뷰 작성/공감 등 CUD 요청은 인증(로그인) 필수
                         .requestMatchers(HttpMethod.GET, "/api/v1/community/posts").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/community/posts/*").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/community/posts/*/comments").permitAll()
                         .anyRequest().authenticated()
                 )

@@ -38,6 +38,7 @@ class PostRepositoryIntegrationTest {
         var result = postRepository.findActivePosts(
                 PostStatus.ACTIVE,
                 "언어치료",
+                null,
                 PageRequest.of(
                         0,
                         10,
@@ -63,6 +64,7 @@ class PostRepositoryIntegrationTest {
         var result = postRepository.findActivePosts(
                 PostStatus.ACTIVE,
                 null,
+                null,
                 PageRequest.of(0, 10, Sort.by(Sort.Order.desc("viewCount")))
         );
 
@@ -80,11 +82,13 @@ class PostRepositoryIntegrationTest {
         var percentResult = postRepository.findActivePosts(
                 PostStatus.ACTIVE,
                 "100!%",
+                null,
                 PageRequest.of(0, 10)
         );
         var underscoreResult = postRepository.findActivePosts(
                 PostStatus.ACTIVE,
                 "센터!_A",
+                null,
                 PageRequest.of(0, 10)
         );
 
@@ -92,6 +96,29 @@ class PostRepositoryIntegrationTest {
                 .containsExactly("달성률 100% 기록");
         assertThat(underscoreResult.getContent()).extracting(Post::getTitle)
                 .containsExactly("센터_A 후기");
+    }
+
+    @Test
+    void findActivePostsFiltersByCategoryCode() {
+        Post freePost = post("자유 게시글", "자유 게시글 내용", 1);
+        Post questionPost = Post.create(
+                10L,
+                PostBoardType.INFORMATION_QUESTION,
+                PostAnonymityType.PROFILE_TAG_VISIBLE,
+                "질문 게시글",
+                "질문 게시글 내용"
+        );
+        postRepository.saveAllAndFlush(List.of(freePost, questionPost));
+
+        var result = postRepository.findActivePosts(
+                PostStatus.ACTIVE,
+                null,
+                PostBoardType.INFORMATION_QUESTION,
+                PageRequest.of(0, 10)
+        );
+
+        assertThat(result.getContent()).extracting(Post::getBoardType)
+                .containsExactly(PostBoardType.INFORMATION_QUESTION);
     }
 
     private Post post(String title, String content, int viewCount) {

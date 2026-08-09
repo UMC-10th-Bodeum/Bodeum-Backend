@@ -82,6 +82,7 @@ class PostServiceIntegrationTest {
             postId = created.postId();
 
             PostResponse viewed = postQueryFacade.getPost(20L, postId);
+            PostResponse viewedByAnonymousUser = postQueryFacade.getPost(null, postId);
 
             assertThat(created.authorId()).isNull();
             assertThat(created.isMine()).isTrue();
@@ -95,6 +96,9 @@ class PostServiceIntegrationTest {
                     "https://example.com/1.jpg",
                     "https://example.com/2.jpg"
             );
+            assertThat(viewedByAnonymousUser.isMine()).isFalse();
+            assertThat(viewedByAnonymousUser.isLiked()).isFalse();
+            assertThat(viewedByAnonymousUser.isScrapped()).isFalse();
         } finally {
             deleteCommittedPostData(postId);
         }

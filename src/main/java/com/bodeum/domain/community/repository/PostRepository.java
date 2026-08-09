@@ -1,6 +1,7 @@
 package com.bodeum.domain.community.repository;
 
 import com.bodeum.domain.community.entity.Post;
+import com.bodeum.domain.community.enums.PostBoardType;
 import com.bodeum.domain.community.enums.PostStatus;
 import jakarta.persistence.LockModeType;
 import java.util.Optional;
@@ -21,6 +22,7 @@ public interface PostRepository extends JpaRepository<Post, Long> {
                     select p from Post p
                     where p.status = :status
                       and p.deletedAt is null
+                      and (:categoryCode is null or p.boardType = :categoryCode)
                       and (
                         :keyword is null
                         or lower(p.title) like lower(concat('%', :keyword, '%')) escape '!'
@@ -31,6 +33,7 @@ public interface PostRepository extends JpaRepository<Post, Long> {
                     select count(p) from Post p
                     where p.status = :status
                       and p.deletedAt is null
+                      and (:categoryCode is null or p.boardType = :categoryCode)
                       and (
                         :keyword is null
                         or lower(p.title) like lower(concat('%', :keyword, '%')) escape '!'
@@ -41,6 +44,7 @@ public interface PostRepository extends JpaRepository<Post, Long> {
     Page<Post> findActivePosts(
             @Param("status") PostStatus status,
             @Param("keyword") String keyword,
+            @Param("categoryCode") PostBoardType categoryCode,
             Pageable pageable
     );
 
