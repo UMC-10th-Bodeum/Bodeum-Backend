@@ -24,6 +24,7 @@ import org.springframework.web.bind.support.WebDataBinderFactory;
 import org.springframework.web.context.request.NativeWebRequest;
 import org.springframework.web.method.support.HandlerMethodArgumentResolver;
 import org.springframework.web.method.support.ModelAndViewContainer;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.multipart.MultipartFile;
 
 @ExtendWith(MockitoExtension.class)
@@ -69,6 +70,24 @@ class PostImageControllerTest {
                 .andExpect(jsonPath("$.code").value("COMMON400_1"));
 
         then(postImageService).shouldHaveNoInteractions();
+    }
+
+    @Test
+    void uploadImageMapsMultipartSizeLimitExceptionToStorageError() throws Exception {
+        long maxImageSize = 10L * 1024 * 1024;
+        MockMultipartFile image = new MockMultipartFile(
+                "image",
+                "large-image.jpg",
+                "image/jpeg",
+                new byte[(int) maxImageSize + 1]
+        );
+        given(postImageService.uploadImage(any(MultipartFile.class)))
+                .willThrow(new MaxUploadSizeExceededException(maxImageSize));
+
+        mockMvc.perform(multipart("/api/v1/community/posts/images").file(image))
+                .andExpect(status().isPayloadTooLarge())
+                .andExpect(jsonPath("$.code").value("STORAGE413_1"))
+                .andExpect(jsonPath("$.message").value("이미지는 장당 10MB 이하만 업로드할 수 있습니다."));
     }
 
     private HandlerMethodArgumentResolver loginUserArgumentResolver() {
