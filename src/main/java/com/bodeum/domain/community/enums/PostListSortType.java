@@ -7,11 +7,12 @@ import org.springframework.data.domain.Sort;
 
 public enum PostListSortType {
 
+    LATEST("createdAt"),
     VIEW("viewCount"),
     SCRAP("scrapCount"),
     COMMENT("commentCount");
 
-    public static final String DEFAULT_SORT_VALUE = "view";
+    public static final String LOGGED_IN_DEFAULT_SORT_VALUE = "latest";
 
     private final String property;
 
@@ -20,8 +21,12 @@ public enum PostListSortType {
     }
 
     public static PostListSortType from(String value) {
+        return from(value, VIEW);
+    }
+
+    public static PostListSortType from(String value, PostListSortType defaultSortType) {
         if (value == null || value.isBlank()) {
-            return VIEW;
+            return defaultSortType;
         }
 
         try {
@@ -32,6 +37,13 @@ public enum PostListSortType {
     }
 
     public Sort toSort() {
+        if (this == LATEST) {
+            return Sort.by(
+                    Sort.Order.desc("createdAt"),
+                    Sort.Order.desc("id")
+            );
+        }
+
         return Sort.by(
                 Sort.Order.desc(property),
                 Sort.Order.desc("createdAt"),

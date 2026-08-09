@@ -17,12 +17,15 @@ import com.bodeum.domain.community.repository.CommentRepository;
 import com.bodeum.domain.community.repository.PostRepository;
 import com.bodeum.domain.point.enums.PointEventType;
 import com.bodeum.domain.point.service.PointService;
+import com.bodeum.domain.user.entity.User;
 import com.bodeum.domain.user.repository.UserRepository;
+import com.bodeum.global.common.constant.WithdrawalConstants;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -59,7 +62,7 @@ public class CommentService {
             );
         }
 
-        return CommentResponse.of(comment, userId, false, List.of());
+        return getCommentResponse(comment, userId, false);
     }
 
     @Transactional
@@ -69,7 +72,7 @@ public class CommentService {
         lockPost(parent.getPost().getId());
         Comment reply = commentRepository.save(Comment.createReply(parent, userId, request.content()));
 
-        return CommentResponse.of(reply, userId, false, List.of());
+        return getCommentResponse(reply, userId, false);
     }
 
     public CommentListResponse getComments(Long userId, Long postId) {
@@ -80,10 +83,17 @@ public class CommentService {
         );
         Set<Long> likedCommentIds = findLikedCommentIds(userId, comments);
         Set<Long> withdrawnAuthorIds = findWithdrawnAuthorIds(comments);
+        Map<Long, String> authorDisplayNames = buildAuthorDisplayNames(comments, withdrawnAuthorIds);
 
         return new CommentListResponse(
                 post.getCommentCount(),
-                buildCommentTree(comments, userId, likedCommentIds, withdrawnAuthorIds)
+                buildCommentTree(
+                        comments,
+                        userId,
+                        likedCommentIds,
+                        withdrawnAuthorIds,
+                        authorDisplayNames
+                )
         );
     }
 
@@ -98,7 +108,7 @@ public class CommentService {
         commentRepository.flush();
         boolean liked = commentLikeRepository.existsByComment_IdAndUserId(commentId, userId);
 
-        return CommentResponse.of(comment, userId, liked, List.of());
+        return getCommentResponse(comment, userId, liked);
     }
 
     @Transactional
@@ -268,6 +278,7 @@ public class CommentService {
                 .findWithdrawnUserIdsByIdIn(List.of(comment.getUserId()))
                 .isEmpty();
         Long parentCommentId = comment.getParent() == null ? null : comment.getParent().getId();
+        String authorDisplayName = resolveAuthorDisplayName(comment, authorWithdrawn);
 
         return CommentResponse.of(
                 comment,
@@ -275,8 +286,28 @@ public class CommentService {
                 viewerId,
                 liked,
                 authorWithdrawn,
+                authorDisplayName,
                 List.of()
         );
+    }
+
+    private String resolveAuthorDisplayName(Comment comment, boolean authorWithdrawn) {
+        if (authorWithdrawn) {
+            return WithdrawalConstants.WITHDRAWN_DISPLAY_NAME;
+        }
+
+        List<Comment> postComments = new ArrayList<>(commentRepository.findAllActiveByPostIdWithParent(
+                comment.getPost().getId(),
+                CommentStatus.ACTIVE
+        ));
+        boolean currentCommentIncluded = postComments.stream()
+                .anyMatch(postComment -> Objects.equals(postComment.getId(), comment.getId()));
+        if (!currentCommentIncluded) {
+            postComments.add(comment);
+        }
+
+        Set<Long> withdrawnAuthorIds = findWithdrawnAuthorIds(postComments);
+        return buildAuthorDisplayNames(postComments, withdrawnAuthorIds).get(comment.getUserId());
     }
 
     private Set<Long> findLikedCommentIds(Long userId, List<Comment> comments) {
@@ -308,11 +339,51 @@ public class CommentService {
         return new HashSet<>(userRepository.findWithdrawnUserIdsByIdIn(authorIds));
     }
 
+    private Map<Long, String> buildAuthorDisplayNames(
+            List<Comment> comments,
+            Set<Long> withdrawnAuthorIds
+    ) {
+        List<Comment> orderedComments = comments.stream()
+                .sorted(Comparator.comparing(Comment::getId))
+                .toList();
+        Set<Long> activeAuthorIds = orderedComments.stream()
+                .map(Comment::getUserId)
+                .filter(authorId -> !withdrawnAuthorIds.contains(authorId))
+                .collect(Collectors.toSet());
+        Map<Long, User> authorsById = userRepository.findAllById(activeAuthorIds).stream()
+                .collect(Collectors.toMap(User::getId, Function.identity()));
+
+        Map<Long, String> displayNamesByAuthorId = new LinkedHashMap<>();
+        int anonymousNumber = 1;
+        for (Comment comment : orderedComments) {
+            Long authorId = comment.getUserId();
+            if (displayNamesByAuthorId.containsKey(authorId)) {
+                continue;
+            }
+            if (withdrawnAuthorIds.contains(authorId)) {
+                displayNamesByAuthorId.put(authorId, WithdrawalConstants.WITHDRAWN_DISPLAY_NAME);
+                continue;
+            }
+
+            User author = authorsById.get(authorId);
+            String nickname = author == null ? null : author.getNickname();
+            if (nickname != null && !nickname.isBlank()) {
+                displayNamesByAuthorId.put(authorId, nickname);
+                continue;
+            }
+
+            displayNamesByAuthorId.put(authorId, "익명 " + anonymousNumber);
+            anonymousNumber++;
+        }
+        return Map.copyOf(displayNamesByAuthorId);
+    }
+
     private List<CommentResponse> buildCommentTree(
             List<Comment> comments,
             Long viewerId,
             Set<Long> likedCommentIds,
-            Set<Long> withdrawnAuthorIds
+            Set<Long> withdrawnAuthorIds,
+            Map<Long, String> authorDisplayNames
     ) {
         List<Comment> orderedComments = comments.stream()
                 .sorted(Comparator.comparing(Comment::getId))
@@ -333,6 +404,7 @@ public class CommentService {
                     viewerId,
                     likedCommentIds.contains(comment.getId()),
                     withdrawnAuthorIds.contains(comment.getUserId()),
+                    authorDisplayNames.get(comment.getUserId()),
                     replies
             );
 

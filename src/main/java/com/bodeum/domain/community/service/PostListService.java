@@ -1,6 +1,7 @@
 package com.bodeum.domain.community.service;
 
 import com.bodeum.domain.community.dto.response.PostListItemResponse;
+import com.bodeum.domain.community.dto.response.PostSearchSuggestionsResponse;
 import com.bodeum.domain.community.entity.Post;
 import com.bodeum.domain.community.enums.PostAnonymityType;
 import com.bodeum.domain.community.enums.PostBoardType;
@@ -46,7 +47,10 @@ public class PostListService {
             String keyword,
             PostBoardType categoryCode
     ) {
-        PostListSortType sortType = PostListSortType.from(sort);
+        PostListSortType defaultSortType = userId == null
+                ? PostListSortType.VIEW
+                : PostListSortType.LATEST;
+        PostListSortType sortType = PostListSortType.from(sort, defaultSortType);
         String normalizedKeyword = normalizeKeyword(keyword);
         PageRequest pageRequest = PageRequest.of(page, PAGE_SIZE, sortType.toSort());
         Page<Post> postPage = postRepository.findActivePosts(
@@ -83,6 +87,21 @@ public class PostListService {
                 .toList();
 
         return new PageImpl<>(responses, postPage.getPageable(), postPage.getTotalElements());
+    }
+
+    public PostSearchSuggestionsResponse getSearchSuggestions(String keyword, int size) {
+        String normalizedKeyword = normalizeKeyword(keyword);
+        Page<Post> postPage = postRepository.findActivePosts(
+                PostStatus.ACTIVE,
+                normalizedKeyword,
+                null,
+                PageRequest.of(0, size, PostListSortType.LATEST.toSort())
+        );
+        List<String> titles = postPage.getContent().stream()
+                .map(Post::getTitle)
+                .distinct()
+                .toList();
+        return PostSearchSuggestionsResponse.fromTitles(titles);
     }
 
     private Map<Long, User> getAuthorsById(List<Post> posts) {

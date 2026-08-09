@@ -40,6 +40,14 @@ class PostListControllerIntegrationTest {
     }
 
     @Test
+    void getSearchSuggestionsAllowsAnonymousUser() throws Exception {
+        mockMvc.perform(get("/api/v1/community/posts/search/suggestions")
+                        .param("keyword", "자폐"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.suggestions").isArray());
+    }
+
+    @Test
     void getPostsRejectsNegativePage() throws Exception {
         mockMvc.perform(get("/api/v1/community/posts")
                         .param("page", "-1")
@@ -51,7 +59,7 @@ class PostListControllerIntegrationTest {
     @Test
     void getPostsRejectsUnsupportedSort() throws Exception {
         mockMvc.perform(get("/api/v1/community/posts")
-                        .param("sort", "latest")
+                        .param("sort", "oldest")
                         .with(authentication(userAuthentication())))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("COMMUNITY400_7"));

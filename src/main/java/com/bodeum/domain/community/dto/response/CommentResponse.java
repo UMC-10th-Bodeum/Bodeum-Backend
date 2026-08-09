@@ -14,7 +14,8 @@ public record CommentResponse(
         @Schema(description = "작성자 ID. 탈퇴 회원이면 null", nullable = true)
         Long authorId,
         @Schema(
-                description = "작성자 표시명. 탈퇴 회원이면 '탈퇴한 사용자', 그 외에는 null(프론트가 authorId로 해석)",
+                description = "작성자 표시명. 닉네임이 있으면 닉네임, 없으면 게시글 내 '익명 N', "
+                        + "탈퇴 회원이면 '탈퇴한 사용자'",
                 nullable = true
         )
         String authorNickname,
@@ -38,7 +39,7 @@ public record CommentResponse(
             List<CommentResponse> replies
     ) {
         Long parentCommentId = comment.getParent() == null ? null : comment.getParent().getId();
-        return of(comment, parentCommentId, viewerId, liked, false, replies);
+        return of(comment, parentCommentId, viewerId, liked, false, null, replies);
     }
 
     public static CommentResponse of(
@@ -47,10 +48,13 @@ public record CommentResponse(
             Long viewerId,
             boolean liked,
             boolean authorWithdrawn,
+            String activeAuthorNickname,
             List<CommentResponse> replies
     ) {
         Long authorId = authorWithdrawn ? null : comment.getUserId();
-        String authorNickname = authorWithdrawn ? WithdrawalConstants.WITHDRAWN_DISPLAY_NAME : null;
+        String authorNickname = authorWithdrawn
+                ? WithdrawalConstants.WITHDRAWN_DISPLAY_NAME
+                : activeAuthorNickname;
 
         return new CommentResponse(
                 comment.getId(),
