@@ -74,15 +74,14 @@ class PostImageControllerTest {
 
     @Test
     void uploadImageMapsMultipartSizeLimitExceptionToStorageError() throws Exception {
-        long maxImageSize = 10L * 1024 * 1024;
         MockMultipartFile image = new MockMultipartFile(
                 "image",
-                "large-image.jpg",
+                "post-image.jpg",
                 "image/jpeg",
-                new byte[(int) maxImageSize + 1]
+                new byte[]{1, 2, 3}
         );
         given(postImageService.uploadImage(any(MultipartFile.class)))
-                .willThrow(new MaxUploadSizeExceededException(maxImageSize));
+                .willThrow(new MaxUploadSizeExceededException(10L * 1024 * 1024));
 
         mockMvc.perform(multipart("/api/v1/community/posts/images").file(image))
                 .andExpect(status().isPayloadTooLarge())
