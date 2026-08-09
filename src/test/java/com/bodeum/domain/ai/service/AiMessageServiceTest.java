@@ -25,6 +25,7 @@ import com.bodeum.domain.ai.service.port.AiDocumentRetriever;
 import com.bodeum.domain.ai.service.port.AiExternalAnswerProvider;
 import com.bodeum.domain.ai.service.port.AiQuestionIntentClassifier;
 import com.bodeum.domain.ai.model.rag.AiReferenceDocument;
+import com.bodeum.domain.ai.model.rag.AiQuestionAnalysis;
 import com.bodeum.domain.ai.model.rag.AiScrapInterests;
 import com.bodeum.domain.ai.model.rag.AiSourceKey;
 import com.bodeum.domain.ai.model.answer.GeneratedAiAnswer;
@@ -89,14 +90,14 @@ class AiMessageServiceTest {
         lenient().when(userRepository.findAiProfileById(1L)).thenReturn(Optional.of(user));
         lenient().when(userRepository.findAiDisabilityProfileById(1L))
                 .thenReturn(Optional.of(user));
-        lenient().when(externalAnswerProvider.search(any(), any()))
+        lenient().when(externalAnswerProvider.search(any(), any(), any()))
                 .thenReturn(ExternalAiAnswer.empty());
         lenient().when(referenceDocumentResolver.resolve(any()))
                 .thenAnswer(invocation -> invocation.getArgument(0));
         lenient().when(starterQuestionRouter.route(any(), any()))
                 .thenReturn(Optional.empty());
-        lenient().when(questionIntentClassifier.classify(any()))
-                .thenReturn(AiQuestionIntent.NONE);
+        lenient().when(questionIntentClassifier.analyze(any()))
+                .thenReturn(AiQuestionAnalysis.fallback());
         lenient().when(scrapInterestService.findRecentInterests(1L))
                 .thenReturn(AiScrapInterests.empty());
         AiMessage userMessage = mock(AiMessage.class);
@@ -188,7 +189,8 @@ class AiMessageServiceTest {
             AiQuestionIntent intent,
             String expectedContent
     ) {
-        when(questionIntentClassifier.classify(question)).thenReturn(intent);
+        when(questionIntentClassifier.analyze(question))
+                .thenReturn(new AiQuestionAnalysis(intent, List.of()));
         when(persistenceService.saveAiMessageAndComplete(
                 eq(11L),
                 eq(chatRoom),
@@ -206,7 +208,7 @@ class AiMessageServiceTest {
         verify(starterQuestionRouter, never()).route(any(), any());
         verify(documentRetriever, never()).retrieve(any(), any());
         verify(answerGenerator, never()).generate(any(), any(), any());
-        verify(externalAnswerProvider, never()).search(any(), any());
+        verify(externalAnswerProvider, never()).search(any(), any(), any());
     }
 
     @Test
@@ -243,7 +245,7 @@ class AiMessageServiceTest {
         assertThat(result.aiMessage().sources()).hasSize(1);
         verify(documentRetriever, never()).retrieve(any(), any());
         verify(answerGenerator, never()).generate(any(), any(), any());
-        verify(externalAnswerProvider, never()).search(any(), any());
+        verify(externalAnswerProvider, never()).search(any(), any(), any());
     }
 
     @Test
@@ -264,7 +266,7 @@ class AiMessageServiceTest {
                 "https://www.bokjiro.go.kr",
                 null
         );
-        when(externalAnswerProvider.search(eq(question), any())).thenReturn(
+        when(externalAnswerProvider.search(eq(question), any(), any())).thenReturn(
                 new ExternalAiAnswer("외부 검색 복지 사이트 안내", List.of(source))
         );
         AiMessage saved = savedAiMessage("외부 검색 복지 사이트 안내");
@@ -283,15 +285,18 @@ class AiMessageServiceTest {
         assertThat(result.aiMessage().answerStatus()).isEqualTo(AiAnswerStatus.ANSWERED);
         assertThat(result.aiMessage().sources()).hasSize(1);
         verify(documentRetriever).retrieve(eq(question), any());
-        verify(externalAnswerProvider).search(eq(question), any());
+        verify(externalAnswerProvider).search(eq(question), any(), any());
         verify(answerGenerator, never()).generate(any(), any(), any());
     }
 
     @Test
     void routesSemanticallySimilarQuestionToReviewedStarterAnswer() {
         String question = "장애 진단을 받았는데 이제 뭘 먼저 해야 해?";
-        when(questionIntentClassifier.classify(question))
-                .thenReturn(AiQuestionIntent.DIAGNOSIS_FIRST_STEPS);
+        when(questionIntentClassifier.analyze(question))
+                .thenReturn(new AiQuestionAnalysis(
+                        AiQuestionIntent.DIAGNOSIS_FIRST_STEPS,
+                        List.of()
+                ));
 
         AiReferenceDocument source = new AiReferenceDocument(
                 "SITE-1",
@@ -323,7 +328,7 @@ class AiMessageServiceTest {
         assertThat(result.aiMessage().content()).isEqualTo("진단 이후 안내");
         verify(documentRetriever, never()).retrieve(any(), any());
         verify(answerGenerator, never()).generate(any(), any(), any());
-        verify(externalAnswerProvider, never()).search(any(), any());
+        verify(externalAnswerProvider, never()).search(any(), any(), any());
     }
 
     @Test
@@ -353,7 +358,7 @@ class AiMessageServiceTest {
                 .isEqualTo(AiAnswerStatus.REGION_REQUIRED);
         assertThat(result.aiMessage().sources()).isEmpty();
         verify(documentRetriever, never()).retrieve(any(), any());
-        verify(externalAnswerProvider, never()).search(any(), any());
+        verify(externalAnswerProvider, never()).search(any(), any(), any());
     }
 
     @Test
@@ -409,7 +414,7 @@ class AiMessageServiceTest {
                 );
         verify(documentRetriever, never()).retrieve(any(), any());
         verify(answerGenerator, never()).generate(any(), any(), any());
-        verify(externalAnswerProvider, never()).search(any(), any());
+        verify(externalAnswerProvider, never()).search(any(), any(), any());
     }
 
     @Test
@@ -501,7 +506,7 @@ class AiMessageServiceTest {
         assertThat(result.aiMessage().sources()).hasSize(1);
         verify(documentRetriever, never()).retrieve(any(), any());
         verify(answerGenerator, never()).generate(any(), any(), any());
-        verify(externalAnswerProvider, never()).search(any(), any());
+        verify(externalAnswerProvider, never()).search(any(), any(), any());
     }
 
     @Test
@@ -517,7 +522,7 @@ class AiMessageServiceTest {
                 null
         );
         when(documentRetriever.retrieve(eq(question), any())).thenReturn(List.of());
-        when(externalAnswerProvider.search(eq(question), any())).thenReturn(
+        when(externalAnswerProvider.search(eq(question), any(), any())).thenReturn(
                 ExternalAiAnswer.linkGuidance(
                         "수원시에서 확인 가능한 복지기관 정보입니다.",
                         List.of(externalSource)));
@@ -567,7 +572,7 @@ class AiMessageServiceTest {
                 "https://www.kpat.or.kr/guardianship",
                 null
         );
-        when(externalAnswerProvider.search(eq(question), any())).thenReturn(
+        when(externalAnswerProvider.search(eq(question), any(), any())).thenReturn(
                 new ExternalAiAnswer(
                         "한국장애인부모회 공공후견지원사업 정보입니다.",
                         List.of(externalSource)));
@@ -587,7 +592,7 @@ class AiMessageServiceTest {
         assertThat(result.aiMessage().content())
                 .isEqualTo("한국장애인부모회 공공후견지원사업 정보입니다.");
         assertThat(result.aiMessage().sources()).hasSize(1);
-        verify(externalAnswerProvider).search(eq(question), any());
+        verify(externalAnswerProvider).search(eq(question), any(), any());
         assertThat(result.aiMessage().warning()).isNull();
     }
 
@@ -618,6 +623,95 @@ class AiMessageServiceTest {
         assertThat(result.aiMessage().answerStatus()).isEqualTo(AiAnswerStatus.ANSWERED);
         assertThat(result.aiMessage().warning().type()).isEqualTo(AiWarningType.INCORRECT_SOURCE);
         assertThat(result.aiMessage().warning().message()).contains("오류 피드백");
+    }
+
+    @Test
+    void mergesDocumentsRetrievedByOriginalAndExpandedQueries() {
+        String question = "장애아동 활동지원 서비스 신청 방법 알려줘";
+        String expandedQuery = "장애인 활동지원서비스 아동 신청 대상 신청 방법";
+        when(questionIntentClassifier.analyze(question)).thenReturn(
+                new AiQuestionAnalysis(
+                        AiQuestionIntent.NONE,
+                        List.of(question, expandedQuery)
+                )
+        );
+
+        AiReferenceDocument originalDocument = new AiReferenceDocument(
+                "INFO-1-0",
+                "장애아동 지원 정보",
+                AiResponseSourceType.INFO,
+                1L,
+                "장애아동 지원",
+                "https://example.com/info/1",
+                Instant.parse("2026-07-01T00:00:00Z")
+        );
+        AiReferenceDocument expandedDocument = new AiReferenceDocument(
+                "INFO-7183-0",
+                "만 6세 이상 장애인 활동지원 대상자의 신청 안내",
+                AiResponseSourceType.INFO,
+                7183L,
+                "장애인활동지원",
+                "https://example.com/info/7183",
+                Instant.parse("2026-07-01T00:00:00Z")
+        );
+        when(documentRetriever.retrieve(eq(question), any()))
+                .thenReturn(List.of(originalDocument));
+        when(documentRetriever.retrieve(eq(expandedQuery), any()))
+                .thenReturn(List.of(expandedDocument));
+        when(answerGenerator.generate(
+                eq(question),
+                any(),
+                eq(List.of(originalDocument, expandedDocument))
+        )).thenReturn(new GeneratedAiAnswer(
+                "장애인 활동지원서비스 신청 안내입니다.",
+                List.of("INFO-7183-0")
+        ));
+        AiMessage saved = savedAiMessage("장애인 활동지원서비스 신청 안내입니다.");
+        when(persistenceService.saveAiMessageAndComplete(
+                11L,
+                chatRoom,
+                "장애인 활동지원서비스 신청 안내입니다.",
+                false,
+                AiAnswerStatus.ANSWERED,
+                List.of(expandedDocument)
+        )).thenReturn(saved);
+
+        var result = service.createMessage(1L, question);
+
+        assertThat(result.aiMessage().answerStatus()).isEqualTo(AiAnswerStatus.ANSWERED);
+        assertThat(result.aiMessage().sources()).hasSize(1);
+        verify(documentRetriever).retrieve(eq(question), any());
+        verify(documentRetriever).retrieve(eq(expandedQuery), any());
+    }
+
+    @Test
+    void passesExpandedQueriesToExternalSearchWhenInternalEvidenceIsMissing() {
+        String question = "장애아동 활동지원 서비스 신청 방법 알려줘";
+        List<String> expandedQueries = List.of(
+                question,
+                "장애인 활동지원서비스 아동 신청 대상 신청 방법"
+        );
+        when(questionIntentClassifier.analyze(question)).thenReturn(
+                new AiQuestionAnalysis(AiQuestionIntent.NONE, expandedQueries)
+        );
+        when(documentRetriever.retrieve(any(), any())).thenReturn(List.of());
+        AiMessage saved = savedAiMessage("관련 정보를 찾을 수 없습니다.");
+        when(persistenceService.saveAiMessageAndComplete(
+                11L,
+                chatRoom,
+                "관련 정보를 찾을 수 없습니다.",
+                false,
+                AiAnswerStatus.NO_EVIDENCE,
+                List.of()
+        )).thenReturn(saved);
+
+        service.createMessage(1L, question);
+
+        verify(externalAnswerProvider).search(
+                eq(question),
+                eq(expandedQueries),
+                any()
+        );
     }
 
     private AiMessage savedAiMessage(String content) {

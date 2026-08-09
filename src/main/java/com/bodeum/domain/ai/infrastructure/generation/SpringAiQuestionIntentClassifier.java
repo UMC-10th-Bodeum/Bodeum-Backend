@@ -1,9 +1,11 @@
 package com.bodeum.domain.ai.infrastructure.generation;
 
 import com.bodeum.domain.ai.enums.AiQuestionIntent;
+import com.bodeum.domain.ai.model.rag.AiQuestionAnalysis;
 import com.bodeum.domain.ai.service.port.AiQuestionIntentClassifier;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.beans.factory.annotation.Value;
@@ -21,15 +23,20 @@ public class SpringAiQuestionIntentClassifier implements AiQuestionIntentClassif
     public SpringAiQuestionIntentClassifier(
             ChatClient.Builder builder,
             @Value("classpath:prompts/ai-question-intent-classifier-system-prompt.txt")
-            Resource systemPromptResource
+            Resource systemPromptResource,
+            @Value("classpath:prompts/ai-query-expansion-system-prompt.txt")
+            Resource queryExpansionPromptResource
     ) {
-        this.chatClient = builder.defaultSystem(readPrompt(systemPromptResource)).build();
+        String systemPrompt = readPrompt(systemPromptResource)
+                + "\n\n"
+                + readPrompt(queryExpansionPromptResource);
+        this.chatClient = builder.defaultSystem(systemPrompt).build();
     }
 
     @Override
-    public AiQuestionIntent classify(String question) {
+    public AiQuestionAnalysis analyze(String question) {
         if (question == null || question.isBlank()) {
-            return AiQuestionIntent.NONE;
+            return AiQuestionAnalysis.fallback();
         }
 
         try {
@@ -39,18 +46,25 @@ public class SpringAiQuestionIntentClassifier implements AiQuestionIntentClassif
                     .entity(ClassificationResult.class, spec -> spec
                             .useProviderStructuredOutput()
                             .validateSchema());
-            AiQuestionIntent intent = result == null || result.intent() == null
-                    ? AiQuestionIntent.NONE
-                    : result.intent();
-            log.info("[AI] 질문 LLM 의도 분류 결과: {}", intent);
-            return intent;
+            AiQuestionAnalysis analysis = result == null
+                    ? AiQuestionAnalysis.fallback()
+                    : new AiQuestionAnalysis(result.intent(), result.retrievalQueries());
+            log.info(
+                    "[AI] 질문 LLM 분석 결과: intent={}, retrievalQueryCount={}",
+                    analysis.intent(),
+                    analysis.retrievalQueries().size()
+            );
+            return analysis;
         } catch (Exception e) {
-            log.warn("[AI] 질문 LLM 의도 분류 실패, 일반 RAG로 처리합니다.", e);
-            return AiQuestionIntent.NONE;
+            log.warn("[AI] 질문 LLM 분석 실패, 사용자 원문으로 일반 RAG를 수행합니다.", e);
+            return AiQuestionAnalysis.fallback();
         }
     }
 
-    record ClassificationResult(AiQuestionIntent intent) {
+    record ClassificationResult(
+            AiQuestionIntent intent,
+            List<String> retrievalQueries
+    ) {
     }
 
     private String readPrompt(Resource resource) {

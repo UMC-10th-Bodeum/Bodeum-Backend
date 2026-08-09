@@ -62,13 +62,20 @@ class OpenAiExternalAnswerProviderTest {
 
         Map<String, Object> body = provider.requestBody(
                 "사용자 질문",
+                List.of("사용자 질문", "공식 제도명 검색 질의"),
                 mock(AiUserProfile.class),
                 List.of("example.com")
         );
 
         assertThat(body.get("instructions")).isEqualTo(systemPrompt);
         assertThat((String) body.get("input"))
-                .contains("[사용자 맞춤 정보]", "사용자 질문")
+                .contains(
+                        "[사용자 맞춤 정보]",
+                        "[검색 질의 힌트]",
+                        "공식 제도명 검색 질의",
+                        "[사용자 질문]",
+                        "사용자 질문"
+                )
                 .doesNotContain(systemPrompt);
     }
 }
