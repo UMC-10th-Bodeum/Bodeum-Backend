@@ -56,40 +56,39 @@ public class InfoItemQueryService {
             InfoItemSearchCondition condition,
             Pageable pageable
     ) {
-        // ★ [추가된 로직] 프론트에서 isRecommended=true 파라미터를 보낸 경우
-        if (Boolean.TRUE.equals(condition.isRecommended())) {
-            List<InfoItemResponse> recommendedList = getRecommendedInfoItems(userId);
+        // ★ [방법 1 적용] subCategory ID로 조회 시 _ETC(추천) 카테고리인 경우 추천 로직 수행
+        if (condition.subCategory() != null) {
+            InfoCategory category = infoCategoryRepository.findById(condition.subCategory()).orElse(null);
 
-            // CodeRabbit 지적 사항 반영: Pageable 기준 메모리 내 subList 슬라이싱 처리
-            int start = (int) pageable.getOffset();
-            int end = Math.min((start + pageable.getPageSize()), recommendedList.size());
+            if (category != null && category.getSubCategory() != null && category.getSubCategory().endsWith("_ETC")) {
+                List<InfoItemResponse> recommendedList = getRecommendedInfoItems(userId);
 
-            List<InfoItemResponse> pagedList = (start <= end)
-                    ? recommendedList.subList(start, end)
-                    : List.of();
+                // Pageable 기준 메모리 내 슬라이싱
+                int start = (int) pageable.getOffset();
+                int end = Math.min((start + pageable.getPageSize()), recommendedList.size());
 
-            Page<InfoItemResponse> recommendedPage = new PageImpl<>(
-                    pagedList,
-                    pageable,
-                    recommendedList.size()
-            );
+                List<InfoItemResponse> pagedList = (start <= end)
+                        ? recommendedList.subList(start, end)
+                        : List.of();
 
-            MainCategory category = condition.category() != null ? condition.category() : MainCategory.INSTITUTION;
-            String categoryKo = infoCategoryRepository.findFirstByMainCategory(category)
-                    .map(InfoCategory::getMainCategoryKo)
-                    .orElse("기관");
+                Page<InfoItemResponse> recommendedPage = new PageImpl<>(
+                        pagedList,
+                        pageable,
+                        recommendedList.size()
+                );
 
-            return InfoItemPageResponse.of(
-                    category,
-                    categoryKo,
-                    null,
-                    "RECOMMEND",
-                    "추천",
-                    recommendedPage
-            );
+                return InfoItemPageResponse.of(
+                        category.getMainCategory(),
+                        category.getMainCategoryKo(),
+                        category.getId(),
+                        category.getSubCategory(),
+                        category.getSubCategoryKo(),
+                        recommendedPage
+                );
+            }
         }
 
-        // ================= 기존 로직 100% 동일하게 유지 =================
+        // ================= 기존 일반 검색 로직 =================
         if (condition.category() == null && condition.subCategory() == null) {
             condition = condition.withCategory(MainCategory.INSTITUTION);
         }
