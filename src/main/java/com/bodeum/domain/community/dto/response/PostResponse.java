@@ -1,7 +1,6 @@
 package com.bodeum.domain.community.dto.response;
 
 import com.bodeum.domain.community.entity.Post;
-import com.bodeum.domain.community.enums.DisabilityType;
 import com.bodeum.domain.community.enums.PostAnonymityType;
 import com.bodeum.domain.community.enums.PostBoardType;
 import com.bodeum.global.common.constant.WithdrawalConstants;
@@ -57,8 +56,6 @@ public record PostResponse(
         @Schema(description = "현재 사용자의 스크랩 여부", example = "false")
         boolean isScrapped,
 
-        List<DisabilityType> disabilityTypes,
-        List<String> hashtags,
         List<String> imageUrls,
         Instant createdAt,
         Instant updatedAt
@@ -72,8 +69,6 @@ public record PostResponse(
             boolean authorWithdrawn,
             Integer authorLevel,
             Integer childAge,
-            List<DisabilityType> disabilityTypes,
-            List<String> hashtags,
             List<String> imageUrls
     ) {
         boolean anonymous = post.getAnonymityType() == PostAnonymityType.FULLY_ANONYMOUS;
@@ -101,8 +96,6 @@ public record PostResponse(
                 post.getCommentCount(),
                 post.getScrapCount(),
                 scrapped,
-                List.copyOf(disabilityTypes),
-                List.copyOf(hashtags),
                 List.copyOf(imageUrls),
                 post.getCreatedAt(),
                 post.getUpdatedAt()

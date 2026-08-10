@@ -17,17 +17,13 @@ import com.bodeum.domain.community.entity.Post;
 import com.bodeum.domain.community.entity.PostImage;
 import com.bodeum.domain.community.entity.PostLike;
 import com.bodeum.domain.community.entity.PostScrap;
-import com.bodeum.domain.community.enums.DisabilityType;
 import com.bodeum.domain.community.enums.PostAnonymityType;
 import com.bodeum.domain.community.enums.PostBoardType;
 import com.bodeum.domain.community.enums.PostStatus;
 import com.bodeum.domain.community.exception.CommunityErrorCode;
 import com.bodeum.domain.community.exception.CommunityException;
 import com.bodeum.domain.community.repository.CommentRepository;
-import com.bodeum.domain.community.repository.HashtagRepository;
 import com.bodeum.domain.community.repository.PostAuthorRepository;
-import com.bodeum.domain.community.repository.PostDisabilityTagRepository;
-import com.bodeum.domain.community.repository.PostHashtagRepository;
 import com.bodeum.domain.community.repository.PostImageRepository;
 import com.bodeum.domain.community.repository.PostLikeRepository;
 import com.bodeum.domain.community.repository.PostRepository;
@@ -55,13 +51,7 @@ class PostServiceTest {
     @Mock
     private CommentRepository commentRepository;
     @Mock
-    private HashtagRepository hashtagRepository;
-    @Mock
-    private PostHashtagRepository postHashtagRepository;
-    @Mock
     private PostImageRepository postImageRepository;
-    @Mock
-    private PostDisabilityTagRepository postDisabilityTagRepository;
     @Mock
     private PostLikeRepository postLikeRepository;
     @Mock
@@ -89,8 +79,6 @@ class PostServiceTest {
         assertThat(response.authorId()).isEqualTo(10L);
         assertThat(response.isQuestion()).isTrue();
         assertThat(response.title()).isEqualTo("게시글 제목");
-        then(postDisabilityTagRepository).should().saveAll(anyList());
-        then(postHashtagRepository).should().saveAll(anyList());
         then(postImageRepository).should().saveAll(anyList());
         then(pointService).should().grantActivityPoint(
                 10L,
@@ -113,8 +101,6 @@ class PostServiceTest {
                         PostBoardType.INFORMATION_QUESTION,
                         PostAnonymityType.FULLY_ANONYMOUS,
                         "수정 제목",
-                        null,
-                        null,
                         null,
                         null
                 )
@@ -144,7 +130,7 @@ class PostServiceTest {
         postService.updatePost(
                 10L,
                 1L,
-                new UpdatePostRequest(null, null, null, null, null, null, finalImageUrls)
+                new UpdatePostRequest(null, null, null, null, finalImageUrls)
         );
 
         then(postImageRepository).should().deleteAllByPost_Id(1L);
@@ -164,7 +150,7 @@ class PostServiceTest {
         assertThatThrownBy(() -> postService.updatePost(
                 20L,
                 1L,
-                new UpdatePostRequest(null, null, "수정 제목", null, null, null, null)
+                new UpdatePostRequest(null, null, "수정 제목", null, null)
         ))
                 .isInstanceOf(CommunityException.class)
                 .extracting(exception -> ((CommunityException) exception).getErrorCode())
@@ -370,8 +356,6 @@ class PostServiceTest {
                 PostAnonymityType.PROFILE_TAG_VISIBLE,
                 "게시글 제목",
                 "게시글 내용",
-                List.of(DisabilityType.AUTISM),
-                List.of("육아"),
                 List.of("https://example.com/image.jpg")
         );
     }

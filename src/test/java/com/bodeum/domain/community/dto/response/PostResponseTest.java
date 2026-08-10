@@ -21,7 +21,7 @@ class PostResponseTest {
     void exposesAuthorIdWhenAuthorIsActive() {
         PostResponse response = PostResponse.of(
                 post(PostAnonymityType.PROFILE_TAG_VISIBLE), 99L, false, false, false, 3, 7,
-                List.of(), List.of(), List.of());
+                List.of());
 
         assertThat(response.authorId()).isEqualTo(10L);
         assertThat(response.authorNickname()).isNull();
@@ -33,7 +33,7 @@ class PostResponseTest {
     void anonymizesWithdrawnAuthor() {
         PostResponse response = PostResponse.of(
                 post(PostAnonymityType.PROFILE_TAG_VISIBLE), 99L, false, false, true, 3, 7,
-                List.of(), List.of(), List.of());
+                List.of());
 
         assertThat(response.authorId()).isNull();
         assertThat(response.authorNickname()).isEqualTo("탈퇴한 사용자");
@@ -46,7 +46,7 @@ class PostResponseTest {
         // 완전 익명 게시글은 탈퇴 저자여도 '탈퇴한 사용자'를 노출하지 않는다(탈퇴 사실 비노출).
         PostResponse response = PostResponse.of(
                 post(PostAnonymityType.FULLY_ANONYMOUS), 99L, false, false, true, 3, 7,
-                List.of(), List.of(), List.of());
+                List.of());
 
         assertThat(response.authorId()).isNull();
         assertThat(response.authorNickname()).isNull();

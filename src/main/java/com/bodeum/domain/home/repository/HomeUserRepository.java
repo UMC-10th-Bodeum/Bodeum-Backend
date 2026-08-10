@@ -25,12 +25,4 @@ public interface HomeUserRepository extends JpaRepository<User, Long> {
             WHERE u.id = :userId
             """)
     Optional<User> findWithRegionAndInterestsById(@Param("userId") Long userId);
-
-    @Query("""
-            SELECT u FROM User u
-            LEFT JOIN FETCH u.childProfile cp
-            LEFT JOIN FETCH cp.disabilities
-            WHERE u.id = :userId
-            """)
-    Optional<User> findWithChildDisabilitiesById(@Param("userId") Long userId);
 }
