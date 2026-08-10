@@ -172,9 +172,67 @@ certbot이 자동 갱신 타이머를 등록한다(`systemctl status certbot.tim
 | `EC2_USER` | `ubuntu` |
 | `EC2_SSH_KEY` | SSH 개인키(.pem) **전체 내용** (`-----BEGIN...` 포함) |
 | `EC2_PORT` | `22` (비워도 기본 22) |
+| `EC2_HOST_FINGERPRINT` | EC2의 **ECDSA** 호스트 키 지문 (`SHA256:...` 형식). 비워두면 호스트 키 검증을 건너뛴다 |
 
 - GHCR push/pull은 `GITHUB_TOKEN`(자동 제공)을 쓰므로 별도 토큰 불필요.
 - GHCR 패키지는 기본 private. 워크플로우가 `GITHUB_TOKEN`으로 로그인해 pull하므로 그대로 두면 된다.
+
+### D-1. 호스트 키 지문(`EC2_HOST_FINGERPRINT`) 구하기
+
+호스트 키는 공개 정보라 서버에 로그인하지 않고 뽑는다. 배포가 실제로 접속하는 대상과
+같은 값이어야 하므로 `EC2_HOST` / `EC2_PORT`에 등록한 값을 그대로 쓴다:
+
+```bash
+ssh-keyscan -p <EC2_PORT 또는 22> <EC2_HOST> | ssh-keygen -lf -
+```
+
+RSA / ECDSA / ED25519 세 줄이 나오는데, **ECDSA 줄의 `SHA256:...` 값**을 등록한다.
+
+> ⚠️ ED25519 값을 넣으면 안 된다. 배포에 쓰는 `appleboy/ssh-action`(내부 drone-ssh, Go
+> `x/crypto/ssh`)은 호스트 키 알고리즘 협상에서 ECDSA를 ED25519보다 먼저 고른다.
+> OpenSSH는 반대라서, `ssh`로 접속해 뽑은 ed25519 지문을 넣으면 로컬 접속은 정상인데
+> 배포만 `ssh: handshake failed: ssh: host key fingerprint mismatch`로 끊긴다.
+> (2026-08-07 실제 발생)
+
+> 🔒 `ssh-keyscan` 결과를 그대로 믿고 등록하면 안 된다. `ssh-keyscan`은 키를 받아올 뿐
+> 그 키가 진짜 우리 EC2의 것인지 검증하지 않는다. 조회 시점에 이미 중간자가 끼어 있으면
+> 공격자의 호스트 키를 "신뢰 지문"으로 못 박는 셈이라, 이 시크릿을 등록하는 목적
+> (MITM 서버에 `EC2_SSH_KEY`가 넘어가는 것을 막는 것) 자체가 무너진다.
+>
+> 등록 전에 아래 중 하나로 **다른 경로에서 얻은 값과 대조**한다:
+> - EC2 콘솔 → 인스턴스 → *모니터링 및 문제 해결* → **시스템 로그 가져오기**. 최초 부팅
+>   로그에 호스트 키 지문이 찍혀 있다(로그가 잘려 없으면 아래 방법을 쓴다).
+> - EC2 Instance Connect / SSM Session Manager 등 SSH가 아닌 경로로 접속해
+>   `ssh-keygen -lf /etc/ssh/ssh_host_ecdsa_key.pub` 실행.
+> - 이미 신뢰 중인 `~/.ssh/known_hosts` 항목과 비교
+>   (`ssh-keygen -lF <EC2_HOST>`).
+
+### D-2. 시크릿 등록/변경 후 검증 (필수)
+
+시크릿을 등록하거나 바꾼 사람이 **그 자리에서** 배포를 1회 돌려 확인한다:
+
+```bash
+gh workflow run "Deploy to EC2" --repo <owner>/<repo> --ref main
+```
+
+`gh workflow run`은 실행을 **요청만** 하고 바로 끝난다. 이 명령이 성공했다고 배포가
+성공한 게 아니므로, 반드시 해당 실행의 `Deploy over SSH` job이 `Success`로 끝나는지까지
+확인한다. CLI로는 방금 만들어진 실행 ID를 잡아 끝까지 지켜본다:
+
+```bash
+gh run watch <run-id> --repo <owner>/<repo> --exit-status
+```
+
+`<run-id>`는 `gh run list --workflow "Deploy to EC2" --repo <owner>/<repo> --limit 1`로
+확인한다. Web UI에서 볼 때도 마찬가지로 `Deploy over SSH` 단계가 초록색인지까지 본다
+(지문이 틀리면 이 단계가 handshake에서 몇 초 만에 실패한다).
+
+배포는 `main` push(=릴리스 PR) 때만 자동으로 돌기 때문에, 검증을 미루면 잘못된 값이
+그대로 장전된 채 남아 있다가 **다음 릴리스에서 다른 사람의 배포가 대신 실패한다.**
+2026-08-07 장애가 정확히 이 경로였다(시크릿 등록 26시간 뒤 발현).
+
+> EC2를 재생성하면 호스트 키가 바뀐다. 인스턴스를 새로 만들었으면 이 시크릿도 반드시
+> 갱신하고 위 검증을 다시 돌릴 것.
 
 ---
 

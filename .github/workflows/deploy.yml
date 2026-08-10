@@ -120,7 +120,25 @@ jobs:
           # 호스트 키 검증. 값이 비어 있으면 검증을 건너뛰므로(액션 기본 동작) 시크릿을
           # 등록하기 전에도 배포는 그대로 동작한다. 등록하면 MITM 서버에 EC2_SSH_KEY와
           # GHCR_TOKEN이 넘어가는 것을 막는다.
-          # 값 확인: ssh <host> ssh-keygen -l -f /etc/ssh/ssh_host_ed25519_key.pub | cut -d' ' -f2
+          #
+          # 값 확인(서버 로그인 불필요, 호스트 키는 공개 정보다). 배포가 접속하는 대상과
+          # 같아야 하므로 EC2_HOST/EC2_PORT에 넣은 값을 그대로 쓴다:
+          #   ssh-keyscan -p <EC2_PORT 또는 22> <EC2_HOST> | ssh-keygen -lf -
+          # 단, ssh-keyscan은 받아온 키가 진짜 우리 서버 것인지 검증하지 않는다. 조회 시점에
+          # 중간자가 끼어 있으면 공격자 키를 신뢰 지문으로 박게 되어 위 MITM 방어가 무의미해진다.
+          # 등록 전에 EC2 콘솔 시스템 로그 / SSM 세션 등 SSH가 아닌 경로에서 얻은 값과 대조할 것
+          # (자세한 절차는 docs/deploy-guide.md D-1).
+          # 출력 중 반드시 ECDSA 줄의 SHA256:... 값을 쓴다. 이 액션이 쓰는 drone-ssh는
+          # Go x/crypto/ssh 기반이고, 호스트 키 알고리즘 협상에서 ECDSA를 ED25519보다
+          # 먼저 고르기 때문이다. OpenSSH는 반대로 ED25519를 먼저 고르므로, ssh로 접속해
+          # 뽑은 ed25519 지문을 넣으면 로컬 접속은 멀쩡한데 배포만 handshake에서 끊긴다.
+          # (2026-08-07 실제 발생: ssh: handshake failed: host key fingerprint mismatch)
+          #
+          # EC2를 재생성하면 호스트 키가 바뀌므로 이 시크릿도 함께 갱신해야 한다.
+          # 값을 등록/변경한 뒤에는 workflow_dispatch로 배포를 1회 돌려 검증할 것.
+          # 실행 요청만으로는 부족하고, 그 실행의 Deploy over SSH job이 Success로 끝나는지까지
+          # 확인해야 한다(gh run watch <run-id> --exit-status).
+          # 검증을 미루면 다음 릴리스 때 다른 사람의 배포가 대신 실패한다.
           fingerprint: ${{ secrets.EC2_HOST_FINGERPRINT }}
           # GITHUB_TOKEN은 이 job 실행 동안만 유효하며 GHCR pull 권한이 있다.
           envs: GHCR_USER,GHCR_TOKEN,IMAGE

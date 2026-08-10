@@ -5,9 +5,16 @@ import com.bodeum.domain.info.service.publicDataService.PublicDataSyncFacadeServ
 import com.bodeum.global.apiPayload.ApiResponse;
 import com.bodeum.global.apiPayload.code.GeneralSuccessCode;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.annotation.Profile;
 import org.springframework.web.bind.annotation.*;
 
+/**
+ * 공공데이터 수동 동기화 트리거 (로컬/개발 전용).
+ * 운영에서는 PublicDataSyncScheduler(매일 03:00)가 자동 동기화를 담당하며,
+ * 관리자 권한 체계가 없어 무인증 노출을 막기 위해 prod 프로파일에서는 빈을 등록하지 않는다.
+ */
 @RestController
+@Profile("!prod")
 @RequiredArgsConstructor
 @RequestMapping("/api/v1/admin/sync")
 public class PublicDataSyncController {
