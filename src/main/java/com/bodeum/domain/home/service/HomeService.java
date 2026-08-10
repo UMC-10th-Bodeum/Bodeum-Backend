@@ -63,31 +63,15 @@ public class HomeService {
     }
 
     public List<PostPreviewResponse> getPostsPreview(String sort, int limit, Long userId) {
-        Region region = userId != null ? getUserRegion(userId) : null;
         List<Post> posts;
         if (SORT_LATEST.equals(sort)) {
-            posts = region != null
-                    ? homePostRepository.findAllByStatusAndRegionOrderByCreatedAtDesc(
-                            PostStatus.ACTIVE, region.getId(), PageRequest.of(0, limit))
-                    : List.of();
-            if (posts.isEmpty()) {
-                posts = homePostRepository.findAllByStatusAndDeletedAtIsNullOrderByCreatedAtDesc(
-                        PostStatus.ACTIVE, PageRequest.of(0, limit));
-                region = null;
-            }
+            posts = homePostRepository.findAllByStatusAndDeletedAtIsNullOrderByCreatedAtDesc(
+                    PostStatus.ACTIVE, PageRequest.of(0, limit));
         } else {
-            posts = region != null
-                    ? homePostRepository.findTopByPopularityAndRegion(
-                            PostStatus.ACTIVE, region.getId(), PageRequest.of(0, limit))
-                    : List.of();
-            if (posts.isEmpty()) {
-                posts = homePostRepository.findTopByPopularity(PostStatus.ACTIVE, PageRequest.of(0, limit));
-                region = null;
-            }
+            posts = homePostRepository.findTopByPopularity(PostStatus.ACTIVE, PageRequest.of(0, limit));
         }
-        String regionName = region != null ? region.getFullName() : null;
         return posts.stream()
-                .map(post -> PostPreviewResponse.of(post, regionName))
+                .map(post -> PostPreviewResponse.of(post, null))
                 .toList();
     }
 
