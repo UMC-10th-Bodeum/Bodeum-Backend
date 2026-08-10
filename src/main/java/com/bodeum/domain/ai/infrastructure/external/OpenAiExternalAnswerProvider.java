@@ -162,6 +162,9 @@ public class OpenAiExternalAnswerProvider implements AiExternalAnswerProvider {
             AiUserProfile profile,
             AiSearchScope searchScope
     ) {
+        AiUserProfile searchProfile = searchScope == AiSearchScope.GENERAL
+                ? profile.withRegion("", "", "")
+                : profile;
         String searchHints = retrievalQueries == null
                 ? ""
                 : retrievalQueries.stream()
@@ -169,7 +172,8 @@ public class OpenAiExternalAnswerProvider implements AiExternalAnswerProvider {
                         .map(String::trim)
                         .distinct()
                         .limit(3)
-                        .map(query -> "- " + externalSearchQuery(query, profile, searchScope))
+                        .map(query -> "- " + externalSearchQuery(
+                                query, searchProfile, searchScope))
                         .collect(java.util.stream.Collectors.joining("\n"));
         return """
                 %s
@@ -183,10 +187,10 @@ public class OpenAiExternalAnswerProvider implements AiExternalAnswerProvider {
                 [사용자 질문]
                 %s
                 """.formatted(
-                promptFormatter.formatProfile(profile),
+                promptFormatter.formatProfile(searchProfile),
                 "등록된 허용 도메인에서 관련 상세 페이지를 찾으세요.",
                 searchHints.isBlank()
-                        ? "- " + externalSearchQuery(question, profile, searchScope)
+                        ? "- " + externalSearchQuery(question, searchProfile, searchScope)
                         : searchHints,
                 question
         );
@@ -197,7 +201,7 @@ public class OpenAiExternalAnswerProvider implements AiExternalAnswerProvider {
             AiUserProfile profile,
             AiSearchScope searchScope
     ) {
-        if (searchScope != AiSearchScope.LOCAL_INSTITUTION
+        if (searchScope != AiSearchScope.LOCAL_RESOURCE
                 || profile == null
                 || profile.region() == null
                 || profile.region().isBlank()) {

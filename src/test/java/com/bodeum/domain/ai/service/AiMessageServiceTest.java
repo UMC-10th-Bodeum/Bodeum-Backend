@@ -730,12 +730,12 @@ class AiMessageServiceTest {
                 AiQuestionAnalysis.forQuestion(
                         question,
                         AiQuestionIntent.NONE,
-                        AiSearchScope.LOCAL_INSTITUTION,
+                        AiSearchScope.LOCAL_RESOURCE,
                         List.of()
                 )
         );
         when(documentRetriever.retrieve(eq(question), any(),
-                eq(AiSearchScope.LOCAL_INSTITUTION))).thenReturn(List.of());
+                eq(AiSearchScope.LOCAL_RESOURCE))).thenReturn(List.of());
         AiMessage saved = savedAiMessage("관련 정보를 찾을 수 없습니다.");
         when(persistenceService.saveAiMessageAndComplete(
                 11L,
@@ -754,14 +754,14 @@ class AiMessageServiceTest {
                         "부산광역시".equals(profile.region())
                                 && "부산광역시".equals(profile.regionLevel1())
                                 && profile.regionLevel2().isBlank()),
-                eq(AiSearchScope.LOCAL_INSTITUTION)
+                eq(AiSearchScope.LOCAL_RESOURCE)
         );
         verify(externalAnswerProvider).search(
                 eq(question),
                 any(),
                 org.mockito.ArgumentMatchers.argThat(profile ->
                         "부산광역시".equals(profile.region())),
-                eq(AiSearchScope.LOCAL_INSTITUTION)
+                eq(AiSearchScope.LOCAL_RESOURCE)
         );
     }
 
@@ -782,12 +782,12 @@ class AiMessageServiceTest {
                 AiQuestionAnalysis.forQuestion(
                         question,
                         AiQuestionIntent.NONE,
-                        AiSearchScope.LOCAL_INSTITUTION,
+                        AiSearchScope.LOCAL_RESOURCE,
                         List.of()
                 )
         );
         when(documentRetriever.retrieve(eq(question), any(),
-                eq(AiSearchScope.LOCAL_INSTITUTION))).thenReturn(List.of());
+                eq(AiSearchScope.LOCAL_RESOURCE))).thenReturn(List.of());
         AiMessage saved = savedAiMessage("관련 정보를 찾을 수 없습니다.");
         when(persistenceService.saveAiMessageAndComplete(
                 11L,
@@ -806,7 +806,7 @@ class AiMessageServiceTest {
                         "서울특별시 강남구".equals(profile.region())
                                 && "서울특별시".equals(profile.regionLevel1())
                                 && "강남구".equals(profile.regionLevel2())),
-                eq(AiSearchScope.LOCAL_INSTITUTION)
+                eq(AiSearchScope.LOCAL_RESOURCE)
         );
     }
 

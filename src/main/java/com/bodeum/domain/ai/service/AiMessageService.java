@@ -283,7 +283,7 @@ public class AiMessageService {
             AiUserProfile profile,
             AiSearchScope searchScope
     ) {
-        if (searchScope != AiSearchScope.LOCAL_INSTITUTION) {
+        if (searchScope != AiSearchScope.LOCAL_RESOURCE) {
             return profile;
         }
 
@@ -365,7 +365,7 @@ public class AiMessageService {
 
     private AiSearchScope searchScope(AiStarterQuestionType questionType) {
         return switch (questionType) {
-            case LOCAL_REHAB_CENTERS -> AiSearchScope.LOCAL_INSTITUTION;
+            case LOCAL_REHAB_CENTERS -> AiSearchScope.LOCAL_RESOURCE;
             case CHILD_MEDICAL_SUPPORT, VOUCHER_APPLICATION ->
                     AiSearchScope.NATIONAL_POLICY;
             default -> AiSearchScope.GENERAL;

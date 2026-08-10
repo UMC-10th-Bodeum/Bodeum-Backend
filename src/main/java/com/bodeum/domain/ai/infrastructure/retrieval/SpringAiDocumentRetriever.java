@@ -52,14 +52,14 @@ public class SpringAiDocumentRetriever implements AiDocumentRetriever {
             AiSearchScope resolvedScope = searchScope == null
                     ? AiSearchScope.GENERAL
                     : searchScope;
-            if (resolvedScope == AiSearchScope.LOCAL_INSTITUTION) {
+            if (resolvedScope == AiSearchScope.LOCAL_RESOURCE) {
                 return retrieveLocalInstitution(question, profile);
             }
             return retrieveAtScope(
                     question,
                     profile,
                     null,
-                    resolvedScope == AiSearchScope.GENERAL
+                    false
             );
         } catch (ProjectException e) {
             throw e;

@@ -14,11 +14,11 @@ class AiQuestionAnalysisTest {
         AiQuestionAnalysis analysis = AiQuestionAnalysis.forQuestion(
                 "우리 지역 특수학교 알려줘",
                 AiQuestionIntent.NONE,
-                AiSearchScope.LOCAL_INSTITUTION,
+                AiSearchScope.LOCAL_RESOURCE,
                 List.of("수원시 특수학교")
         );
 
-        assertThat(analysis.searchScope()).isEqualTo(AiSearchScope.LOCAL_INSTITUTION);
+        assertThat(analysis.searchScope()).isEqualTo(AiSearchScope.LOCAL_RESOURCE);
         assertThat(analysis.retrievalQueries())
                 .containsExactly("우리 지역 특수학교 알려줘", "수원시 특수학교");
     }

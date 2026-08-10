@@ -64,7 +64,15 @@ class OpenAiExternalAnswerProviderTest {
         Map<String, Object> body = provider.requestBody(
                 "사용자 질문",
                 List.of("사용자 질문", "공식 제도명 검색 질의"),
-                mock(AiUserProfile.class),
+                new AiUserProfile(
+                        "서울특별시 강남구",
+                        "서울특별시",
+                        "강남구",
+                        6,
+                        List.of(),
+                        List.of(),
+                        ""
+                ),
                 AiSearchScope.GENERAL,
                 List.of("example.com")
         );
@@ -79,6 +87,12 @@ class OpenAiExternalAnswerProviderTest {
                         "사용자 질문"
                 )
                 .doesNotContain(systemPrompt);
+        org.mockito.Mockito.verify(promptFormatter).formatProfile(
+                org.mockito.ArgumentMatchers.argThat(profile ->
+                        profile.region().isBlank()
+                                && profile.regionLevel1().isBlank()
+                                && profile.regionLevel2().isBlank())
+        );
 
         AiUserProfile localProfile = mock(AiUserProfile.class);
         when(localProfile.region()).thenReturn("부산광역시");
@@ -86,7 +100,7 @@ class OpenAiExternalAnswerProviderTest {
                 "부산시 재활센터를 추천해줘",
                 List.of("재활센터 추천"),
                 localProfile,
-                AiSearchScope.LOCAL_INSTITUTION,
+                AiSearchScope.LOCAL_RESOURCE,
                 List.of("example.com")
         );
 

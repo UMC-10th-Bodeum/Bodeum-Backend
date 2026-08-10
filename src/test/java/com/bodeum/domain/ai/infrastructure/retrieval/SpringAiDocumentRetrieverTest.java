@@ -23,7 +23,7 @@ class SpringAiDocumentRetrieverTest {
     private VectorStoreRetriever vectorStoreRetriever;
 
     @Test
-    void includesUserProfileContextInVectorSearchQuery() {
+    void excludesRegionButKeepsOtherProfileContextInGeneralSearchQuery() {
         SpringAiDocumentRetriever retriever =
                 new SpringAiDocumentRetriever(vectorStoreRetriever, 5, 0.7);
         AiUserProfile profile = new AiUserProfile(
@@ -46,10 +46,10 @@ class SpringAiDocumentRetrieverTest {
                 .contains("복지 센터 알려줘");
         assertThat(requestCaptor.getAllValues().getFirst().getQuery())
                 .contains("복지 센터 알려줘")
-                .contains("활동 지역: 서울 강남구")
                 .contains("집중 케어 영역: AUTISM_SPECTRUM")
                 .contains("관심사: HOSPITAL_HEALTH")
-                .contains("자녀 관련 관심 키워드: 언어치료, 사회성 발달");
+                .contains("자녀 관련 관심 키워드: 언어치료, 사회성 발달")
+                .doesNotContain("활동 지역: 서울 강남구");
     }
 
     @Test
@@ -70,7 +70,7 @@ class SpringAiDocumentRetrieverTest {
                 .thenReturn(List.of());
 
         retriever.retrieve("우리 지역 특수학교 알려줘", profile,
-                AiSearchScope.LOCAL_INSTITUTION);
+                AiSearchScope.LOCAL_RESOURCE);
 
         ArgumentCaptor<SearchRequest> requestCaptor = ArgumentCaptor.forClass(SearchRequest.class);
         verify(vectorStoreRetriever, times(6)).similaritySearch(requestCaptor.capture());
