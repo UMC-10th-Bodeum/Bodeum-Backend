@@ -1,11 +1,8 @@
 package com.bodeum.domain.home.service;
 
 import com.bodeum.domain.community.entity.Post;
-import com.bodeum.domain.community.entity.PostDisabilityTag;
-import com.bodeum.domain.community.enums.DisabilityType;
 import com.bodeum.domain.community.enums.PostBoardType;
 import com.bodeum.domain.community.enums.PostStatus;
-import com.bodeum.domain.community.repository.PostDisabilityTagRepository;
 import com.bodeum.domain.home.dto.response.*;
 import com.bodeum.domain.home.repository.*;
 import com.bodeum.domain.news.entity.News;
@@ -35,7 +32,6 @@ public class HomeService {
     private final HomePostRepository homePostRepository;
     private final HomeInfoItemRepository homeInfoItemRepository;
     private final HomeUserRepository homeUserRepository;
-    private final PostDisabilityTagRepository postDisabilityTagRepository;
     private final HomeRegionRepository homeRegionRepository;
 
     public List<RecommendedNewsResponse> getRecommendedNews(Long userId) {
@@ -78,8 +74,6 @@ public class HomeService {
     public List<RecommendedPostResponse> getRecommendedPosts(int limit, Long userId) {
         List<Post> posts;
         if (userId != null) {
-            // 장애 유형과 관심사는 각각 다른 컬렉션 fetch가 필요해 쿼리를 분리
-            List<DisabilityType> disabilityTypes = getUserDisabilityTypes(userId);
             List<PostBoardType> boardTypes = homeUserRepository.findWithRegionAndInterestsById(userId)
                     .map(user -> user.getInterestCategories().stream()
                             .flatMap(ic -> toBoardTypes(ic).stream())
@@ -87,13 +81,7 @@ public class HomeService {
                             .toList())
                     .orElse(List.of());
 
-            if (!disabilityTypes.isEmpty() && !boardTypes.isEmpty()) {
-                posts = homePostRepository.findTopByPersonalization(
-                        PostStatus.ACTIVE, disabilityTypes, boardTypes, PageRequest.of(0, limit));
-            } else if (!disabilityTypes.isEmpty()) {
-                posts = homePostRepository.findTopByDisabilityTypes(
-                        PostStatus.ACTIVE, disabilityTypes, PageRequest.of(0, limit));
-            } else if (!boardTypes.isEmpty()) {
+            if (!boardTypes.isEmpty()) {
                 posts = homePostRepository.findTopByBoardTypes(
                         PostStatus.ACTIVE, boardTypes, PageRequest.of(0, limit));
             } else {
@@ -106,16 +94,8 @@ public class HomeService {
             posts = homePostRepository.findTopByPopularity(PostStatus.ACTIVE, PageRequest.of(0, limit));
         }
 
-        List<Long> postIds = posts.stream().map(Post::getId).toList();
-        Map<Long, List<DisabilityType>> tagsMap = postDisabilityTagRepository.findAllByPost_IdIn(postIds)
-                .stream()
-                .collect(Collectors.groupingBy(
-                        tag -> tag.getPost().getId(),
-                        Collectors.mapping(PostDisabilityTag::getDisabilityType, Collectors.toList())
-                ));
-
         return posts.stream()
-                .map(post -> RecommendedPostResponse.of(post, tagsMap.getOrDefault(post.getId(), List.of())))
+                .map(post -> RecommendedPostResponse.of(post, List.of()))
                 .toList();
     }
 
@@ -172,14 +152,6 @@ public class HomeService {
         return homeUserRepository.findWithRegionById(userId)
                 .map(User::getRegion)
                 .orElse(null);
-    }
-
-    private List<DisabilityType> getUserDisabilityTypes(Long userId) {
-        return homeUserRepository.findWithChildDisabilitiesById(userId)
-                .map(user -> user.getDisabilityTypes().stream()
-                        .map(d -> DisabilityType.valueOf(d.name()))
-                        .toList())
-                .orElse(List.of());
     }
 
     private List<PostBoardType> toBoardTypes(InterestCategory interestCategory) {

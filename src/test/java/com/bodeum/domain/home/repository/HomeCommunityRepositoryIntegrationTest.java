@@ -8,6 +8,7 @@ import com.bodeum.domain.community.enums.CommentStatus;
 import com.bodeum.domain.community.enums.PostAnonymityType;
 import com.bodeum.domain.community.enums.PostBoardType;
 import com.bodeum.domain.community.enums.PostStatus;
+import com.bodeum.domain.community.repository.PostRepository;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -26,6 +27,9 @@ class HomeCommunityRepositoryIntegrationTest {
 
     @Autowired
     private HomeCommentRepository homeCommentRepository;
+
+    @Autowired
+    private PostRepository postRepository;
 
     @Test
     void postQueriesExcludeHiddenAndDeletedPosts() {
@@ -74,15 +78,15 @@ class HomeCommunityRepositoryIntegrationTest {
     }
 
     @Test
-    void popularityQueryOrdersPostsBySynchronizedLikeCount() {
+    void popularityQueryOrdersPostsByViewCount() {
         Post popularPost = post("인기 게시글");
-        popularPost.increaseLikeCount();
-        popularPost.increaseLikeCount();
         homePostRepository.saveAndFlush(popularPost);
+        postRepository.incrementViewCount(popularPost.getId(), PostStatus.ACTIVE);
+        postRepository.incrementViewCount(popularPost.getId(), PostStatus.ACTIVE);
 
         Post recentPost = post("최근 게시글");
-        recentPost.increaseLikeCount();
         homePostRepository.saveAndFlush(recentPost);
+        postRepository.incrementViewCount(recentPost.getId(), PostStatus.ACTIVE);
 
         List<Post> posts = homePostRepository.findTopByPopularity(
                 PostStatus.ACTIVE,
