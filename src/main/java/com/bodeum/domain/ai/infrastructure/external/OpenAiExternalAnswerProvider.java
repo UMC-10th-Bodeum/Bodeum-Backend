@@ -4,6 +4,7 @@ import com.bodeum.domain.ai.entity.AiExternalDocument;
 import com.bodeum.domain.ai.entity.AiExternalSource;
 import com.bodeum.domain.ai.enums.AiExternalSourceType;
 import com.bodeum.domain.ai.enums.AiResponseSourceType;
+import com.bodeum.domain.ai.enums.AiSearchScope;
 import com.bodeum.domain.ai.exception.AiErrorCode;
 import com.bodeum.domain.ai.infrastructure.generation.AiPromptFormatter;
 import com.bodeum.domain.ai.infrastructure.support.AiTimeoutDetector;
@@ -87,7 +88,8 @@ public class OpenAiExternalAnswerProvider implements AiExternalAnswerProvider {
     public ExternalAiAnswer search(
             String question,
             List<String> retrievalQueries,
-            AiUserProfile profile
+            AiUserProfile profile,
+            AiSearchScope searchScope
     ) {
         List<AiExternalSource> sources = externalSourceRepository
                 .findAllBySourceTypeAndActiveTrue(AiExternalSourceType.WEBSITE)
@@ -109,6 +111,7 @@ public class OpenAiExternalAnswerProvider implements AiExternalAnswerProvider {
                             question,
                             retrievalQueries,
                             profile,
+                            searchScope,
                             sourcesByDomain.keySet().stream().toList()
                     ))
                     .retrieve()
@@ -131,6 +134,7 @@ public class OpenAiExternalAnswerProvider implements AiExternalAnswerProvider {
             String question,
             List<String> retrievalQueries,
             AiUserProfile profile,
+            AiSearchScope searchScope,
             List<String> allowedDomains
     ) {
         Map<String, Object> filters = Map.of(
@@ -147,15 +151,20 @@ public class OpenAiExternalAnswerProvider implements AiExternalAnswerProvider {
         body.put("tool_choice", "required");
         body.put("include", List.of("web_search_call.action.sources"));
         body.put("instructions", externalSearchSystemPrompt);
-        body.put("input", externalSearchInput(question, retrievalQueries, profile));
+        body.put("input", externalSearchInput(
+                question, retrievalQueries, profile, searchScope));
         return body;
     }
 
     private String externalSearchInput(
             String question,
             List<String> retrievalQueries,
-            AiUserProfile profile
+            AiUserProfile profile,
+            AiSearchScope searchScope
     ) {
+        AiUserProfile searchProfile = searchScope == AiSearchScope.GENERAL
+                ? profile.withRegion("", "", "")
+                : profile;
         String searchHints = retrievalQueries == null
                 ? ""
                 : retrievalQueries.stream()
@@ -163,7 +172,8 @@ public class OpenAiExternalAnswerProvider implements AiExternalAnswerProvider {
                         .map(String::trim)
                         .distinct()
                         .limit(3)
-                        .map(query -> "- " + query)
+                        .map(query -> "- " + externalSearchQuery(
+                                query, searchProfile, searchScope))
                         .collect(java.util.stream.Collectors.joining("\n"));
         return """
                 %s
@@ -177,11 +187,30 @@ public class OpenAiExternalAnswerProvider implements AiExternalAnswerProvider {
                 [사용자 질문]
                 %s
                 """.formatted(
-                promptFormatter.formatProfile(profile),
+                promptFormatter.formatProfile(searchProfile),
                 "등록된 허용 도메인에서 관련 상세 페이지를 찾으세요.",
-                searchHints.isBlank() ? "- 사용자 질문 원문을 기준으로 검색" : searchHints,
+                searchHints.isBlank()
+                        ? "- " + externalSearchQuery(question, searchProfile, searchScope)
+                        : searchHints,
                 question
         );
+    }
+
+    private String externalSearchQuery(
+            String query,
+            AiUserProfile profile,
+            AiSearchScope searchScope
+    ) {
+        if (searchScope != AiSearchScope.LOCAL_RESOURCE
+                || profile == null
+                || profile.region() == null
+                || profile.region().isBlank()) {
+            return query;
+        }
+        if (query.contains(profile.region())) {
+            return query;
+        }
+        return profile.region() + " " + query;
     }
 
     private String readPrompt(Resource resource) {
