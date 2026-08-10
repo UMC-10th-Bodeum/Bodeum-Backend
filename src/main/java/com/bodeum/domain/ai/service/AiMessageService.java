@@ -5,6 +5,7 @@ import com.bodeum.domain.ai.entity.AiChatRoom;
 import com.bodeum.domain.ai.entity.AiMessage;
 import com.bodeum.domain.ai.enums.AiAnswerStatus;
 import com.bodeum.domain.ai.enums.AiQuestionIntent;
+import com.bodeum.domain.ai.enums.AiSearchScope;
 import com.bodeum.domain.ai.enums.AiStarterQuestionType;
 import com.bodeum.domain.ai.enums.SenderType;
 import com.bodeum.domain.ai.exception.AiErrorCode;
@@ -154,7 +155,8 @@ public class AiMessageService {
         List<AiReferenceDocument> retrievedDocuments = retrieveDocuments(
                 content,
                 questionContext.retrievalQueries(),
-                profile
+                profile,
+                questionContext.searchScope()
         );
 
         log.info("[AI] 검색 문서 수: {}", retrievedDocuments.size());
@@ -235,6 +237,7 @@ public class AiMessageService {
                 profile,
                 intent.starterQuestionType(),
                 intent.safetyGuidance(),
+                analysis.searchScope(),
                 intent == AiQuestionIntent.NONE
                         ? analysis.retrievalQueries()
                         : List.of()
@@ -249,8 +252,18 @@ public class AiMessageService {
                 profile,
                 Optional.of(questionType),
                 Optional.empty(),
+                searchScope(questionType),
                 List.of()
         );
+    }
+
+    private AiSearchScope searchScope(AiStarterQuestionType questionType) {
+        return switch (questionType) {
+            case LOCAL_REHAB_CENTERS -> AiSearchScope.LOCAL_INSTITUTION;
+            case CHILD_MEDICAL_SUPPORT, VOUCHER_APPLICATION ->
+                    AiSearchScope.NATIONAL_POLICY;
+            default -> AiSearchScope.GENERAL;
+        };
     }
 
     private QuestionContext localRehabContext(
@@ -345,7 +358,8 @@ public class AiMessageService {
     private List<AiReferenceDocument> retrieveDocuments(
             String originalQuestion,
             List<String> expandedQueries,
-            AiUserProfile profile
+            AiUserProfile profile,
+            AiSearchScope searchScope
     ) {
         List<String> queries = new ArrayList<>();
         queries.add(originalQuestion);
@@ -361,7 +375,7 @@ public class AiMessageService {
 
         List<List<AiReferenceDocument>> documentsByQuery = new ArrayList<>();
         for (String query : distinctQueries) {
-            documentsByQuery.add(documentRetriever.retrieve(query, profile));
+            documentsByQuery.add(documentRetriever.retrieve(query, profile, searchScope));
         }
 
         LinkedHashMap<String, AiReferenceDocument> documentsByKey = new LinkedHashMap<>();
@@ -646,6 +660,7 @@ public class AiMessageService {
             AiUserProfile profile,
             Optional<AiStarterQuestionType> questionType,
             Optional<String> safetyGuidance,
+            AiSearchScope searchScope,
             List<String> retrievalQueries
     ) {
     }

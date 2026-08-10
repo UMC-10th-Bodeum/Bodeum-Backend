@@ -19,7 +19,7 @@ public class AiInfrastructureFallbackConfiguration {
 
     @Bean
     AiDocumentRetriever emptyAiDocumentRetriever() {
-        return (question, profile) -> List.of();
+        return (question, profile, searchScope) -> List.of();
     }
 
     @Bean

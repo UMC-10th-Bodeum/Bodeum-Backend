@@ -1,6 +1,7 @@
 package com.bodeum.domain.ai.infrastructure.generation;
 
 import com.bodeum.domain.ai.enums.AiQuestionIntent;
+import com.bodeum.domain.ai.enums.AiSearchScope;
 import com.bodeum.domain.ai.model.rag.AiQuestionAnalysis;
 import com.bodeum.domain.ai.service.port.AiQuestionIntentClassifier;
 import java.io.IOException;
@@ -49,11 +50,13 @@ public class SpringAiQuestionIntentClassifier implements AiQuestionIntentClassif
             AiQuestionAnalysis analysis = AiQuestionAnalysis.forQuestion(
                     question,
                     result == null ? null : result.intent(),
+                    result == null ? null : result.searchScope(),
                     result == null ? List.of() : result.retrievalQueries()
             );
             log.info(
-                    "[AI] 질문 LLM 분석 결과: intent={}, retrievalQueryCount={}",
+                    "[AI] 질문 LLM 분석 결과: intent={}, searchScope={}, retrievalQueryCount={}",
                     analysis.intent(),
+                    analysis.searchScope(),
                     analysis.retrievalQueries().size()
             );
             return analysis;
@@ -65,6 +68,7 @@ public class SpringAiQuestionIntentClassifier implements AiQuestionIntentClassif
 
     record ClassificationResult(
             AiQuestionIntent intent,
+            AiSearchScope searchScope,
             List<String> retrievalQueries
     ) {
     }

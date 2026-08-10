@@ -6,6 +6,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.when;
 
 import com.bodeum.domain.ai.model.rag.AiUserProfile;
+import com.bodeum.domain.ai.enums.AiSearchScope;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -49,5 +50,65 @@ class SpringAiDocumentRetrieverTest {
                 .contains("집중 케어 영역: AUTISM_SPECTRUM")
                 .contains("관심사: HOSPITAL_HEALTH")
                 .contains("자녀 관련 관심 키워드: 언어치료, 사회성 발달");
+    }
+
+    @Test
+    void expandsLocalInstitutionSearchFromSigunguToSidoAndAll() {
+        SpringAiDocumentRetriever retriever =
+                new SpringAiDocumentRetriever(vectorStoreRetriever, 5, 0.7);
+        AiUserProfile profile = new AiUserProfile(
+                "경기도 수원시",
+                "경기도",
+                "수원시",
+                6,
+                List.of(),
+                List.of(),
+                ""
+        );
+        when(vectorStoreRetriever.similaritySearch(
+                org.mockito.ArgumentMatchers.any(SearchRequest.class)))
+                .thenReturn(List.of());
+
+        retriever.retrieve("우리 지역 특수학교 알려줘", profile,
+                AiSearchScope.LOCAL_INSTITUTION);
+
+        ArgumentCaptor<SearchRequest> requestCaptor = ArgumentCaptor.forClass(SearchRequest.class);
+        verify(vectorStoreRetriever, times(6)).similaritySearch(requestCaptor.capture());
+        assertThat(requestCaptor.getAllValues().subList(0, 2))
+                .extracting(request -> request.getFilterExpression().toString())
+                .allMatch(filter -> filter.contains("경기도") && filter.contains("수원시"));
+        assertThat(requestCaptor.getAllValues().subList(2, 4))
+                .extracting(request -> request.getFilterExpression().toString())
+                .allMatch(filter -> filter.contains("경기도") && !filter.contains("수원시"));
+        assertThat(requestCaptor.getAllValues().subList(4, 6))
+                .extracting(SearchRequest::getFilterExpression)
+                .containsOnlyNulls();
+    }
+
+    @Test
+    void doesNotAddProfileRegionToNationalPolicySearchQuery() {
+        SpringAiDocumentRetriever retriever =
+                new SpringAiDocumentRetriever(vectorStoreRetriever, 5, 0.7);
+        AiUserProfile profile = new AiUserProfile(
+                "경기도 수원시",
+                "경기도",
+                "수원시",
+                6,
+                List.of(),
+                List.of(),
+                ""
+        );
+        when(vectorStoreRetriever.similaritySearch(
+                org.mockito.ArgumentMatchers.any(SearchRequest.class)))
+                .thenReturn(List.of());
+
+        retriever.retrieve("장애인 활동지원서비스 신청 방법", profile,
+                AiSearchScope.NATIONAL_POLICY);
+
+        ArgumentCaptor<SearchRequest> requestCaptor = ArgumentCaptor.forClass(SearchRequest.class);
+        verify(vectorStoreRetriever, times(2)).similaritySearch(requestCaptor.capture());
+        assertThat(requestCaptor.getAllValues())
+                .extracting(SearchRequest::getQuery)
+                .allMatch(query -> !query.contains("경기도 수원시"));
     }
 }
