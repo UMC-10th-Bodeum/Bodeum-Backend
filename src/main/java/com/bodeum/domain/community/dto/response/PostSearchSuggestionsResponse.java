@@ -19,4 +19,10 @@ public record PostSearchSuggestionsResponse(
                         .toList()
         );
     }
+
+    public static PostSearchSuggestionsResponse fromSuggestions(
+            List<PostSearchSuggestionResponse> suggestions
+    ) {
+        return new PostSearchSuggestionsResponse(suggestions);
+    }
 }

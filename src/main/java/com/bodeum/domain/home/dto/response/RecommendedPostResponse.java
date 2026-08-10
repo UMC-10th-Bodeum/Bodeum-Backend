@@ -1,16 +1,13 @@
 package com.bodeum.domain.home.dto.response;
 
 import com.bodeum.domain.community.entity.Post;
-import com.bodeum.domain.community.enums.DisabilityType;
 import com.bodeum.domain.community.enums.PostAnonymityType;
 import com.bodeum.domain.community.enums.PostBoardType;
 
 import java.time.Instant;
-import java.util.List;
 
 public record RecommendedPostResponse(
         Long postId,
-        List<DisabilityTagDto> disabilityTags,
         String categoryName,
         String authorDisplay,
         String title,
@@ -20,16 +17,9 @@ public record RecommendedPostResponse(
         long viewCount,
         Instant createdAt
 ) {
-    public record DisabilityTagDto(String code, String label) {
-        public static DisabilityTagDto from(DisabilityType type) {
-            return new DisabilityTagDto(type.name(), type.getLabel());
-        }
-    }
-
-    public static RecommendedPostResponse of(Post post, List<DisabilityType> disabilityTypes) {
+    public static RecommendedPostResponse from(Post post) {
         return new RecommendedPostResponse(
                 post.getId(),
-                disabilityTypes.stream().map(DisabilityTagDto::from).toList(),
                 toBoardTypeName(post.getBoardType()),
                 toAuthorDisplay(post.getAnonymityType()),
                 post.getTitle(),

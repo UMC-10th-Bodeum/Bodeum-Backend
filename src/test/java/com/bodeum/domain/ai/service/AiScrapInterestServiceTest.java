@@ -7,13 +7,10 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.bodeum.domain.community.entity.Hashtag;
 import com.bodeum.domain.community.entity.Post;
-import com.bodeum.domain.community.entity.PostHashtag;
 import com.bodeum.domain.community.entity.PostScrap;
 import com.bodeum.domain.community.enums.PostBoardType;
 import com.bodeum.domain.community.enums.PostStatus;
-import com.bodeum.domain.community.repository.PostHashtagRepository;
 import com.bodeum.domain.info.entity.InfoItem;
 import com.bodeum.domain.info.entity.InfoScrap;
 import com.bodeum.domain.mypage.repository.MyPageInfoScrapRepository;
@@ -36,7 +33,6 @@ class AiScrapInterestServiceTest {
     @Mock MyPageInfoScrapRepository infoScrapRepository;
     @Mock MyPageNewsScrapRepository newsScrapRepository;
     @Mock MyPagePostScrapRepository postScrapRepository;
-    @Mock PostHashtagRepository postHashtagRepository;
 
     private AiScrapInterestService service;
 
@@ -45,8 +41,7 @@ class AiScrapInterestServiceTest {
         service = new AiScrapInterestService(
                 infoScrapRepository,
                 newsScrapRepository,
-                postScrapRepository,
-                postHashtagRepository
+                postScrapRepository
         );
     }
 
@@ -73,20 +68,11 @@ class AiScrapInterestServiceTest {
         PostScrap postScrap = mock(PostScrap.class);
         Post post = mock(Post.class);
         when(postScrap.getPost()).thenReturn(post);
-        when(post.getId()).thenReturn(3L);
         when(post.getTitle()).thenReturn("특수학교 정보를 찾고 있어요");
         when(post.getBoardType()).thenReturn(PostBoardType.INFORMATION_QUESTION);
         when(postScrapRepository.findRecentVisibleByUserId(
                 eq(1L), eq(PostStatus.ACTIVE), any(Pageable.class)
         )).thenReturn(List.of(postScrap));
-
-        PostHashtag postHashtag = mock(PostHashtag.class);
-        Hashtag hashtag = mock(Hashtag.class);
-        when(postHashtag.getPost()).thenReturn(post);
-        when(postHashtag.getHashtag()).thenReturn(hashtag);
-        when(hashtag.getName()).thenReturn("특수학교");
-        when(postHashtagRepository.findAllByPost_IdIn(List.of(3L)))
-                .thenReturn(List.of(postHashtag));
 
         var result = service.findRecentInterests(1L);
 
@@ -98,7 +84,7 @@ class AiScrapInterestServiceTest {
                         + "(카테고리: 복지지원)");
         assertThat(result.communityTopics())
                 .containsExactly("특수학교 정보를 찾고 있어요 "
-                        + "(게시판: INFORMATION_QUESTION, 태그: 특수학교)");
+                        + "(게시판: INFORMATION_QUESTION)");
         verify(infoScrapRepository).findRecentByUserId(
                 eq(1L),
                 org.mockito.ArgumentMatchers.argThat(pageable -> pageable.getPageSize() == 5)
@@ -126,15 +112,11 @@ class AiScrapInterestServiceTest {
         PostScrap postScrap = mock(PostScrap.class);
         Post post = mock(Post.class);
         when(postScrap.getPost()).thenReturn(post);
-        when(post.getId()).thenReturn(4L);
         when(post.getTitle()).thenReturn("유형과 태그 없는 게시글");
         when(post.getBoardType()).thenReturn(null);
         when(postScrapRepository.findRecentVisibleByUserId(
                 eq(1L), eq(PostStatus.ACTIVE), any(Pageable.class)
         )).thenReturn(List.of(postScrap));
-        when(postHashtagRepository.findAllByPost_IdIn(List.of(4L)))
-                .thenReturn(List.of());
-
         var result = service.findRecentInterests(1L);
 
         assertThat(result.infoTitles()).containsExactly("카테고리 없는 정보");
@@ -163,14 +145,10 @@ class AiScrapInterestServiceTest {
         PostScrap postScrap = mock(PostScrap.class);
         Post post = mock(Post.class);
         when(postScrap.getPost()).thenReturn(post);
-        when(post.getId()).thenReturn(5L);
         when(post.getTitle()).thenReturn("");
         when(postScrapRepository.findRecentVisibleByUserId(
                 eq(1L), eq(PostStatus.ACTIVE), any(Pageable.class)
         )).thenReturn(List.of(postScrap));
-        when(postHashtagRepository.findAllByPost_IdIn(List.of(5L)))
-                .thenReturn(List.of());
-
         var result = service.findRecentInterests(1L);
 
         assertThat(result.infoTitles()).isEmpty();

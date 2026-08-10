@@ -69,7 +69,7 @@ class SpringAiDocumentRetrieverTest {
                 org.mockito.ArgumentMatchers.any(SearchRequest.class)))
                 .thenReturn(List.of());
 
-        retriever.retrieve("우리 지역 특수학교 알려줘", profile,
+        retriever.retrieve("우리 지역 복지센터 알려줘", profile,
                 AiSearchScope.LOCAL_RESOURCE);
 
         ArgumentCaptor<SearchRequest> requestCaptor = ArgumentCaptor.forClass(SearchRequest.class);
@@ -111,4 +111,5 @@ class SpringAiDocumentRetrieverTest {
                 .extracting(SearchRequest::getQuery)
                 .allMatch(query -> !query.contains("경기도 수원시"));
     }
+
 }

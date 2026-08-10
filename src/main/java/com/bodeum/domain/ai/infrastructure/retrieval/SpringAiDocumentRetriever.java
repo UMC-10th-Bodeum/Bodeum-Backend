@@ -27,7 +27,6 @@ import org.slf4j.LoggerFactory;
 public class SpringAiDocumentRetriever implements AiDocumentRetriever {
 
     private static final Logger log = LoggerFactory.getLogger(SpringAiDocumentRetriever.class);
-
     private final VectorStoreRetriever vectorStoreRetriever;
     private final int topK;
     private final double similarityThreshold;

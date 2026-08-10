@@ -764,6 +764,87 @@ class AiMessageServiceTest {
     }
 
     @Test
+    void removesProfileRegionFromGeneralSearchAndAnswerContext() {
+        String question = "특수학교를 알려줘";
+        user.updateInterestRegion(List.of(), Region.create("경기도", "수원시"));
+        when(questionIntentClassifier.analyze(question)).thenReturn(
+                AiQuestionAnalysis.forQuestion(
+                        question,
+                        AiQuestionIntent.NONE,
+                        AiSearchScope.GENERAL,
+                        List.of()
+                )
+        );
+        when(documentRetriever.retrieve(eq(question), any(),
+                eq(AiSearchScope.GENERAL))).thenReturn(List.of());
+        AiMessage saved = savedAiMessage("관련 정보를 찾을 수 없습니다.");
+        when(persistenceService.saveAiMessageAndComplete(
+                11L, chatRoom, "관련 정보를 찾을 수 없습니다.", false,
+                AiAnswerStatus.NO_EVIDENCE, List.of()
+        )).thenReturn(saved);
+
+        service.createMessage(1L, question);
+
+        verify(documentRetriever).retrieve(
+                eq(question),
+                org.mockito.ArgumentMatchers.argThat(profile ->
+                        profile.region().isBlank()
+                                && profile.regionLevel1().isBlank()
+                                && profile.regionLevel2().isBlank()),
+                eq(AiSearchScope.GENERAL)
+        );
+        verify(externalAnswerProvider).search(
+                eq(question),
+                any(),
+                org.mockito.ArgumentMatchers.argThat(profile ->
+                        profile.region().isBlank()
+                                && profile.regionLevel1().isBlank()
+                                && profile.regionLevel2().isBlank()),
+                eq(AiSearchScope.GENERAL)
+        );
+    }
+
+    @Test
+    void replacesRelativeLocalExpressionWithProfileRegionForRetrieval() {
+        String question = "우리 지역 특수학교를 알려줘";
+        String contextualizedQuestion = "경기도 수원시 특수학교를 알려줘";
+        user.updateInterestRegion(List.of(), Region.create("경기도", "수원시"));
+        when(questionIntentClassifier.analyze(question)).thenReturn(
+                AiQuestionAnalysis.forQuestion(
+                        question,
+                        AiQuestionIntent.NONE,
+                        AiSearchScope.LOCAL_RESOURCE,
+                        List.of()
+                )
+        );
+        when(regionRepository.findMentionedInQuestion(any(), any()))
+                .thenReturn(List.of());
+        when(documentRetriever.retrieve(eq(contextualizedQuestion), any(),
+                eq(AiSearchScope.LOCAL_RESOURCE))).thenReturn(List.of());
+        AiMessage saved = savedAiMessage("관련 정보를 찾을 수 없습니다.");
+        when(persistenceService.saveAiMessageAndComplete(
+                11L, chatRoom, "관련 정보를 찾을 수 없습니다.", false,
+                AiAnswerStatus.NO_EVIDENCE, List.of()
+        )).thenReturn(saved);
+
+        service.createMessage(1L, question);
+
+        verify(documentRetriever).retrieve(
+                eq(contextualizedQuestion),
+                org.mockito.ArgumentMatchers.argThat(profile ->
+                        "경기도 수원시".equals(profile.region())),
+                eq(AiSearchScope.LOCAL_RESOURCE)
+        );
+        verify(externalAnswerProvider).search(
+                eq(contextualizedQuestion),
+                eq(List.of(contextualizedQuestion)),
+                org.mockito.ArgumentMatchers.argThat(profile ->
+                        "경기도 수원시".equals(profile.region())),
+                eq(AiSearchScope.LOCAL_RESOURCE)
+        );
+    }
+
+    @Test
     void resolvesRegionLevel2AfterMetropolitanAlias() {
         String question = "서울시 강남구 특수학교 알려줘";
         Region seoulRegion = Region.create("서울특별시", "강남구");

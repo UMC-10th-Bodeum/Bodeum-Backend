@@ -5,25 +5,18 @@ import com.bodeum.domain.community.dto.request.UpdatePostRequest;
 import com.bodeum.domain.community.dto.response.PostLikeResponse;
 import com.bodeum.domain.community.dto.response.PostResponse;
 import com.bodeum.domain.community.dto.response.PostScrapResponse;
-import com.bodeum.domain.community.entity.Hashtag;
 import com.bodeum.domain.community.entity.Post;
-import com.bodeum.domain.community.entity.PostDisabilityTag;
-import com.bodeum.domain.community.entity.PostHashtag;
 import com.bodeum.domain.community.entity.PostImage;
 import com.bodeum.domain.community.entity.PostLike;
 import com.bodeum.domain.community.entity.PostScrap;
 import com.bodeum.domain.community.enums.CommentStatus;
-import com.bodeum.domain.community.enums.DisabilityType;
 import com.bodeum.domain.community.enums.PostAnonymityType;
 import com.bodeum.domain.community.enums.PostBoardType;
 import com.bodeum.domain.community.enums.PostStatus;
 import com.bodeum.domain.community.exception.CommunityErrorCode;
 import com.bodeum.domain.community.exception.CommunityException;
 import com.bodeum.domain.community.repository.CommentRepository;
-import com.bodeum.domain.community.repository.HashtagRepository;
 import com.bodeum.domain.community.repository.PostAuthorRepository;
-import com.bodeum.domain.community.repository.PostDisabilityTagRepository;
-import com.bodeum.domain.community.repository.PostHashtagRepository;
 import com.bodeum.domain.community.repository.PostImageRepository;
 import com.bodeum.domain.community.repository.PostLikeRepository;
 import com.bodeum.domain.community.repository.PostRepository;
@@ -46,10 +39,7 @@ public class PostService {
 
     private final PostRepository postRepository;
     private final CommentRepository commentRepository;
-    private final HashtagRepository hashtagRepository;
-    private final PostHashtagRepository postHashtagRepository;
     private final PostImageRepository postImageRepository;
-    private final PostDisabilityTagRepository postDisabilityTagRepository;
     private final PostLikeRepository postLikeRepository;
     private final PostScrapRepository postScrapRepository;
     private final PostAuthorRepository postAuthorRepository;
@@ -68,8 +58,6 @@ public class PostService {
                 request.content()
         ));
 
-        saveDisabilityTags(post, safeList(request.disabilityTypes()));
-        saveHashtags(post, normalizeHashtags(request.hashtags()));
         saveImages(post, safeList(request.imageUrls()));
         pointService.grantActivityPoint(
                 userId,
@@ -96,12 +84,6 @@ public class PostService {
                 request.content() == null ? post.getContent() : request.content()
         );
 
-        if (request.disabilityTypes() != null) {
-            replaceDisabilityTags(post, request.disabilityTypes());
-        }
-        if (request.hashtags() != null) {
-            replaceHashtags(post, normalizeHashtags(request.hashtags()));
-        }
         if (request.imageUrls() != null) {
             replaceImages(post, request.imageUrls());
         }
@@ -259,17 +241,6 @@ public class PostService {
                 && postLikeRepository.existsByPost_IdAndUserId(post.getId(), viewerId);
         boolean scrapped = viewerId != null
                 && postScrapRepository.existsByPost_IdAndUserId(post.getId(), viewerId);
-        List<DisabilityType> disabilityTypes = postDisabilityTagRepository
-                .findAllByPost_IdOrderByIdAsc(post.getId())
-                .stream()
-                .map(PostDisabilityTag::getDisabilityType)
-                .toList();
-        List<String> hashtags = postHashtagRepository
-                .findAllByPost_IdOrderByIdAsc(post.getId())
-                .stream()
-                .map(PostHashtag::getHashtag)
-                .map(Hashtag::getName)
-                .toList();
         List<String> imageUrls = postImageRepository
                 .findAllByPost_IdOrderBySortOrderAsc(post.getId())
                 .stream()
@@ -291,38 +262,7 @@ public class PostService {
         }
 
         return PostResponse.of(post, viewerId, liked, scrapped, authorWithdrawn, authorLevel, childAge,
-                disabilityTypes, hashtags, imageUrls);
-    }
-
-    private void replaceDisabilityTags(Post post, List<DisabilityType> disabilityTypes) {
-        postDisabilityTagRepository.deleteAllByPost_Id(post.getId());
-        postDisabilityTagRepository.flush();
-        saveDisabilityTags(post, disabilityTypes);
-    }
-
-    private void saveDisabilityTags(Post post, List<DisabilityType> disabilityTypes) {
-        postDisabilityTagRepository.saveAll(disabilityTypes.stream()
-                .distinct()
-                .map(disabilityType -> PostDisabilityTag.create(post, disabilityType))
-                .toList());
-    }
-
-    private void replaceHashtags(Post post, List<String> hashtagNames) {
-        postHashtagRepository.deleteAllByPost_Id(post.getId());
-        postHashtagRepository.flush();
-        saveHashtags(post, hashtagNames);
-    }
-
-    private void saveHashtags(Post post, List<String> hashtagNames) {
-        postHashtagRepository.saveAll(hashtagNames.stream()
-                .map(this::getOrCreateHashtag)
-                .map(hashtag -> PostHashtag.create(post, hashtag))
-                .toList());
-    }
-
-    private Hashtag getOrCreateHashtag(String name) {
-        return hashtagRepository.findByName(name)
-                .orElseGet(() -> hashtagRepository.save(Hashtag.create(name)));
+                imageUrls);
     }
 
     private void replaceImages(Post post, List<String> imageUrls) {
@@ -335,13 +275,6 @@ public class PostService {
         postImageRepository.saveAll(java.util.stream.IntStream.range(0, imageUrls.size())
                 .mapToObj(index -> PostImage.create(post, imageUrls.get(index), index))
                 .toList());
-    }
-
-    private List<String> normalizeHashtags(List<String> hashtags) {
-        return safeList(hashtags).stream()
-                .map(String::trim)
-                .distinct()
-                .toList();
     }
 
     private <T> List<T> safeList(List<T> values) {

@@ -18,8 +18,8 @@ import com.bodeum.domain.community.dto.response.PostLikeResponse;
 import com.bodeum.domain.community.dto.response.PostListItemResponse;
 import com.bodeum.domain.community.dto.response.PostResponse;
 import com.bodeum.domain.community.dto.response.PostScrapResponse;
+import com.bodeum.domain.community.dto.response.PostSearchSuggestionResponse;
 import com.bodeum.domain.community.dto.response.PostSearchSuggestionsResponse;
-import com.bodeum.domain.community.enums.DisabilityType;
 import com.bodeum.domain.community.enums.PostAnonymityType;
 import com.bodeum.domain.community.enums.PostBoardType;
 import com.bodeum.domain.community.exception.CommunityErrorCode;
@@ -82,7 +82,7 @@ class PostControllerTest {
         given(postListService.getPosts(10L, 0, null, null, null))
                 .willReturn(new PageImpl<>(
                         List.of(postListItemResponse()),
-                        PageRequest.of(0, 10),
+                        PageRequest.of(0, 14),
                         1
                 ));
 
@@ -93,7 +93,7 @@ class PostControllerTest {
                 .andExpect(jsonPath("$.result.content[0].thumbnailUrl")
                         .value("https://example.com/image.jpg"))
                 .andExpect(jsonPath("$.result.content[0].isLiked").value(true))
-                .andExpect(jsonPath("$.result.size").value(10))
+                .andExpect(jsonPath("$.result.size").value(14))
                 .andExpect(jsonPath("$.result.totalElements").value(1));
 
         then(postListService).should().getPosts(10L, 0, null, null, null);
@@ -108,7 +108,7 @@ class PostControllerTest {
                 "언어치료",
                 PostBoardType.TREATMENT_GROWTH_RECORD
         ))
-                .willReturn(new PageImpl<>(List.of(), PageRequest.of(2, 10), 0));
+                .willReturn(new PageImpl<>(List.of(), PageRequest.of(2, 14), 0));
 
         mockMvc.perform(get("/api/v1/community/posts")
                         .param("page", "2")
@@ -127,22 +127,28 @@ class PostControllerTest {
     }
 
     @Test
-    void getSearchSuggestionsReturnsMatchingPostTitles() throws Exception {
+    void getSearchSuggestionsReturnsTitleAndContentTypes() throws Exception {
         given(postListService.getSearchSuggestions("자폐스펙트럼", 10))
-                .willReturn(PostSearchSuggestionsResponse.fromTitles(List.of("자폐스펙트럼 치료 기록")));
+                .willReturn(PostSearchSuggestionsResponse.fromSuggestions(List.of(
+                        PostSearchSuggestionResponse.fromTitle("자폐스펙트럼 치료 기록"),
+                        PostSearchSuggestionResponse.fromContent("자폐스펙트럼 아이의 치료 경험입니다.")
+                )));
 
         mockMvc.perform(get("/api/v1/community/posts/search/suggestions")
                         .param("keyword", "자폐스펙트럼"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.result.suggestions[0].text")
                         .value("자폐스펙트럼 치료 기록"))
-                .andExpect(jsonPath("$.result.suggestions[0].type").value("POST_TITLE"));
+                .andExpect(jsonPath("$.result.suggestions[0].type").value("POST_TITLE"))
+                .andExpect(jsonPath("$.result.suggestions[1].text")
+                        .value("자폐스펙트럼 아이의 치료 경험입니다."))
+                .andExpect(jsonPath("$.result.suggestions[1].type").value("POST_CONTENT"));
 
         then(postListService).should().getSearchSuggestions("자폐스펙트럼", 10);
     }
 
     @Test
-    void createPostReturnsCreatedResponse() throws Exception {
+    void createPostIgnoresRemovedLegacyTagFields() throws Exception {
         given(postService.createPost(any(), any(CreatePostRequest.class))).willReturn(postResponse());
 
         mockMvc.perform(post("/api/v1/community/posts")
@@ -168,6 +174,25 @@ class PostControllerTest {
     }
 
     @Test
+    void createPostRejectsUnknownFieldsOtherThanRemovedLegacyTagFields() throws Exception {
+        mockMvc.perform(post("/api/v1/community/posts")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "boardType": "INFORMATION_QUESTION",
+                                  "anonymityType": "PROFILE_TAG_VISIBLE",
+                                  "title": "게시글 제목",
+                                  "titlte": "잘못된 필드명",
+                                  "content": "게시글 내용"
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("COMMON400_1"));
+
+        then(postService).should(never()).createPost(any(), any(CreatePostRequest.class));
+    }
+
+    @Test
     void createPostRejectsBlankTitle() throws Exception {
         mockMvc.perform(post("/api/v1/community/posts")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -186,25 +211,6 @@ class PostControllerTest {
     }
 
     @Test
-    void createPostRejectsNullDisabilityType() throws Exception {
-        mockMvc.perform(post("/api/v1/community/posts")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "boardType": "FREE_COMMUNICATION",
-                                  "anonymityType": "PROFILE_TAG_VISIBLE",
-                                  "title": "게시글 제목",
-                                  "content": "게시글 내용",
-                                  "disabilityTypes": [null]
-                                }
-                                """))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("COMMON400_1"));
-
-        then(postService).should(never()).createPost(any(), any(CreatePostRequest.class));
-    }
-
-    @Test
     void createPostRejectsMoreThanTenImages() throws Exception {
         List<String> imageUrls = IntStream.rangeClosed(1, 11)
                 .mapToObj(index -> "https://example.com/" + index + ".jpg")
@@ -214,8 +220,6 @@ class PostControllerTest {
                 PostAnonymityType.PROFILE_TAG_VISIBLE,
                 "게시글 제목",
                 "게시글 내용",
-                List.of(DisabilityType.AUTISM),
-                List.of("육아"),
                 imageUrls
         );
 
@@ -244,13 +248,46 @@ class PostControllerTest {
     }
 
     @Test
+    void updatePostIgnoresRemovedLegacyTagFields() throws Exception {
+        given(postService.updatePost(any(), any(), any(UpdatePostRequest.class))).willReturn(postResponse());
+
+        mockMvc.perform(patch("/api/v1/community/posts/1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "title": "수정된 게시글 제목",
+                                  "disabilityTypes": ["AUTISM"],
+                                  "hashtags": ["육아"]
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.postId").value(1));
+
+        then(postService).should().updatePost(any(), any(), any(UpdatePostRequest.class));
+    }
+
+    @Test
+    void updatePostRejectsUnknownFieldsOtherThanRemovedLegacyTagFields() throws Exception {
+        mockMvc.perform(patch("/api/v1/community/posts/1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "title": "수정된 게시글 제목",
+                                  "imageUrlz": ["https://example.com/image.jpg"]
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("COMMON400_1"));
+
+        then(postService).should(never()).updatePost(any(), any(), any(UpdatePostRequest.class));
+    }
+
+    @Test
     void updatePostAcceptsTenImages() throws Exception {
         List<String> imageUrls = IntStream.rangeClosed(1, 10)
                 .mapToObj(index -> "https://example.com/" + index + ".jpg")
                 .toList();
         UpdatePostRequest request = new UpdatePostRequest(
-                null,
-                null,
                 null,
                 null,
                 null,
@@ -274,8 +311,6 @@ class PostControllerTest {
                 .mapToObj(index -> "https://example.com/" + index + ".jpg")
                 .toList();
         UpdatePostRequest request = new UpdatePostRequest(
-                null,
-                null,
                 null,
                 null,
                 null,
@@ -317,7 +352,8 @@ class PostControllerTest {
                 .andExpect(jsonPath("$.result.commentCount").value(5))
                 .andExpect(jsonPath("$.result.scrapCount").value(6))
                 .andExpect(jsonPath("$.result.isScrapped").value(false))
-                .andExpect(jsonPath("$.result.disabilityTypes[0]").value("AUTISM"));
+                .andExpect(jsonPath("$.result.disabilityTypes").doesNotExist())
+                .andExpect(jsonPath("$.result.hashtags").doesNotExist());
     }
 
     @Test
@@ -408,8 +444,6 @@ class PostControllerTest {
                 5,
                 6,
                 false,
-                List.of(DisabilityType.AUTISM),
-                List.of("육아"),
                 List.of("https://example.com/image.jpg"),
                 Instant.parse("2026-07-18T00:00:00Z"),
                 Instant.parse("2026-07-18T00:00:00Z")
