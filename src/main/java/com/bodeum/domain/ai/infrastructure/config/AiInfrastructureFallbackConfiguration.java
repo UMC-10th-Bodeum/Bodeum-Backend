@@ -1,7 +1,7 @@
 package com.bodeum.domain.ai.infrastructure.config;
 
 import com.bodeum.domain.ai.exception.AiErrorCode;
-import com.bodeum.domain.ai.enums.AiQuestionIntent;
+import com.bodeum.domain.ai.model.rag.AiQuestionAnalysis;
 import com.bodeum.domain.ai.service.port.AiAnswerGenerator;
 import com.bodeum.domain.ai.service.port.AiDocumentRetriever;
 import com.bodeum.domain.ai.service.port.AiExternalAnswerProvider;
@@ -31,11 +31,11 @@ public class AiInfrastructureFallbackConfiguration {
 
     @Bean
     AiExternalAnswerProvider emptyAiExternalAnswerProvider() {
-        return (question, profile) -> ExternalAiAnswer.empty();
+        return (question, retrievalQueries, profile) -> ExternalAiAnswer.empty();
     }
 
     @Bean
     AiQuestionIntentClassifier emptyAiQuestionIntentClassifier() {
-        return question -> AiQuestionIntent.NONE;
+        return AiQuestionAnalysis::fallback;
     }
 }

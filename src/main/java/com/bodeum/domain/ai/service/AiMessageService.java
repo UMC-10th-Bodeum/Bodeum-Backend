@@ -9,6 +9,7 @@ import com.bodeum.domain.ai.enums.AiStarterQuestionType;
 import com.bodeum.domain.ai.enums.SenderType;
 import com.bodeum.domain.ai.exception.AiErrorCode;
 import com.bodeum.domain.ai.model.rag.AiReferenceDocument;
+import com.bodeum.domain.ai.model.rag.AiQuestionAnalysis;
 import com.bodeum.domain.ai.model.rag.AiScrapInterests;
 import com.bodeum.domain.ai.model.rag.AiSourceKey;
 import com.bodeum.domain.ai.model.rag.AiUserProfile;
@@ -30,7 +31,9 @@ import com.bodeum.domain.user.exception.UserErrorCode;
 import com.bodeum.domain.user.repository.UserRepository;
 import com.bodeum.global.apiPayload.exception.ProjectException;
 
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Set;
 import java.util.Optional;
@@ -45,6 +48,7 @@ import org.springframework.stereotype.Service;
 @Slf4j
 public class AiMessageService {
 
+    private static final int MAX_RETRIEVED_DOCUMENTS = 10;
     private static final String NO_RESULT_MESSAGE = "관련 정보를 찾을 수 없습니다.";
     private static final Set<String> EXPLICIT_REGION_REHAB_QUESTIONS = Set.of(
             "재활센터추천해줘",
@@ -147,8 +151,10 @@ public class AiMessageService {
         }
 
         log.debug("[AI] 문서 검색 시작");
-        List<AiReferenceDocument> retrievedDocuments = referenceDocumentResolver.resolve(
-                documentRetriever.retrieve(content, profile)
+        List<AiReferenceDocument> retrievedDocuments = retrieveDocuments(
+                content,
+                questionContext.retrievalQueries(),
+                profile
         );
 
         log.info("[AI] 검색 문서 수: {}", retrievedDocuments.size());
@@ -160,7 +166,12 @@ public class AiMessageService {
         if (retrievedDocuments.isEmpty()) {
             log.info("[AI] 내부 문서 없음, 외부 검색 시작");
             return createExternalOrNoResultResponse(
-                    chatRoom, userMessage, content, profile);
+                    chatRoom,
+                    userMessage,
+                    content,
+                    questionContext.retrievalQueries(),
+                    profile
+            );
         }
 
         log.debug("[AI] 답변 생성 시작");
@@ -180,7 +191,12 @@ public class AiMessageService {
         if (citedSources.isEmpty()) {
             log.info("[AI] 내부 문서 인용 근거 없음, 외부 검색 시작");
             return createExternalOrNoResultResponse(
-                    chatRoom, userMessage, content, profile);
+                    chatRoom,
+                    userMessage,
+                    content,
+                    questionContext.retrievalQueries(),
+                    profile
+            );
         }
 
         boolean warning = hasIncorrectFeedback(citedSources);
@@ -213,11 +229,15 @@ public class AiMessageService {
             return localRehabContext(profile, followUpRegion.get());
         }
 
-        AiQuestionIntent intent = questionIntentClassifier.classify(content);
+        AiQuestionAnalysis analysis = questionIntentClassifier.analyze(content);
+        AiQuestionIntent intent = analysis.intent();
         return new QuestionContext(
                 profile,
                 intent.starterQuestionType(),
-                intent.safetyGuidance()
+                intent.safetyGuidance(),
+                intent == AiQuestionIntent.NONE
+                        ? analysis.retrievalQueries()
+                        : List.of()
         );
     }
 
@@ -225,7 +245,12 @@ public class AiMessageService {
             AiUserProfile profile,
             AiStarterQuestionType questionType
     ) {
-        return new QuestionContext(profile, Optional.of(questionType), Optional.empty());
+        return new QuestionContext(
+                profile,
+                Optional.of(questionType),
+                Optional.empty(),
+                List.of()
+        );
     }
 
     private QuestionContext localRehabContext(
@@ -317,6 +342,58 @@ public class AiMessageService {
                         .replaceAll("\\s+", " ");
     }
 
+    private List<AiReferenceDocument> retrieveDocuments(
+            String originalQuestion,
+            List<String> expandedQueries,
+            AiUserProfile profile
+    ) {
+        List<String> queries = new ArrayList<>();
+        queries.add(originalQuestion);
+        if (expandedQueries != null) {
+            queries.addAll(expandedQueries);
+        }
+        List<String> distinctQueries = queries.stream()
+                .filter(query -> query != null && !query.isBlank())
+                .map(String::trim)
+                .distinct()
+                .limit(3)
+                .toList();
+
+        List<List<AiReferenceDocument>> documentsByQuery = new ArrayList<>();
+        for (String query : distinctQueries) {
+            documentsByQuery.add(documentRetriever.retrieve(query, profile));
+        }
+
+        LinkedHashMap<String, AiReferenceDocument> documentsByKey = new LinkedHashMap<>();
+        int maxRank = documentsByQuery.stream()
+                .mapToInt(List::size)
+                .max()
+                .orElse(0);
+        for (int rank = 0;
+             rank < maxRank && documentsByKey.size() < MAX_RETRIEVED_DOCUMENTS;
+             rank++) {
+            for (List<AiReferenceDocument> queryDocuments : documentsByQuery) {
+                if (rank < queryDocuments.size()) {
+                    AiReferenceDocument document = queryDocuments.get(rank);
+                    documentsByKey.putIfAbsent(document.documentKey(), document);
+                }
+                if (documentsByKey.size() >= MAX_RETRIEVED_DOCUMENTS) {
+                    break;
+                }
+            }
+        }
+
+        List<AiReferenceDocument> merged = documentsByKey.values().stream()
+                .limit(MAX_RETRIEVED_DOCUMENTS)
+                .toList();
+        log.info(
+                "[AI] 다중 검색 완료: queryCount={}, uniqueDocumentCount={}",
+                distinctQueries.size(),
+                merged.size()
+        );
+        return referenceDocumentResolver.resolve(merged);
+    }
+
     private CreateAiMessageResponse saveStarterAnswer(
             AiChatRoom chatRoom,
             AiMessage userMessage,
@@ -350,9 +427,14 @@ public class AiMessageService {
             AiChatRoom chatRoom,
             AiMessage userMessage,
             String question,
+            List<String> retrievalQueries,
             AiUserProfile profile
     ) {
-        ExternalAiAnswer externalAnswer = externalAnswerProvider.search(question, profile);
+        ExternalAiAnswer externalAnswer = externalAnswerProvider.search(
+                question,
+                retrievalQueries,
+                profile
+        );
         if (!externalAnswer.hasEvidence()) {
             return createNoEvidenceResponse(chatRoom, userMessage);
         }
@@ -563,7 +645,8 @@ public class AiMessageService {
     private record QuestionContext(
             AiUserProfile profile,
             Optional<AiStarterQuestionType> questionType,
-            Optional<String> safetyGuidance
+            Optional<String> safetyGuidance,
+            List<String> retrievalQueries
     ) {
     }
 

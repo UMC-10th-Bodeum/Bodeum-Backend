@@ -84,7 +84,11 @@ public class OpenAiExternalAnswerProvider implements AiExternalAnswerProvider {
     }
 
     @Override
-    public ExternalAiAnswer search(String question, AiUserProfile profile) {
+    public ExternalAiAnswer search(
+            String question,
+            List<String> retrievalQueries,
+            AiUserProfile profile
+    ) {
         List<AiExternalSource> sources = externalSourceRepository
                 .findAllBySourceTypeAndActiveTrue(AiExternalSourceType.WEBSITE)
                 .stream()
@@ -103,6 +107,7 @@ public class OpenAiExternalAnswerProvider implements AiExternalAnswerProvider {
                     .contentType(MediaType.APPLICATION_JSON)
                     .body(requestBody(
                             question,
+                            retrievalQueries,
                             profile,
                             sourcesByDomain.keySet().stream().toList()
                     ))
@@ -124,6 +129,7 @@ public class OpenAiExternalAnswerProvider implements AiExternalAnswerProvider {
 
     Map<String, Object> requestBody(
             String question,
+            List<String> retrievalQueries,
             AiUserProfile profile,
             List<String> allowedDomains
     ) {
@@ -141,18 +147,31 @@ public class OpenAiExternalAnswerProvider implements AiExternalAnswerProvider {
         body.put("tool_choice", "required");
         body.put("include", List.of("web_search_call.action.sources"));
         body.put("instructions", externalSearchSystemPrompt);
-        body.put("input", externalSearchInput(question, profile));
+        body.put("input", externalSearchInput(question, retrievalQueries, profile));
         return body;
     }
 
     private String externalSearchInput(
             String question,
+            List<String> retrievalQueries,
             AiUserProfile profile
     ) {
+        String searchHints = retrievalQueries == null
+                ? ""
+                : retrievalQueries.stream()
+                        .filter(query -> query != null && !query.isBlank())
+                        .map(String::trim)
+                        .distinct()
+                        .limit(3)
+                        .map(query -> "- " + query)
+                        .collect(java.util.stream.Collectors.joining("\n"));
         return """
                 %s
 
                 [우선 확인할 공식 페이지]
+                %s
+
+                [검색 질의 힌트]
                 %s
 
                 [사용자 질문]
@@ -160,6 +179,7 @@ public class OpenAiExternalAnswerProvider implements AiExternalAnswerProvider {
                 """.formatted(
                 promptFormatter.formatProfile(profile),
                 "등록된 허용 도메인에서 관련 상세 페이지를 찾으세요.",
+                searchHints.isBlank() ? "- 사용자 질문 원문을 기준으로 검색" : searchHints,
                 question
         );
     }

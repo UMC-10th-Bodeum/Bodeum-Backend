@@ -1,0 +1,68 @@
+package com.bodeum.domain.ai.model.rag;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import com.bodeum.domain.ai.enums.AiQuestionIntent;
+import java.util.List;
+import org.junit.jupiter.api.Test;
+
+class AiQuestionAnalysisTest {
+
+    @Test
+    void normalizesAndLimitsRetrievalQueries() {
+        AiQuestionAnalysis analysis = new AiQuestionAnalysis(
+                AiQuestionIntent.NONE,
+                List.of(" 원문 ", "공식 제도명", "공식 제도명", "세 번째", "네 번째")
+        );
+
+        assertThat(analysis.retrievalQueries())
+                .containsExactly("원문", "공식 제도명", "세 번째");
+    }
+
+    @Test
+    void fallsBackToNoneWithNoExpandedQuery() {
+        AiQuestionAnalysis analysis = AiQuestionAnalysis.fallback();
+
+        assertThat(analysis.intent()).isEqualTo(AiQuestionIntent.NONE);
+        assertThat(analysis.retrievalQueries()).isEmpty();
+    }
+
+    @Test
+    void alwaysPlacesOriginalQuestionBeforeExpandedQueries() {
+        AiQuestionAnalysis analysis = AiQuestionAnalysis.forQuestion(
+                " 장애아동 활동지원 서비스 신청 방법 ",
+                AiQuestionIntent.NONE,
+                List.of(
+                        "장애인 활동지원서비스 신청 방법",
+                        "장애아동 활동지원 서비스 신청 방법",
+                        "장애인 활동지원서비스 아동 신청 대상"
+                )
+        );
+
+        assertThat(analysis.retrievalQueries()).containsExactly(
+                "장애아동 활동지원 서비스 신청 방법",
+                "장애인 활동지원서비스 신청 방법",
+                "장애인 활동지원서비스 아동 신청 대상"
+        );
+    }
+
+    @Test
+    void fallbackKeepsOriginalQuestion() {
+        AiQuestionAnalysis analysis = AiQuestionAnalysis.fallback("원문 질문");
+
+        assertThat(analysis.intent()).isEqualTo(AiQuestionIntent.NONE);
+        assertThat(analysis.retrievalQueries()).containsExactly("원문 질문");
+    }
+
+    @Test
+    void ignoresRetrievalQueriesForNonNoneIntent() {
+        AiQuestionAnalysis analysis = AiQuestionAnalysis.forQuestion(
+                "진단해줘",
+                AiQuestionIntent.MEDICAL_DIAGNOSIS,
+                List.of("확장 질의")
+        );
+
+        assertThat(analysis.intent()).isEqualTo(AiQuestionIntent.MEDICAL_DIAGNOSIS);
+        assertThat(analysis.retrievalQueries()).isEmpty();
+    }
+}
