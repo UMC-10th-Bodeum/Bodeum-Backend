@@ -58,14 +58,11 @@ public class SecurityConfig {
             // 검색 API
             "/api/v1/info/search",
 
-            // Open API 동기화
-            "/api/v1/admin/openapi/**",
-
             // 정보 항목 조회 및 지역 필터 API (비회원 허용)
             "/api/v1/info-items/**",
-            "/api/v1/info-regions/**",
-            // 동기화 API
-            "/api/v1/admin/sync/**"
+            "/api/v1/info-regions/**"
+            // 주의: /api/v1/admin/** 는 이 목록에 추가하지 않는다.
+            // 관리자 권한(Role) 체계가 없어 인증만으로는 관리자 전용을 보장할 수 없다.
     };
 
     @Bean
