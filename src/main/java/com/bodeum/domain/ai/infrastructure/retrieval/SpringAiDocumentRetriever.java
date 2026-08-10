@@ -1,6 +1,7 @@
 package com.bodeum.domain.ai.infrastructure.retrieval;
 
 import com.bodeum.domain.ai.enums.AiResponseSourceType;
+import com.bodeum.domain.ai.enums.AiSearchScope;
 import com.bodeum.domain.ai.exception.AiErrorCode;
 import com.bodeum.domain.ai.model.rag.AiReferenceDocument;
 import com.bodeum.domain.ai.model.rag.AiUserProfile;
@@ -42,27 +43,24 @@ public class SpringAiDocumentRetriever implements AiDocumentRetriever {
     }
 
     @Override
-    public List<AiReferenceDocument> retrieve(String question, AiUserProfile profile) {
+    public List<AiReferenceDocument> retrieve(
+            String question,
+            AiUserProfile profile,
+            AiSearchScope searchScope
+    ) {
         try {
-            String searchQuery = buildSearchQuery(question, profile);
-            List<Document> personalizedDocuments = search(searchQuery);
-            List<Document> questionDocuments = search(question);
-
-            Map<String, Document> documentsById = new LinkedHashMap<>();
-            personalizedDocuments.forEach(document -> documentsById.put(document.getId(), document));
-            questionDocuments.forEach(document -> documentsById.merge(
-                    document.getId(), document, this::higherScore));
-
-            documentsById.values().forEach(document -> log.debug(
-                    "[AI] RAG candidate: id={}, score={}, threshold={}",
-                    document.getId(), score(document), similarityThreshold));
-
-            return documentsById.values().stream()
-                    .filter(document -> score(document) >= similarityThreshold)
-                    .sorted(Comparator.comparingDouble(this::score).reversed())
-                    .limit(topK)
-                    .map(this::mapDocument)
-                    .toList();
+            AiSearchScope resolvedScope = searchScope == null
+                    ? AiSearchScope.GENERAL
+                    : searchScope;
+            if (resolvedScope == AiSearchScope.LOCAL_RESOURCE) {
+                return retrieveLocalInstitution(question, profile);
+            }
+            return retrieveAtScope(
+                    question,
+                    profile,
+                    null,
+                    false
+            );
         } catch (ProjectException e) {
             throw e;
         } catch (Exception e) {
@@ -70,12 +68,78 @@ public class SpringAiDocumentRetriever implements AiDocumentRetriever {
         }
     }
 
-    private List<Document> search(String query) {
-        return vectorStoreRetriever.similaritySearch(SearchRequest.builder()
+    private List<AiReferenceDocument> retrieveLocalInstitution(
+            String question,
+            AiUserProfile profile
+    ) {
+        if (hasText(profile.regionLevel1()) && hasText(profile.regionLevel2())) {
+            String cityFilter = equalsFilter("sido", profile.regionLevel1())
+                    + " && " + equalsFilter("sigungu", profile.regionLevel2());
+            List<AiReferenceDocument> cityDocuments = retrieveAtScope(
+                    question, profile, cityFilter, false);
+            if (!cityDocuments.isEmpty()) {
+                log.info("[AI] 지역 기관 검색 완료: scope=SIGUNGU, count={}",
+                        cityDocuments.size());
+                return cityDocuments;
+            }
+        }
+
+        if (hasText(profile.regionLevel1())) {
+            List<AiReferenceDocument> provinceDocuments = retrieveAtScope(
+                    question,
+                    profile,
+                    equalsFilter("sido", profile.regionLevel1()),
+                    false
+            );
+            if (!provinceDocuments.isEmpty()) {
+                log.info("[AI] 지역 기관 검색 범위 확대: scope=SIDO, count={}",
+                        provinceDocuments.size());
+                return provinceDocuments;
+            }
+        }
+
+        List<AiReferenceDocument> allDocuments = retrieveAtScope(
+                question, profile, null, false);
+        log.info("[AI] 지역 기관 검색 범위 확대: scope=ALL, count={}", allDocuments.size());
+        return allDocuments;
+    }
+
+    private List<AiReferenceDocument> retrieveAtScope(
+            String question,
+            AiUserProfile profile,
+            String filterExpression,
+            boolean includeRegion
+    ) {
+        String searchQuery = buildSearchQuery(question, profile, includeRegion);
+        List<Document> personalizedDocuments = search(searchQuery, filterExpression);
+        List<Document> questionDocuments = search(question, filterExpression);
+
+        Map<String, Document> documentsById = new LinkedHashMap<>();
+        personalizedDocuments.forEach(document -> documentsById.put(document.getId(), document));
+        questionDocuments.forEach(document -> documentsById.merge(
+                document.getId(), document, this::higherScore));
+
+        documentsById.values().forEach(document -> log.debug(
+                "[AI] RAG candidate: id={}, score={}, threshold={}",
+                document.getId(), score(document), similarityThreshold));
+
+        return documentsById.values().stream()
+                .filter(document -> score(document) >= similarityThreshold)
+                .sorted(Comparator.comparingDouble(this::score).reversed())
+                .limit(topK)
+                .map(this::mapDocument)
+                .toList();
+    }
+
+    private List<Document> search(String query, String filterExpression) {
+        SearchRequest.Builder builder = SearchRequest.builder()
                 .query(query)
                 .topK(topK)
-                .similarityThreshold(0.0)
-                .build());
+                .similarityThreshold(0.0);
+        if (hasText(filterExpression)) {
+            builder.filterExpression(filterExpression);
+        }
+        return vectorStoreRetriever.similaritySearch(builder.build());
     }
 
     private Document higherScore(Document left, Document right) {
@@ -86,13 +150,27 @@ public class SpringAiDocumentRetriever implements AiDocumentRetriever {
         return document.getScore() == null ? 0.0 : document.getScore();
     }
 
-    private String buildSearchQuery(String question, AiUserProfile profile) {
+    private String buildSearchQuery(
+            String question,
+            AiUserProfile profile,
+            boolean includeRegion
+    ) {
         StringBuilder query = new StringBuilder(question);
-        append(query, "활동 지역", profile.region());
+        if (includeRegion) {
+            append(query, "활동 지역", profile.region());
+        }
         append(query, "집중 케어 영역", String.join(", ", profile.disabilityTypes()));
         append(query, "관심사", String.join(", ", profile.interests()));
         append(query, "자녀 관련 관심 키워드", profile.keywordText());
         return query.toString();
+    }
+
+    private String equalsFilter(String field, String value) {
+        return field + " == '" + value.replace("'", "\\'") + "'";
+    }
+
+    private boolean hasText(String value) {
+        return value != null && !value.isBlank();
     }
 
     private void append(StringBuilder query, String label, String value) {

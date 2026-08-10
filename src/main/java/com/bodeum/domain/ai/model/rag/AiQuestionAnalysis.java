@@ -1,16 +1,23 @@
 package com.bodeum.domain.ai.model.rag;
 
 import com.bodeum.domain.ai.enums.AiQuestionIntent;
+import com.bodeum.domain.ai.enums.AiSearchScope;
 import java.util.List;
 import java.util.stream.Stream;
 
 public record AiQuestionAnalysis(
         AiQuestionIntent intent,
+        AiSearchScope searchScope,
         List<String> retrievalQueries
 ) {
 
+    public AiQuestionAnalysis(AiQuestionIntent intent, List<String> retrievalQueries) {
+        this(intent, AiSearchScope.GENERAL, retrievalQueries);
+    }
+
     public AiQuestionAnalysis {
         intent = intent == null ? AiQuestionIntent.NONE : intent;
+        searchScope = searchScope == null ? AiSearchScope.GENERAL : searchScope;
         retrievalQueries = retrievalQueries == null
                 ? List.of()
                 : retrievalQueries.stream()
@@ -22,11 +29,11 @@ public record AiQuestionAnalysis(
     }
 
     public static AiQuestionAnalysis fallback() {
-        return new AiQuestionAnalysis(AiQuestionIntent.NONE, List.of());
+        return new AiQuestionAnalysis(AiQuestionIntent.NONE, AiSearchScope.GENERAL, List.of());
     }
 
     public static AiQuestionAnalysis fallback(String question) {
-        return forQuestion(question, AiQuestionIntent.NONE, List.of());
+        return forQuestion(question, AiQuestionIntent.NONE, AiSearchScope.GENERAL, List.of());
     }
 
     public static AiQuestionAnalysis forQuestion(
@@ -34,11 +41,20 @@ public record AiQuestionAnalysis(
             AiQuestionIntent intent,
             List<String> expandedQueries
     ) {
+        return forQuestion(question, intent, AiSearchScope.GENERAL, expandedQueries);
+    }
+
+    public static AiQuestionAnalysis forQuestion(
+            String question,
+            AiQuestionIntent intent,
+            AiSearchScope searchScope,
+            List<String> expandedQueries
+    ) {
         AiQuestionIntent resolvedIntent = intent == null
                 ? AiQuestionIntent.NONE
                 : intent;
         if (resolvedIntent != AiQuestionIntent.NONE) {
-            return new AiQuestionAnalysis(resolvedIntent, List.of());
+            return new AiQuestionAnalysis(resolvedIntent, AiSearchScope.GENERAL, List.of());
         }
 
         Stream<String> expansions = expandedQueries == null
@@ -53,6 +69,6 @@ public record AiQuestionAnalysis(
                 .distinct()
                 .limit(3)
                 .toList();
-        return new AiQuestionAnalysis(resolvedIntent, retrievalQueries);
+        return new AiQuestionAnalysis(resolvedIntent, searchScope, retrievalQueries);
     }
 }

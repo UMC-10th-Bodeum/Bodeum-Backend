@@ -3,10 +3,25 @@ package com.bodeum.domain.ai.model.rag;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.bodeum.domain.ai.enums.AiQuestionIntent;
+import com.bodeum.domain.ai.enums.AiSearchScope;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
 class AiQuestionAnalysisTest {
+
+    @Test
+    void preservesSearchScopeForGeneralRagQuestion() {
+        AiQuestionAnalysis analysis = AiQuestionAnalysis.forQuestion(
+                "우리 지역 특수학교 알려줘",
+                AiQuestionIntent.NONE,
+                AiSearchScope.LOCAL_RESOURCE,
+                List.of("수원시 특수학교")
+        );
+
+        assertThat(analysis.searchScope()).isEqualTo(AiSearchScope.LOCAL_RESOURCE);
+        assertThat(analysis.retrievalQueries())
+                .containsExactly("우리 지역 특수학교 알려줘", "수원시 특수학교");
+    }
 
     @Test
     void normalizesAndLimitsRetrievalQueries() {
