@@ -1,6 +1,7 @@
 package com.bodeum.domain.search.service;
 
 import com.bodeum.domain.info.entity.InfoItem;
+import com.bodeum.domain.region.entity.Region;
 import com.bodeum.domain.search.dto.response.AutocompleteResponse;
 import com.bodeum.domain.search.dto.response.InfoSearchResponse;
 import com.bodeum.domain.search.dto.response.SearchHistoryResponse;
@@ -10,6 +11,8 @@ import com.bodeum.domain.search.exception.SearchErrorCode;
 import com.bodeum.domain.search.exception.SearchException;
 import com.bodeum.domain.search.repository.SearchInfoItemRepository;
 import com.bodeum.domain.search.repository.SearchLogRepository;
+import com.bodeum.domain.user.entity.User;
+import com.bodeum.domain.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -28,6 +31,7 @@ public class SearchService {
 
     private final SearchInfoItemRepository searchInfoItemRepository;
     private final SearchLogRepository searchLogRepository;
+    private final UserRepository userRepository;
 
     @Transactional
     public InfoSearchResponse searchInfo(String keyword, Long userId) {
@@ -54,7 +58,7 @@ public class SearchService {
         }
     }
 
-    public AutocompleteResponse getAutocomplete(String keyword) {
+    public AutocompleteResponse getAutocomplete(String keyword, Long userId) {
         // 1. 공백/null 검증 -> 예외 발생
         if (keyword == null || keyword.trim().isEmpty()) {
             throw new SearchException(SearchErrorCode.SEARCH_KEYWORD_BLANK);
@@ -67,8 +71,24 @@ public class SearchService {
             throw new SearchException(SearchErrorCode.SEARCH_KEYWORD_TOO_LONG);
         }
 
+        // 3. 로그인 유저의 시/도(sido) 및 시/군/구(sigungu) 정보 추출
+        String userSido = null;
+        String userSigungu = null;
+
+        if (userId != null) {
+            User user = userRepository.findByIdWithGuardianProfileAndRegion(userId)
+                    .orElseGet(() -> userRepository.findById(userId).orElse(null));
+            if (user != null && user.getRegion() != null) {
+                Region region = user.getRegion();
+                userSido = region.getRegionLevel1();
+                userSigungu = region.getRegionLevel2();
+            }
+        }
+        // 4. 가중치 적용 자동완성 조회
         List<InfoItem> items = searchInfoItemRepository.findAutocompleteByKeyword(
                 trimmedKeyword,
+                userSido,
+                userSigungu,
                 PageRequest.of(0, AUTOCOMPLETE_LIMIT)
         );
 
