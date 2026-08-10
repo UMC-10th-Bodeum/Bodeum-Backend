@@ -835,6 +835,13 @@ class AiMessageServiceTest {
                         "경기도 수원시".equals(profile.region())),
                 eq(AiSearchScope.LOCAL_RESOURCE)
         );
+        verify(externalAnswerProvider).search(
+                eq(contextualizedQuestion),
+                eq(List.of(contextualizedQuestion)),
+                org.mockito.ArgumentMatchers.argThat(profile ->
+                        "경기도 수원시".equals(profile.region())),
+                eq(AiSearchScope.LOCAL_RESOURCE)
+        );
     }
 
     @Test
