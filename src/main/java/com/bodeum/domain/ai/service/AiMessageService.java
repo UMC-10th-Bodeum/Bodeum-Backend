@@ -250,11 +250,9 @@ public class AiMessageService {
         AiQuestionAnalysis analysis = questionIntentClassifier.analyze(content);
         AiQuestionIntent intent = analysis.intent();
         AiSearchScope searchScope = resolveSearchScope(intent, analysis.searchScope());
-        AiUserProfile searchProfile = applyExplicitSearchRegion(
-                content,
-                profile,
-                searchScope
-        );
+        AiUserProfile searchProfile = searchScope == AiSearchScope.GENERAL
+                ? profile.withRegion("", "", "")
+                : applyExplicitSearchRegion(content, profile, searchScope);
         return new QuestionContext(
                 searchProfile,
                 intent.starterQuestionType(),
@@ -490,6 +488,7 @@ public class AiMessageService {
         List<String> distinctQueries = queries.stream()
                 .filter(query -> query != null && !query.isBlank())
                 .map(String::trim)
+                .map(query -> contextualizeLocalRegion(query, profile, searchScope))
                 .distinct()
                 .limit(3)
                 .toList();
@@ -527,6 +526,24 @@ public class AiMessageService {
                 merged.size()
         );
         return referenceDocumentResolver.resolve(merged);
+    }
+
+    private String contextualizeLocalRegion(
+            String query,
+            AiUserProfile profile,
+            AiSearchScope searchScope
+    ) {
+        if (searchScope != AiSearchScope.LOCAL_RESOURCE
+                || profile == null
+                || profile.region() == null
+                || profile.region().isBlank()) {
+            return query;
+        }
+        return query
+                .replace("우리 지역", profile.region())
+                .replace("우리 동네", profile.region())
+                .replace("근처", profile.region())
+                .replace("주변", profile.region());
     }
 
     private CreateAiMessageResponse saveStarterAnswer(
