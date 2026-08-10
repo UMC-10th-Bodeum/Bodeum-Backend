@@ -727,10 +727,8 @@ class AiMessageServiceTest {
         when(regionRepository.findFirstByRegionLevel1OrderByIdAsc("부산광역시"))
                 .thenReturn(Optional.of(busanRegion));
         when(questionIntentClassifier.analyze(question)).thenReturn(
-                AiQuestionAnalysis.forQuestion(
-                        question,
-                        AiQuestionIntent.NONE,
-                        AiSearchScope.LOCAL_RESOURCE,
+                new AiQuestionAnalysis(
+                        AiQuestionIntent.LOCAL_REHAB_CENTERS,
                         List.of()
                 )
         );

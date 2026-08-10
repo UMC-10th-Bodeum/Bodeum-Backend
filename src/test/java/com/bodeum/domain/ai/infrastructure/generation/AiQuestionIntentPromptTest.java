@@ -19,6 +19,9 @@ class AiQuestionIntentPromptTest {
                 "MEDICAL_DIAGNOSIS",
                 "LEGAL_ADVICE",
                 "INSTITUTION_EVALUATION",
+                "우리 지역 특수학교 알려줘",
+                "우리 동네 장애인복지관 알려줘",
+                "LOCAL_REHAB_CENTERS로 분류하지 말고 NONE",
                 "어떤 질환인지 판단해주지 말고 병원을 추천해줘\" -> NONE",
                 "소송 절차와 필요한 서류를 알려줘\" -> NONE",
                 "두 복지관의 서비스와 비용을 비교해줘\" -> NONE"

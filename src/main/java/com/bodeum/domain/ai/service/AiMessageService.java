@@ -249,16 +249,17 @@ public class AiMessageService {
 
         AiQuestionAnalysis analysis = questionIntentClassifier.analyze(content);
         AiQuestionIntent intent = analysis.intent();
+        AiSearchScope searchScope = resolveSearchScope(intent, analysis.searchScope());
         AiUserProfile searchProfile = applyExplicitSearchRegion(
                 content,
                 profile,
-                analysis.searchScope()
+                searchScope
         );
         return new QuestionContext(
                 searchProfile,
                 intent.starterQuestionType(),
                 intent.safetyGuidance(),
-                analysis.searchScope(),
+                searchScope,
                 intent == AiQuestionIntent.NONE
                         ? analysis.retrievalQueries()
                         : List.of()
@@ -276,6 +277,20 @@ public class AiMessageService {
                 searchScope(questionType),
                 List.of()
         );
+    }
+
+    private AiSearchScope resolveSearchScope(
+            AiQuestionIntent intent,
+            AiSearchScope analyzedSearchScope
+    ) {
+        return switch (intent) {
+            case LOCAL_REHAB_CENTERS -> AiSearchScope.LOCAL_RESOURCE;
+            case CHILD_MEDICAL_SUPPORT, VOUCHER_APPLICATION ->
+                    AiSearchScope.NATIONAL_POLICY;
+            default -> analyzedSearchScope == null
+                    ? AiSearchScope.GENERAL
+                    : analyzedSearchScope;
+        };
     }
 
     private AiUserProfile applyExplicitSearchRegion(
