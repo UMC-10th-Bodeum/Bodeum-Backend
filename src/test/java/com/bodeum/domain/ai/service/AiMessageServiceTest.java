@@ -765,6 +765,51 @@ class AiMessageServiceTest {
         );
     }
 
+    @Test
+    void resolvesRegionLevel2AfterMetropolitanAlias() {
+        String question = "서울시 강남구 특수학교 알려줘";
+        Region seoulRegion = Region.create("서울특별시", "강남구");
+        Region busanRegion = Region.create("부산광역시", "강남구");
+        when(regionRepository.findMentionedInQuestion(any(), any()))
+                .thenReturn(List.of());
+        when(regionRepository.findFirstByRegionLevel1OrderByIdAsc("서울특별시"))
+                .thenReturn(Optional.of(seoulRegion));
+        when(regionRepository.findAllByRegionLevel2OrderByIdAsc(any()))
+                .thenAnswer(invocation -> "강남구".equals(invocation.getArgument(0))
+                        ? List.of(seoulRegion, busanRegion)
+                        : List.of());
+        when(questionIntentClassifier.analyze(question)).thenReturn(
+                AiQuestionAnalysis.forQuestion(
+                        question,
+                        AiQuestionIntent.NONE,
+                        AiSearchScope.LOCAL_INSTITUTION,
+                        List.of()
+                )
+        );
+        when(documentRetriever.retrieve(eq(question), any(),
+                eq(AiSearchScope.LOCAL_INSTITUTION))).thenReturn(List.of());
+        AiMessage saved = savedAiMessage("관련 정보를 찾을 수 없습니다.");
+        when(persistenceService.saveAiMessageAndComplete(
+                11L,
+                chatRoom,
+                "관련 정보를 찾을 수 없습니다.",
+                false,
+                AiAnswerStatus.NO_EVIDENCE,
+                List.of()
+        )).thenReturn(saved);
+
+        service.createMessage(1L, question);
+
+        verify(documentRetriever).retrieve(
+                eq(question),
+                org.mockito.ArgumentMatchers.argThat(profile ->
+                        "서울특별시 강남구".equals(profile.region())
+                                && "서울특별시".equals(profile.regionLevel1())
+                                && "강남구".equals(profile.regionLevel2())),
+                eq(AiSearchScope.LOCAL_INSTITUTION)
+        );
+    }
+
     private AiMessage savedAiMessage(String content) {
         AiMessage message = mock(AiMessage.class);
         when(message.getId()).thenReturn(12L);

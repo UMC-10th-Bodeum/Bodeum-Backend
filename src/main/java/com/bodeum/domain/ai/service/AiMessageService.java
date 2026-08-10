@@ -298,25 +298,34 @@ public class AiMessageService {
         }
 
         String normalizedQuestion = normalizeQuestion(question);
+        String explicitRegionLevel1 = null;
         for (Map.Entry<String, String> alias : REGION_LEVEL_1_ALIASES.entrySet()) {
             if (normalizedQuestion.contains(normalizeQuestion(alias.getKey()))) {
                 Optional<Region> region = regionRepository
                         .findFirstByRegionLevel1OrderByIdAsc(alias.getValue());
                 if (region.isPresent()) {
-                    return profile.withRegion(
-                            alias.getValue(),
-                            alias.getValue(),
-                            ""
-                    );
+                    explicitRegionLevel1 = alias.getValue();
+                    break;
                 }
             }
         }
+        String matchedRegionLevel1 = explicitRegionLevel1;
 
         Matcher matcher = REGION_LEVEL_2_PATTERN.matcher(normalizeSpacing(question));
         while (matcher.find()) {
             String regionLevel2 = matcher.group(1);
             List<Region> candidates = regionRepository
                     .findAllByRegionLevel2OrderByIdAsc(regionLevel2);
+            if (matchedRegionLevel1 != null) {
+                Optional<Region> explicitRegionCandidate = candidates.stream()
+                        .filter(region -> region.getRegionLevel1()
+                                .equals(matchedRegionLevel1))
+                        .findFirst();
+                if (explicitRegionCandidate.isPresent()) {
+                    return withRegion(profile, explicitRegionCandidate.get());
+                }
+                continue;
+            }
             Optional<Region> profileRegionCandidate = candidates.stream()
                     .filter(region -> region.getRegionLevel1()
                             .equals(profile.regionLevel1()))
@@ -335,6 +344,13 @@ public class AiMessageService {
                         candidates.size()
                 );
             }
+        }
+        if (matchedRegionLevel1 != null) {
+            return profile.withRegion(
+                    matchedRegionLevel1,
+                    matchedRegionLevel1,
+                    ""
+            );
         }
         return profile;
     }
