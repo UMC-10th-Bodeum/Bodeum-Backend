@@ -42,7 +42,6 @@ public class InfoItemQueryService {
     private final InfoCategoryRepository infoCategoryRepository;
     private final UserRepository userRepository;
     private final InfoScrapRepository infoScrapRepository;
-    private final InfoOperatingHourRepository infoOperatingHourRepository;
     private final InfoItemTagRepository infoItemTagRepository;
 
     @Value("${bodeum.share.base-url}")
@@ -175,17 +174,7 @@ public class InfoItemQueryService {
                 .map(itemTag -> itemTag.getInfoTag().getName())
                 .toList();
 
-        // 해당 아이템의 운영시간 목록 DB 조회 및 DTO 매핑
-        List<InfoItemDetailResponse.BusinessHourDto> businessHours =
-                infoOperatingHourRepository.findAllByInfoItem(infoItem).stream()
-                        .map(hour -> new InfoItemDetailResponse.BusinessHourDto(
-                                hour.getDayOfWeek() != null ? hour.getDayOfWeek().name() : null,
-                                hour.getOpenTime() != null ? hour.getOpenTime().toString() : null,
-                                hour.getCloseTime() != null ? hour.getCloseTime().toString() : null
-                        ))
-                        .toList();
-
-        return InfoItemDetailResponse.of(infoItem, isScrapped, tags, businessHours);
+        return InfoItemDetailResponse.of(infoItem, isScrapped, tags);
     }
 
     /**
@@ -223,7 +212,6 @@ public class InfoItemQueryService {
     /**
      * 온보딩 유저 맞춤 추천 목록 조회 API
      */
-// MainCategory mainCategory 파라미터 추가
     public List<InfoItemResponse> getRecommendedInfoItems(Long userId, MainCategory mainCategory) {
         if (userId == null) {
             return List.of();
@@ -242,7 +230,6 @@ public class InfoItemQueryService {
             return List.of();
         }
 
-        // ★ Repository 메서드 변경 및 mainCategory 전달
         List<InfoItem> recommendedItems = infoItemRepository.findBySidoAndSigunguAndInterestInAndMainCategory(
                 region.getRegionLevel1(),
                 region.getRegionLevel2(),

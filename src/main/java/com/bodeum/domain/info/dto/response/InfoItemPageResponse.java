@@ -7,7 +7,7 @@ public record InfoItemPageResponse(
         MainCategory selectedMainCategory,
         String selectedMainCategoryKo,
         Long selectedSubCategoryId,
-        String selectedSubCategory,    // 추가!
+        String selectedSubCategory,
         String selectedSubCategoryKo,
         Page<InfoItemResponse> items
 ) {

@@ -62,7 +62,6 @@ public class InfoItem extends BaseCreatedUpdatedEntity {
     @Column(name = "homepage_url", length = 500)
     private String homepageUrl;
 
-    // --- 데모데이 및 기관 대표 이미지용 컬럼 ---
     @Column(name = "image_url", length = 1000)
     private String imageUrl;
 
@@ -78,7 +77,6 @@ public class InfoItem extends BaseCreatedUpdatedEntity {
     @Column(name = "synced_at", nullable = false)
     private LocalDateTime syncedAt;
 
-    // --- 태그 연관관계 매핑 ---
     @OneToMany(mappedBy = "infoItem")
     private List<InfoItemTag> infoItemTags = new ArrayList<>();
 

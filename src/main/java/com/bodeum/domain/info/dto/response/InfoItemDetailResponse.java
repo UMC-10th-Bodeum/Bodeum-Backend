@@ -22,14 +22,12 @@ public record InfoItemDetailResponse(
         int scrapCount,
         int reviewCount,
         boolean isScrapped,
-        List<String> tags, // ★ 태그 목록 추가
-        List<BusinessHourDto> businessHours
+        List<String> tags
 ) {
     public static InfoItemDetailResponse of(
             InfoItem entity,
             boolean isScrapped,
-            List<String> tags,
-            List<BusinessHourDto> businessHours
+            List<String> tags
     ) {
         return new InfoItemDetailResponse(
                 entity.getId(),
@@ -49,8 +47,7 @@ public record InfoItemDetailResponse(
                 entity.getScrapCount(),
                 entity.getReviewCount(),
                 isScrapped,
-                tags != null ? tags : List.of(),
-                businessHours
+                tags != null ? tags : List.of()
         );
     }
 

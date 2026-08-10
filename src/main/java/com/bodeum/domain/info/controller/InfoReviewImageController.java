@@ -30,7 +30,7 @@ public class InfoReviewImageController {
     // S3 상의 저장 디렉터리. 리뷰 도메인 전용 prefix로 다른 도메인 이미지와 구분한다.
     private static final String IMAGE_DIRECTORY = "info-reviews";
 
-    // 기획 스펙상 정보 후기 이미지는 jpg/png만 허용한다 (S3ImageStorage 자체는 webp도 지원하지만 이 기능에서는 제외).
+    // 정보 후기 이미지는 jpg/png만 허용.
     private static final Set<String> ALLOWED_CONTENT_TYPES = Set.of("image/jpeg", "image/png");
 
     private final S3ImageStorage s3ImageStorage;
