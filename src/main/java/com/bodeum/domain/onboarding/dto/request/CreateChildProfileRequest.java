@@ -48,13 +48,15 @@ public record CreateChildProfileRequest(
         String keywordText
 ) {
 
+    private static final int MIN_BIRTH_YEAR = 1990;
+
     @JsonIgnore
     @Schema(hidden = true)
-    @AssertTrue(message = "생년월은 YYYY-MM 형식으로 입력해주세요.")
+    @AssertTrue(message = "생년월은 1990-01 이후, 현재 연월 이전의 YYYY-MM 형식으로 입력해주세요.")
     public boolean isBirthValid() {
         try {
             YearMonth birthYearMonth = YearMonth.parse(birth);
-            return birthYearMonth.getYear() >= 2000 && !birthYearMonth.isAfter(YearMonth.now());
+            return birthYearMonth.getYear() >= MIN_BIRTH_YEAR && !birthYearMonth.isAfter(YearMonth.now());
         } catch (DateTimeParseException | NullPointerException e) {
             return false;
         }
