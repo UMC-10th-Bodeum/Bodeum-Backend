@@ -18,6 +18,7 @@ import com.bodeum.domain.community.dto.response.PostLikeResponse;
 import com.bodeum.domain.community.dto.response.PostListItemResponse;
 import com.bodeum.domain.community.dto.response.PostResponse;
 import com.bodeum.domain.community.dto.response.PostScrapResponse;
+import com.bodeum.domain.community.dto.response.PostSearchSuggestionResponse;
 import com.bodeum.domain.community.dto.response.PostSearchSuggestionsResponse;
 import com.bodeum.domain.community.enums.DisabilityType;
 import com.bodeum.domain.community.enums.PostAnonymityType;
@@ -82,7 +83,7 @@ class PostControllerTest {
         given(postListService.getPosts(10L, 0, null, null, null))
                 .willReturn(new PageImpl<>(
                         List.of(postListItemResponse()),
-                        PageRequest.of(0, 10),
+                        PageRequest.of(0, 14),
                         1
                 ));
 
@@ -93,7 +94,7 @@ class PostControllerTest {
                 .andExpect(jsonPath("$.result.content[0].thumbnailUrl")
                         .value("https://example.com/image.jpg"))
                 .andExpect(jsonPath("$.result.content[0].isLiked").value(true))
-                .andExpect(jsonPath("$.result.size").value(10))
+                .andExpect(jsonPath("$.result.size").value(14))
                 .andExpect(jsonPath("$.result.totalElements").value(1));
 
         then(postListService).should().getPosts(10L, 0, null, null, null);
@@ -108,7 +109,7 @@ class PostControllerTest {
                 "언어치료",
                 PostBoardType.TREATMENT_GROWTH_RECORD
         ))
-                .willReturn(new PageImpl<>(List.of(), PageRequest.of(2, 10), 0));
+                .willReturn(new PageImpl<>(List.of(), PageRequest.of(2, 14), 0));
 
         mockMvc.perform(get("/api/v1/community/posts")
                         .param("page", "2")
@@ -127,16 +128,22 @@ class PostControllerTest {
     }
 
     @Test
-    void getSearchSuggestionsReturnsMatchingPostTitles() throws Exception {
+    void getSearchSuggestionsReturnsTitleAndContentTypes() throws Exception {
         given(postListService.getSearchSuggestions("자폐스펙트럼", 10))
-                .willReturn(PostSearchSuggestionsResponse.fromTitles(List.of("자폐스펙트럼 치료 기록")));
+                .willReturn(PostSearchSuggestionsResponse.fromSuggestions(List.of(
+                        PostSearchSuggestionResponse.fromTitle("자폐스펙트럼 치료 기록"),
+                        PostSearchSuggestionResponse.fromContent("자폐스펙트럼 아이의 치료 경험입니다.")
+                )));
 
         mockMvc.perform(get("/api/v1/community/posts/search/suggestions")
                         .param("keyword", "자폐스펙트럼"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.result.suggestions[0].text")
                         .value("자폐스펙트럼 치료 기록"))
-                .andExpect(jsonPath("$.result.suggestions[0].type").value("POST_TITLE"));
+                .andExpect(jsonPath("$.result.suggestions[0].type").value("POST_TITLE"))
+                .andExpect(jsonPath("$.result.suggestions[1].text")
+                        .value("자폐스펙트럼 아이의 치료 경험입니다."))
+                .andExpect(jsonPath("$.result.suggestions[1].type").value("POST_CONTENT"));
 
         then(postListService).should().getSearchSuggestions("자폐스펙트럼", 10);
     }
