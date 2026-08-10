@@ -7,7 +7,8 @@ public record InfoItemSearchCondition(
         Long subCategory,        // 카테고리별 소분류 ID
         String regionLevel1,     // 시/도
         String regionLevel2,     // 시/군/구
-        String sort              // view|scrap|review (기본값: view)
+        String sort,              // view|scrap|review (기본값: view)
+        Boolean isRecommended
 ) {
     // Compact Constructor를 활용한 비즈니스 기본값 처리 및 유저 프로필 지역 보완
     public InfoItemSearchCondition {
@@ -24,7 +25,8 @@ public record InfoItemSearchCondition(
                 this.subCategory,
                 this.regionLevel1 != null ? this.regionLevel1 : defaultRegion1,
                 this.regionLevel2 != null ? this.regionLevel2 : defaultRegion2,
-                this.sort
+                this.sort,
+                this.isRecommended
         );
     }
 
@@ -35,7 +37,8 @@ public record InfoItemSearchCondition(
                 this.subCategory,
                 this.regionLevel1,
                 this.regionLevel2,
-                this.sort
+                this.sort,
+                this.isRecommended
         );
     }
 }

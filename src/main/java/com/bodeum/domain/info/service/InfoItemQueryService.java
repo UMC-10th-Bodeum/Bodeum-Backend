@@ -20,6 +20,7 @@ import com.bodeum.domain.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -55,6 +56,34 @@ public class InfoItemQueryService {
             InfoItemSearchCondition condition,
             Pageable pageable
     ) {
+        // ★ [추가된 로직] 프론트에서 isRecommended=true 파라미터를 보낸 경우
+        if (Boolean.TRUE.equals(condition.isRecommended())) {
+            // 하단에 미리 만들어두었던 getRecommendedInfoItems(userId) 실행
+            List<InfoItemResponse> recommendedList = getRecommendedInfoItems(userId);
+
+            // List를 응답 타입인 Page 객체로 변환
+            Page<InfoItemResponse> recommendedPage = new PageImpl<>(
+                    recommendedList,
+                    pageable,
+                    recommendedList.size()
+            );
+
+            MainCategory category = condition.category() != null ? condition.category() : MainCategory.INSTITUTION;
+            String categoryKo = infoCategoryRepository.findFirstByMainCategory(category)
+                    .map(InfoCategory::getMainCategoryKo)
+                    .orElse("기관");
+
+            return InfoItemPageResponse.of(
+                    category,
+                    categoryKo,
+                    null,
+                    "RECOMMEND",
+                    "추천",
+                    recommendedPage
+            );
+        }
+
+        // ================= 기존 로직 100% 동일하게 유지 =================
         if (condition.category() == null && condition.subCategory() == null) {
             condition = condition.withCategory(MainCategory.INSTITUTION);
         }
