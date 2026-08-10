@@ -60,8 +60,9 @@ public class InfoItemQueryService {
             InfoCategory category = infoCategoryRepository.findById(condition.subCategory()).orElse(null);
 
             if (category != null && category.getSubCategory() != null && category.getSubCategory().endsWith("_ETC")) {
-                List<InfoItemResponse> recommendedList = getRecommendedInfoItems(userId);
+                List<InfoItemResponse> recommendedList = getRecommendedInfoItems(userId, category.getMainCategory());
 
+                // CodeRabbit 큰 offset 방어 로직
                 long offset = pageable.getOffset();
                 List<InfoItemResponse> pagedList;
 
@@ -222,16 +223,14 @@ public class InfoItemQueryService {
     /**
      * 온보딩 유저 맞춤 추천 목록 조회 API
      */
-    public List<InfoItemResponse> getRecommendedInfoItems(Long userId) {
-        // 1. 비로그인 유저 -> 빈 리스트 (비노출)
+// MainCategory mainCategory 파라미터 추가
+    public List<InfoItemResponse> getRecommendedInfoItems(Long userId, MainCategory mainCategory) {
         if (userId == null) {
             return List.of();
         }
 
-        // 2. 로그인 유저 조회
         User loginUser = userRepository.findAiProfileById(userId).orElse(null);
 
-        // 3. 유저가 없거나, 온보딩을 미완료했거나, 지역/관심사 정보가 없으면 빈 리스트 (비노출)
         if (loginUser == null || !loginUser.isOnboardingCompleted()) {
             return List.of();
         }
@@ -243,18 +242,18 @@ public class InfoItemQueryService {
             return List.of();
         }
 
-        // 4. 유저 지역(sido, sigungu) + 관심사 카테고리 기반 추천 아이템 DB 조회
-        List<InfoItem> recommendedItems = infoItemRepository.findBySidoAndSigunguAndInterestIn(
-                region.getRegionLevel1(), // 예: 서울특별시 / 경기도 등
-                region.getRegionLevel2(), // 예: 강남구 / 수원시 등
-                interestCategories
+        // ★ Repository 메서드 변경 및 mainCategory 전달
+        List<InfoItem> recommendedItems = infoItemRepository.findBySidoAndSigunguAndInterestInAndMainCategory(
+                region.getRegionLevel1(),
+                region.getRegionLevel2(),
+                interestCategories,
+                mainCategory
         );
 
         if (recommendedItems.isEmpty()) {
             return List.of();
         }
 
-        // 5. N+1 방지를 위한 태그 배치 조회 및 DTO 변환
         List<Long> itemIds = recommendedItems.stream().map(InfoItem::getId).toList();
         Map<Long, List<String>> tagMap = infoItemTagRepository.findAllByInfoItemIdIn(itemIds).stream()
                 .collect(Collectors.groupingBy(

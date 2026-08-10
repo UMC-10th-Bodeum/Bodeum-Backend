@@ -1,6 +1,7 @@
 package com.bodeum.domain.info.repository;
 
 import com.bodeum.domain.info.entity.InfoItem;
+import com.bodeum.domain.info.entity.enums.MainCategory;
 import com.bodeum.domain.user.enums.InterestCategory;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.EntityGraph;
@@ -55,10 +56,12 @@ public interface InfoItemRepository extends JpaRepository<InfoItem, Long>, InfoI
             "WHERE i.sido = :sido " +
             "  AND i.sigungu = :sigungu " +
             "  AND i.interest IN :interests " +
+            "  AND i.infoCategory.mainCategory = :mainCategory " +
             "ORDER BY (i.scrapCount * 5 + i.reviewCount * 3 + i.viewCount) DESC, i.id DESC")
-    List<InfoItem> findBySidoAndSigunguAndInterestIn(
+    List<InfoItem> findBySidoAndSigunguAndInterestInAndMainCategory(
             @Param("sido") String sido,
             @Param("sigungu") String sigungu,
-            @Param("interests") Collection<InterestCategory> interests
+            @Param("interests") Collection<InterestCategory> interests,
+            @Param("mainCategory") MainCategory mainCategory
     );
 }
