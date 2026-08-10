@@ -32,7 +32,7 @@ public class PublicDataSyncController {
     }
 
     /**
-     * 2. 대분류 카테고리별 선택 비동기 동기화 (예: /api/v1/admin/sync/main-category/WELFARE)
+     * 2. 대분류 카테고리별 선택 비동기 동기화
      */
     @PostMapping("/main-category/{mainCategory}")
     public ApiResponse<String> syncByMainCategory(@PathVariable MainCategory mainCategory) {
@@ -41,7 +41,7 @@ public class PublicDataSyncController {
     }
 
     /**
-     * 3. 특정 카테고리 ID 단건 선택 비동기 동기화 (예: /api/v1/admin/sync/category/4)
+     * 3. 특정 카테고리 ID 단건 선택 비동기 동기화
      */
     @PostMapping("/category/{categoryId}")
     public ApiResponse<String> syncByCategoryId(@PathVariable Long categoryId) {

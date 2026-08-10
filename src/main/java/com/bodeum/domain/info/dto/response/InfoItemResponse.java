@@ -22,7 +22,7 @@ public record InfoItemResponse(
         int viewCount,
         int scrapCount,
         int reviewCount,
-        List<String> tags // ★ 태그 목록 추가
+        List<String> tags
 ) {
     public static InfoItemResponse of(InfoItem entity, List<String> tags) {
         InfoCategory category = entity.getInfoCategory();
