@@ -12,7 +12,6 @@ import com.bodeum.domain.community.entity.Post;
 import com.bodeum.domain.community.entity.PostLike;
 import com.bodeum.domain.community.entity.PostScrap;
 import com.bodeum.domain.community.enums.CommentStatus;
-import com.bodeum.domain.community.enums.DisabilityType;
 import com.bodeum.domain.community.enums.PostAnonymityType;
 import com.bodeum.domain.community.enums.PostBoardType;
 import com.bodeum.domain.community.enums.PostStatus;
@@ -20,8 +19,6 @@ import com.bodeum.domain.community.exception.CommunityErrorCode;
 import com.bodeum.domain.community.exception.CommunityException;
 import com.bodeum.domain.community.repository.CommentLikeRepository;
 import com.bodeum.domain.community.repository.CommentRepository;
-import com.bodeum.domain.community.repository.PostDisabilityTagRepository;
-import com.bodeum.domain.community.repository.PostHashtagRepository;
 import com.bodeum.domain.community.repository.PostImageRepository;
 import com.bodeum.domain.community.repository.PostLikeRepository;
 import com.bodeum.domain.community.repository.PostRepository;
@@ -45,10 +42,6 @@ class PostServiceIntegrationTest {
     private PostQueryFacade postQueryFacade;
     @Autowired
     private PostRepository postRepository;
-    @Autowired
-    private PostDisabilityTagRepository postDisabilityTagRepository;
-    @Autowired
-    private PostHashtagRepository postHashtagRepository;
     @Autowired
     private PostImageRepository postImageRepository;
     @Autowired
@@ -74,8 +67,6 @@ class PostServiceIntegrationTest {
                             PostAnonymityType.FULLY_ANONYMOUS,
                             "익명 게시글",
                             "익명 게시글 내용",
-                            List.of(DisabilityType.AUTISM, DisabilityType.AUTISM, DisabilityType.ADHD),
-                            List.of("육아", "정보공유"),
                             List.of("https://example.com/1.jpg", "https://example.com/2.jpg")
                     )
             );
@@ -90,8 +81,6 @@ class PostServiceIntegrationTest {
             assertThat(viewed.authorId()).isNull();
             assertThat(viewed.isMine()).isFalse();
             assertThat(viewed.viewCount()).isEqualTo(1);
-            assertThat(viewed.disabilityTypes()).containsExactly(DisabilityType.AUTISM, DisabilityType.ADHD);
-            assertThat(viewed.hashtags()).containsExactly("육아", "정보공유");
             assertThat(viewed.imageUrls()).containsExactly(
                     "https://example.com/1.jpg",
                     "https://example.com/2.jpg"
@@ -128,8 +117,6 @@ class PostServiceIntegrationTest {
         assertThat(commentLikeRepository.count()).isOne();
         assertThat(postLikeRepository.count()).isOne();
         assertThat(postScrapRepository.count()).isOne();
-        assertThat(postDisabilityTagRepository.count()).isZero();
-        assertThat(postHashtagRepository.count()).isZero();
         assertThat(postImageRepository.count()).isZero();
     }
 
@@ -151,8 +138,6 @@ class PostServiceIntegrationTest {
                 post.getId(),
                 new UpdatePostRequest(
                         PostBoardType.FREE_COMMUNICATION,
-                        null,
-                        null,
                         null,
                         null,
                         null,
@@ -271,8 +256,6 @@ class PostServiceIntegrationTest {
         new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
             postLikeRepository.deleteAllByPost_Id(postId);
             postScrapRepository.deleteAllByPost_Id(postId);
-            postDisabilityTagRepository.deleteAllByPost_Id(postId);
-            postHashtagRepository.deleteAllByPost_Id(postId);
             postImageRepository.deleteAllByPost_Id(postId);
             postRepository.flush();
             postRepository.deleteById(postId);

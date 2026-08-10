@@ -20,7 +20,6 @@ import com.bodeum.domain.community.dto.response.PostResponse;
 import com.bodeum.domain.community.dto.response.PostScrapResponse;
 import com.bodeum.domain.community.dto.response.PostSearchSuggestionResponse;
 import com.bodeum.domain.community.dto.response.PostSearchSuggestionsResponse;
-import com.bodeum.domain.community.enums.DisabilityType;
 import com.bodeum.domain.community.enums.PostAnonymityType;
 import com.bodeum.domain.community.enums.PostBoardType;
 import com.bodeum.domain.community.exception.CommunityErrorCode;
@@ -149,7 +148,7 @@ class PostControllerTest {
     }
 
     @Test
-    void createPostReturnsCreatedResponse() throws Exception {
+    void createPostIgnoresRemovedLegacyTagFields() throws Exception {
         given(postService.createPost(any(), any(CreatePostRequest.class))).willReturn(postResponse());
 
         mockMvc.perform(post("/api/v1/community/posts")
@@ -175,6 +174,25 @@ class PostControllerTest {
     }
 
     @Test
+    void createPostRejectsUnknownFieldsOtherThanRemovedLegacyTagFields() throws Exception {
+        mockMvc.perform(post("/api/v1/community/posts")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "boardType": "INFORMATION_QUESTION",
+                                  "anonymityType": "PROFILE_TAG_VISIBLE",
+                                  "title": "게시글 제목",
+                                  "titlte": "잘못된 필드명",
+                                  "content": "게시글 내용"
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("COMMON400_1"));
+
+        then(postService).should(never()).createPost(any(), any(CreatePostRequest.class));
+    }
+
+    @Test
     void createPostRejectsBlankTitle() throws Exception {
         mockMvc.perform(post("/api/v1/community/posts")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -193,25 +211,6 @@ class PostControllerTest {
     }
 
     @Test
-    void createPostRejectsNullDisabilityType() throws Exception {
-        mockMvc.perform(post("/api/v1/community/posts")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "boardType": "FREE_COMMUNICATION",
-                                  "anonymityType": "PROFILE_TAG_VISIBLE",
-                                  "title": "게시글 제목",
-                                  "content": "게시글 내용",
-                                  "disabilityTypes": [null]
-                                }
-                                """))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("COMMON400_1"));
-
-        then(postService).should(never()).createPost(any(), any(CreatePostRequest.class));
-    }
-
-    @Test
     void createPostRejectsMoreThanTenImages() throws Exception {
         List<String> imageUrls = IntStream.rangeClosed(1, 11)
                 .mapToObj(index -> "https://example.com/" + index + ".jpg")
@@ -221,8 +220,6 @@ class PostControllerTest {
                 PostAnonymityType.PROFILE_TAG_VISIBLE,
                 "게시글 제목",
                 "게시글 내용",
-                List.of(DisabilityType.AUTISM),
-                List.of("육아"),
                 imageUrls
         );
 
@@ -251,13 +248,46 @@ class PostControllerTest {
     }
 
     @Test
+    void updatePostIgnoresRemovedLegacyTagFields() throws Exception {
+        given(postService.updatePost(any(), any(), any(UpdatePostRequest.class))).willReturn(postResponse());
+
+        mockMvc.perform(patch("/api/v1/community/posts/1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "title": "수정된 게시글 제목",
+                                  "disabilityTypes": ["AUTISM"],
+                                  "hashtags": ["육아"]
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.postId").value(1));
+
+        then(postService).should().updatePost(any(), any(), any(UpdatePostRequest.class));
+    }
+
+    @Test
+    void updatePostRejectsUnknownFieldsOtherThanRemovedLegacyTagFields() throws Exception {
+        mockMvc.perform(patch("/api/v1/community/posts/1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "title": "수정된 게시글 제목",
+                                  "imageUrlz": ["https://example.com/image.jpg"]
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("COMMON400_1"));
+
+        then(postService).should(never()).updatePost(any(), any(), any(UpdatePostRequest.class));
+    }
+
+    @Test
     void updatePostAcceptsTenImages() throws Exception {
         List<String> imageUrls = IntStream.rangeClosed(1, 10)
                 .mapToObj(index -> "https://example.com/" + index + ".jpg")
                 .toList();
         UpdatePostRequest request = new UpdatePostRequest(
-                null,
-                null,
                 null,
                 null,
                 null,
@@ -281,8 +311,6 @@ class PostControllerTest {
                 .mapToObj(index -> "https://example.com/" + index + ".jpg")
                 .toList();
         UpdatePostRequest request = new UpdatePostRequest(
-                null,
-                null,
                 null,
                 null,
                 null,
@@ -324,7 +352,8 @@ class PostControllerTest {
                 .andExpect(jsonPath("$.result.commentCount").value(5))
                 .andExpect(jsonPath("$.result.scrapCount").value(6))
                 .andExpect(jsonPath("$.result.isScrapped").value(false))
-                .andExpect(jsonPath("$.result.disabilityTypes[0]").value("AUTISM"));
+                .andExpect(jsonPath("$.result.disabilityTypes").doesNotExist())
+                .andExpect(jsonPath("$.result.hashtags").doesNotExist());
     }
 
     @Test
@@ -415,8 +444,6 @@ class PostControllerTest {
                 5,
                 6,
                 false,
-                List.of(DisabilityType.AUTISM),
-                List.of("육아"),
                 List.of("https://example.com/image.jpg"),
                 Instant.parse("2026-07-18T00:00:00Z"),
                 Instant.parse("2026-07-18T00:00:00Z")

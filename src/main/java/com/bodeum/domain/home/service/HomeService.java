@@ -95,7 +95,7 @@ public class HomeService {
         }
 
         return posts.stream()
-                .map(post -> RecommendedPostResponse.of(post, List.of()))
+                .map(RecommendedPostResponse::from)
                 .toList();
     }
 
