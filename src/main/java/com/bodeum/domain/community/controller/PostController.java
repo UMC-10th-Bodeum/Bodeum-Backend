@@ -52,7 +52,7 @@ public class PostController {
 
     @Operation(
             summary = "게시글 목록 조회 및 검색",
-            description = "전체 게시글 또는 제목·본문에 검색어가 포함된 게시글을 10개씩 조회한다."
+            description = "전체 게시글 또는 제목·본문에 검색어가 포함된 게시글을 14개씩 조회한다."
     )
     @GetMapping
     public ApiResponse<Page<PostListItemResponse>> getPosts(

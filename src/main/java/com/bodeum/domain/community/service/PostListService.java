@@ -1,6 +1,7 @@
 package com.bodeum.domain.community.service;
 
 import com.bodeum.domain.community.dto.response.PostListItemResponse;
+import com.bodeum.domain.community.dto.response.PostSearchSuggestionResponse;
 import com.bodeum.domain.community.dto.response.PostSearchSuggestionsResponse;
 import com.bodeum.domain.community.entity.Post;
 import com.bodeum.domain.community.enums.PostAnonymityType;
@@ -13,8 +14,11 @@ import com.bodeum.domain.community.repository.PostLikeRepository;
 import com.bodeum.domain.community.repository.PostRepository;
 import com.bodeum.domain.point.service.PointService;
 import com.bodeum.domain.user.entity.User;
+import java.text.BreakIterator;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
@@ -31,7 +35,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class PostListService {
 
-    static final int PAGE_SIZE = 10;
+    static final int PAGE_SIZE = 14;
     private static final String LIKE_ESCAPE_CHARACTER = "!";
 
     private final PostRepository postRepository;
@@ -90,18 +94,99 @@ public class PostListService {
     }
 
     public PostSearchSuggestionsResponse getSearchSuggestions(String keyword, int size) {
-        String normalizedKeyword = normalizeKeyword(keyword);
+        String searchKeyword = trimKeyword(keyword);
+        String normalizedKeyword = escapeLikeKeyword(searchKeyword);
         Page<Post> postPage = postRepository.findActivePosts(
                 PostStatus.ACTIVE,
                 normalizedKeyword,
                 null,
                 PageRequest.of(0, size, PostListSortType.LATEST.toSort())
         );
-        List<String> titles = postPage.getContent().stream()
-                .map(Post::getTitle)
+        List<PostSearchSuggestionResponse> suggestions = postPage.getContent().stream()
+                .map(post -> toSearchSuggestion(post, searchKeyword))
                 .distinct()
                 .toList();
-        return PostSearchSuggestionsResponse.fromTitles(titles);
+        return PostSearchSuggestionsResponse.fromSuggestions(suggestions);
+    }
+
+    private PostSearchSuggestionResponse toSearchSuggestion(Post post, String keyword) {
+        if (containsIgnoreCase(post.getTitle(), keyword)) {
+            return PostSearchSuggestionResponse.fromTitle(post.getTitle());
+        }
+
+        if (containsIgnoreCase(post.getContent(), keyword)) {
+            return PostSearchSuggestionResponse.fromContent(
+                    extractContentSnippet(post.getContent(), keyword)
+            );
+        }
+
+        return PostSearchSuggestionResponse.fromTitle(post.getTitle());
+    }
+
+    private String extractContentSnippet(String content, String keyword) {
+        int matchIndex = indexOfIgnoreCase(content, keyword);
+        if (matchIndex < 0) {
+            return content;
+        }
+
+        List<SentenceRange> sentences = splitSentences(content);
+        int matchedSentenceIndex = findSentenceIndex(sentences, matchIndex);
+        if (matchedSentenceIndex < 0) {
+            return content;
+        }
+
+        int startSentenceIndex = matchedSentenceIndex;
+        int endSentenceIndex = Math.min(matchedSentenceIndex + 1, sentences.size() - 1);
+        if (startSentenceIndex == endSentenceIndex && startSentenceIndex > 0) {
+            startSentenceIndex--;
+        }
+
+        SentenceRange startSentence = sentences.get(startSentenceIndex);
+        SentenceRange endSentence = sentences.get(endSentenceIndex);
+        String snippet = content.substring(startSentence.start(), endSentence.end()).trim();
+
+        if (startSentenceIndex > 0) {
+            snippet = "… " + snippet;
+        }
+        if (endSentenceIndex < sentences.size() - 1) {
+            snippet = snippet + " …";
+        }
+        return snippet;
+    }
+
+    private List<SentenceRange> splitSentences(String content) {
+        BreakIterator iterator = BreakIterator.getSentenceInstance(Locale.KOREAN);
+        iterator.setText(content);
+
+        List<SentenceRange> sentences = new ArrayList<>();
+        int start = iterator.first();
+        for (int end = iterator.next(); end != BreakIterator.DONE; start = end, end = iterator.next()) {
+            if (!content.substring(start, end).isBlank()) {
+                sentences.add(new SentenceRange(start, end));
+            }
+        }
+        return List.copyOf(sentences);
+    }
+
+    private int findSentenceIndex(List<SentenceRange> sentences, int matchIndex) {
+        for (int index = 0; index < sentences.size(); index++) {
+            SentenceRange sentence = sentences.get(index);
+            if (sentence.start() <= matchIndex && matchIndex < sentence.end()) {
+                return index;
+            }
+        }
+        return -1;
+    }
+
+    private boolean containsIgnoreCase(String text, String keyword) {
+        return indexOfIgnoreCase(text, keyword) >= 0;
+    }
+
+    private int indexOfIgnoreCase(String text, String keyword) {
+        if (text == null || keyword == null || keyword.isBlank()) {
+            return -1;
+        }
+        return text.toLowerCase(Locale.ROOT).indexOf(keyword.toLowerCase(Locale.ROOT));
     }
 
     private Map<Long, User> getAuthorsById(List<Post> posts) {
@@ -136,14 +221,29 @@ public class PostListService {
     }
 
     private String normalizeKeyword(String keyword) {
+        return escapeLikeKeyword(trimKeyword(keyword));
+    }
+
+    private String trimKeyword(String keyword) {
         if (keyword == null || keyword.isBlank()) {
             return null;
         }
 
-        return keyword.trim()
+        return keyword.trim();
+    }
+
+    private String escapeLikeKeyword(String keyword) {
+        if (keyword == null) {
+            return null;
+        }
+
+        return keyword
                 .replace(LIKE_ESCAPE_CHARACTER, LIKE_ESCAPE_CHARACTER.repeat(2))
                 .replace("%", LIKE_ESCAPE_CHARACTER + "%")
                 .replace("_", LIKE_ESCAPE_CHARACTER + "_");
+    }
+
+    private record SentenceRange(int start, int end) {
     }
 
 }

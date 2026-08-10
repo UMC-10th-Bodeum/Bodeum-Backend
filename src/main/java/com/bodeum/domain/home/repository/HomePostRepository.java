@@ -15,31 +15,16 @@ public interface HomePostRepository extends JpaRepository<Post, Long> {
             SELECT p FROM Post p
             WHERE p.status = :status
               AND p.deletedAt IS NULL
-            ORDER BY p.likeCount DESC, p.createdAt DESC
+            ORDER BY p.viewCount DESC, p.createdAt DESC
             """)
     List<Post> findTopByPopularity(@Param("status") PostStatus status, Pageable pageable);
-
-    @Query("""
-            SELECT p FROM Post p
-            JOIN User u ON u.id = p.userId
-            JOIN u.guardianProfile gp
-            WHERE p.status = :status
-              AND p.deletedAt IS NULL
-              AND gp.region.id = :regionId
-            ORDER BY p.likeCount DESC, p.createdAt DESC
-            """)
-    List<Post> findTopByPopularityAndRegion(
-            @Param("status") PostStatus status,
-            @Param("regionId") Long regionId,
-            Pageable pageable
-    );
 
     @Query("""
             SELECT p FROM Post p
             WHERE p.status = :status
               AND p.deletedAt IS NULL
               AND p.boardType IN :boardTypes
-            ORDER BY p.likeCount DESC, p.createdAt DESC
+            ORDER BY p.viewCount DESC, p.createdAt DESC
             """)
     List<Post> findTopByBoardTypes(
             @Param("status") PostStatus status,

@@ -64,7 +64,7 @@ class PostListServiceTest {
                 eq("언어치료"),
                 eq(PostBoardType.FREE_COMMUNICATION),
                 any(Pageable.class)
-        )).willReturn(new PageImpl<>(List.of(post), PageRequest.of(0, 10), 1));
+        )).willReturn(new PageImpl<>(List.of(post), PageRequest.of(0, 14), 1));
         given(postAuthorRepository.findAllByIdIn(List.of(10L))).willReturn(List.of(author));
         given(pointService.getTotalPoints(Set.of(10L))).willReturn(Map.of(10L, 200));
         given(postImageRepository.findAllByPost_IdInOrderByPost_IdAscSortOrderAsc(List.of(1L)))
@@ -79,7 +79,7 @@ class PostListServiceTest {
                 PostBoardType.FREE_COMMUNICATION
         );
 
-        assertThat(response.getSize()).isEqualTo(10);
+        assertThat(response.getSize()).isEqualTo(14);
         assertThat(response.getTotalElements()).isOne();
         assertThat(response.getContent()).singleElement().satisfies(item -> {
             assertThat(item.postId()).isEqualTo(1L);
@@ -99,6 +99,7 @@ class PostListServiceTest {
                 pageableCaptor.capture()
         );
         Sort.Order scrapOrder = pageableCaptor.getValue().getSort().getOrderFor("scrapCount");
+        assertThat(pageableCaptor.getValue().getPageSize()).isEqualTo(14);
         assertThat(scrapOrder).isNotNull();
         assertThat(scrapOrder.getDirection()).isEqualTo(Sort.Direction.DESC);
     }
@@ -110,7 +111,7 @@ class PostListServiceTest {
                 eq(null),
                 eq(null),
                 any(Pageable.class)
-        )).willReturn(new PageImpl<>(List.of(), PageRequest.of(0, 10), 0));
+        )).willReturn(new PageImpl<>(List.of(), PageRequest.of(0, 14), 0));
 
         var response = postListService.getPosts(10L, 0, "view", " ", null);
 
@@ -134,7 +135,7 @@ class PostListServiceTest {
                 eq(null),
                 eq(null),
                 any(Pageable.class)
-        )).willReturn(new PageImpl<>(List.of(), PageRequest.of(0, 10), 0));
+        )).willReturn(new PageImpl<>(List.of(), PageRequest.of(0, 14), 0));
 
         postListService.getPosts(10L, 0, null, null, null);
 
@@ -157,7 +158,7 @@ class PostListServiceTest {
                 eq(null),
                 eq(null),
                 any(Pageable.class)
-        )).willReturn(new PageImpl<>(List.of(), PageRequest.of(0, 10), 0));
+        )).willReturn(new PageImpl<>(List.of(), PageRequest.of(0, 14), 0));
 
         postListService.getPosts(null, 0, null, null, null);
 
@@ -180,7 +181,7 @@ class PostListServiceTest {
                 eq("100!%!_!!"),
                 eq(null),
                 any(Pageable.class)
-        )).willReturn(new PageImpl<>(List.of(), PageRequest.of(0, 10), 0));
+        )).willReturn(new PageImpl<>(List.of(), PageRequest.of(0, 14), 0));
 
         postListService.getPosts(10L, 0, "view", "100%_!", null);
 
@@ -193,20 +194,20 @@ class PostListServiceTest {
     }
 
     @Test
-    void getSearchSuggestionsReturnsTitlesForTitleAndContentMatches() {
+    void getSearchSuggestionsReturnsTitleOrNearbyContentSentences() {
         Post titleMatch = post(
                 1L,
                 10L,
                 PostAnonymityType.PROFILE_TAG_VISIBLE,
                 "자폐스펙트럼 치료 기록",
-                "치료 정보를 공유합니다."
+                "본문에도 자폐스펙트럼 치료 정보를 공유합니다."
         );
         Post contentMatch = post(
                 2L,
                 11L,
                 PostAnonymityType.PROFILE_TAG_VISIBLE,
                 "언어치료 후기",
-                "자폐스펙트럼 아이의 경험을 공유합니다."
+                "치료를 시작했습니다. 자폐스펙트럼 아이의 경험을 공유합니다. 비슷한 고민에 도움이 되길 바랍니다. 마지막 문장입니다."
         );
         given(postRepository.findActivePosts(
                 eq(PostStatus.ACTIVE),
@@ -217,9 +218,18 @@ class PostListServiceTest {
 
         var response = postListService.getSearchSuggestions("  자폐스펙트럼  ", 10);
 
-        assertThat(response.suggestions())
-                .extracting(suggestion -> suggestion.text())
-                .containsExactly("자폐스펙트럼 치료 기록", "언어치료 후기");
+        assertThat(response.suggestions()).satisfiesExactly(
+                suggestion -> {
+                    assertThat(suggestion.text()).isEqualTo("자폐스펙트럼 치료 기록");
+                    assertThat(suggestion.type().name()).isEqualTo("POST_TITLE");
+                },
+                suggestion -> {
+                    assertThat(suggestion.text()).isEqualTo(
+                            "… 자폐스펙트럼 아이의 경험을 공유합니다. 비슷한 고민에 도움이 되길 바랍니다. …"
+                    );
+                    assertThat(suggestion.type().name()).isEqualTo("POST_CONTENT");
+                }
+        );
     }
 
     @Test
@@ -230,7 +240,7 @@ class PostListServiceTest {
                 eq(null),
                 eq(null),
                 any(Pageable.class)
-        )).willReturn(new PageImpl<>(List.of(post), PageRequest.of(0, 10), 1));
+        )).willReturn(new PageImpl<>(List.of(post), PageRequest.of(0, 14), 1));
         given(postImageRepository.findAllByPost_IdInOrderByPost_IdAscSortOrderAsc(List.of(1L)))
                 .willReturn(List.of());
         given(postLikeRepository.findLikedPostIds(List.of(1L), 10L)).willReturn(List.of());
@@ -268,7 +278,7 @@ class PostListServiceTest {
                 eq(null),
                 eq(null),
                 any(Pageable.class)
-        )).willReturn(new PageImpl<>(List.of(post), PageRequest.of(0, 10), 1));
+        )).willReturn(new PageImpl<>(List.of(post), PageRequest.of(0, 14), 1));
         given(postAuthorRepository.findAllByIdIn(List.of(10L))).willReturn(List.of(author));
         given(pointService.getTotalPoints(Set.of(10L))).willReturn(Map.of());
         given(postImageRepository.findAllByPost_IdInOrderByPost_IdAscSortOrderAsc(List.of(1L)))
