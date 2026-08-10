@@ -4,6 +4,7 @@ import com.bodeum.domain.community.entity.Post;
 import com.bodeum.domain.community.entity.PostImage;
 import com.bodeum.domain.community.enums.PostAnonymityType;
 import com.bodeum.domain.community.enums.PostBoardType;
+import com.fasterxml.jackson.annotation.JsonAnySetter;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import io.swagger.v3.oas.annotations.media.ArraySchema;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -12,7 +13,7 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import java.util.List;
 
-@JsonIgnoreProperties(ignoreUnknown = true)
+@JsonIgnoreProperties({"disabilityTypes", "hashtags"})
 public record CreatePostRequest(
         @Schema(example = "FREE_COMMUNICATION")
         @NotNull(message = "게시판 유형은 필수입니다.")
@@ -40,4 +41,9 @@ public record CreatePostRequest(
                 String
                 > imageUrls
 ) {
+
+    @JsonAnySetter
+    public void rejectUnknownField(String fieldName, Object value) {
+        throw new IllegalArgumentException("지원하지 않는 요청 필드입니다: " + fieldName);
+    }
 }

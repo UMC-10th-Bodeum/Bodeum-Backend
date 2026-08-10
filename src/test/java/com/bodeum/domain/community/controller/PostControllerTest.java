@@ -167,6 +167,25 @@ class PostControllerTest {
     }
 
     @Test
+    void createPostRejectsUnknownFieldsOtherThanRemovedLegacyTagFields() throws Exception {
+        mockMvc.perform(post("/api/v1/community/posts")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "boardType": "INFORMATION_QUESTION",
+                                  "anonymityType": "PROFILE_TAG_VISIBLE",
+                                  "title": "게시글 제목",
+                                  "titlte": "잘못된 필드명",
+                                  "content": "게시글 내용"
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("COMMON400_1"));
+
+        then(postService).should(never()).createPost(any(), any(CreatePostRequest.class));
+    }
+
+    @Test
     void createPostRejectsBlankTitle() throws Exception {
         mockMvc.perform(post("/api/v1/community/posts")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -219,6 +238,41 @@ class PostControllerTest {
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.result.postId").value(1));
+    }
+
+    @Test
+    void updatePostIgnoresRemovedLegacyTagFields() throws Exception {
+        given(postService.updatePost(any(), any(), any(UpdatePostRequest.class))).willReturn(postResponse());
+
+        mockMvc.perform(patch("/api/v1/community/posts/1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "title": "수정된 게시글 제목",
+                                  "disabilityTypes": ["AUTISM"],
+                                  "hashtags": ["육아"]
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.postId").value(1));
+
+        then(postService).should().updatePost(any(), any(), any(UpdatePostRequest.class));
+    }
+
+    @Test
+    void updatePostRejectsUnknownFieldsOtherThanRemovedLegacyTagFields() throws Exception {
+        mockMvc.perform(patch("/api/v1/community/posts/1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "title": "수정된 게시글 제목",
+                                  "imageUrlz": ["https://example.com/image.jpg"]
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("COMMON400_1"));
+
+        then(postService).should(never()).updatePost(any(), any(), any(UpdatePostRequest.class));
     }
 
     @Test

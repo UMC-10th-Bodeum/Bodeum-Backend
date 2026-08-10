@@ -4,6 +4,7 @@ import com.bodeum.domain.community.entity.Post;
 import com.bodeum.domain.community.entity.PostImage;
 import com.bodeum.domain.community.enums.PostAnonymityType;
 import com.bodeum.domain.community.enums.PostBoardType;
+import com.fasterxml.jackson.annotation.JsonAnySetter;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import io.swagger.v3.oas.annotations.media.ArraySchema;
@@ -14,7 +15,7 @@ import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import java.util.List;
 
-@JsonIgnoreProperties(ignoreUnknown = true)
+@JsonIgnoreProperties({"disabilityTypes", "hashtags"})
 public record UpdatePostRequest(
         @Schema(example = "INFORMATION_QUESTION")
         PostBoardType boardType,
@@ -40,6 +41,11 @@ public record UpdatePostRequest(
                 String
                 > imageUrls
 ) {
+
+    @JsonAnySetter
+    public void rejectUnknownField(String fieldName, Object value) {
+        throw new IllegalArgumentException("지원하지 않는 요청 필드입니다: " + fieldName);
+    }
 
     @JsonIgnore
     @Schema(hidden = true)
