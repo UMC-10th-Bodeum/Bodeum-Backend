@@ -165,10 +165,21 @@ public class AiMessageService {
             log.info("[AI] 추천 질문 출처 없음, 일반 질문 흐름으로 전환");
         }
 
+        String searchQuestion = contextualizeLocalRegion(
+                content,
+                profile,
+                questionContext.searchScope()
+        );
+        List<String> searchQueries = contextualizeLocalRegions(
+                questionContext.retrievalQueries(),
+                profile,
+                questionContext.searchScope()
+        );
+
         log.debug("[AI] 문서 검색 시작");
         List<AiReferenceDocument> retrievedDocuments = retrieveDocuments(
-                content,
-                questionContext.retrievalQueries(),
+                searchQuestion,
+                searchQueries,
                 profile,
                 questionContext.searchScope()
         );
@@ -184,8 +195,8 @@ public class AiMessageService {
             return createExternalOrNoResultResponse(
                     chatRoom,
                     userMessage,
-                    content,
-                    questionContext.retrievalQueries(),
+                    searchQuestion,
+                    searchQueries,
                     profile,
                     questionContext.searchScope()
             );
@@ -210,8 +221,8 @@ public class AiMessageService {
             return createExternalOrNoResultResponse(
                     chatRoom,
                     userMessage,
-                    content,
-                    questionContext.retrievalQueries(),
+                    searchQuestion,
+                    searchQueries,
                     profile,
                     questionContext.searchScope()
             );
@@ -250,11 +261,9 @@ public class AiMessageService {
         AiQuestionAnalysis analysis = questionIntentClassifier.analyze(content);
         AiQuestionIntent intent = analysis.intent();
         AiSearchScope searchScope = resolveSearchScope(intent, analysis.searchScope());
-        AiUserProfile searchProfile = applyExplicitSearchRegion(
-                content,
-                profile,
-                searchScope
-        );
+        AiUserProfile searchProfile = searchScope == AiSearchScope.GENERAL
+                ? profile.withRegion("", "", "")
+                : applyExplicitSearchRegion(content, profile, searchScope);
         return new QuestionContext(
                 searchProfile,
                 intent.starterQuestionType(),
@@ -527,6 +536,37 @@ public class AiMessageService {
                 merged.size()
         );
         return referenceDocumentResolver.resolve(merged);
+    }
+
+    private List<String> contextualizeLocalRegions(
+            List<String> queries,
+            AiUserProfile profile,
+            AiSearchScope searchScope
+    ) {
+        if (queries == null) {
+            return List.of();
+        }
+        return queries.stream()
+                .map(query -> contextualizeLocalRegion(query, profile, searchScope))
+                .toList();
+    }
+
+    private String contextualizeLocalRegion(
+            String query,
+            AiUserProfile profile,
+            AiSearchScope searchScope
+    ) {
+        if (searchScope != AiSearchScope.LOCAL_RESOURCE
+                || profile == null
+                || profile.region() == null
+                || profile.region().isBlank()) {
+            return query;
+        }
+        return query
+                .replace("우리 지역", profile.region())
+                .replace("우리 동네", profile.region())
+                .replace("근처", profile.region())
+                .replace("주변", profile.region());
     }
 
     private CreateAiMessageResponse saveStarterAnswer(
