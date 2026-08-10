@@ -6,6 +6,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.bodeum.domain.ai.infrastructure.generation.AiPromptFormatter;
+import com.bodeum.domain.ai.enums.AiSearchScope;
 import com.bodeum.domain.ai.model.rag.AiUserProfile;
 import com.bodeum.domain.ai.repository.AiExternalSourceRepository;
 import java.io.IOException;
@@ -64,6 +65,7 @@ class OpenAiExternalAnswerProviderTest {
                 "사용자 질문",
                 List.of("사용자 질문", "공식 제도명 검색 질의"),
                 mock(AiUserProfile.class),
+                AiSearchScope.GENERAL,
                 List.of("example.com")
         );
 
@@ -77,5 +79,18 @@ class OpenAiExternalAnswerProviderTest {
                         "사용자 질문"
                 )
                 .doesNotContain(systemPrompt);
+
+        AiUserProfile localProfile = mock(AiUserProfile.class);
+        when(localProfile.region()).thenReturn("부산광역시");
+        Map<String, Object> localBody = provider.requestBody(
+                "부산시 재활센터를 추천해줘",
+                List.of("재활센터 추천"),
+                localProfile,
+                AiSearchScope.LOCAL_INSTITUTION,
+                List.of("example.com")
+        );
+
+        assertThat((String) localBody.get("input"))
+                .contains("부산광역시 재활센터 추천");
     }
 }

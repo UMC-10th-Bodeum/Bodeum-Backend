@@ -36,8 +36,11 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.Optional;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -50,6 +53,17 @@ import org.springframework.stereotype.Service;
 public class AiMessageService {
 
     private static final int MAX_RETRIEVED_DOCUMENTS = 10;
+    private static final Pattern REGION_LEVEL_2_PATTERN =
+            Pattern.compile("([가-힣]+(?:시|군|구))");
+    private static final Map<String, String> REGION_LEVEL_1_ALIASES = Map.of(
+            "서울시", "서울특별시",
+            "부산시", "부산광역시",
+            "대구시", "대구광역시",
+            "인천시", "인천광역시",
+            "대전시", "대전광역시",
+            "울산시", "울산광역시",
+            "세종시", "세종특별자치시"
+    );
     private static final String NO_RESULT_MESSAGE = "관련 정보를 찾을 수 없습니다.";
     private static final Set<String> EXPLICIT_REGION_REHAB_QUESTIONS = Set.of(
             "재활센터추천해줘",
@@ -172,7 +186,8 @@ public class AiMessageService {
                     userMessage,
                     content,
                     questionContext.retrievalQueries(),
-                    profile
+                    profile,
+                    questionContext.searchScope()
             );
         }
 
@@ -197,7 +212,8 @@ public class AiMessageService {
                     userMessage,
                     content,
                     questionContext.retrievalQueries(),
-                    profile
+                    profile,
+                    questionContext.searchScope()
             );
         }
 
@@ -233,8 +249,13 @@ public class AiMessageService {
 
         AiQuestionAnalysis analysis = questionIntentClassifier.analyze(content);
         AiQuestionIntent intent = analysis.intent();
-        return new QuestionContext(
+        AiUserProfile searchProfile = applyExplicitSearchRegion(
+                content,
                 profile,
+                analysis.searchScope()
+        );
+        return new QuestionContext(
+                searchProfile,
                 intent.starterQuestionType(),
                 intent.safetyGuidance(),
                 analysis.searchScope(),
@@ -254,6 +275,75 @@ public class AiMessageService {
                 Optional.empty(),
                 searchScope(questionType),
                 List.of()
+        );
+    }
+
+    private AiUserProfile applyExplicitSearchRegion(
+            String question,
+            AiUserProfile profile,
+            AiSearchScope searchScope
+    ) {
+        if (searchScope != AiSearchScope.LOCAL_INSTITUTION) {
+            return profile;
+        }
+
+        Optional<Region> fullNameRegion = regionRepository.findMentionedInQuestion(
+                        normalizeSpacing(question),
+                        PageRequest.of(0, 1)
+                )
+                .stream()
+                .findFirst();
+        if (fullNameRegion.isPresent()) {
+            return withRegion(profile, fullNameRegion.get());
+        }
+
+        String normalizedQuestion = normalizeQuestion(question);
+        for (Map.Entry<String, String> alias : REGION_LEVEL_1_ALIASES.entrySet()) {
+            if (normalizedQuestion.contains(normalizeQuestion(alias.getKey()))) {
+                Optional<Region> region = regionRepository
+                        .findFirstByRegionLevel1OrderByIdAsc(alias.getValue());
+                if (region.isPresent()) {
+                    return profile.withRegion(
+                            alias.getValue(),
+                            alias.getValue(),
+                            ""
+                    );
+                }
+            }
+        }
+
+        Matcher matcher = REGION_LEVEL_2_PATTERN.matcher(normalizeSpacing(question));
+        while (matcher.find()) {
+            String regionLevel2 = matcher.group(1);
+            List<Region> candidates = regionRepository
+                    .findAllByRegionLevel2OrderByIdAsc(regionLevel2);
+            Optional<Region> profileRegionCandidate = candidates.stream()
+                    .filter(region -> region.getRegionLevel1()
+                            .equals(profile.regionLevel1()))
+                    .findFirst();
+            if (profileRegionCandidate.isPresent()) {
+                return withRegion(profile, profileRegionCandidate.get());
+            }
+            if (candidates.size() == 1) {
+                return withRegion(profile, candidates.getFirst());
+            }
+            if (candidates.size() > 1) {
+                log.info(
+                        "[AI] 질문의 지역명이 모호하여 프로필 지역을 유지합니다: "
+                                + "regionLevel2={}, candidateCount={}",
+                        regionLevel2,
+                        candidates.size()
+                );
+            }
+        }
+        return profile;
+    }
+
+    private AiUserProfile withRegion(AiUserProfile profile, Region region) {
+        return profile.withRegion(
+                region.getFullName(),
+                region.getRegionLevel1(),
+                region.getRegionLevel2()
         );
     }
 
@@ -442,12 +532,14 @@ public class AiMessageService {
             AiMessage userMessage,
             String question,
             List<String> retrievalQueries,
-            AiUserProfile profile
+            AiUserProfile profile,
+            AiSearchScope searchScope
     ) {
         ExternalAiAnswer externalAnswer = externalAnswerProvider.search(
                 question,
                 retrievalQueries,
-                profile
+                profile,
+                searchScope
         );
         if (!externalAnswer.hasEvidence()) {
             return createNoEvidenceResponse(chatRoom, userMessage);

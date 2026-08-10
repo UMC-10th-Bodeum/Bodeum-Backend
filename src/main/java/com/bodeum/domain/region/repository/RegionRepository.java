@@ -18,6 +18,10 @@ public interface RegionRepository extends JpaRepository<Region, Long> {
 
     Optional<Region> findByFullName(String fullName);
 
+    Optional<Region> findFirstByRegionLevel1OrderByIdAsc(String regionLevel1);
+
+    List<Region> findAllByRegionLevel2OrderByIdAsc(String regionLevel2);
+
     @Query("""
             select region
               from Region region
