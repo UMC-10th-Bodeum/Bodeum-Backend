@@ -80,7 +80,7 @@ public record UpdateUserProfileRequest(
 
     @JsonIgnore
     @Schema(hidden = true)
-    @AssertTrue(message = "생년월은 1990-01 이후, 현재 연월 이전의 YYYY-MM 형식으로 입력해주세요.")
+    @AssertTrue(message = "생년월은 1990-01부터 현재 연월까지의 YYYY-MM 형식으로 입력해주세요.")
     public boolean isBirthValid() {
         if (childBirth == null) {
             return true;

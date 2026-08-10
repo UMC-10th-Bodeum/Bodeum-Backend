@@ -15,7 +15,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 class ChildBirthValidationTest {
 
     private static final String BIRTH_RANGE_MESSAGE =
-            "생년월은 1990-01 이후, 현재 연월 이전의 YYYY-MM 형식으로 입력해주세요.";
+            "생년월은 1990-01부터 현재 연월까지의 YYYY-MM 형식으로 입력해주세요.";
 
     private final Validator validator = Validation.buildDefaultValidatorFactory().getValidator();
 
@@ -31,6 +31,14 @@ class ChildBirthValidationTest {
     void createChildProfileRejectsBirthBefore1990(String birth) {
         assertThat(messagesOf(createChildProfile(birth)))
                 .contains(BIRTH_RANGE_MESSAGE);
+    }
+
+    @Test
+    void createChildProfileAcceptsCurrentYearMonth() {
+        String currentBirth = YearMonth.now().toString();
+
+        assertThat(messagesOf(createChildProfile(currentBirth)))
+                .doesNotContain(BIRTH_RANGE_MESSAGE);
     }
 
     @Test
