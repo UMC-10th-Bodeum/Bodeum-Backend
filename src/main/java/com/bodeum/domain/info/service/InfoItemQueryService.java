@@ -58,12 +58,18 @@ public class InfoItemQueryService {
     ) {
         // ★ [추가된 로직] 프론트에서 isRecommended=true 파라미터를 보낸 경우
         if (Boolean.TRUE.equals(condition.isRecommended())) {
-            // 하단에 미리 만들어두었던 getRecommendedInfoItems(userId) 실행
             List<InfoItemResponse> recommendedList = getRecommendedInfoItems(userId);
 
-            // List를 응답 타입인 Page 객체로 변환
+            // CodeRabbit 지적 사항 반영: Pageable 기준 메모리 내 subList 슬라이싱 처리
+            int start = (int) pageable.getOffset();
+            int end = Math.min((start + pageable.getPageSize()), recommendedList.size());
+
+            List<InfoItemResponse> pagedList = (start <= end)
+                    ? recommendedList.subList(start, end)
+                    : List.of();
+
             Page<InfoItemResponse> recommendedPage = new PageImpl<>(
-                    recommendedList,
+                    pagedList,
                     pageable,
                     recommendedList.size()
             );
