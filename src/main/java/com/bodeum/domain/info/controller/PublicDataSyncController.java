@@ -1,10 +1,12 @@
 package com.bodeum.domain.info.controller;
 
 import com.bodeum.domain.info.entity.enums.MainCategory;
+import com.bodeum.domain.info.exception.InfoErrorCode;
 import com.bodeum.domain.info.service.publicDataService.PublicDataSyncFacadeService;
 import com.bodeum.global.apiPayload.ApiResponse;
 import com.bodeum.global.apiPayload.code.GeneralSuccessCode;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Profile;
 import org.springframework.web.bind.annotation.*;
 
@@ -21,11 +23,26 @@ public class PublicDataSyncController {
 
     private final PublicDataSyncFacadeService publicDataSyncFacadeService;
 
+    @Value("${admin.secret-token}")
+    private String adminSecretToken;
+
+    // 관리자 토큰 유효성 검증
+    private boolean isInvalidAdminToken(String token) {
+        return token == null || !token.equals(adminSecretToken);
+    }
+
     /**
      * 1. 전체 공공데이터 API 수동 통합 비동기 동기화
      */
     @PostMapping("/all")
-    public ApiResponse<String> syncAllPublicData() {
+    public ApiResponse<String> syncAllPublicData(
+            @RequestHeader(value = "X-ADMIN-TOKEN", required = false) String token
+    ) {
+
+        if (isInvalidAdminToken(token)) {
+            return ApiResponse.onFailure(InfoErrorCode.UNAUTHORIZED, null);
+        }
+
         // 백그라운드 전용 스레드(Sync-Thread)에서 13개 API를 순차 동기화
         publicDataSyncFacadeService.syncAllAsync();
         return ApiResponse.of(GeneralSuccessCode.OK, "전체 공공데이터 비동기 동기화 백그라운드 작업이 시작되었습니다.");

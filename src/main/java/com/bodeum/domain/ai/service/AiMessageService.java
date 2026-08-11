@@ -176,7 +176,9 @@ public class AiMessageService {
                         questionContext.retrievalQueries(),
                         profile,
                         questionContext.searchScope()
-                )
+                ),
+                profile,
+                questionContext.searchScope()
         );
 
         log.debug("[AI] 문서 검색 시작");
@@ -522,6 +524,52 @@ public class AiMessageService {
         }
 
         LinkedHashMap<String, AiReferenceDocument> documentsByKey = new LinkedHashMap<>();
+        if (normalizeQuestion(originalQuestion).contains("장애아동")) {
+            // 원문·전국·지역 결과 균형 병합
+            mergeRoundRobin(documentsByQuery, documentsByKey);
+        } else {
+            // 기존 원문 우선 병합
+            mergeOriginalFirst(documentsByQuery, documentsByKey);
+        }
+
+        List<AiReferenceDocument> merged = documentsByKey.values().stream()
+                .limit(MAX_RETRIEVED_DOCUMENTS)
+                .toList();
+        log.info(
+                "[AI] 다중 검색 완료: queryCount={}, uniqueDocumentCount={}",
+                distinctQueries.size(),
+                merged.size()
+        );
+        return referenceDocumentResolver.resolve(merged);
+    }
+
+    private void mergeRoundRobin(
+            List<List<AiReferenceDocument>> documentsByQuery,
+            LinkedHashMap<String, AiReferenceDocument> documentsByKey
+    ) {
+        int maxRank = documentsByQuery.stream()
+                .mapToInt(List::size)
+                .max()
+                .orElse(0);
+        for (int rank = 0;
+             rank < maxRank && documentsByKey.size() < MAX_RETRIEVED_DOCUMENTS;
+             rank++) {
+            for (List<AiReferenceDocument> queryDocuments : documentsByQuery) {
+                if (rank < queryDocuments.size()) {
+                    AiReferenceDocument document = queryDocuments.get(rank);
+                    documentsByKey.putIfAbsent(document.documentKey(), document);
+                }
+                if (documentsByKey.size() >= MAX_RETRIEVED_DOCUMENTS) {
+                    break;
+                }
+            }
+        }
+    }
+
+    private void mergeOriginalFirst(
+            List<List<AiReferenceDocument>> documentsByQuery,
+            LinkedHashMap<String, AiReferenceDocument> documentsByKey
+    ) {
         if (!documentsByQuery.isEmpty()) {
             int reservedExpandedSlots = Math.min(
                     documentsByQuery.size() - 1,
@@ -579,16 +627,6 @@ public class AiMessageService {
                 }
             }
         }
-
-        List<AiReferenceDocument> merged = documentsByKey.values().stream()
-                .limit(MAX_RETRIEVED_DOCUMENTS)
-                .toList();
-        log.info(
-                "[AI] 다중 검색 완료: queryCount={}, uniqueDocumentCount={}",
-                distinctQueries.size(),
-                merged.size()
-        );
-        return referenceDocumentResolver.resolve(merged);
     }
 
     private List<String> contextualizeLocalRegions(
@@ -606,13 +644,22 @@ public class AiMessageService {
 
     private List<String> ensureBroaderDisabilityTargetQuery(
             String question,
-            List<String> queries
+            List<String> queries,
+            AiUserProfile profile,
+            AiSearchScope searchScope
     ) {
         List<String> expanded = new ArrayList<>();
         if (question != null) {
             String broaderTargetQuery = question.replaceAll("장애\\s*아동", "장애인");
             if (!broaderTargetQuery.equals(question)) {
                 expanded.add(broaderTargetQuery);
+                if (searchScope == AiSearchScope.NATIONAL_POLICY
+                        && question.replaceAll("\\s+", "").contains("활동지원")
+                        && profile != null
+                        && profile.region() != null
+                        && !profile.region().isBlank()) {
+                    expanded.add(profile.region() + " " + broaderTargetQuery);
+                }
             }
         }
         if (queries != null) {
