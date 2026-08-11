@@ -84,6 +84,9 @@ public record PostResponse(
                 : authorWithdrawn ? WithdrawalConstants.WITHDRAWN_DISPLAY_NAME : activeAuthorNickname;
         Integer visibleAuthorLevel = anonymous || authorWithdrawn ? null : authorLevel;
         Integer visibleChildAge = anonymous || authorWithdrawn ? null : childAge;
+        List<DisabilityType> visibleDisabilityTypes = anonymous || authorWithdrawn
+                ? List.of()
+                : List.copyOf(disabilityTypes);
 
         return new PostResponse(
                 post.getId(),
@@ -103,7 +106,7 @@ public record PostResponse(
                 post.getCommentCount(),
                 post.getScrapCount(),
                 scrapped,
-                List.copyOf(disabilityTypes),
+                visibleDisabilityTypes,
                 List.copyOf(imageUrls),
                 post.getCreatedAt(),
                 post.getUpdatedAt()

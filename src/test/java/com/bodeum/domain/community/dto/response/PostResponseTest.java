@@ -35,12 +35,13 @@ class PostResponseTest {
     void anonymizesWithdrawnAuthor() {
         PostResponse response = PostResponse.of(
                 post(PostAnonymityType.PROFILE_TAG_VISIBLE), 99L, false, false, true,
-                "보듬맘", 3, 7, List.of(), List.of());
+                "보듬맘", 3, 7, List.of(DisabilityType.AUTISM), List.of());
 
         assertThat(response.authorId()).isNull();
         assertThat(response.authorNickname()).isEqualTo("탈퇴한 사용자");
         assertThat(response.authorLevel()).isNull();
         assertThat(response.childAge()).isNull();
+        assertThat(response.disabilityTypes()).isEmpty();
     }
 
     @Test
@@ -48,11 +49,12 @@ class PostResponseTest {
         // 완전 익명 게시글은 탈퇴 저자여도 '탈퇴한 사용자'를 노출하지 않는다(탈퇴 사실 비노출).
         PostResponse response = PostResponse.of(
                 post(PostAnonymityType.FULLY_ANONYMOUS), 99L, false, false, true,
-                "보듬맘", 3, 7, List.of(), List.of());
+                "보듬맘", 3, 7, List.of(DisabilityType.AUTISM), List.of());
 
         assertThat(response.authorId()).isNull();
         assertThat(response.authorNickname()).isNull();
         assertThat(response.authorLevel()).isNull();
         assertThat(response.childAge()).isNull();
+        assertThat(response.disabilityTypes()).isEmpty();
     }
 }
