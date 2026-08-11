@@ -24,6 +24,7 @@ import com.bodeum.domain.community.repository.PostScrapRepository;
 import com.bodeum.domain.point.enums.PointEventType;
 import com.bodeum.domain.point.service.PointService;
 import com.bodeum.domain.user.entity.User;
+import com.bodeum.domain.user.enums.DisabilityType;
 import com.bodeum.domain.user.enums.GuardianLevel;
 import com.bodeum.domain.user.repository.UserRepository;
 import java.util.List;
@@ -251,18 +252,22 @@ public class PostService {
                 .isEmpty();
 
         User author = null;
+        String authorNickname = null;
         Integer authorLevel = null;
         Integer childAge = null;
+        List<DisabilityType> disabilityTypes = List.of();
         if (!authorWithdrawn && post.getAnonymityType() != PostAnonymityType.FULLY_ANONYMOUS) {
             author = postAuthorRepository.findById(post.getUserId()).orElse(null);
         }
         if (author != null) {
+            authorNickname = author.getNickname();
             authorLevel = GuardianLevel.from(pointService.getTotalPoint(author.getId())).getLevelNumber();
             childAge = author.getChildAge();
+            disabilityTypes = author.getDisabilityTypes();
         }
 
-        return PostResponse.of(post, viewerId, liked, scrapped, authorWithdrawn, authorLevel, childAge,
-                imageUrls);
+        return PostResponse.of(post, viewerId, liked, scrapped, authorWithdrawn, authorNickname,
+                authorLevel, childAge, disabilityTypes, imageUrls);
     }
 
     private void replaceImages(Post post, List<String> imageUrls) {

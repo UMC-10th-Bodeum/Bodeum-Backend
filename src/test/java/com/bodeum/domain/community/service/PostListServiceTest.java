@@ -74,7 +74,7 @@ class PostListServiceTest {
         var response = postListService.getPosts(
                 20L,
                 0,
-                "scrap",
+                "like",
                 "  언어치료  ",
                 PostBoardType.FREE_COMMUNICATION
         );
@@ -98,10 +98,10 @@ class PostListServiceTest {
                 eq(PostBoardType.FREE_COMMUNICATION),
                 pageableCaptor.capture()
         );
-        Sort.Order scrapOrder = pageableCaptor.getValue().getSort().getOrderFor("scrapCount");
+        Sort.Order likeOrder = pageableCaptor.getValue().getSort().getOrderFor("likeCount");
         assertThat(pageableCaptor.getValue().getPageSize()).isEqualTo(14);
-        assertThat(scrapOrder).isNotNull();
-        assertThat(scrapOrder.getDirection()).isEqualTo(Sort.Direction.DESC);
+        assertThat(likeOrder).isNotNull();
+        assertThat(likeOrder.getDirection()).isEqualTo(Sort.Direction.DESC);
     }
 
     @Test
@@ -260,8 +260,8 @@ class PostListServiceTest {
     }
 
     @Test
-    void getPostsRejectsUnsupportedSort() {
-        assertThatThrownBy(() -> postListService.getPosts(10L, 0, "oldest", null, null))
+    void getPostsRejectsRemovedScrapSort() {
+        assertThatThrownBy(() -> postListService.getPosts(10L, 0, "scrap", null, null))
                 .isInstanceOf(CommunityException.class)
                 .extracting(exception -> ((CommunityException) exception).getErrorCode())
                 .isEqualTo(CommunityErrorCode.INVALID_POST_LIST_SORT);

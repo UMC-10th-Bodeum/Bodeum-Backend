@@ -9,7 +9,7 @@ public enum PostListSortType {
 
     LATEST("createdAt"),
     VIEW("viewCount"),
-    SCRAP("scrapCount"),
+    LIKE("likeCount"),
     COMMENT("commentCount");
 
     public static final String LOGGED_IN_DEFAULT_SORT_VALUE = "latest";
