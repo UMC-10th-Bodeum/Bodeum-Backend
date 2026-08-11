@@ -58,11 +58,7 @@ public class SecurityConfig {
             // 검색 API
             "/api/v1/info/search",
 
-            // 정보 항목 조회 및 지역 필터 API (비회원 허용)
-            "/api/v1/info-items/**",
             "/api/v1/info-regions/**"
-            // 주의: /api/v1/admin/** 는 이 목록에 추가하지 않는다.
-            // 관리자 권한(Role) 체계가 없어 인증만으로는 관리자 전용을 보장할 수 없다.
     };
 
     @Bean
@@ -78,9 +74,13 @@ public class SecurityConfig {
                         // 1. 공통 허용 URI
                         .requestMatchers(allowUris).permitAll()
 
-                        // 2. 정보(Info) 관련 비로그인 허용 API (GET 조회 전체 + 카카오지도 생성 POST)
+                        // 2. 정보(Info) 관련 비로그인 허용 API
+                        // -> 모든 Info GET 조회 허용
                         .requestMatchers(HttpMethod.GET, "/api/v1/info-items/**").permitAll()
+                        // -> 카카오지도 URL POST 허용
                         .requestMatchers(HttpMethod.POST, "/api/v1/info-items/kakaomap-url").permitAll()
+                        // 2-1. 정보 공공데이터 관리자 수동 동기화 API : 컨트롤러에서 직접 만든 헤더 토큰 검사.
+                        .requestMatchers("/api/v1/admin/**").permitAll()
 
                         // 3. 뉴스 및 커뮤니티 GET 조회 허용 API
                         .requestMatchers(

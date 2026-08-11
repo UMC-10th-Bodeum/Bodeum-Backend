@@ -191,3 +191,6 @@ openapi:
     datago: ${OPENAPI_SECRET_DATAGO:${OPENAPI_SECRET_ODCLOUD:}}
     odcloud: ${OPENAPI_SECRET_ODCLOUD:}
     gg: ${OPENAPI_SECRET_GG:}
+
+admin:
+  secret-token: ${ADMIN_SECRET_TOKEN:test-admin-secret-token}
