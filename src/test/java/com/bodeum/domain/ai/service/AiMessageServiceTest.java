@@ -691,7 +691,7 @@ class AiMessageServiceTest {
 
     @Test
     @SuppressWarnings("unchecked")
-    void preservesAllOriginalQueryDocumentsBeforeMergingExpandedResults() {
+    void preservesOriginalDocumentsAndTopResultFromEachExpandedQuery() {
         String question = "수원시 특수학교를 알려줘";
         String expandedQuery1 = "수원시 특수교육 학교 현황";
         String expandedQuery2 = "경기도 수원시 특수학교 목록";
@@ -751,7 +751,11 @@ class AiMessageServiceTest {
         assertThat(documentsCaptor.getValue().subList(0, 5))
                 .containsExactlyElementsOf(originalDocuments);
         assertThat(documentsCaptor.getValue())
-                .contains(originalDocuments.get(4));
+                .contains(
+                        originalDocuments.get(4),
+                        expandedDocuments1.getFirst(),
+                        expandedDocuments2.getFirst()
+                );
     }
 
     @Test
