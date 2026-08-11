@@ -193,4 +193,4 @@ openapi:
     gg: ${OPENAPI_SECRET_GG:}
 
 admin:
-  secret-token: ${ADMIN_SECRET_TOKEN}
+  secret-token: ${ADMIN_SECRET_TOKEN:test-admin-secret-token}
