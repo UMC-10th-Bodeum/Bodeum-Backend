@@ -74,6 +74,9 @@ public class News extends BaseCreatedUpdatedDeletedEntity {
     @Column(name = "original_url", length = 500)
     private String originalUrl;
 
+    @Column(name = "external_url", length = 500)
+    private String externalUrl;
+
     @Column(name = "thumbnail_url", length = 500)
     private String thumbnailUrl;
 
@@ -185,6 +188,10 @@ public class News extends BaseCreatedUpdatedDeletedEntity {
         this.sourceName = candidate.sourceName();
         this.publishedAt = candidate.publishedAt();
         this.originalUrl = candidate.originalUrl();
+        this.externalUrl = NewsExternalLinkResolver.resolve(
+                candidate.sourceName(),
+                candidate.title()
+        );
         this.thumbnailUrl = candidate.thumbnailUrl();
         this.newsType = candidate.newsType();
         this.recruitmentStatus = candidate.recruitmentStatus();
