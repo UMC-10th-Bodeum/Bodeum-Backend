@@ -114,20 +114,28 @@ public class SpringAiDocumentRetriever implements AiDocumentRetriever {
         List<Document> questionDocuments = search(question, filterExpression);
 
         Map<String, Document> documentsById = new LinkedHashMap<>();
-        personalizedDocuments.forEach(document -> documentsById.put(document.getId(), document));
-        questionDocuments.forEach(document -> documentsById.merge(
-                document.getId(), document, this::higherScore));
+        addByScore(documentsById, questionDocuments);
+        addByScore(documentsById, personalizedDocuments);
 
         documentsById.values().forEach(document -> log.debug(
                 "[AI] RAG candidate: id={}, score={}, threshold={}",
                 document.getId(), score(document), similarityThreshold));
 
         return documentsById.values().stream()
-                .filter(document -> score(document) >= similarityThreshold)
-                .sorted(Comparator.comparingDouble(this::score).reversed())
                 .limit(topK)
                 .map(this::mapDocument)
                 .toList();
+    }
+
+    private void addByScore(
+            Map<String, Document> documentsById,
+            List<Document> documents
+    ) {
+        documents.stream()
+                .filter(document -> score(document) >= similarityThreshold)
+                .sorted(Comparator.comparingDouble(this::score).reversed())
+                .forEach(document -> documentsById.putIfAbsent(
+                        document.getId(), document));
     }
 
     private List<Document> search(String query, String filterExpression) {
@@ -139,10 +147,6 @@ public class SpringAiDocumentRetriever implements AiDocumentRetriever {
             builder.filterExpression(filterExpression);
         }
         return vectorStoreRetriever.similaritySearch(builder.build());
-    }
-
-    private Document higherScore(Document left, Document right) {
-        return score(left) >= score(right) ? left : right;
     }
 
     private double score(Document document) {

@@ -170,10 +170,13 @@ public class AiMessageService {
                 profile,
                 questionContext.searchScope()
         );
-        List<String> searchQueries = contextualizeLocalRegions(
-                questionContext.retrievalQueries(),
-                profile,
-                questionContext.searchScope()
+        List<String> searchQueries = ensureBroaderDisabilityTargetQuery(
+                searchQuestion,
+                contextualizeLocalRegions(
+                        questionContext.retrievalQueries(),
+                        profile,
+                        questionContext.searchScope()
+                )
         );
 
         log.debug("[AI] 문서 검색 시작");
@@ -504,17 +507,43 @@ public class AiMessageService {
                 .toList();
 
         List<List<AiReferenceDocument>> documentsByQuery = new ArrayList<>();
-        for (String query : distinctQueries) {
-            documentsByQuery.add(documentRetriever.retrieve(query, profile, searchScope));
+        for (int queryIndex = 0; queryIndex < distinctQueries.size(); queryIndex++) {
+            String query = distinctQueries.get(queryIndex);
+            List<AiReferenceDocument> queryDocuments =
+                    documentRetriever.retrieve(query, profile, searchScope);
+            documentsByQuery.add(queryDocuments);
+            log.debug(
+                    "[AI] 질의별 검색 결과: queryIndex={}, documentKeys={}",
+                    queryIndex,
+                    queryDocuments.stream()
+                            .map(AiReferenceDocument::documentKey)
+                            .toList()
+            );
         }
 
         LinkedHashMap<String, AiReferenceDocument> documentsByKey = new LinkedHashMap<>();
         if (!documentsByQuery.isEmpty()) {
+            int reservedExpandedSlots = Math.min(
+                    documentsByQuery.size() - 1,
+                    MAX_RETRIEVED_DOCUMENTS
+            );
+            int originalLimit = MAX_RETRIEVED_DOCUMENTS - reservedExpandedSlots;
             for (AiReferenceDocument document : documentsByQuery.getFirst()) {
                 documentsByKey.putIfAbsent(document.documentKey(), document);
-                if (documentsByKey.size() >= MAX_RETRIEVED_DOCUMENTS) {
+                if (documentsByKey.size() >= originalLimit) {
                     break;
                 }
+            }
+        }
+
+        for (int queryIndex = 1;
+             queryIndex < documentsByQuery.size()
+                     && documentsByKey.size() < MAX_RETRIEVED_DOCUMENTS;
+             queryIndex++) {
+            List<AiReferenceDocument> queryDocuments = documentsByQuery.get(queryIndex);
+            if (!queryDocuments.isEmpty()) {
+                AiReferenceDocument document = queryDocuments.getFirst();
+                documentsByKey.putIfAbsent(document.documentKey(), document);
             }
         }
 
@@ -523,7 +552,7 @@ public class AiMessageService {
                 .mapToInt(List::size)
                 .max()
                 .orElse(0);
-        for (int rank = 0;
+        for (int rank = 1;
              rank < maxExpandedRank
                      && documentsByKey.size() < MAX_RETRIEVED_DOCUMENTS;
              rank++) {
@@ -536,6 +565,15 @@ public class AiMessageService {
                     AiReferenceDocument document = queryDocuments.get(rank);
                     documentsByKey.putIfAbsent(document.documentKey(), document);
                 }
+                if (documentsByKey.size() >= MAX_RETRIEVED_DOCUMENTS) {
+                    break;
+                }
+            }
+        }
+
+        if (!documentsByQuery.isEmpty()) {
+            for (AiReferenceDocument document : documentsByQuery.getFirst()) {
+                documentsByKey.putIfAbsent(document.documentKey(), document);
                 if (documentsByKey.size() >= MAX_RETRIEVED_DOCUMENTS) {
                     break;
                 }
@@ -563,6 +601,28 @@ public class AiMessageService {
         }
         return queries.stream()
                 .map(query -> contextualizeLocalRegion(query, profile, searchScope))
+                .toList();
+    }
+
+    private List<String> ensureBroaderDisabilityTargetQuery(
+            String question,
+            List<String> queries
+    ) {
+        List<String> expanded = new ArrayList<>();
+        if (question != null) {
+            String broaderTargetQuery = question.replaceAll("장애\\s*아동", "장애인");
+            if (!broaderTargetQuery.equals(question)) {
+                expanded.add(broaderTargetQuery);
+            }
+        }
+        if (queries != null) {
+            expanded.addAll(queries);
+        }
+        return expanded.stream()
+                .filter(query -> query != null && !query.isBlank())
+                .map(String::trim)
+                .distinct()
+                .limit(3)
                 .toList();
     }
 

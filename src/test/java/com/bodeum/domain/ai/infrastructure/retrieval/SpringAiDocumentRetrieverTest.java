@@ -1,18 +1,23 @@
 package com.bodeum.domain.ai.infrastructure.retrieval;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.bodeum.domain.ai.model.rag.AiUserProfile;
+import com.bodeum.domain.ai.enums.AiResponseSourceType;
 import com.bodeum.domain.ai.enums.AiSearchScope;
+import com.bodeum.domain.ai.model.rag.AiUserProfile;
+import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.ai.document.Document;
 import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStoreRetriever;
 
@@ -110,6 +115,69 @@ class SpringAiDocumentRetrieverTest {
         assertThat(requestCaptor.getAllValues())
                 .extracting(SearchRequest::getQuery)
                 .allMatch(query -> !query.contains("경기도 수원시"));
+    }
+
+    @Test
+    void prioritizesQuestionDocumentsBeforePersonalizedDocuments() {
+        SpringAiDocumentRetriever retriever =
+                new SpringAiDocumentRetriever(vectorStoreRetriever, 5, 0.4);
+        AiUserProfile profile = new AiUserProfile(
+                "경기도 수원시",
+                "경기도",
+                "수원시",
+                6,
+                List.of("AUTISM_SPECTRUM"),
+                List.of("EDUCATION"),
+                "특수교육"
+        );
+        List<Document> personalizedDocuments = List.of(
+                document("PERSONALIZED-1", 0.9),
+                document("PERSONALIZED-2", 0.8),
+                document("PERSONALIZED-3", 0.7),
+                document("PERSONALIZED-4", 0.65),
+                document("PERSONALIZED-5", 0.61)
+        );
+        List<Document> questionDocuments = List.of(
+                document("QUESTION-1", 0.6),
+                document("QUESTION-2", 0.55),
+                document("QUESTION-3", 0.5),
+                document("QUESTION-4", 0.45),
+                document("QUESTION-5", 0.4)
+        );
+        when(vectorStoreRetriever.similaritySearch(
+                org.mockito.ArgumentMatchers.any(SearchRequest.class)))
+                .thenReturn(personalizedDocuments, questionDocuments);
+
+        var result = retriever.retrieve(
+                "수원시 특수학교를 알려줘",
+                profile,
+                AiSearchScope.LOCAL_RESOURCE
+        );
+
+        assertThat(result)
+                .extracting(document -> document.documentKey())
+                .containsExactly(
+                        "QUESTION-1",
+                        "QUESTION-2",
+                        "QUESTION-3",
+                        "QUESTION-4",
+                        "QUESTION-5"
+                );
+    }
+
+    private Document document(String id, double score) {
+        Document document = org.mockito.Mockito.mock(Document.class);
+        when(document.getId()).thenReturn(id);
+        lenient().when(document.getText()).thenReturn(id + " content");
+        when(document.getScore()).thenReturn(score);
+        lenient().when(document.getMetadata()).thenReturn(Map.of(
+                "sourceType", AiResponseSourceType.INFO.name(),
+                "sourceId", Integer.toString(Math.abs(id.hashCode())),
+                "title", id,
+                "sourceUrl", "https://example.com/" + id,
+                "updatedAt", Instant.parse("2026-07-01T00:00:00Z").toString()
+        ));
+        return document;
     }
 
 }
