@@ -634,11 +634,15 @@ class AiMessageServiceTest {
     void mergesDocumentsRetrievedByOriginalAndExpandedQueries() {
         String question = "장애아동 활동지원 서비스 신청 방법 알려줘";
         String broaderTargetQuery = "장애인 활동지원 서비스 신청 방법 알려줘";
-        String expandedQuery = "장애인 활동지원서비스 아동 신청 대상 신청 방법";
+        String localBroaderTargetQuery =
+                "경기도 수원시 장애인 활동지원 서비스 신청 방법 알려줘";
+        user.updateInterestRegion(List.of(), Region.create("경기도", "수원시"));
         when(questionIntentClassifier.analyze(question)).thenReturn(
-                new AiQuestionAnalysis(
+                AiQuestionAnalysis.forQuestion(
+                        question,
                         AiQuestionIntent.NONE,
-                        List.of(question, expandedQuery)
+                        AiSearchScope.NATIONAL_POLICY,
+                        List.of("장애인 활동지원서비스 아동 신청 대상 신청 방법")
                 )
         );
 
@@ -651,46 +655,121 @@ class AiMessageServiceTest {
                 "https://example.com/info/1",
                 Instant.parse("2026-07-01T00:00:00Z")
         );
-        AiReferenceDocument expandedDocument = new AiReferenceDocument(
+        AiReferenceDocument nationalDocument = new AiReferenceDocument(
+                "INFO-5724-0",
+                "장애인활동지원 전국 공통 제도 안내",
+                AiResponseSourceType.INFO,
+                5724L,
+                "장애인활동지원",
+                "https://example.com/info/5724",
+                Instant.parse("2026-07-01T00:00:00Z")
+        );
+        AiReferenceDocument localDocument = new AiReferenceDocument(
                 "INFO-7183-0",
-                "만 6세 이상 장애인 활동지원 대상자의 신청 안내",
+                "만 6세 이상 장애인 활동지원 대상자의 수원시 추가지원 안내",
                 AiResponseSourceType.INFO,
                 7183L,
-                "장애인활동지원",
+                "장애인활동지원 수원시 추가지원",
                 "https://example.com/info/7183",
                 Instant.parse("2026-07-01T00:00:00Z")
         );
         when(documentRetriever.retrieve(eq(question), any(), any()))
                 .thenReturn(List.of(originalDocument));
         when(documentRetriever.retrieve(eq(broaderTargetQuery), any(), any()))
-                .thenReturn(List.of());
-        when(documentRetriever.retrieve(eq(expandedQuery), any(), any()))
-                .thenReturn(List.of(expandedDocument));
+                .thenReturn(List.of(nationalDocument));
+        when(documentRetriever.retrieve(eq(localBroaderTargetQuery), any(), any()))
+                .thenReturn(List.of(localDocument));
         when(answerGenerator.generate(
                 eq(question),
                 any(),
-                eq(List.of(originalDocument, expandedDocument))
+                eq(List.of(originalDocument, nationalDocument, localDocument))
         )).thenReturn(new GeneratedAiAnswer(
-                "장애인 활동지원서비스 신청 안내입니다.",
-                List.of("INFO-7183-0")
+                "장애인활동지원과 수원시 추가지원 안내입니다.",
+                List.of("INFO-5724-0", "INFO-7183-0")
         ));
-        AiMessage saved = savedAiMessage("장애인 활동지원서비스 신청 안내입니다.");
+        AiMessage saved = savedAiMessage("장애인활동지원과 수원시 추가지원 안내입니다.");
         when(persistenceService.saveAiMessageAndComplete(
                 11L,
                 chatRoom,
-                "장애인 활동지원서비스 신청 안내입니다.",
+                "장애인활동지원과 수원시 추가지원 안내입니다.",
                 false,
                 AiAnswerStatus.ANSWERED,
-                List.of(expandedDocument)
+                List.of(nationalDocument, localDocument)
         )).thenReturn(saved);
 
         var result = service.createMessage(1L, question);
 
         assertThat(result.aiMessage().answerStatus()).isEqualTo(AiAnswerStatus.ANSWERED);
-        assertThat(result.aiMessage().sources()).hasSize(1);
+        assertThat(result.aiMessage().sources()).hasSize(2);
         verify(documentRetriever).retrieve(eq(question), any(), any());
         verify(documentRetriever).retrieve(eq(broaderTargetQuery), any(), any());
-        verify(documentRetriever).retrieve(eq(expandedQuery), any(), any());
+        verify(documentRetriever).retrieve(eq(localBroaderTargetQuery), any(), any());
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void roundRobinsOriginalAndExpandedResultsForChildDisabilityQuestion() {
+        String question = "장애아동 활동지원 서비스를 알려줘";
+        String broaderTargetQuery = "장애인 활동지원 서비스를 알려줘";
+        String localBroaderTargetQuery =
+                "경기도 수원시 장애인 활동지원 서비스를 알려줘";
+        user.updateInterestRegion(List.of(), Region.create("경기도", "수원시"));
+        when(questionIntentClassifier.analyze(question)).thenReturn(
+                AiQuestionAnalysis.forQuestion(
+                        question,
+                        AiQuestionIntent.NONE,
+                        AiSearchScope.NATIONAL_POLICY,
+                        List.of()
+                )
+        );
+
+        List<AiReferenceDocument> childDocuments = IntStream.rangeClosed(1, 5)
+                .mapToObj(index -> referenceDocument("CHILD-" + index, index))
+                .toList();
+        List<AiReferenceDocument> nationalDocuments = IntStream.rangeClosed(1, 5)
+                .mapToObj(index -> referenceDocument("NATIONAL-" + index, 100L + index))
+                .toList();
+        List<AiReferenceDocument> localDocuments = IntStream.rangeClosed(1, 5)
+                .mapToObj(index -> referenceDocument("LOCAL-" + index, 200L + index))
+                .toList();
+        when(documentRetriever.retrieve(eq(question), any(), any()))
+                .thenReturn(childDocuments);
+        when(documentRetriever.retrieve(eq(broaderTargetQuery), any(), any()))
+                .thenReturn(nationalDocuments);
+        when(documentRetriever.retrieve(eq(localBroaderTargetQuery), any(), any()))
+                .thenReturn(localDocuments);
+        when(answerGenerator.generate(eq(question), any(), any()))
+                .thenReturn(new GeneratedAiAnswer(
+                        "장애아동 활동지원 안내",
+                        List.of("CHILD-4")
+                ));
+        AiMessage saved = savedAiMessage("장애아동 활동지원 안내");
+        when(persistenceService.saveAiMessageAndComplete(
+                11L,
+                chatRoom,
+                "장애아동 활동지원 안내",
+                false,
+                AiAnswerStatus.ANSWERED,
+                List.of(childDocuments.get(3))
+        )).thenReturn(saved);
+
+        service.createMessage(1L, question);
+
+        ArgumentCaptor<List<AiReferenceDocument>> documentsCaptor =
+                ArgumentCaptor.forClass(List.class);
+        verify(answerGenerator).generate(eq(question), any(), documentsCaptor.capture());
+        assertThat(documentsCaptor.getValue()).containsExactly(
+                childDocuments.get(0),
+                nationalDocuments.get(0),
+                localDocuments.get(0),
+                childDocuments.get(1),
+                nationalDocuments.get(1),
+                localDocuments.get(1),
+                childDocuments.get(2),
+                nationalDocuments.get(2),
+                localDocuments.get(2),
+                childDocuments.get(3)
+        );
     }
 
     @Test
@@ -766,12 +845,19 @@ class AiMessageServiceTest {
     void passesExpandedQueriesToExternalSearchWhenInternalEvidenceIsMissing() {
         String question = "장애 아동 활동지원 서비스 신청 방법 알려줘";
         String broaderTargetQuery = "장애인 활동지원 서비스 신청 방법 알려줘";
+        String localBroaderTargetQuery =
+                "경기도 수원시 장애인 활동지원 서비스 신청 방법 알려줘";
+        user.updateInterestRegion(List.of(), Region.create("경기도", "수원시"));
         List<String> analyzedQueries = List.of(
                 question,
                 "장애인 활동지원서비스 아동 신청 대상 신청 방법"
         );
         when(questionIntentClassifier.analyze(question)).thenReturn(
-                new AiQuestionAnalysis(AiQuestionIntent.NONE, analyzedQueries)
+                new AiQuestionAnalysis(
+                        AiQuestionIntent.NONE,
+                        AiSearchScope.NATIONAL_POLICY,
+                        analyzedQueries
+                )
         );
         when(documentRetriever.retrieve(any(), any(), any())).thenReturn(List.of());
         AiMessage saved = savedAiMessage("관련 정보를 찾을 수 없습니다.");
@@ -790,8 +876,8 @@ class AiMessageServiceTest {
                 eq(question),
                 eq(List.of(
                         broaderTargetQuery,
-                        question,
-                        "장애인 활동지원서비스 아동 신청 대상 신청 방법"
+                        localBroaderTargetQuery,
+                        question
                 )),
                 any(),
                 any()
