@@ -81,6 +81,7 @@ class PostServiceIntegrationTest {
             assertThat(viewed.authorId()).isNull();
             assertThat(viewed.isMine()).isFalse();
             assertThat(viewed.viewCount()).isEqualTo(1);
+            assertThat(viewed.disabilityTypes()).isEmpty();
             assertThat(viewed.imageUrls()).containsExactly(
                     "https://example.com/1.jpg",
                     "https://example.com/2.jpg"

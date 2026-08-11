@@ -3,6 +3,7 @@ package com.bodeum.domain.community.dto.response;
 import com.bodeum.domain.community.entity.Post;
 import com.bodeum.domain.community.enums.PostAnonymityType;
 import com.bodeum.domain.community.enums.PostBoardType;
+import com.bodeum.domain.user.enums.DisabilityType;
 import com.bodeum.global.common.constant.WithdrawalConstants;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
@@ -20,8 +21,8 @@ public record PostResponse(
         Long authorId,
 
         @Schema(
-                description = "작성자 표시명. 탈퇴 회원이면 '탈퇴한 사용자', 그 외에는 null(프론트가 authorId로 해석)",
-                example = "탈퇴한 사용자",
+                description = "작성자 닉네임. 완전 익명이면 null, 탈퇴 회원이면 '탈퇴한 사용자'",
+                example = "보듬맘",
                 nullable = true
         )
         String authorNickname,
@@ -56,6 +57,8 @@ public record PostResponse(
         @Schema(description = "현재 사용자의 스크랩 여부", example = "false")
         boolean isScrapped,
 
+        @Schema(description = "작성자가 온보딩에서 등록한 장애 유형. 완전 익명·탈퇴 회원이면 빈 목록")
+        List<DisabilityType> disabilityTypes,
         List<String> imageUrls,
         Instant createdAt,
         Instant updatedAt
@@ -67,16 +70,23 @@ public record PostResponse(
             boolean liked,
             boolean scrapped,
             boolean authorWithdrawn,
+            String activeAuthorNickname,
             Integer authorLevel,
             Integer childAge,
+            List<DisabilityType> disabilityTypes,
             List<String> imageUrls
     ) {
         boolean anonymous = post.getAnonymityType() == PostAnonymityType.FULLY_ANONYMOUS;
         // 완전 익명이 우선한다(탈퇴 사실을 드러내지 않음). 실명 게시글의 탈퇴 저자만 '탈퇴한 사용자'로 노출한다.
         Long authorId = anonymous || authorWithdrawn ? null : post.getUserId();
-        String authorNickname = (!anonymous && authorWithdrawn) ? WithdrawalConstants.WITHDRAWN_DISPLAY_NAME : null;
+        String authorNickname = anonymous
+                ? null
+                : authorWithdrawn ? WithdrawalConstants.WITHDRAWN_DISPLAY_NAME : activeAuthorNickname;
         Integer visibleAuthorLevel = anonymous || authorWithdrawn ? null : authorLevel;
         Integer visibleChildAge = anonymous || authorWithdrawn ? null : childAge;
+        List<DisabilityType> visibleDisabilityTypes = anonymous || authorWithdrawn
+                ? List.of()
+                : List.copyOf(disabilityTypes);
 
         return new PostResponse(
                 post.getId(),
@@ -96,6 +106,7 @@ public record PostResponse(
                 post.getCommentCount(),
                 post.getScrapCount(),
                 scrapped,
+                visibleDisabilityTypes,
                 List.copyOf(imageUrls),
                 post.getCreatedAt(),
                 post.getUpdatedAt()
