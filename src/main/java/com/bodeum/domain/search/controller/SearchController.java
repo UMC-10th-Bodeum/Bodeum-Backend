@@ -22,6 +22,8 @@ import org.springframework.web.bind.annotation.*;
 @Tag(name = "Search", description = "검색 API")
 public class SearchController {
 
+    private static final int AUTOCOMPLETE_KEYWORD_MAX_LENGTH = 50;
+
     private final SearchService searchService;
 
     @GetMapping("/info/search")
@@ -54,7 +56,7 @@ public class SearchController {
     public ApiResponse<AutocompleteResponse> getAutocomplete(
             @RequestParam
             @NotBlank(message = "검색어를 입력해주세요.")
-            @Size(max = 50, message = "검색어는 최대 50자까지 입력 가능합니다.")
+            @Size(max = AUTOCOMPLETE_KEYWORD_MAX_LENGTH, message = "검색어는 최대 50자까지 입력 가능합니다.")
             String keyword,
             @LoginUser Long userId
     ) {
