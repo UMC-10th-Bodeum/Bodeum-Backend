@@ -20,6 +20,7 @@ public record NewsDetailResponse(
         @Schema(description = "카테고리 표시명", example = "교육 · 세미나")
         String categoryLabel,
         String sourceName,
+        @Schema(description = "수집 원본 데이터의 출처 URL")
         String originalUrl,
         String thumbnailUrl,
         NewsType newsType,
