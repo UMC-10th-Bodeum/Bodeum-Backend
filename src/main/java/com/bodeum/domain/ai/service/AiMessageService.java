@@ -509,14 +509,29 @@ public class AiMessageService {
         }
 
         LinkedHashMap<String, AiReferenceDocument> documentsByKey = new LinkedHashMap<>();
-        int maxRank = documentsByQuery.stream()
+        if (!documentsByQuery.isEmpty()) {
+            for (AiReferenceDocument document : documentsByQuery.getFirst()) {
+                documentsByKey.putIfAbsent(document.documentKey(), document);
+                if (documentsByKey.size() >= MAX_RETRIEVED_DOCUMENTS) {
+                    break;
+                }
+            }
+        }
+
+        int maxExpandedRank = documentsByQuery.stream()
+                .skip(1)
                 .mapToInt(List::size)
                 .max()
                 .orElse(0);
         for (int rank = 0;
-             rank < maxRank && documentsByKey.size() < MAX_RETRIEVED_DOCUMENTS;
+             rank < maxExpandedRank
+                     && documentsByKey.size() < MAX_RETRIEVED_DOCUMENTS;
              rank++) {
-            for (List<AiReferenceDocument> queryDocuments : documentsByQuery) {
+            for (int queryIndex = 1;
+                 queryIndex < documentsByQuery.size();
+                 queryIndex++) {
+                List<AiReferenceDocument> queryDocuments =
+                        documentsByQuery.get(queryIndex);
                 if (rank < queryDocuments.size()) {
                     AiReferenceDocument document = queryDocuments.get(rank);
                     documentsByKey.putIfAbsent(document.documentKey(), document);

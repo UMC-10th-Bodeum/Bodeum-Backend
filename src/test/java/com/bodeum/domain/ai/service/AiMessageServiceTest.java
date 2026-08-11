@@ -45,12 +45,14 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.IntStream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -688,6 +690,71 @@ class AiMessageServiceTest {
     }
 
     @Test
+    @SuppressWarnings("unchecked")
+    void preservesAllOriginalQueryDocumentsBeforeMergingExpandedResults() {
+        String question = "수원시 특수학교를 알려줘";
+        String expandedQuery1 = "수원시 특수교육 학교 현황";
+        String expandedQuery2 = "경기도 수원시 특수학교 목록";
+        when(questionIntentClassifier.analyze(question)).thenReturn(
+                AiQuestionAnalysis.forQuestion(
+                        question,
+                        AiQuestionIntent.NONE,
+                        AiSearchScope.LOCAL_RESOURCE,
+                        List.of(expandedQuery1, expandedQuery2)
+                )
+        );
+        when(regionRepository.findMentionedInQuestion(any(), any()))
+                .thenReturn(List.of());
+        when(regionRepository.findAllByRegionLevel2OrderByIdAsc(any()))
+                .thenReturn(List.of());
+
+        List<AiReferenceDocument> originalDocuments = IntStream.rangeClosed(1, 5)
+                .mapToObj(index -> referenceDocument("ORIGINAL-" + index, index))
+                .toList();
+        List<AiReferenceDocument> expandedDocuments1 = IntStream.rangeClosed(1, 5)
+                .mapToObj(index -> referenceDocument("EXPANDED-A-" + index, 100L + index))
+                .toList();
+        List<AiReferenceDocument> expandedDocuments2 = IntStream.rangeClosed(1, 5)
+                .mapToObj(index -> referenceDocument("EXPANDED-B-" + index, 200L + index))
+                .toList();
+        when(documentRetriever.retrieve(eq(question), any(), any()))
+                .thenReturn(originalDocuments);
+        when(documentRetriever.retrieve(eq(expandedQuery1), any(), any()))
+                .thenReturn(expandedDocuments1);
+        when(documentRetriever.retrieve(eq(expandedQuery2), any(), any()))
+                .thenReturn(expandedDocuments2);
+        when(answerGenerator.generate(eq(question), any(), any()))
+                .thenReturn(new GeneratedAiAnswer(
+                        "원문 검색 결과를 사용한 답변",
+                        List.of("ORIGINAL-5")
+                ));
+        AiMessage saved = savedAiMessage("원문 검색 결과를 사용한 답변");
+        when(persistenceService.saveAiMessageAndComplete(
+                11L,
+                chatRoom,
+                "원문 검색 결과를 사용한 답변",
+                false,
+                AiAnswerStatus.ANSWERED,
+                List.of(originalDocuments.get(4))
+        )).thenReturn(saved);
+
+        service.createMessage(1L, question);
+
+        ArgumentCaptor<List<AiReferenceDocument>> documentsCaptor =
+                ArgumentCaptor.forClass(List.class);
+        verify(answerGenerator).generate(
+                eq(question),
+                any(),
+                documentsCaptor.capture()
+        );
+        assertThat(documentsCaptor.getValue()).hasSize(10);
+        assertThat(documentsCaptor.getValue().subList(0, 5))
+                .containsExactlyElementsOf(originalDocuments);
+        assertThat(documentsCaptor.getValue())
+                .contains(originalDocuments.get(4));
+    }
+
+    @Test
     void passesExpandedQueriesToExternalSearchWhenInternalEvidenceIsMissing() {
         String question = "장애아동 활동지원 서비스 신청 방법 알려줘";
         List<String> expandedQueries = List.of(
@@ -896,5 +963,17 @@ class AiMessageServiceTest {
         when(message.getContent()).thenReturn(content);
         when(message.getCreatedAt()).thenReturn(Instant.parse("2026-07-03T06:30:03Z"));
         return message;
+    }
+
+    private AiReferenceDocument referenceDocument(String documentKey, long sourceId) {
+        return new AiReferenceDocument(
+                documentKey,
+                documentKey + " 내용",
+                AiResponseSourceType.INFO,
+                sourceId,
+                documentKey,
+                "https://example.com/" + sourceId,
+                Instant.parse("2026-07-01T00:00:00Z")
+        );
     }
 }
