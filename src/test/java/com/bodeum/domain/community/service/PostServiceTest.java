@@ -31,6 +31,7 @@ import com.bodeum.domain.community.repository.PostScrapRepository;
 import com.bodeum.domain.point.enums.PointEventType;
 import com.bodeum.domain.point.service.PointService;
 import com.bodeum.domain.user.entity.User;
+import com.bodeum.domain.user.enums.DisabilityType;
 import com.bodeum.domain.user.repository.UserRepository;
 import java.time.YearMonth;
 import java.util.List;
@@ -72,12 +73,12 @@ class PostServiceTest {
             ReflectionTestUtils.setField(post, "id", 1L);
             return post;
         });
-
         PostResponse response = postService.createPost(10L, createRequest());
 
         assertThat(response.postId()).isEqualTo(1L);
         assertThat(response.authorId()).isEqualTo(10L);
         assertThat(response.isQuestion()).isTrue();
+        assertThat(response.disabilityTypes()).isEmpty();
         assertThat(response.title()).isEqualTo("게시글 제목");
         then(postImageRepository).should().saveAll(anyList());
         then(pointService).should().grantActivityPoint(
@@ -228,7 +229,7 @@ class PostServiceTest {
         author.updateChildProfile(
                 "아이",
                 YearMonth.now().minusYears(7).toString(),
-                List.of(),
+                List.of(DisabilityType.AUTISM),
                 null
         );
         given(postRepository.findByIdAndStatusAndDeletedAtIsNull(1L, PostStatus.ACTIVE))
@@ -240,6 +241,8 @@ class PostServiceTest {
 
         assertThat(response.authorLevel()).isEqualTo(3);
         assertThat(response.childAge()).isEqualTo(7);
+        assertThat(response.authorNickname()).isEqualTo(author.getNickname());
+        assertThat(response.disabilityTypes()).containsExactly(DisabilityType.AUTISM);
     }
 
     @Test

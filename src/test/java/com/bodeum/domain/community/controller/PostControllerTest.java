@@ -24,6 +24,7 @@ import com.bodeum.domain.community.enums.PostAnonymityType;
 import com.bodeum.domain.community.enums.PostBoardType;
 import com.bodeum.domain.community.exception.CommunityErrorCode;
 import com.bodeum.domain.community.exception.CommunityException;
+import com.bodeum.domain.user.enums.DisabilityType;
 import com.bodeum.domain.community.service.PostListService;
 import com.bodeum.domain.community.service.PostQueryFacade;
 import com.bodeum.domain.community.service.PostService;
@@ -343,6 +344,7 @@ class PostControllerTest {
         mockMvc.perform(get("/api/v1/community/posts/1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.result.title").value("게시글 제목"))
+                .andExpect(jsonPath("$.result.authorNickname").value("보듬맘"))
                 .andExpect(jsonPath("$.result.authorLevel").value(3))
                 .andExpect(jsonPath("$.result.childAge").value(7))
                 .andExpect(jsonPath("$.result.isMine").value(true))
@@ -352,7 +354,7 @@ class PostControllerTest {
                 .andExpect(jsonPath("$.result.commentCount").value(5))
                 .andExpect(jsonPath("$.result.scrapCount").value(6))
                 .andExpect(jsonPath("$.result.isScrapped").value(false))
-                .andExpect(jsonPath("$.result.disabilityTypes").doesNotExist())
+                .andExpect(jsonPath("$.result.disabilityTypes[0]").value("AUTISM"))
                 .andExpect(jsonPath("$.result.hashtags").doesNotExist());
     }
 
@@ -429,7 +431,7 @@ class PostControllerTest {
         return new PostResponse(
                 1L,
                 10L,
-                null,
+                "보듬맘",
                 3,
                 7,
                 true,
@@ -444,6 +446,7 @@ class PostControllerTest {
                 5,
                 6,
                 false,
+                List.of(DisabilityType.AUTISM),
                 List.of("https://example.com/image.jpg"),
                 Instant.parse("2026-07-18T00:00:00Z"),
                 Instant.parse("2026-07-18T00:00:00Z")

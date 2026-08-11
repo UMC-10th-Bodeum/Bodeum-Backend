@@ -12,6 +12,6 @@ public interface PostAuthorRepository extends Repository<User, Long> {
     @EntityGraph(attributePaths = "guardianProfile")
     List<User> findAllByIdIn(Collection<Long> ids);
 
-    @EntityGraph(attributePaths = {"guardianProfile", "childProfile"})
+    @EntityGraph(attributePaths = {"guardianProfile", "childProfile", "childProfile.disabilities"})
     Optional<User> findById(Long id);
 }
