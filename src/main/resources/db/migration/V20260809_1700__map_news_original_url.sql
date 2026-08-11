@@ -1,9 +1,5 @@
-ALTER TABLE news
-    ADD COLUMN external_url VARCHAR(500) NULL
-    AFTER original_url;
-
 UPDATE news
-SET external_url = CASE source_name
+SET original_url = CASE source_name
     WHEN '순천시장애인종합복지관' THEN 'http://www.scrw.or.kr/'
     WHEN '구리시장애인종합복지관' THEN 'https://guriwel.or.kr/'
     WHEN '성남시장애인종합복지관' THEN 'https://www.rehab21.or.kr/'
@@ -23,7 +19,7 @@ SET external_url = CASE source_name
     WHEN '아주청각언어센터' THEN 'https://hellosu26.wixsite.com/ajouhearing/blank-yur91'
     WHEN '우리아이통합발달센터' THEN 'https://uriai-center.com/'
     WHEN '우리아이통합발달센터 권선점' THEN 'https://uriai-center.com/'
-    ELSE NULL
+    ELSE original_url
 END
 WHERE source_name IN (
     '순천시장애인종합복지관',
@@ -48,7 +44,7 @@ WHERE source_name IN (
 );
 
 UPDATE news
-SET external_url = CASE title
+SET original_url = CASE title
     WHEN '장애공감문화' THEN 'http://www.scrw.or.kr/bbs/view.php?wcode=06&wnum=125'
     WHEN '자연체험활동' THEN 'http://www.scrw.or.kr/bbs/view.php?wcode=01&wnum=34208'
     WHEN '동산골축제' THEN 'http://www.scrw.or.kr/bbs/view.php?wcode=02&wnum=34220'
@@ -69,11 +65,11 @@ SET external_url = CASE title
     WHEN '동산오락실' THEN 'http://www.scrw.or.kr/bbs/view.php?wcode=01&wnum=34323'
     WHEN '노리존' THEN 'http://www.scrw.or.kr/bbs/view.php?wcode=01&wnum=34184'
     WHEN '문화활동' THEN 'http://www.scrw.or.kr/bbs/view.php?wcode=02&wnum=33919'
-    ELSE external_url
+    ELSE original_url
 END
 WHERE source_name = '순천시장애인종합복지관';
 
 UPDATE news
-SET external_url = 'https://www.gjrc.or.kr/SW_bbs/view.php?zipEncode=Zitm90wDU91DLLMDMqMBLrhDH91vt1drjrMCH9MyMetpSfMvWLME'
+SET original_url = 'https://www.gjrc.or.kr/SW_bbs/view.php?zipEncode=Zitm90wDU91DLLMDMqMBLrhDH91vt1drjrMCH9MyMetpSfMvWLME'
 WHERE source_name = '부산광역시 금정구 장애인복지관'
   AND title = '외부연계프로그램 금토피아';

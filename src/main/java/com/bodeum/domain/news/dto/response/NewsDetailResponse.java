@@ -20,8 +20,6 @@ public record NewsDetailResponse(
         @Schema(description = "카테고리 표시명", example = "교육 · 세미나")
         String categoryLabel,
         String sourceName,
-        @Schema(description = "기관 홈페이지 또는 프로그램 안내 페이지 URL")
-        String externalUrl,
         @Schema(description = "수집 원본 데이터의 출처 URL")
         String originalUrl,
         String thumbnailUrl,
@@ -53,7 +51,6 @@ public record NewsDetailResponse(
                 news.getNewsCategory().getCode(),
                 news.getNewsCategory().getLabel(),
                 news.getSourceName(),
-                news.getExternalUrl(),
                 news.getOriginalUrl(),
                 news.getThumbnailUrl(),
                 news.getNewsType(),
