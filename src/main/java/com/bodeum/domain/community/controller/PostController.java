@@ -60,7 +60,7 @@ public class PostController {
             @Parameter(description = "페이지 번호(0부터 시작)", example = "0")
             @RequestParam(defaultValue = "0") @Min(0) int page,
             @Parameter(
-                    description = "정렬 기준: latest, view, scrap, comment. "
+                    description = "정렬 기준: latest, view, like, comment. "
                             + "미지정 시 로그인 사용자는 latest, 비회원은 view",
                     example = PostListSortType.LOGGED_IN_DEFAULT_SORT_VALUE
             )
