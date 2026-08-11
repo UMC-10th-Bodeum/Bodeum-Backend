@@ -9,9 +9,13 @@ import com.bodeum.global.apiPayload.code.GeneralSuccessCode;
 import com.bodeum.global.auth.LoginUser;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import lombok.RequiredArgsConstructor;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
+@Validated
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/v1")
@@ -48,7 +52,10 @@ public class SearchController {
     @GetMapping("/info-items/search")
     @Operation(summary = "정보 검색어 자동완성 조회", description = "입력한 키워드에 매칭되는 정보(기관/병원 등) 이름 및 추천 태그 목록을 반환합니다.")
     public ApiResponse<AutocompleteResponse> getAutocomplete(
-            @RequestParam(required = false) String keyword,
+            @RequestParam
+            @NotBlank(message = "검색어를 입력해주세요.")
+            @Size(max = 50, message = "검색어는 최대 50자까지 입력 가능합니다.")
+            String keyword,
             @LoginUser Long userId
     ) {
         return ApiResponse.of(GeneralSuccessCode.OK, searchService.getAutocomplete(keyword, userId));
