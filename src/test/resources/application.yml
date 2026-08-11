@@ -62,3 +62,6 @@ openapi:
     datago: test-datago-key
     odcloud: test-odcloud-key
     gg: test-gg-key
+
+admin:
+  secret-token: ${ADMIN_SECRET_TOKEN:test-admin-secret-token}
