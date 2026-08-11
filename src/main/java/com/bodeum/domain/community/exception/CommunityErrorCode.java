@@ -42,7 +42,7 @@ public enum CommunityErrorCode implements BaseErrorCode {
     INVALID_POST_LIST_SORT(
             HttpStatus.BAD_REQUEST,
             "COMMUNITY400_7",
-            "게시글 정렬 기준은 view, scrap, comment 중 하나여야 합니다."
+            "게시글 정렬 기준은 latest, view, like, comment 중 하나여야 합니다."
     ),
     POST_NOT_QUESTION(
             HttpStatus.BAD_REQUEST,
