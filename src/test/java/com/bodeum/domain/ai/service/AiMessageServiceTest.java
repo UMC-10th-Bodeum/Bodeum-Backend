@@ -633,6 +633,7 @@ class AiMessageServiceTest {
     @Test
     void mergesDocumentsRetrievedByOriginalAndExpandedQueries() {
         String question = "장애아동 활동지원 서비스 신청 방법 알려줘";
+        String broaderTargetQuery = "장애인 활동지원 서비스 신청 방법 알려줘";
         String expandedQuery = "장애인 활동지원서비스 아동 신청 대상 신청 방법";
         when(questionIntentClassifier.analyze(question)).thenReturn(
                 new AiQuestionAnalysis(
@@ -661,6 +662,8 @@ class AiMessageServiceTest {
         );
         when(documentRetriever.retrieve(eq(question), any(), any()))
                 .thenReturn(List.of(originalDocument));
+        when(documentRetriever.retrieve(eq(broaderTargetQuery), any(), any()))
+                .thenReturn(List.of());
         when(documentRetriever.retrieve(eq(expandedQuery), any(), any()))
                 .thenReturn(List.of(expandedDocument));
         when(answerGenerator.generate(
@@ -686,6 +689,7 @@ class AiMessageServiceTest {
         assertThat(result.aiMessage().answerStatus()).isEqualTo(AiAnswerStatus.ANSWERED);
         assertThat(result.aiMessage().sources()).hasSize(1);
         verify(documentRetriever).retrieve(eq(question), any(), any());
+        verify(documentRetriever).retrieve(eq(broaderTargetQuery), any(), any());
         verify(documentRetriever).retrieve(eq(expandedQuery), any(), any());
     }
 
@@ -760,13 +764,14 @@ class AiMessageServiceTest {
 
     @Test
     void passesExpandedQueriesToExternalSearchWhenInternalEvidenceIsMissing() {
-        String question = "장애아동 활동지원 서비스 신청 방법 알려줘";
-        List<String> expandedQueries = List.of(
+        String question = "장애 아동 활동지원 서비스 신청 방법 알려줘";
+        String broaderTargetQuery = "장애인 활동지원 서비스 신청 방법 알려줘";
+        List<String> analyzedQueries = List.of(
                 question,
                 "장애인 활동지원서비스 아동 신청 대상 신청 방법"
         );
         when(questionIntentClassifier.analyze(question)).thenReturn(
-                new AiQuestionAnalysis(AiQuestionIntent.NONE, expandedQueries)
+                new AiQuestionAnalysis(AiQuestionIntent.NONE, analyzedQueries)
         );
         when(documentRetriever.retrieve(any(), any(), any())).thenReturn(List.of());
         AiMessage saved = savedAiMessage("관련 정보를 찾을 수 없습니다.");
@@ -783,7 +788,11 @@ class AiMessageServiceTest {
 
         verify(externalAnswerProvider).search(
                 eq(question),
-                eq(expandedQueries),
+                eq(List.of(
+                        broaderTargetQuery,
+                        question,
+                        "장애인 활동지원서비스 아동 신청 대상 신청 방법"
+                )),
                 any(),
                 any()
         );
