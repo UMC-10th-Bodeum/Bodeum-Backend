@@ -510,9 +510,8 @@ public class AiMessageService {
                     documentRetriever.retrieve(query, profile, searchScope);
             documentsByQuery.add(queryDocuments);
             log.debug(
-                    "[AI] 질의별 검색 결과: queryIndex={}, query={}, documentKeys={}",
+                    "[AI] 질의별 검색 결과: queryIndex={}, documentKeys={}",
                     queryIndex,
-                    query,
                     queryDocuments.stream()
                             .map(AiReferenceDocument::documentKey)
                             .toList()
