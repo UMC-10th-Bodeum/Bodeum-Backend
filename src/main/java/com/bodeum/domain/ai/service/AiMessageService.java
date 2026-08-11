@@ -170,10 +170,13 @@ public class AiMessageService {
                 profile,
                 questionContext.searchScope()
         );
-        List<String> searchQueries = contextualizeLocalRegions(
-                questionContext.retrievalQueries(),
-                profile,
-                questionContext.searchScope()
+        List<String> searchQueries = ensureBroaderDisabilityTargetQuery(
+                searchQuestion,
+                contextualizeLocalRegions(
+                        questionContext.retrievalQueries(),
+                        profile,
+                        questionContext.searchScope()
+                )
         );
 
         log.debug("[AI] 문서 검색 시작");
@@ -598,6 +601,28 @@ public class AiMessageService {
         }
         return queries.stream()
                 .map(query -> contextualizeLocalRegion(query, profile, searchScope))
+                .toList();
+    }
+
+    private List<String> ensureBroaderDisabilityTargetQuery(
+            String question,
+            List<String> queries
+    ) {
+        List<String> expanded = new ArrayList<>();
+        if (question != null) {
+            String broaderTargetQuery = question.replaceAll("장애\\s*아동", "장애인");
+            if (!broaderTargetQuery.equals(question)) {
+                expanded.add(broaderTargetQuery);
+            }
+        }
+        if (queries != null) {
+            expanded.addAll(queries);
+        }
+        return expanded.stream()
+                .filter(query -> query != null && !query.isBlank())
+                .map(String::trim)
+                .distinct()
+                .limit(3)
                 .toList();
     }
 
