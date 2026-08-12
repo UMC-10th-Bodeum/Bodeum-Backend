@@ -26,9 +26,12 @@ public class SpringAiAnswerGenerator implements AiAnswerGenerator {
     public SpringAiAnswerGenerator(
             ChatClient.Builder builder,
             AiPromptFormatter promptFormatter,
+            @Value("${bodeum.ai.result.max-count:10}") int maxResultCount,
             @Value("classpath:prompts/ai-rag-system-prompt.txt") Resource systemPromptResource
     ) {
-        this.chatClient = builder.defaultSystem(readPrompt(systemPromptResource)).build();
+        String systemPrompt = readPrompt(systemPromptResource)
+                .replace("{{maxResultCount}}", Integer.toString(maxResultCount));
+        this.chatClient = builder.defaultSystem(systemPrompt).build();
         this.promptFormatter = promptFormatter;
     }
 

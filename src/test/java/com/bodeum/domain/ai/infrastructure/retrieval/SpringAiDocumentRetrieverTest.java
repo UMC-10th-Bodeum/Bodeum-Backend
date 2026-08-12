@@ -30,7 +30,7 @@ class SpringAiDocumentRetrieverTest {
     @Test
     void excludesRegionButKeepsOtherProfileContextInGeneralSearchQuery() {
         SpringAiDocumentRetriever retriever =
-                new SpringAiDocumentRetriever(vectorStoreRetriever, 5, 0.7);
+                new SpringAiDocumentRetriever(vectorStoreRetriever, 5, 10, 0.7);
         AiUserProfile profile = new AiUserProfile(
                 "서울 강남구",
                 "서울",
@@ -60,7 +60,7 @@ class SpringAiDocumentRetrieverTest {
     @Test
     void expandsLocalInstitutionSearchFromSigunguToSidoAndAll() {
         SpringAiDocumentRetriever retriever =
-                new SpringAiDocumentRetriever(vectorStoreRetriever, 5, 0.7);
+                new SpringAiDocumentRetriever(vectorStoreRetriever, 5, 10, 0.7);
         AiUserProfile profile = new AiUserProfile(
                 "경기도 수원시",
                 "경기도",
@@ -93,7 +93,7 @@ class SpringAiDocumentRetrieverTest {
     @Test
     void doesNotAddProfileRegionToNationalPolicySearchQuery() {
         SpringAiDocumentRetriever retriever =
-                new SpringAiDocumentRetriever(vectorStoreRetriever, 5, 0.7);
+                new SpringAiDocumentRetriever(vectorStoreRetriever, 5, 10, 0.7);
         AiUserProfile profile = new AiUserProfile(
                 "경기도 수원시",
                 "경기도",
@@ -120,7 +120,7 @@ class SpringAiDocumentRetrieverTest {
     @Test
     void prioritizesQuestionDocumentsBeforePersonalizedDocuments() {
         SpringAiDocumentRetriever retriever =
-                new SpringAiDocumentRetriever(vectorStoreRetriever, 5, 0.4);
+                new SpringAiDocumentRetriever(vectorStoreRetriever, 5, 10, 0.4);
         AiUserProfile profile = new AiUserProfile(
                 "경기도 수원시",
                 "경기도",
@@ -168,7 +168,7 @@ class SpringAiDocumentRetrieverTest {
     @Test
     void expandsTopKWhenQuestionRequestsTenInstitutions() {
         SpringAiDocumentRetriever retriever =
-                new SpringAiDocumentRetriever(vectorStoreRetriever, 5, 0.4);
+                new SpringAiDocumentRetriever(vectorStoreRetriever, 5, 10, 0.4);
         AiUserProfile profile = new AiUserProfile(
                 "경기도 수원시",
                 "경기도",
@@ -203,7 +203,7 @@ class SpringAiDocumentRetrieverTest {
     @Test
     void capsTopKAtTenWhenQuestionRequestsMoreThanTenInstitutions() {
         SpringAiDocumentRetriever retriever =
-                new SpringAiDocumentRetriever(vectorStoreRetriever, 5, 0.4);
+                new SpringAiDocumentRetriever(vectorStoreRetriever, 5, 10, 0.4);
         AiUserProfile profile = new AiUserProfile(
                 "경기도 수원시",
                 "경기도",

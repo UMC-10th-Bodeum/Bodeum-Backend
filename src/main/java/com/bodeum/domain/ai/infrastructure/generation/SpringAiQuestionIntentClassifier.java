@@ -23,12 +23,14 @@ public class SpringAiQuestionIntentClassifier implements AiQuestionIntentClassif
 
     public SpringAiQuestionIntentClassifier(
             ChatClient.Builder builder,
+            @Value("${bodeum.ai.result.max-count:10}") int maxResultCount,
             @Value("classpath:prompts/ai-question-intent-classifier-system-prompt.txt")
             Resource systemPromptResource,
             @Value("classpath:prompts/ai-query-expansion-system-prompt.txt")
             Resource queryExpansionPromptResource
     ) {
         String systemPrompt = readPrompt(systemPromptResource)
+                .replace("{{maxResultCount}}", Integer.toString(maxResultCount))
                 + "\n\n"
                 + readPrompt(queryExpansionPromptResource);
         this.chatClient = builder.defaultSystem(systemPrompt).build();
@@ -36,23 +38,49 @@ public class SpringAiQuestionIntentClassifier implements AiQuestionIntentClassif
 
     @Override
     public AiQuestionAnalysis analyze(String question) {
+        return analyze(question, null, null);
+    }
+
+    @Override
+    public AiQuestionAnalysis analyze(
+            String question,
+            String previousUserQuestion,
+            String previousAiAnswer
+    ) {
         if (question == null || question.isBlank()) {
             return AiQuestionAnalysis.fallback();
         }
 
         try {
+            StringBuilder userPrompt = new StringBuilder();
+            if (previousUserQuestion != null && !previousUserQuestion.isBlank()
+                    && previousAiAnswer != null && !previousAiAnswer.isBlank()) {
+                userPrompt.append("[직전 사용자 질문]\n")
+                        .append(previousUserQuestion.trim())
+                        .append("\n\n[직전 AI 답변]\n")
+                        .append(previousAiAnswer.trim())
+                        .append("\n\n");
+            }
+            userPrompt.append("[분류할 현재 사용자 질문]\n").append(question.trim());
             ClassificationResult result = chatClient.prompt()
-                    .user("[분류할 사용자 질문]\n" + question.trim())
+                    .user(userPrompt.toString())
                     .call()
                     .entity(ClassificationResult.class, spec -> spec
                             .useProviderStructuredOutput()
                             .validateSchema());
+            String resolvedQuestion = result == null
+                    || result.resolvedQuestion() == null
+                    || result.resolvedQuestion().isBlank()
+                    ? question
+                    : result.resolvedQuestion().trim();
             AiQuestionAnalysis analysis = AiQuestionAnalysis.forQuestion(
-                    question,
+                    resolvedQuestion,
                     result == null ? null : result.intent(),
                     result == null ? null : result.searchScope(),
                     result == null ? List.of() : result.retrievalQueries(),
-                    result == null ? null : result.requestedResultCount()
+                    result == null ? null : result.requestedResultCount(),
+                    resolvedQuestion,
+                    result != null && result.isFollowUp()
             );
             log.info(
                     "[AI] 질문 LLM 분석 결과: intent={}, searchScope={}, retrievalQueryCount={}",
@@ -71,7 +99,9 @@ public class SpringAiQuestionIntentClassifier implements AiQuestionIntentClassif
             AiQuestionIntent intent,
             AiSearchScope searchScope,
             List<String> retrievalQueries,
-            Integer requestedResultCount
+            Integer requestedResultCount,
+            String resolvedQuestion,
+            boolean isFollowUp
     ) {
     }
 

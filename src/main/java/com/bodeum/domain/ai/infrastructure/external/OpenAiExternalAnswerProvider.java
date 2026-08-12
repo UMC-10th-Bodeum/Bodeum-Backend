@@ -65,6 +65,7 @@ public class OpenAiExternalAnswerProvider implements AiExternalAnswerProvider {
             @Value("${bodeum.ai.web-search.max-output-tokens:1200}") int maxOutputTokens,
             @Value("${bodeum.ai.web-search.connect-timeout:3s}") Duration connectTimeout,
             @Value("${bodeum.ai.web-search.read-timeout:30s}") Duration readTimeout,
+            @Value("${bodeum.ai.result.max-count:10}") int maxResultCount,
             @Value("classpath:prompts/ai-external-search-system-prompt.txt") Resource promptResource,
             AiPromptFormatter promptFormatter
     ) {
@@ -80,7 +81,8 @@ public class OpenAiExternalAnswerProvider implements AiExternalAnswerProvider {
                 .build();
         this.model = model;
         this.maxOutputTokens = maxOutputTokens;
-        this.externalSearchSystemPrompt = readPrompt(promptResource);
+        this.externalSearchSystemPrompt = readPrompt(promptResource)
+                .replace("{{maxResultCount}}", Integer.toString(maxResultCount));
         this.promptFormatter = promptFormatter;
     }
 

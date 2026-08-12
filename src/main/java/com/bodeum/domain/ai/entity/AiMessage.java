@@ -32,6 +32,15 @@ public class AiMessage extends BaseCreatedEntity {
     @Column(name = "content", nullable = false, columnDefinition = "TEXT")
     private String content;
 
+    @Column(name = "resolved_question", columnDefinition = "TEXT")
+    private String resolvedQuestion;
+
+    @Column(name = "context_parent_message_id")
+    private Long contextParentMessageId;
+
+    @Column(name = "context_root_message_id")
+    private Long contextRootMessageId;
+
     @Column(name = "is_warning", nullable = false)
     private boolean warning = false;
 
@@ -93,6 +102,29 @@ public class AiMessage extends BaseCreatedEntity {
         if (aiProcessingStatus == AiResponseProcessingStatus.PROCESSING) {
             aiProcessingStatus = AiResponseProcessingStatus.COMPLETED;
         }
+    }
+
+    public void updateConversationContext(
+            String resolvedQuestion,
+            Long contextParentMessageId,
+            Long contextRootMessageId
+    ) {
+        validateUserMessage();
+        this.resolvedQuestion = resolvedQuestion == null || resolvedQuestion.isBlank()
+                ? content
+                : resolvedQuestion.trim();
+        this.contextParentMessageId = contextParentMessageId;
+        this.contextRootMessageId = contextRootMessageId;
+    }
+
+    public void inheritConversationContext(AiMessage userMessage) {
+        if (senderType != SenderType.AI || userMessage.senderType != SenderType.USER) {
+            throw new IllegalStateException(
+                    "AI message can inherit context only from a USER message");
+        }
+        this.resolvedQuestion = userMessage.resolvedQuestion;
+        this.contextParentMessageId = userMessage.id;
+        this.contextRootMessageId = userMessage.contextRootMessageId;
     }
 
     public void failAiResponse() {

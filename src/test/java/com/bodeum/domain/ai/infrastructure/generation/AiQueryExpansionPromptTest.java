@@ -44,8 +44,27 @@ class AiQueryExpansionPromptTest {
                 "한 스무 곳",
                 "최대한 많이",
                 "가능한 곳 전부",
-                "한 번 응답 최대치인 10",
+                "한 번 응답 최대치인 {{maxResultCount}}",
                 "개수나 최대 범위 요청이 없다면 null"
+        );
+    }
+
+    @Test
+    void resolvesIncompleteFollowUpQuestionsFromPreviousConversation() throws IOException {
+        String prompt = new ClassPathResource(
+                "prompts/ai-question-intent-classifier-system-prompt.txt"
+        ).getContentAsString(StandardCharsets.UTF_8);
+
+        assertThat(prompt).contains(
+                "resolvedQuestion",
+                "isFollowUp",
+                "독립적인 새 주제이면 false",
+                "같은 대화방에 이전 메시지가 있다는 이유로",
+                "직전 대화 없이는 의미가 불완전한 후속 질문",
+                "대상·지역·자원 유형·조건을 복원",
+                "독립적으로 검색하고 답변할 수 있는 하나의 질문",
+                "새로 추가하거나 변경한 조건은 반영",
+                "변경하지 않은 이전 조건은 유지"
         );
     }
 }

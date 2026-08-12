@@ -29,20 +29,22 @@ import org.slf4j.LoggerFactory;
 public class SpringAiDocumentRetriever implements AiDocumentRetriever {
 
     private static final Logger log = LoggerFactory.getLogger(SpringAiDocumentRetriever.class);
-    private static final int MAX_REQUESTED_RESULT_COUNT = 10;
     private static final Pattern REQUESTED_RESULT_COUNT_PATTERN =
             Pattern.compile("(\\d{1,2})\\s*(?:개|곳)");
     private final VectorStoreRetriever vectorStoreRetriever;
     private final int topK;
+    private final int maxResultCount;
     private final double similarityThreshold;
 
     public SpringAiDocumentRetriever(
             VectorStoreRetriever vectorStoreRetriever,
             @Value("${bodeum.ai.rag.top-k:5}") int topK,
+            @Value("${bodeum.ai.result.max-count:10}") int maxResultCount,
             @Value("${bodeum.ai.rag.similarity-threshold:0.4}") double similarityThreshold
     ) {
         this.vectorStoreRetriever = vectorStoreRetriever;
         this.topK = topK;
+        this.maxResultCount = Math.max(topK, maxResultCount);
         this.similarityThreshold = similarityThreshold;
     }
 
@@ -166,11 +168,14 @@ public class SpringAiDocumentRetriever implements AiDocumentRetriever {
             return topK;
         }
         Matcher matcher = REQUESTED_RESULT_COUNT_PATTERN.matcher(question);
-        if (!matcher.find()) {
-            return topK;
+        int requestedCount = topK;
+        while (matcher.find()) {
+            requestedCount = Math.max(
+                    requestedCount,
+                    Integer.parseInt(matcher.group(1))
+            );
         }
-        int requestedCount = Integer.parseInt(matcher.group(1));
-        return Math.max(topK, Math.min(requestedCount, MAX_REQUESTED_RESULT_COUNT));
+        return Math.min(requestedCount, maxResultCount);
     }
 
     private double score(Document document) {

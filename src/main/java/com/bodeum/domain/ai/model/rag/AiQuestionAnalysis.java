@@ -9,11 +9,13 @@ public record AiQuestionAnalysis(
         AiQuestionIntent intent,
         AiSearchScope searchScope,
         List<String> retrievalQueries,
-        Integer requestedResultCount
+        Integer requestedResultCount,
+        String resolvedQuestion,
+        boolean followUp
 ) {
 
     public AiQuestionAnalysis(AiQuestionIntent intent, List<String> retrievalQueries) {
-        this(intent, AiSearchScope.GENERAL, retrievalQueries, null);
+        this(intent, AiSearchScope.GENERAL, retrievalQueries, null, null, false);
     }
 
     public AiQuestionAnalysis(
@@ -21,7 +23,16 @@ public record AiQuestionAnalysis(
             AiSearchScope searchScope,
             List<String> retrievalQueries
     ) {
-        this(intent, searchScope, retrievalQueries, null);
+        this(intent, searchScope, retrievalQueries, null, null, false);
+    }
+
+    public AiQuestionAnalysis(
+            AiQuestionIntent intent,
+            AiSearchScope searchScope,
+            List<String> retrievalQueries,
+            Integer requestedResultCount
+    ) {
+        this(intent, searchScope, retrievalQueries, requestedResultCount, null, false);
     }
 
     public AiQuestionAnalysis {
@@ -38,11 +49,14 @@ public record AiQuestionAnalysis(
         requestedResultCount = requestedResultCount != null && requestedResultCount > 0
                 ? requestedResultCount
                 : null;
+        resolvedQuestion = resolvedQuestion == null || resolvedQuestion.isBlank()
+                ? null
+                : resolvedQuestion.trim();
     }
 
     public static AiQuestionAnalysis fallback() {
         return new AiQuestionAnalysis(
-                AiQuestionIntent.NONE, AiSearchScope.GENERAL, List.of(), null);
+                AiQuestionIntent.NONE, AiSearchScope.GENERAL, List.of(), null, null, false);
     }
 
     public static AiQuestionAnalysis fallback(String question) {
@@ -74,6 +88,45 @@ public record AiQuestionAnalysis(
             List<String> expandedQueries,
             Integer requestedResultCount
     ) {
+        return forQuestion(
+                question,
+                intent,
+                searchScope,
+                expandedQueries,
+                requestedResultCount,
+                question,
+                false
+        );
+    }
+
+    public static AiQuestionAnalysis forQuestion(
+            String question,
+            AiQuestionIntent intent,
+            AiSearchScope searchScope,
+            List<String> expandedQueries,
+            Integer requestedResultCount,
+            String resolvedQuestion
+    ) {
+        return forQuestion(
+                question,
+                intent,
+                searchScope,
+                expandedQueries,
+                requestedResultCount,
+                resolvedQuestion,
+                false
+        );
+    }
+
+    public static AiQuestionAnalysis forQuestion(
+            String question,
+            AiQuestionIntent intent,
+            AiSearchScope searchScope,
+            List<String> expandedQueries,
+            Integer requestedResultCount,
+            String resolvedQuestion,
+            boolean followUp
+    ) {
         AiQuestionIntent resolvedIntent = intent == null
                 ? AiQuestionIntent.NONE
                 : intent;
@@ -82,7 +135,9 @@ public record AiQuestionAnalysis(
                     resolvedIntent,
                     AiSearchScope.GENERAL,
                     List.of(),
-                    requestedResultCount
+                    requestedResultCount,
+                    resolvedQuestion,
+                    followUp
             );
         }
 
@@ -99,6 +154,12 @@ public record AiQuestionAnalysis(
                 .limit(3)
                 .toList();
         return new AiQuestionAnalysis(
-                resolvedIntent, searchScope, retrievalQueries, requestedResultCount);
+                resolvedIntent,
+                searchScope,
+                retrievalQueries,
+                requestedResultCount,
+                resolvedQuestion,
+                followUp
+        );
     }
 }
