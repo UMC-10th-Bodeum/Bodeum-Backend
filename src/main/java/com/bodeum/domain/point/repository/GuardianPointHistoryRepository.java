@@ -3,6 +3,7 @@ package com.bodeum.domain.point.repository;
 import com.bodeum.domain.point.entity.GuardianPointHistory;
 import com.bodeum.domain.point.enums.PointEventType;
 import com.bodeum.domain.point.enums.PointType;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -24,6 +25,13 @@ public interface GuardianPointHistoryRepository extends JpaRepository<GuardianPo
             PointEventType eventType,
             Long referenceId,
             Long actorUserId
+    );
+
+    long countByGuardianPoint_IdAndEventTypeAndCreatedAtGreaterThanEqualAndCreatedAtLessThan(
+            Long guardianPointId,
+            PointEventType eventType,
+            Instant startInclusive,
+            Instant endExclusive
     );
 
     @Query("""

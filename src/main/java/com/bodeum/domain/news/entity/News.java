@@ -184,7 +184,11 @@ public class News extends BaseCreatedUpdatedDeletedEntity {
         this.content = candidate.content();
         this.sourceName = candidate.sourceName();
         this.publishedAt = candidate.publishedAt();
-        this.originalUrl = candidate.originalUrl();
+        String resolvedUrl = NewsExternalLinkResolver.resolve(
+                candidate.sourceName(),
+                candidate.title()
+        );
+        this.originalUrl = resolvedUrl != null ? resolvedUrl : candidate.originalUrl();
         this.thumbnailUrl = candidate.thumbnailUrl();
         this.newsType = candidate.newsType();
         this.recruitmentStatus = candidate.recruitmentStatus();

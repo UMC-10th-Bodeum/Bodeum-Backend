@@ -78,7 +78,7 @@ public class PostController {
 
     @Operation(
             summary = "게시글 검색어 추천 조회",
-            description = "검색어가 제목 또는 본문에 포함된 활성 게시글에서 제목 또는 본문 일부를 추천어로 조회한다."
+            description = "검색어가 제목 또는 본문에 포함된 활성 게시글의 제목과 본문 미리보기를 함께 조회한다."
     )
     @GetMapping("/search/suggestions")
     public ApiResponse<PostSearchSuggestionsResponse> getSearchSuggestions(

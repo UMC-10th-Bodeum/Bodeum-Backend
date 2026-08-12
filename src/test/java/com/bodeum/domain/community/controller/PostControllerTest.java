@@ -128,20 +128,30 @@ class PostControllerTest {
     }
 
     @Test
-    void getSearchSuggestionsReturnsTitleAndContentTypes() throws Exception {
+    void getSearchSuggestionsReturnsTitleAndContentPreview() throws Exception {
         given(postListService.getSearchSuggestions("자폐스펙트럼", 10))
                 .willReturn(PostSearchSuggestionsResponse.fromSuggestions(List.of(
-                        PostSearchSuggestionResponse.fromTitle("자폐스펙트럼 치료 기록"),
-                        PostSearchSuggestionResponse.fromContent("자폐스펙트럼 아이의 치료 경험입니다.")
+                        PostSearchSuggestionResponse.fromTitle(
+                                "자폐스펙트럼 치료 기록",
+                                "치료 과정을 기록했습니다."
+                        ),
+                        PostSearchSuggestionResponse.fromContent(
+                                "언어치료 후기",
+                                "자폐스펙트럼 아이의 치료 경험입니다."
+                        )
                 )));
 
         mockMvc.perform(get("/api/v1/community/posts/search/suggestions")
                         .param("keyword", "자폐스펙트럼"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.result.suggestions[0].text")
+                .andExpect(jsonPath("$.result.suggestions[0].title")
                         .value("자폐스펙트럼 치료 기록"))
+                .andExpect(jsonPath("$.result.suggestions[0].content")
+                        .value("치료 과정을 기록했습니다."))
                 .andExpect(jsonPath("$.result.suggestions[0].type").value("POST_TITLE"))
-                .andExpect(jsonPath("$.result.suggestions[1].text")
+                .andExpect(jsonPath("$.result.suggestions[1].title")
+                        .value("언어치료 후기"))
+                .andExpect(jsonPath("$.result.suggestions[1].content")
                         .value("자폐스펙트럼 아이의 치료 경험입니다."))
                 .andExpect(jsonPath("$.result.suggestions[1].type").value("POST_CONTENT"));
 
