@@ -46,6 +46,7 @@ import com.bodeum.domain.user.repository.UserRepository;
 import com.bodeum.global.apiPayload.exception.ProjectException;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -1224,6 +1225,33 @@ class AiMessageServiceTest {
                 .startsWith(nationalDocument, localDocument)
                 .contains(unrelatedDocument);
         verify(documentRetriever).retrieve(eq(nationalSupplementQuery), any(), any());
+    }
+
+    @Test
+    void limitsSupplementalConceptSearches() {
+        List<AiRequiredConcept> concepts = IntStream.rangeClosed(1, 5)
+                .mapToObj(index -> new AiRequiredConcept(
+                        "필수 개념 " + index,
+                        "보충 검색어 " + index,
+                        List.of("일치어-" + index),
+                        List.of()
+                ))
+                .toList();
+        when(documentRetriever.retrieve(any(), any(), any())).thenReturn(List.of());
+
+        ReflectionTestUtils.invokeMethod(
+                service,
+                "preserveRequiredConceptDocuments",
+                concepts,
+                "검색 목표",
+                List.<List<AiReferenceDocument>>of(),
+                new LinkedHashMap<String, AiReferenceDocument>(),
+                null,
+                AiSearchScope.GENERAL
+        );
+
+        verify(documentRetriever, org.mockito.Mockito.times(3))
+                .retrieve(any(), any(), eq(AiSearchScope.GENERAL));
     }
 
     @Test

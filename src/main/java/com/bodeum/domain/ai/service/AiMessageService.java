@@ -119,6 +119,9 @@ public class AiMessageService {
     @Value("${bodeum.ai.result.max-count:10}")
     private int maxResultCount = 10;
 
+    @Value("${bodeum.ai.rag.max-supplemental-concept-searches:3}")
+    private int maxSupplementalConceptSearches = 3;
+
     public CreateAiMessageResponse createMessage(Long userId, String content) {
         AiChatRoom chatRoom = aiChatRoomRepository.findByUserId(userId)
                 .orElseThrow(() -> new ProjectException(AiErrorCode.AI_CHAT_ROOM_NOT_FOUND));
@@ -934,6 +937,7 @@ public class AiMessageService {
         List<AiReferenceDocument> candidates = new ArrayList<>(documentsByQuery.stream()
                 .flatMap(List::stream)
                 .toList());
+        int supplementalSearchCount = 0;
         for (int conceptIndex = 0; conceptIndex < requiredConcepts.size(); conceptIndex++) {
             AiRequiredConcept concept = requiredConcepts.get(conceptIndex);
             Optional<AiReferenceDocument> matched = findConceptDocument(
@@ -942,7 +946,9 @@ public class AiMessageService {
                     profile,
                     documentsByKey.keySet()
             );
-            if (matched.isEmpty()) {
+            if (matched.isEmpty()
+                    && supplementalSearchCount < maxSupplementalConceptSearches) {
+                supplementalSearchCount++;
                 List<AiReferenceDocument> supplemented = documentRetriever.retrieve(
                         supplementalResultQuery(concept, searchGoal, profile),
                         profile,
