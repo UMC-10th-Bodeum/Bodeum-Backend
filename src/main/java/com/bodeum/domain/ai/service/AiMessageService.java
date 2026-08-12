@@ -10,7 +10,7 @@ import com.bodeum.domain.ai.enums.AiStarterQuestionType;
 import com.bodeum.domain.ai.enums.SenderType;
 import com.bodeum.domain.ai.exception.AiErrorCode;
 import com.bodeum.domain.ai.model.rag.AiReferenceDocument;
-import com.bodeum.domain.ai.model.rag.AiInfoSubCategory;
+import com.bodeum.domain.info.entity.enums.InfoSubCategory;
 import com.bodeum.domain.ai.model.rag.AiQuestionAnalysis;
 import com.bodeum.domain.ai.model.rag.AiScrapInterests;
 import com.bodeum.domain.ai.model.rag.AiSourceKey;
@@ -69,6 +69,21 @@ public class AiMessageService {
             "재활센터를추천해줘",
             "재활센터알려줘",
             "재활센터를알려줘"
+    );
+    private static final Set<InfoSubCategory> AI_SEARCHABLE_INFO_SUB_CATEGORIES = Set.of(
+            InfoSubCategory.PRIMARY_CARE,
+            InfoSubCategory.EMERGENCY_CLINIC,
+            InfoSubCategory.THERAPY_REHAB,
+            InfoSubCategory.WELFARE_CENTER,
+            InfoSubCategory.FAMILY_SUPPORT,
+            InfoSubCategory.PRIVATE_WELFARE,
+            InfoSubCategory.NATIONAL_WELFARE,
+            InfoSubCategory.LOCAL_WELFARE,
+            InfoSubCategory.SPECIAL_SCHOOL,
+            InfoSubCategory.SPECIAL_EDU_SUPPORT,
+            InfoSubCategory.LIFELONG_EDU,
+            InfoSubCategory.REALTIME_JOB,
+            InfoSubCategory.STANDARD_WORKPLACE
     );
     private final AiChatRoomRepository aiChatRoomRepository;
     private final AiMessageRepository aiMessageRepository;
@@ -346,7 +361,7 @@ public class AiMessageService {
                 && LOCAL_RESOURCE_PATTERN.matcher(resolvedQuestion).find()) {
             searchScope = AiSearchScope.LOCAL_RESOURCE;
         }
-        AiInfoSubCategory infoSubCategory = resolveInfoSubCategory(
+        InfoSubCategory infoSubCategory = resolveInfoSubCategory(
                 resolvedQuestion,
                 analysis.infoSubCategory()
         );
@@ -400,37 +415,40 @@ public class AiMessageService {
         };
     }
 
-    private AiInfoSubCategory resolveInfoSubCategory(
+    private InfoSubCategory resolveInfoSubCategory(
             String question,
-            AiInfoSubCategory analyzedCategory
+            InfoSubCategory analyzedCategory
     ) {
         String normalizedQuestion = normalizeQuestion(question);
         if (normalizedQuestion.contains("특수교육지원센터")) {
-            return AiInfoSubCategory.SPECIAL_EDU_SUPPORT;
+            return InfoSubCategory.SPECIAL_EDU_SUPPORT;
         }
         if (normalizedQuestion.contains("특수학교")) {
-            return AiInfoSubCategory.SPECIAL_SCHOOL;
+            return InfoSubCategory.SPECIAL_SCHOOL;
         }
         if (normalizedQuestion.contains("장애인평생교육")) {
-            return AiInfoSubCategory.LIFELONG_EDU;
+            return InfoSubCategory.LIFELONG_EDU;
         }
         if (normalizedQuestion.contains("응급의료기관")) {
-            return AiInfoSubCategory.EMERGENCY_CLINIC;
+            return InfoSubCategory.EMERGENCY_CLINIC;
         }
         if (normalizedQuestion.contains("치료재활기관")
                 || normalizedQuestion.contains("재활센터")) {
-            return AiInfoSubCategory.THERAPY_REHAB;
+            return InfoSubCategory.THERAPY_REHAB;
         }
         if (normalizedQuestion.contains("장애인복지관")) {
-            return AiInfoSubCategory.WELFARE_CENTER;
+            return InfoSubCategory.WELFARE_CENTER;
         }
         if (normalizedQuestion.contains("장애인가족지원센터")) {
-            return AiInfoSubCategory.FAMILY_SUPPORT;
+            return InfoSubCategory.FAMILY_SUPPORT;
         }
         if (normalizedQuestion.contains("장애인표준사업장")) {
-            return AiInfoSubCategory.STANDARD_WORKPLACE;
+            return InfoSubCategory.STANDARD_WORKPLACE;
         }
-        return analyzedCategory;
+        return analyzedCategory != null
+                && AI_SEARCHABLE_INFO_SUB_CATEGORIES.contains(analyzedCategory)
+                ? analyzedCategory
+                : null;
     }
 
     private AiSearchScope searchScope(AiStarterQuestionType questionType) {

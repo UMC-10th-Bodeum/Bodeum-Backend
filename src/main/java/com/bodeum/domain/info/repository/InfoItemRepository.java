@@ -2,6 +2,7 @@ package com.bodeum.domain.info.repository;
 
 import com.bodeum.domain.info.entity.InfoItem;
 import com.bodeum.domain.info.entity.enums.MainCategory;
+import com.bodeum.domain.info.entity.enums.InfoSubCategory;
 import com.bodeum.domain.user.enums.InterestCategory;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.EntityGraph;
@@ -41,9 +42,10 @@ public interface InfoItemRepository extends JpaRepository<InfoItem, Long>, InfoI
 
     @Query("select i from InfoItem i join i.infoCategory c " +
             "where i.sido = :regionLevel1 and i.sigungu = :regionLevel2 " +
-            "and c.subCategory = 'THERAPY_REHAB'")
+            "and c.subCategory = :subCategory")
     List<InfoItem> findRehabCentersByRegion(@Param("regionLevel1") String regionLevel1,
                                             @Param("regionLevel2") String regionLevel2,
+                                            @Param("subCategory") InfoSubCategory subCategory,
                                             Pageable pageable);
 
     /**

@@ -9,7 +9,7 @@ import static org.mockito.Mockito.when;
 import com.bodeum.domain.ai.enums.AiResponseSourceType;
 import com.bodeum.domain.ai.enums.AiSearchScope;
 import com.bodeum.domain.ai.model.rag.AiUserProfile;
-import com.bodeum.domain.ai.model.rag.AiInfoSubCategory;
+import com.bodeum.domain.info.entity.enums.InfoSubCategory;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -239,7 +239,7 @@ class SpringAiDocumentRetrieverTest {
         AiUserProfile profile = new AiUserProfile(
                 "경기도 수원시", "경기도", "수원시", 6,
                 List.of(), List.of(), ""
-        ).withInfoSubCategory(AiInfoSubCategory.SPECIAL_SCHOOL);
+        ).withInfoSubCategory(InfoSubCategory.SPECIAL_SCHOOL);
         when(vectorStoreRetriever.similaritySearch(
                 org.mockito.ArgumentMatchers.any(SearchRequest.class)))
                 .thenReturn(List.of());

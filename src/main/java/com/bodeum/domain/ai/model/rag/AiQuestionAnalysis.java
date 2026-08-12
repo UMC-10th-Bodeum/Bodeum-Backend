@@ -1,5 +1,7 @@
 package com.bodeum.domain.ai.model.rag;
 
+import com.bodeum.domain.info.entity.enums.InfoSubCategory;
+
 import com.bodeum.domain.ai.enums.AiQuestionIntent;
 import com.bodeum.domain.ai.enums.AiSearchScope;
 import java.util.List;
@@ -12,7 +14,7 @@ public record AiQuestionAnalysis(
         Integer requestedResultCount,
         String resolvedQuestion,
         boolean followUp,
-        AiInfoSubCategory infoSubCategory
+        InfoSubCategory infoSubCategory
 ) {
 
     public AiQuestionAnalysis(AiQuestionIntent intent, List<String> retrievalQueries) {
@@ -140,7 +142,7 @@ public record AiQuestionAnalysis(
             Integer requestedResultCount,
             String resolvedQuestion,
             boolean followUp,
-            AiInfoSubCategory infoSubCategory
+            InfoSubCategory infoSubCategory
     ) {
         AiQuestionIntent resolvedIntent = intent == null
                 ? AiQuestionIntent.NONE

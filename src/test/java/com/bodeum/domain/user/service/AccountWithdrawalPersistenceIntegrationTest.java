@@ -302,7 +302,7 @@ class AccountWithdrawalPersistenceIntegrationTest {
         InfoCategory category = InfoCategory.builder()
                 .mainCategory(MainCategory.WELFARE)
                 .mainCategoryKo("복지")
-                .subCategory("sub")
+                .subCategory(com.bodeum.domain.info.entity.enums.InfoSubCategory.PRIVATE_WELFARE)
                 .subCategoryKo("서브")
                 .build();
         em.persist(category);

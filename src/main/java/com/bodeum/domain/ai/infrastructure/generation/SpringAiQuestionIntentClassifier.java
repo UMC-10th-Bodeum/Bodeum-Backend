@@ -3,7 +3,7 @@ package com.bodeum.domain.ai.infrastructure.generation;
 import com.bodeum.domain.ai.enums.AiQuestionIntent;
 import com.bodeum.domain.ai.enums.AiSearchScope;
 import com.bodeum.domain.ai.model.rag.AiQuestionAnalysis;
-import com.bodeum.domain.ai.model.rag.AiInfoSubCategory;
+import com.bodeum.domain.info.entity.enums.InfoSubCategory;
 import com.bodeum.domain.ai.service.port.AiQuestionIntentClassifier;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -104,7 +104,7 @@ public class SpringAiQuestionIntentClassifier implements AiQuestionIntentClassif
             Integer requestedResultCount,
             String resolvedQuestion,
             boolean isFollowUp,
-            AiInfoSubCategory infoSubCategory
+            InfoSubCategory infoSubCategory
     ) {
     }
 

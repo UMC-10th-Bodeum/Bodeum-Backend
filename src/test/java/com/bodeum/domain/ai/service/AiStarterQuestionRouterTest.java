@@ -300,6 +300,7 @@ class AiStarterQuestionRouterTest {
         when(infoItemRepository.findRehabCentersByRegion(
                 eq("경기도"),
                 eq("수원시"),
+                eq(com.bodeum.domain.info.entity.enums.InfoSubCategory.THERAPY_REHAB),
                 any(Pageable.class)
         )).thenReturn(List.of(center));
 
@@ -331,7 +332,7 @@ class AiStarterQuestionRouterTest {
         assertThat(result.content()).contains("시·도와 시·군·구를 알려주세요");
         assertThat(result.sources()).isEmpty();
         verify(infoItemRepository, never())
-                .findRehabCentersByRegion(any(), any(), any());
+                .findRehabCentersByRegion(any(), any(), any(), any());
     }
 
     private AiExternalSource source(String name, String baseUrl) {

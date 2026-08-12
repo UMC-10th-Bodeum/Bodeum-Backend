@@ -1,5 +1,7 @@
 package com.bodeum.domain.ai.model.rag;
 
+import com.bodeum.domain.info.entity.enums.InfoSubCategory;
+
 import java.util.List;
 
 public record AiUserProfile(
@@ -13,7 +15,7 @@ public record AiUserProfile(
         List<String> scrappedInfoTitles,
         List<String> scrappedNewsTitles,
         List<String> scrappedCommunityTopics,
-        AiInfoSubCategory infoSubCategory
+        InfoSubCategory infoSubCategory
 ) {
 
     public AiUserProfile {
@@ -85,7 +87,7 @@ public record AiUserProfile(
         );
     }
 
-    public AiUserProfile withInfoSubCategory(AiInfoSubCategory subCategory) {
+    public AiUserProfile withInfoSubCategory(InfoSubCategory subCategory) {
         return new AiUserProfile(
                 region, regionLevel1, regionLevel2, childAge, disabilityTypes,
                 interests, keywordText, scrappedInfoTitles, scrappedNewsTitles,

@@ -1282,7 +1282,7 @@ class AiMessageServiceTest {
                                 && "경기도".equals(profile.regionLevel1())
                                 && "수원시".equals(profile.regionLevel2())
                                 && profile.infoSubCategory()
-                                == com.bodeum.domain.ai.model.rag.AiInfoSubCategory
+                                == com.bodeum.domain.info.entity.enums.InfoSubCategory
                                 .SPECIAL_SCHOOL),
                 eq(AiSearchScope.LOCAL_RESOURCE)
         );
@@ -1508,7 +1508,7 @@ class AiMessageServiceTest {
                 eq(contextualizedQuestion),
                 org.mockito.ArgumentMatchers.argThat(profile ->
                         profile.infoSubCategory()
-                                == com.bodeum.domain.ai.model.rag.AiInfoSubCategory
+                                == com.bodeum.domain.info.entity.enums.InfoSubCategory
                                 .SPECIAL_SCHOOL),
                 eq(AiSearchScope.LOCAL_RESOURCE)))
                 .thenReturn(List.of(school));
