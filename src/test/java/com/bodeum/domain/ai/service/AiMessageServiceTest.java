@@ -1045,6 +1045,79 @@ class AiMessageServiceTest {
     }
 
     @Test
+    void startsNewContextForSelfContainedNearbyResourceQuestionEvenWhenLlmMarksFollowUp() {
+        String question = "근처 장애인재활센터 5개 알려줘";
+        String previousQuestion = "부산 특수학교 알려줘";
+        String previousAnswer = "부산광역시 특수학교 5곳을 안내했습니다.";
+        user.updateInterestRegion(List.of(), Region.create("경기도", "수원시"));
+        AiMessage currentUserMessage = mock(AiMessage.class);
+        AiMessage previousUserMessage = mock(AiMessage.class);
+        AiMessage previousAiMessage = mock(AiMessage.class);
+        when(previousUserMessage.getContent()).thenReturn(previousQuestion);
+        when(previousUserMessage.getId()).thenReturn(100L);
+        when(previousUserMessage.getContextRootMessageId()).thenReturn(90L);
+        when(previousAiMessage.getContent()).thenReturn(previousAnswer);
+        when(aiMessageRepository.findByChatRoomIdAndSenderTypeOrderByCreatedAtDescIdDesc(
+                any(), eq(SenderType.USER), any()))
+                .thenReturn(List.of(currentUserMessage, previousUserMessage));
+        when(aiMessageRepository.findByChatRoomIdAndSenderTypeOrderByCreatedAtDescIdDesc(
+                any(), eq(SenderType.AI), any()))
+                .thenReturn(List.of(previousAiMessage));
+        when(questionIntentClassifier.analyze(question))
+                .thenReturn(AiQuestionAnalysis.forQuestion(
+                        question,
+                        AiQuestionIntent.NONE,
+                        AiSearchScope.LOCAL_RESOURCE,
+                        List.of(),
+                        5,
+                        question,
+                        true
+                ));
+        when(documentRetriever.retrieve(
+                any(), any(), eq(AiSearchScope.LOCAL_RESOURCE)))
+                .thenReturn(List.of());
+        AiMessage saved = savedAiMessage("관련 정보를 찾을 수 없습니다.");
+        when(persistenceService.saveAiMessageAndComplete(
+                eq(11L), eq(chatRoom), eq("관련 정보를 찾을 수 없습니다."),
+                eq(false), eq(AiAnswerStatus.NO_EVIDENCE), eq(List.of())))
+                .thenReturn(saved);
+
+        service.createMessage(1L, question);
+
+        verify(persistenceService).updateUserMessageContext(
+                11L,
+                question,
+                null,
+                11L
+        );
+        verify(questionIntentClassifier).analyze(question);
+        verify(questionIntentClassifier, never()).analyze(
+                question, previousQuestion, previousAnswer);
+    }
+
+    @Test
+    void keepsContextForQuestionThatReferencesPreviouslyMentionedResource() {
+        String question = "그 센터 신청 방법을 알려줘";
+        AiQuestionRegionResolver.RegionResolution regionResolution =
+                new AiQuestionRegionResolver.RegionResolution(
+                        AiQuestionRegionResolver.RegionResolution.Status.RESOLVED,
+                        Region.create("경기도", "수원시"),
+                        "경기도",
+                        List.of()
+                );
+
+        Boolean independent = ReflectionTestUtils.invokeMethod(
+                service,
+                "isSelfContainedLocalResourceQuestion",
+                question,
+                "수원시 그 센터 신청 방법을 알려줘",
+                regionResolution
+        );
+
+        assertThat(independent).isFalse();
+    }
+
+    @Test
     void mergesDocumentsRetrievedByOriginalAndExpandedQueries() {
         String question = "장애아동 활동지원 서비스 신청 방법 알려줘";
         String broaderTargetQuery = "장애인 활동지원 서비스 신청 방법 알려줘";
