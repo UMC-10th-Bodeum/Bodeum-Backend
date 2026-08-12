@@ -59,6 +59,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
 class AiMessageServiceTest {
@@ -757,6 +758,64 @@ class AiMessageServiceTest {
         verify(documentRetriever).retrieve(
                 eq(searchQuestion), any(), eq(AiSearchScope.GENERAL));
         verify(answerGenerator).generate(eq(question), any(), eq(List.of(source)));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void keepsDifferentInstitutionsThatShareTheSamePhoneNumber() {
+        AiReferenceDocument first = identityDocument(
+                "CENTER-1", "첫 번째 센터", "https://first.example.com", "031-123-4567");
+        AiReferenceDocument second = identityDocument(
+                "CENTER-2", "두 번째 센터", "https://second.example.com", "031-123-4567");
+
+        List<AiReferenceDocument> result = ReflectionTestUtils.invokeMethod(
+                service, "deduplicateInstitutions", List.of(first, second));
+
+        assertThat(result).containsExactly(first, second);
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void usesPhoneAsFallbackWhenTitleAndUrlAreMissing() {
+        AiReferenceDocument first = identityDocument(
+                "CENTER-1", null, null, "031-123-4567");
+        AiReferenceDocument duplicate = identityDocument(
+                "CENTER-2", null, null, "031-123-4567");
+
+        List<AiReferenceDocument> result = ReflectionTestUtils.invokeMethod(
+                service, "deduplicateInstitutions", List.of(first, duplicate));
+
+        assertThat(result).containsExactly(first);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "5개 더 알려줘",
+            "더 알려줘",
+            "좀 더 추천해줘",
+            "더 5곳 알려주세요",
+            "추가로 알려줘",
+            "추가로 5개 알려줘",
+            "다른 곳 추천해주세요",
+            "더 많은 기관 알려줘"
+    })
+    void recognizesAdditionalResultsQuestions(String question) {
+        assertThat((Boolean) ReflectionTestUtils.invokeMethod(
+                service, "isAdditionalResultsQuestion", question)).isTrue();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "더봄재활센터 알려줘",
+            "더 자세히 알려줘",
+            "상세히 알려주세요",
+            "지원 내용을 더 알려줘",
+            "신청 방법을 더 알려줘",
+            "재활센터 알려줘"
+    })
+    void doesNotTreatNamesOrDetailQuestionsAsAdditionalResults(String question) {
+        assertThat((Boolean) ReflectionTestUtils.invokeMethod(
+                service, "isAdditionalResultsQuestion", question)).isFalse();
     }
 
     @Test
@@ -1784,6 +1843,23 @@ class AiMessageServiceTest {
                 sourceId,
                 documentKey,
                 "https://example.com/" + sourceId,
+                Instant.parse("2026-07-01T00:00:00Z")
+        );
+    }
+
+    private AiReferenceDocument identityDocument(
+            String documentKey,
+            String title,
+            String url,
+            String phone
+    ) {
+        return new AiReferenceDocument(
+                documentKey,
+                "전화번호: " + phone,
+                AiResponseSourceType.INFO,
+                null,
+                title,
+                url,
                 Instant.parse("2026-07-01T00:00:00Z")
         );
     }

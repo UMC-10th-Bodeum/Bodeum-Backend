@@ -64,6 +64,13 @@ public class AiMessageService {
             "(학교|센터|기관|병원|의원|약국|복지관|시설|교육원|상담소|지원사업|지원서비스)");
     private static final Pattern RELATIVE_LOCAL_REGION_PATTERN = Pattern.compile(
             "(우리\\s*(지역|동네)|근처|주변)");
+    private static final Pattern ADDITIONAL_RESULTS_PATTERN = Pattern.compile(
+            "(?:"
+                    + "(?:\\d+(?:개|곳))?더(?:\\d+(?:개|곳))?"
+                    + "|더많은(?:곳|기관|학교|센터|서비스|제도|항목)?"
+                    + "|추가로?(?:\\d+(?:개|곳))?"
+                    + "|다른(?:곳|기관|학교|센터|서비스|제도|항목)"
+                    + ")(?:알려줘|알려주세요|추천해줘|추천해주세요)$");
     private static final String AMBIGUOUS_REGION_MESSAGE_PREFIX =
             "확인할 지역이 여러 곳입니다. ";
     private static final String NO_RESULT_MESSAGE = "관련 정보를 찾을 수 없습니다.";
@@ -678,6 +685,9 @@ public class AiMessageService {
     private Set<String> documentIdentityKeys(AiReferenceDocument document) {
         Set<String> identityKeys = new HashSet<>(
                 sourceIdentityKeys(document.title(), document.url()));
+        if (!identityKeys.isEmpty()) {
+            return identityKeys;
+        }
         Matcher phoneMatcher = PHONE_NUMBER_PATTERN.matcher(
                 document.content() == null ? "" : document.content());
         while (phoneMatcher.find()) {
@@ -812,19 +822,13 @@ public class AiMessageService {
 
     private boolean isAdditionalResultsQuestion(String content) {
         String normalized = normalizeQuestion(content);
-        if (!normalized.contains("더")) {
-            return false;
-        }
         if (normalized.contains("자세히")
                 || normalized.contains("상세히")
                 || normalized.contains("내용")
                 || normalized.contains("방법")) {
             return false;
         }
-        return normalized.endsWith("알려줘")
-                || normalized.endsWith("알려주세요")
-                || normalized.endsWith("추천해줘")
-                || normalized.endsWith("추천해주세요");
+        return ADDITIONAL_RESULTS_PATTERN.matcher(normalized).find();
     }
 
     private String appendAdditionalResultsSearchContext(
