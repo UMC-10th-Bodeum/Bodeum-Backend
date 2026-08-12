@@ -5,5 +5,6 @@ public enum AiAnswerStatus {
     ANSWERED,
     LINK_GUIDANCE,
     REGION_REQUIRED,
+    CLARIFICATION_REQUIRED,
     NO_EVIDENCE
 }

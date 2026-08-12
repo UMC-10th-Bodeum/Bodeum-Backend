@@ -146,7 +146,8 @@ class AiContentIndexingServiceTest {
         when(category.getId()).thenReturn(9L);
         when(category.getMainCategory()).thenReturn(MainCategory.INSTITUTION);
         when(category.getMainCategoryKo()).thenReturn("기관");
-        when(category.getSubCategory()).thenReturn("FAMILY_SUPPORT");
+        when(category.getSubCategory()).thenReturn(
+                com.bodeum.domain.info.entity.enums.InfoSubCategory.FAMILY_SUPPORT);
         when(category.getSubCategoryKo()).thenReturn("장애인가족지원센터");
         InfoItem info = mock(InfoItem.class);
         when(info.getId()).thenReturn(1L);

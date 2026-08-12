@@ -297,9 +297,11 @@ class AiStarterQuestionRouterTest {
         when(center.getSido()).thenReturn("경기도");
         when(center.getSigungu()).thenReturn("수원시");
         when(center.getPhone()).thenReturn("031-111-1111");
+        when(center.getIntroduction()).thenReturn(null);
         when(infoItemRepository.findRehabCentersByRegion(
                 eq("경기도"),
                 eq("수원시"),
+                eq(com.bodeum.domain.info.entity.enums.InfoSubCategory.THERAPY_REHAB),
                 any(Pageable.class)
         )).thenReturn(List.of(center));
 
@@ -316,7 +318,8 @@ class AiStarterQuestionRouterTest {
                         "① 수원 언어재활센터",
                         "방문 전 꼭 전화로 확인"
                 )
-                .doesNotContain("조회 10", "저장 5", "후기 2", "활동 점수");
+                .doesNotContain(
+                        "조회 10", "저장 5", "후기 2", "활동 점수", "확인 필요");
         assertThat(result.sources().getFirst().sourceId()).isEqualTo(10L);
     }
 
@@ -331,7 +334,7 @@ class AiStarterQuestionRouterTest {
         assertThat(result.content()).contains("시·도와 시·군·구를 알려주세요");
         assertThat(result.sources()).isEmpty();
         verify(infoItemRepository, never())
-                .findRehabCentersByRegion(any(), any(), any());
+                .findRehabCentersByRegion(any(), any(), any(), any());
     }
 
     private AiExternalSource source(String name, String baseUrl) {

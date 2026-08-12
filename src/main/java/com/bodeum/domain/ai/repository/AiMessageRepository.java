@@ -24,6 +24,18 @@ public interface AiMessageRepository extends JpaRepository<AiMessage, Long> {
             SenderType senderType
     );
 
+    List<AiMessage> findByChatRoomIdAndSenderTypeOrderByCreatedAtDescIdDesc(
+            Long chatRoomId,
+            SenderType senderType,
+            Pageable pageable
+    );
+
+    List<AiMessage> findByChatRoomIdAndContextRootMessageIdAndSenderTypeOrderByCreatedAtDescIdDesc(
+            Long chatRoomId,
+            Long contextRootMessageId,
+            SenderType senderType
+    );
+
     boolean existsByChatRoomIdAndCreatedAtGreaterThanEqualAndCreatedAtLessThan(
             Long chatRoomId,
             Instant startAt,

@@ -75,7 +75,7 @@ public record MyScrapListResponse(
                     infoItem.getId(),
                     infoCategory.getMainCategory(),
                     infoCategory.getMainCategoryKo(),
-                    infoCategory.getSubCategory(),
+                    infoCategory.getSubCategory().name(),
                     infoCategory.getSubCategoryKo(),
                     infoItem.getName(),
                     infoItem.getIntroduction(),

@@ -13,6 +13,8 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStoreRetriever;
@@ -27,17 +29,22 @@ import org.slf4j.LoggerFactory;
 public class SpringAiDocumentRetriever implements AiDocumentRetriever {
 
     private static final Logger log = LoggerFactory.getLogger(SpringAiDocumentRetriever.class);
+    private static final Pattern REQUESTED_RESULT_COUNT_PATTERN =
+            Pattern.compile("(?<!\\d)(\\d+)\\s*(?:개|곳)");
     private final VectorStoreRetriever vectorStoreRetriever;
     private final int topK;
+    private final int maxResultCount;
     private final double similarityThreshold;
 
     public SpringAiDocumentRetriever(
             VectorStoreRetriever vectorStoreRetriever,
             @Value("${bodeum.ai.rag.top-k:5}") int topK,
+            @Value("${bodeum.ai.result.max-count:10}") int maxResultCount,
             @Value("${bodeum.ai.rag.similarity-threshold:0.4}") double similarityThreshold
     ) {
         this.vectorStoreRetriever = vectorStoreRetriever;
         this.topK = topK;
+        this.maxResultCount = Math.max(topK, maxResultCount);
         this.similarityThreshold = similarityThreshold;
     }
 
@@ -57,8 +64,9 @@ public class SpringAiDocumentRetriever implements AiDocumentRetriever {
             return retrieveAtScope(
                     question,
                     profile,
-                    null,
-                    false
+                    categoryFilter(profile),
+                    resolvedScope == AiSearchScope.GENERAL
+                            && hasText(profile.region())
             );
         } catch (ProjectException e) {
             throw e;
@@ -72,8 +80,11 @@ public class SpringAiDocumentRetriever implements AiDocumentRetriever {
             AiUserProfile profile
     ) {
         if (hasText(profile.regionLevel1()) && hasText(profile.regionLevel2())) {
-            String cityFilter = equalsFilter("sido", profile.regionLevel1())
-                    + " && " + equalsFilter("sigungu", profile.regionLevel2());
+            String cityFilter = combineFilters(
+                    equalsFilter("sido", profile.regionLevel1())
+                            + " && " + equalsFilter("sigungu", profile.regionLevel2()),
+                    categoryFilter(profile)
+            );
             List<AiReferenceDocument> cityDocuments = retrieveAtScope(
                     question, profile, cityFilter, false);
             if (!cityDocuments.isEmpty()) {
@@ -87,7 +98,10 @@ public class SpringAiDocumentRetriever implements AiDocumentRetriever {
             List<AiReferenceDocument> provinceDocuments = retrieveAtScope(
                     question,
                     profile,
-                    equalsFilter("sido", profile.regionLevel1()),
+                    combineFilters(
+                            equalsFilter("sido", profile.regionLevel1()),
+                            categoryFilter(profile)
+                    ),
                     false
             );
             if (!provinceDocuments.isEmpty()) {
@@ -98,7 +112,7 @@ public class SpringAiDocumentRetriever implements AiDocumentRetriever {
         }
 
         List<AiReferenceDocument> allDocuments = retrieveAtScope(
-                question, profile, null, false);
+                question, profile, categoryFilter(profile), false);
         log.info("[AI] 지역 기관 검색 범위 확대: scope=ALL, count={}", allDocuments.size());
         return allDocuments;
     }
@@ -109,11 +123,18 @@ public class SpringAiDocumentRetriever implements AiDocumentRetriever {
             String filterExpression,
             boolean includeRegion
     ) {
+        int searchCandidateCount = resolveSearchCandidateCount(question);
         String searchQuery = buildSearchQuery(question, profile, includeRegion);
-        List<Document> personalizedDocuments = search(searchQuery, filterExpression);
-        List<Document> questionDocuments = search(question, filterExpression);
+        List<Document> personalizedDocuments = search(
+                searchQuery, filterExpression, searchCandidateCount);
+        List<Document> questionDocuments = search(
+                question, filterExpression, searchCandidateCount);
 
         Map<String, Document> documentsById = new LinkedHashMap<>();
+        if (includeRegion) {
+            addRegionMatches(documentsById, personalizedDocuments, profile);
+            addRegionMatches(documentsById, questionDocuments, profile);
+        }
         addByScore(documentsById, questionDocuments);
         addByScore(documentsById, personalizedDocuments);
 
@@ -122,7 +143,7 @@ public class SpringAiDocumentRetriever implements AiDocumentRetriever {
                 document.getId(), score(document), similarityThreshold));
 
         return documentsById.values().stream()
-                .limit(topK)
+                .limit(searchCandidateCount)
                 .map(this::mapDocument)
                 .toList();
     }
@@ -138,15 +159,66 @@ public class SpringAiDocumentRetriever implements AiDocumentRetriever {
                         document.getId(), document));
     }
 
-    private List<Document> search(String query, String filterExpression) {
+    private List<Document> search(
+            String query,
+            String filterExpression,
+            int resultCount
+    ) {
         SearchRequest.Builder builder = SearchRequest.builder()
                 .query(query)
-                .topK(topK)
+                .topK(resultCount)
                 .similarityThreshold(0.0);
         if (hasText(filterExpression)) {
             builder.filterExpression(filterExpression);
         }
         return vectorStoreRetriever.similaritySearch(builder.build());
+    }
+
+    private void addRegionMatches(
+            Map<String, Document> documentsById,
+            List<Document> documents,
+            AiUserProfile profile
+    ) {
+        documents.stream()
+                .filter(document -> score(document) >= similarityThreshold)
+                .filter(document -> matchesProfileRegion(document, profile))
+                .sorted(Comparator.comparingDouble(this::score).reversed())
+                .forEach(document -> documentsById.putIfAbsent(
+                        document.getId(), document));
+    }
+
+    private boolean matchesProfileRegion(Document document, AiUserProfile profile) {
+        Map<String, Object> metadata = document.getMetadata();
+        String sido = nullable(metadata, "sido");
+        String sigungu = nullable(metadata, "sigungu");
+        if (hasText(profile.regionLevel1()) && hasText(profile.regionLevel2())) {
+            return profile.regionLevel1().equals(sido)
+                    && profile.regionLevel2().equals(sigungu);
+        }
+        return hasText(profile.regionLevel1())
+                && profile.regionLevel1().equals(sido);
+    }
+
+    private int resolveSearchCandidateCount(String question) {
+        if (question == null || question.isBlank()) {
+            return topK;
+        }
+        Matcher matcher = REQUESTED_RESULT_COUNT_PATTERN.matcher(question);
+        // 요청 개수보다 넉넉한 후보를 확보해 중복 제거와 관련성 검증 후에도
+        // 답변 모델이 요청 개수를 충족할 수 있도록 기본 topK를 후보 수의 하한으로 둔다.
+        int requestedCount = topK;
+        while (matcher.find()) {
+            try {
+                requestedCount = Math.max(
+                        requestedCount,
+                        Integer.parseInt(matcher.group(1))
+                );
+            } catch (NumberFormatException ignored) {
+                // 정수 범위를 넘는 요청은 검색 가능한 최대 후보 수로 제한한다.
+                requestedCount = maxResultCount;
+            }
+        }
+        return Math.min(requestedCount, maxResultCount);
     }
 
     private double score(Document document) {
@@ -170,6 +242,22 @@ public class SpringAiDocumentRetriever implements AiDocumentRetriever {
 
     private String equalsFilter(String field, String value) {
         return field + " == '" + value.replace("'", "\\'") + "'";
+    }
+
+    private String categoryFilter(AiUserProfile profile) {
+        return profile.infoSubCategory() == null
+                ? null
+                : equalsFilter("subCategory", profile.infoSubCategory().name());
+    }
+
+    private String combineFilters(String first, String second) {
+        if (!hasText(first)) {
+            return second;
+        }
+        if (!hasText(second)) {
+            return first;
+        }
+        return first + " && " + second;
     }
 
     private boolean hasText(String value) {

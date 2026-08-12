@@ -58,7 +58,8 @@ public class InfoItemQueryService {
         if (condition.subCategory() != null) {
             InfoCategory category = infoCategoryRepository.findById(condition.subCategory()).orElse(null);
 
-            if (category != null && category.getSubCategory() != null && category.getSubCategory().endsWith("_ETC")) {
+            if (category != null && category.getSubCategory() != null
+                    && category.getSubCategory().isRecommendationCategory()) {
                 List<InfoItemResponse> recommendedList = getRecommendedInfoItems(userId, category.getMainCategory());
 
                 // CodeRabbit 큰 offset 방어 로직
@@ -83,7 +84,7 @@ public class InfoItemQueryService {
                         category.getMainCategory(),
                         category.getMainCategoryKo(),
                         category.getId(),
-                        category.getSubCategory(),
+                        category.getSubCategory().name(),
                         category.getSubCategoryKo(),
                         recommendedPage
                 );
@@ -135,7 +136,7 @@ public class InfoItemQueryService {
             if (category != null) {
                 selectedMainCategory = category.getMainCategory();
                 selectedMainCategoryKo = category.getMainCategoryKo();
-                selectedSubCategory = category.getSubCategory();
+                selectedSubCategory = category.getSubCategory().name();
                 selectedSubCategoryKo = category.getSubCategoryKo();
             }
         } else if (selectedMainCategory != null) {

@@ -22,6 +22,8 @@ public interface RegionRepository extends JpaRepository<Region, Long> {
 
     List<Region> findAllByRegionLevel2OrderByIdAsc(String regionLevel2);
 
+    List<Region> findAllByRegionLevel2InOrderByIdAsc(List<String> regionLevel2Names);
+
     @Query("""
             select region
               from Region region

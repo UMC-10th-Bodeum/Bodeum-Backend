@@ -45,7 +45,8 @@ class OpenAiExternalAnswerProviderTest {
         ClassPathResource promptResource = new ClassPathResource(
                 "prompts/ai-external-search-system-prompt.txt"
         );
-        String systemPrompt = promptResource.getContentAsString(StandardCharsets.UTF_8);
+        String systemPrompt = promptResource.getContentAsString(StandardCharsets.UTF_8)
+                .replace("{{maxResultCount}}", "10");
         AiPromptFormatter promptFormatter = mock(AiPromptFormatter.class);
         when(promptFormatter.formatProfile(any())).thenReturn("[사용자 맞춤 정보]");
         OpenAiExternalAnswerProvider provider = new OpenAiExternalAnswerProvider(
@@ -57,6 +58,7 @@ class OpenAiExternalAnswerProviderTest {
                 1200,
                 Duration.ofSeconds(1),
                 Duration.ofSeconds(1),
+                10,
                 promptResource,
                 promptFormatter
         );

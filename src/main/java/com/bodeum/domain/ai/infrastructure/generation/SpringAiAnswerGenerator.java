@@ -1,7 +1,8 @@
 package com.bodeum.domain.ai.infrastructure.generation;
 
-import com.bodeum.domain.ai.infrastructure.support.AiTimeoutDetector;
 import com.bodeum.domain.ai.exception.AiErrorCode;
+import com.bodeum.domain.ai.infrastructure.support.AiPromptTemplate;
+import com.bodeum.domain.ai.infrastructure.support.AiTimeoutDetector;
 import com.bodeum.domain.ai.model.rag.AiReferenceDocument;
 import com.bodeum.domain.ai.model.rag.AiUserProfile;
 import com.bodeum.domain.ai.model.answer.GeneratedAiAnswer;
@@ -26,9 +27,15 @@ public class SpringAiAnswerGenerator implements AiAnswerGenerator {
     public SpringAiAnswerGenerator(
             ChatClient.Builder builder,
             AiPromptFormatter promptFormatter,
+            @Value("${bodeum.ai.result.max-count:10}") int maxResultCount,
             @Value("classpath:prompts/ai-rag-system-prompt.txt") Resource systemPromptResource
     ) {
-        this.chatClient = builder.defaultSystem(readPrompt(systemPromptResource)).build();
+        String systemPrompt = AiPromptTemplate.replaceRequiredPlaceholder(
+                readPrompt(systemPromptResource),
+                "{{maxResultCount}}",
+                Integer.toString(maxResultCount)
+        );
+        this.chatClient = builder.defaultSystem(systemPrompt).build();
         this.promptFormatter = promptFormatter;
     }
 

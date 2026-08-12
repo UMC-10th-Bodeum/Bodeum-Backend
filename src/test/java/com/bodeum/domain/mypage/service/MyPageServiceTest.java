@@ -259,7 +259,7 @@ class MyPageServiceTest {
                 .willReturn("복지");
 
         given(infoCategory.getSubCategory())
-                .willReturn("WELFARE_CENTER");
+                .willReturn(com.bodeum.domain.info.entity.enums.InfoSubCategory.WELFARE_CENTER);
 
         given(infoCategory.getSubCategoryKo())
                 .willReturn("장애인복지관");

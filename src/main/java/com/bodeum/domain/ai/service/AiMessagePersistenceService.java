@@ -33,6 +33,22 @@ public class AiMessagePersistenceService {
     }
 
     @Transactional
+    public void updateUserMessageContext(
+            Long userMessageId,
+            String resolvedQuestion,
+            Long contextParentMessageId,
+            Long contextRootMessageId
+    ) {
+        AiMessage userMessage = aiMessageRepository.findById(userMessageId)
+                .orElseThrow(() -> new ProjectException(AiErrorCode.AI_RESPONSE_FAILED));
+        userMessage.updateConversationContext(
+                resolvedQuestion,
+                contextParentMessageId,
+                contextRootMessageId
+        );
+    }
+
+    @Transactional
     public AiMessage saveAiMessageAndComplete(
             Long userMessageId,
             AiChatRoom chatRoom,
@@ -45,6 +61,7 @@ public class AiMessagePersistenceService {
                 .orElseThrow(() -> new ProjectException(AiErrorCode.AI_RESPONSE_FAILED));
         AiMessage message = aiMessageRepository.save(
                 AiMessage.createAiMessage(chatRoom, content, warning, answerStatus));
+        message.inheritConversationContext(userMessage);
         aiResponseSourceRepository.saveAll(sources.stream()
                 .map(source -> AiResponseSource.create(
                         message, source.sourceType(), source.sourceId(), source.title(),

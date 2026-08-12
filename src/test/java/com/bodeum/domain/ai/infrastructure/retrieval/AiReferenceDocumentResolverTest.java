@@ -29,7 +29,8 @@ class AiReferenceDocumentResolverTest {
         InfoCategory category = mock(InfoCategory.class);
         when(category.getMainCategory()).thenReturn(MainCategory.INSTITUTION);
         when(category.getMainCategoryKo()).thenReturn("기관");
-        when(category.getSubCategory()).thenReturn("FAMILY_SUPPORT");
+        when(category.getSubCategory()).thenReturn(
+                com.bodeum.domain.info.entity.enums.InfoSubCategory.FAMILY_SUPPORT);
         when(category.getSubCategoryKo()).thenReturn("장애인가족지원센터");
         when(info.getId()).thenReturn(12L);
         when(info.getName()).thenReturn("최신 기관명");

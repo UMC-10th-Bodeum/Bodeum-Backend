@@ -127,9 +127,14 @@ bodeum:
         gyeonggi:
           enabled: ${NEWS_PUBLIC_DATA_GYEONGGI_ENABLED:false}
   ai:
+    conversation:
+      recent-turn-count: ${AI_RECENT_CONVERSATION_TURN_COUNT:3}
+    result:
+      max-count: ${AI_RESULT_MAX_COUNT:10}
     rag:
       top-k: ${AI_RAG_TOP_K:5}
       similarity-threshold: ${AI_RAG_SIMILARITY_THRESHOLD:0.4}
+      max-supplemental-concept-searches: ${AI_RAG_MAX_SUPPLEMENTAL_CONCEPT_SEARCHES:3}
     web-search:
       model: ${OPENAI_WEB_SEARCH_MODEL:gpt-5.4-mini}
       max-output-tokens: ${OPENAI_WEB_SEARCH_MAX_OUTPUT_TOKENS:1200}
