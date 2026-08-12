@@ -297,6 +297,7 @@ class AiStarterQuestionRouterTest {
         when(center.getSido()).thenReturn("경기도");
         when(center.getSigungu()).thenReturn("수원시");
         when(center.getPhone()).thenReturn("031-111-1111");
+        when(center.getIntroduction()).thenReturn(null);
         when(infoItemRepository.findRehabCentersByRegion(
                 eq("경기도"),
                 eq("수원시"),
@@ -317,7 +318,8 @@ class AiStarterQuestionRouterTest {
                         "① 수원 언어재활센터",
                         "방문 전 꼭 전화로 확인"
                 )
-                .doesNotContain("조회 10", "저장 5", "후기 2", "활동 점수");
+                .doesNotContain(
+                        "조회 10", "저장 5", "후기 2", "활동 점수", "확인 필요");
         assertThat(result.sources().getFirst().sourceId()).isEqualTo(10L);
     }
 

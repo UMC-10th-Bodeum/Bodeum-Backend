@@ -534,9 +534,10 @@ public class AiStarterQuestionRouter {
                 .append("**\n\n`")
                 .append(info.getInfoCategory().getSubCategoryKo())
                 .append("` — ")
-                .append(info.getAddress())
-                .append("\n\n")
-                .append(value(info.getIntroduction()));
+                .append(info.getAddress());
+        if (info.getIntroduction() != null && !info.getIntroduction().isBlank()) {
+            card.append("\n\n").append(info.getIntroduction());
+        }
         return card.toString();
     }
 
