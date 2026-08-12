@@ -93,7 +93,7 @@ public class PostController {
         );
     }
 
-    @Operation(summary = "게시글 작성", description = "커뮤니티 게시글과 장애 유형·해시태그·이미지를 등록한다.")
+    @Operation(summary = "게시글 작성", description = "커뮤니티 게시글과 이미지를 등록한다.")
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public ApiResponse<PostResponse> createPost(
@@ -103,7 +103,7 @@ public class PostController {
         return ApiResponse.of(GeneralSuccessCode.CREATED, postService.createPost(userId, request));
     }
 
-    @Operation(summary = "게시글 수정", description = "작성자가 게시글과 연관 태그·이미지를 수정한다.")
+    @Operation(summary = "게시글 수정", description = "작성자가 게시글과 이미지를 수정한다.")
     @PatchMapping("/{postId}")
     public ApiResponse<PostResponse> updatePost(
             @LoginUser Long userId,
@@ -123,7 +123,10 @@ public class PostController {
         return ApiResponse.of(GeneralSuccessCode.OK, null);
     }
 
-    @Operation(summary = "게시글 상세 조회", description = "게시글과 장애 유형·해시태그·이미지를 상세 조회한다.")
+    @Operation(
+            summary = "게시글 상세 조회",
+            description = "게시글, 이미지 및 작성자의 공개 가능한 프로필 정보를 상세 조회한다."
+    )
     @GetMapping("/{postId}")
     public ApiResponse<PostResponse> getPost(
             @LoginUser Long userId,
