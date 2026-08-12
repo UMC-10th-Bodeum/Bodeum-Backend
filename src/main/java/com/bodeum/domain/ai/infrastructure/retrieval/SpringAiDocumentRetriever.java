@@ -30,7 +30,7 @@ public class SpringAiDocumentRetriever implements AiDocumentRetriever {
 
     private static final Logger log = LoggerFactory.getLogger(SpringAiDocumentRetriever.class);
     private static final Pattern REQUESTED_RESULT_COUNT_PATTERN =
-            Pattern.compile("(\\d{1,2})\\s*(?:개|곳)");
+            Pattern.compile("(?<!\\d)(\\d+)\\s*(?:개|곳)");
     private final VectorStoreRetriever vectorStoreRetriever;
     private final int topK;
     private final int maxResultCount;
@@ -206,10 +206,14 @@ public class SpringAiDocumentRetriever implements AiDocumentRetriever {
         Matcher matcher = REQUESTED_RESULT_COUNT_PATTERN.matcher(question);
         int requestedCount = topK;
         while (matcher.find()) {
-            requestedCount = Math.max(
-                    requestedCount,
-                    Integer.parseInt(matcher.group(1))
-            );
+            try {
+                requestedCount = Math.max(
+                        requestedCount,
+                        Integer.parseInt(matcher.group(1))
+                );
+            } catch (NumberFormatException ignored) {
+                requestedCount = maxResultCount;
+            }
         }
         return Math.min(requestedCount, maxResultCount);
     }

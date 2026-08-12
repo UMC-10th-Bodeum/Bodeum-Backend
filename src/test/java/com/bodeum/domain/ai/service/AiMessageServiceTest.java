@@ -689,9 +689,9 @@ class AiMessageServiceTest {
     }
 
     @Test
-    void usesLlmNormalizedResultCountAndSkipsFixedStarterAnswer() {
-        String question = "근처 장애인재활센터 열 개 알려줘";
-        String searchQuestion = "경기도 수원시 장애인재활센터 열 개 알려줘"
+    void capsLlmNormalizedResultCountForSearchAndSkipsFixedStarterAnswer() {
+        String question = "근처 장애인재활센터 100개 알려줘";
+        String searchQuestion = "경기도 수원시 장애인재활센터 100개 알려줘"
                 + "\n요청 결과 개수: 10개";
         user.updateInterestRegion(List.of(), Region.create("경기도", "수원시"));
         when(questionIntentClassifier.analyze(question)).thenReturn(
@@ -700,7 +700,7 @@ class AiMessageServiceTest {
                         AiQuestionIntent.LOCAL_REHAB_CENTERS,
                         AiSearchScope.LOCAL_RESOURCE,
                         List.of(),
-                        10
+                        100
                 )
         );
         AiReferenceDocument source = referenceDocument("CENTER-1", 1L);

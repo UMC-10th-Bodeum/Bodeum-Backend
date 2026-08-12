@@ -579,7 +579,8 @@ public class AiMessageService {
         if (requestedResultCount == null || requestedResultCount <= 0) {
             return question;
         }
-        return question + "\n요청 결과 개수: " + requestedResultCount + "개";
+        int searchResultCount = Math.min(requestedResultCount, maxResultCount);
+        return question + "\n요청 결과 개수: " + searchResultCount + "개";
     }
 
     private AdditionalResultsContext resolveAdditionalResultsContext(
