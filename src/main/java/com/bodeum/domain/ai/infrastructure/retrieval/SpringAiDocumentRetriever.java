@@ -65,7 +65,8 @@ public class SpringAiDocumentRetriever implements AiDocumentRetriever {
                     question,
                     profile,
                     categoryFilter(profile),
-                    false
+                    resolvedScope == AiSearchScope.GENERAL
+                            && hasText(profile.region())
             );
         } catch (ProjectException e) {
             throw e;
@@ -130,6 +131,10 @@ public class SpringAiDocumentRetriever implements AiDocumentRetriever {
                 question, filterExpression, resultCount);
 
         Map<String, Document> documentsById = new LinkedHashMap<>();
+        if (includeRegion) {
+            addRegionMatches(documentsById, personalizedDocuments, profile);
+            addRegionMatches(documentsById, questionDocuments, profile);
+        }
         addByScore(documentsById, questionDocuments);
         addByScore(documentsById, personalizedDocuments);
 
@@ -167,6 +172,31 @@ public class SpringAiDocumentRetriever implements AiDocumentRetriever {
             builder.filterExpression(filterExpression);
         }
         return vectorStoreRetriever.similaritySearch(builder.build());
+    }
+
+    private void addRegionMatches(
+            Map<String, Document> documentsById,
+            List<Document> documents,
+            AiUserProfile profile
+    ) {
+        documents.stream()
+                .filter(document -> score(document) >= similarityThreshold)
+                .filter(document -> matchesProfileRegion(document, profile))
+                .sorted(Comparator.comparingDouble(this::score).reversed())
+                .forEach(document -> documentsById.putIfAbsent(
+                        document.getId(), document));
+    }
+
+    private boolean matchesProfileRegion(Document document, AiUserProfile profile) {
+        Map<String, Object> metadata = document.getMetadata();
+        String sido = nullable(metadata, "sido");
+        String sigungu = nullable(metadata, "sigungu");
+        if (hasText(profile.regionLevel1()) && hasText(profile.regionLevel2())) {
+            return profile.regionLevel1().equals(sido)
+                    && profile.regionLevel2().equals(sigungu);
+        }
+        return hasText(profile.regionLevel1())
+                && profile.regionLevel1().equals(sido);
     }
 
     private int resolveResultCount(String question) {

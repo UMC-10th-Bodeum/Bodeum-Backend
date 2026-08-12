@@ -29,7 +29,7 @@ class SpringAiDocumentRetrieverTest {
     private VectorStoreRetriever vectorStoreRetriever;
 
     @Test
-    void excludesRegionButKeepsOtherProfileContextInGeneralSearchQuery() {
+    void includesRegionAsPriorityContextWithoutAddingRegionFilterToGeneralSearch() {
         SpringAiDocumentRetriever retriever =
                 new SpringAiDocumentRetriever(vectorStoreRetriever, 5, 10, 0.7);
         AiUserProfile profile = new AiUserProfile(
@@ -55,7 +55,46 @@ class SpringAiDocumentRetrieverTest {
                 .contains("집중 케어 영역: AUTISM_SPECTRUM")
                 .contains("관심사: HOSPITAL_HEALTH")
                 .contains("자녀 관련 관심 키워드: 언어치료, 사회성 발달")
-                .doesNotContain("활동 지역: 서울 강남구");
+                .contains("활동 지역: 서울 강남구");
+        assertThat(requestCaptor.getAllValues())
+                .extracting(SearchRequest::getFilterExpression)
+                .containsOnlyNulls();
+    }
+
+    @Test
+    void prioritizesExactProfileRegionDocumentsInNationwideGeneralSearch() {
+        SpringAiDocumentRetriever retriever =
+                new SpringAiDocumentRetriever(vectorStoreRetriever, 5, 10, 0.4);
+        AiUserProfile profile = new AiUserProfile(
+                "경기도 수원시",
+                "경기도",
+                "수원시",
+                6,
+                List.of(),
+                List.of(),
+                ""
+        );
+        List<Document> personalizedDocuments = List.of(
+                document("SUWON-1", 0.7, "경기도", "수원시"),
+                document("SEOUL-1", 0.9, "서울특별시", "강남구")
+        );
+        List<Document> questionDocuments = List.of(
+                document("BUSAN-1", 0.95, "부산광역시", "남구"),
+                document("SUWON-2", 0.6, "경기도", "수원시")
+        );
+        when(vectorStoreRetriever.similaritySearch(
+                org.mockito.ArgumentMatchers.any(SearchRequest.class)))
+                .thenReturn(personalizedDocuments, questionDocuments);
+
+        var result = retriever.retrieve(
+                "특수학교를 알려줘",
+                profile,
+                AiSearchScope.GENERAL
+        );
+
+        assertThat(result)
+                .extracting(document -> document.documentKey())
+                .containsExactly("SUWON-1", "SUWON-2", "BUSAN-1", "SEOUL-1");
     }
 
     @Test
@@ -269,17 +308,32 @@ class SpringAiDocumentRetrieverTest {
     }
 
     private Document document(String id, double score) {
+        return document(id, score, null, null);
+    }
+
+    private Document document(
+            String id,
+            double score,
+            String sido,
+            String sigungu
+    ) {
         Document document = org.mockito.Mockito.mock(Document.class);
         when(document.getId()).thenReturn(id);
         lenient().when(document.getText()).thenReturn(id + " content");
         when(document.getScore()).thenReturn(score);
-        lenient().when(document.getMetadata()).thenReturn(Map.of(
-                "sourceType", AiResponseSourceType.INFO.name(),
-                "sourceId", Integer.toString(Math.abs(id.hashCode())),
-                "title", id,
-                "sourceUrl", "https://example.com/" + id,
-                "updatedAt", Instant.parse("2026-07-01T00:00:00Z").toString()
-        ));
+        Map<String, Object> metadata = new java.util.HashMap<>();
+        metadata.put("sourceType", AiResponseSourceType.INFO.name());
+        metadata.put("sourceId", Integer.toString(Math.abs(id.hashCode())));
+        metadata.put("title", id);
+        metadata.put("sourceUrl", "https://example.com/" + id);
+        metadata.put("updatedAt", Instant.parse("2026-07-01T00:00:00Z").toString());
+        if (sido != null) {
+            metadata.put("sido", sido);
+        }
+        if (sigungu != null) {
+            metadata.put("sigungu", sigungu);
+        }
+        lenient().when(document.getMetadata()).thenReturn(metadata);
         return document;
     }
 

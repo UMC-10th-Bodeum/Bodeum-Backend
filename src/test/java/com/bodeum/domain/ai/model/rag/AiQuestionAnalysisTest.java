@@ -93,4 +93,21 @@ class AiQuestionAnalysisTest {
 
         assertThat(analysis.requestedResultCount()).isEqualTo(10);
     }
+
+    @Test
+    void enablesClarificationOnlyWhenQuestionTextExists() {
+        AiQuestionAnalysis analysis = AiQuestionAnalysis.forQuestion(
+                "센터를 알려줘",
+                AiQuestionIntent.NONE,
+                List.of()
+        ).withClarification(true, " 어떤 종류의 센터를 찾으시나요? ");
+
+        assertThat(analysis.needsClarification()).isTrue();
+        assertThat(analysis.clarificationQuestion())
+                .isEqualTo("어떤 종류의 센터를 찾으시나요?");
+
+        AiQuestionAnalysis invalid = analysis.withClarification(true, " ");
+        assertThat(invalid.needsClarification()).isFalse();
+        assertThat(invalid.clarificationQuestion()).isNull();
+    }
 }

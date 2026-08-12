@@ -14,11 +14,16 @@ public record AiQuestionAnalysis(
         Integer requestedResultCount,
         String resolvedQuestion,
         boolean followUp,
-        InfoSubCategory infoSubCategory
+        InfoSubCategory infoSubCategory,
+        String searchGoal,
+        List<AiRequiredConcept> requiredConcepts,
+        boolean needsClarification,
+        String clarificationQuestion
 ) {
 
     public AiQuestionAnalysis(AiQuestionIntent intent, List<String> retrievalQueries) {
-        this(intent, AiSearchScope.GENERAL, retrievalQueries, null, null, false, null);
+        this(intent, AiSearchScope.GENERAL, retrievalQueries, null, null, false,
+                null, null, List.of(), false, null);
     }
 
     public AiQuestionAnalysis(
@@ -26,7 +31,8 @@ public record AiQuestionAnalysis(
             AiSearchScope searchScope,
             List<String> retrievalQueries
     ) {
-        this(intent, searchScope, retrievalQueries, null, null, false, null);
+        this(intent, searchScope, retrievalQueries, null, null, false,
+                null, null, List.of(), false, null);
     }
 
     public AiQuestionAnalysis(
@@ -35,7 +41,8 @@ public record AiQuestionAnalysis(
             List<String> retrievalQueries,
             Integer requestedResultCount
     ) {
-        this(intent, searchScope, retrievalQueries, requestedResultCount, null, false, null);
+        this(intent, searchScope, retrievalQueries, requestedResultCount, null, false,
+                null, null, List.of(), false, null);
     }
 
     public AiQuestionAnalysis {
@@ -55,11 +62,27 @@ public record AiQuestionAnalysis(
         resolvedQuestion = resolvedQuestion == null || resolvedQuestion.isBlank()
                 ? null
                 : resolvedQuestion.trim();
+        searchGoal = searchGoal == null || searchGoal.isBlank()
+                ? null
+                : searchGoal.trim();
+        requiredConcepts = requiredConcepts == null
+                ? List.of()
+                : requiredConcepts.stream()
+                        .filter(concept -> concept != null && concept.isValid())
+                        .distinct()
+                        .limit(3)
+                        .toList();
+        clarificationQuestion = clarificationQuestion == null
+                || clarificationQuestion.isBlank()
+                ? null
+                : clarificationQuestion.trim();
+        needsClarification = needsClarification && clarificationQuestion != null;
     }
 
     public static AiQuestionAnalysis fallback() {
         return new AiQuestionAnalysis(
-                AiQuestionIntent.NONE, AiSearchScope.GENERAL, List.of(), null, null, false, null);
+                AiQuestionIntent.NONE, AiSearchScope.GENERAL, List.of(), null, null, false,
+                null, null, List.of(), false, null);
     }
 
     public static AiQuestionAnalysis fallback(String question) {
@@ -155,7 +178,11 @@ public record AiQuestionAnalysis(
                     requestedResultCount,
                     resolvedQuestion,
                     followUp,
-                    infoSubCategory
+                    infoSubCategory,
+                    null,
+                    List.of(),
+                    false,
+                    null
             );
         }
 
@@ -178,7 +205,49 @@ public record AiQuestionAnalysis(
                 requestedResultCount,
                 resolvedQuestion,
                 followUp,
-                infoSubCategory
+                infoSubCategory,
+                null,
+                List.of(),
+                false,
+                null
+        );
+    }
+
+    public AiQuestionAnalysis withRetrievalPlan(
+            String resolvedSearchGoal,
+            List<AiRequiredConcept> resolvedRequiredConcepts
+    ) {
+        return new AiQuestionAnalysis(
+                intent,
+                searchScope,
+                retrievalQueries,
+                requestedResultCount,
+                resolvedQuestion,
+                followUp,
+                infoSubCategory,
+                resolvedSearchGoal,
+                resolvedRequiredConcepts,
+                needsClarification,
+                clarificationQuestion
+        );
+    }
+
+    public AiQuestionAnalysis withClarification(
+            boolean clarificationRequired,
+            String question
+    ) {
+        return new AiQuestionAnalysis(
+                intent,
+                searchScope,
+                retrievalQueries,
+                requestedResultCount,
+                resolvedQuestion,
+                followUp,
+                infoSubCategory,
+                searchGoal,
+                requiredConcepts,
+                clarificationRequired,
+                question
         );
     }
 }

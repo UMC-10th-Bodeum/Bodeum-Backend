@@ -50,6 +50,20 @@ class AiQueryExpansionPromptTest {
     }
 
     @Test
+    void keepsRegionlessResourceQuestionsNationwideWithProfilePriority() throws IOException {
+        String prompt = new ClassPathResource(
+                "prompts/ai-query-expansion-system-prompt.txt"
+        ).getContentAsString(StandardCharsets.UTF_8);
+
+        assertThat(prompt).contains(
+                "지역 표현이 없는 기관·시설·학교·병원·센터 질문",
+                "GENERAL",
+                "전국을 검색 범위로 유지",
+                "검색 범위를 제한하지 않고 결과 우선순위에만 사용"
+        );
+    }
+
+    @Test
     void resolvesIncompleteFollowUpQuestionsFromPreviousConversation() throws IOException {
         String prompt = new ClassPathResource(
                 "prompts/ai-question-intent-classifier-system-prompt.txt"
@@ -83,6 +97,44 @@ class AiQueryExpansionPromptTest {
                 "GENERAL_HOSPITAL",
                 "YOUTH_CENTER",
                 "KEAD_JOB"
+        );
+    }
+
+    @Test
+    void definesStructuredRequiredConceptsWithoutUsingThemAsCategoryFilters()
+            throws IOException {
+        String prompt = new ClassPathResource(
+                "prompts/ai-question-intent-classifier-system-prompt.txt"
+        ).getContentAsString(StandardCharsets.UTF_8);
+
+        assertThat(prompt).contains(
+                "searchGoal",
+                "requiredConcepts",
+                "retrievalQuery",
+                "matchTerms",
+                "excludeTerms",
+                "requiresUserRegion",
+                "검색 범위를 제한하는 카테고리처럼 사용하지 마세요",
+                "센터·제공기관을 묻는 질문",
+                "소식·공지 질문"
+        );
+    }
+
+    @Test
+    void asksForClarificationOnlyWhenMissingInformationChangesSearchTarget()
+            throws IOException {
+        String prompt = new ClassPathResource(
+                "prompts/ai-question-intent-classifier-system-prompt.txt"
+        ).getContentAsString(StandardCharsets.UTF_8);
+
+        assertThat(prompt).contains(
+                "needsClarification",
+                "clarificationQuestion",
+                "꼭 필요한 정보 하나만",
+                "프로필의 활동 지역으로 보완할 수 있는 지역 생략",
+                "불필요하게 되묻지 마세요",
+                "센터를 알려줘",
+                "재활센터를 알려줘"
         );
     }
 }

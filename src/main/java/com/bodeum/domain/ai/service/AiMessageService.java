@@ -10,6 +10,7 @@ import com.bodeum.domain.ai.enums.AiStarterQuestionType;
 import com.bodeum.domain.ai.enums.SenderType;
 import com.bodeum.domain.ai.exception.AiErrorCode;
 import com.bodeum.domain.ai.model.rag.AiReferenceDocument;
+import com.bodeum.domain.ai.model.rag.AiRequiredConcept;
 import com.bodeum.domain.info.entity.enums.InfoSubCategory;
 import com.bodeum.domain.ai.model.rag.AiQuestionAnalysis;
 import com.bodeum.domain.ai.model.rag.AiScrapInterests;
@@ -61,6 +62,8 @@ public class AiMessageService {
             "(?<!\\d)(?:0\\d{1,2})[- .]?\\d{3,4}[- .]?\\d{4}(?!\\d)");
     private static final Pattern LOCAL_RESOURCE_PATTERN = Pattern.compile(
             "(학교|센터|기관|병원|의원|약국|복지관|시설|교육원|상담소|지원사업|지원서비스)");
+    private static final Pattern RELATIVE_LOCAL_REGION_PATTERN = Pattern.compile(
+            "(우리\\s*(지역|동네)|근처|주변)");
     private static final String AMBIGUOUS_REGION_MESSAGE_PREFIX =
             "확인할 지역이 여러 곳입니다. ";
     private static final String NO_RESULT_MESSAGE = "관련 정보를 찾을 수 없습니다.";
@@ -167,6 +170,16 @@ public class AiMessageService {
                 resolveConversationContext(chatRoom.getId());
         AiUserProfile baseProfile = toProfile(
                 user, userWithDisabilities, scrapInterests);
+        if (RELATIVE_LOCAL_REGION_PATTERN.matcher(content).find()
+                && (baseProfile.region() == null || baseProfile.region().isBlank())) {
+            persistenceService.updateUserMessageContext(
+                    userMessage.getId(), content, null, userMessage.getId());
+            return createRegionRequiredResponse(
+                    chatRoom,
+                    userMessage,
+                    "어느 지역을 기준으로 찾을까요? 시·도와 시·군·구를 알려주세요."
+            );
+        }
         AiQuestionRegionResolver.RegionResolution regionResolution =
                 questionRegionResolver.resolve(content, baseProfile);
         if (LOCAL_RESOURCE_PATTERN.matcher(content).find()
@@ -207,6 +220,14 @@ public class AiMessageService {
                     chatRoom,
                     userMessage,
                     questionContext.safetyGuidance().get()
+            );
+        }
+        if (questionContext.needsClarification()) {
+            log.info("[AI] 사용자 확인 질문으로 전환");
+            return createClarificationRequiredResponse(
+                    chatRoom,
+                    userMessage,
+                    questionContext.clarificationQuestion()
             );
         }
 
@@ -255,6 +276,8 @@ public class AiMessageService {
         List<AiReferenceDocument> retrievedDocuments = retrieveDocuments(
                 searchQuestion,
                 searchQueries,
+                questionContext.searchGoal(),
+                questionContext.requiredConcepts(),
                 profile,
                 questionContext.searchScope()
         ).stream()
@@ -365,9 +388,7 @@ public class AiMessageService {
                 resolvedQuestion,
                 analysis.infoSubCategory()
         );
-        AiUserProfile searchProfile = (searchScope == AiSearchScope.GENERAL
-                ? profile.withRegion("", "", "")
-                : regionResolution.isResolved()
+        AiUserProfile searchProfile = (regionResolution.isResolved()
                         ? regionResolution.applyTo(profile)
                         : profile)
                 .withInfoSubCategory(infoSubCategory);
@@ -381,7 +402,11 @@ public class AiMessageService {
                         : List.of(),
                 analysis.requestedResultCount(),
                 resolvedQuestion,
-                analysis.followUp()
+                analysis.followUp(),
+                analysis.searchGoal(),
+                analysis.requiredConcepts(),
+                analysis.needsClarification(),
+                analysis.clarificationQuestion()
         );
     }
 
@@ -397,7 +422,11 @@ public class AiMessageService {
                 List.of(),
                 null,
                 null,
-                false
+                false,
+                null,
+                List.of(),
+                false,
+                null
         );
     }
 
@@ -824,6 +853,8 @@ public class AiMessageService {
     private List<AiReferenceDocument> retrieveDocuments(
             String originalQuestion,
             List<String> expandedQueries,
+            String searchGoal,
+            List<AiRequiredConcept> requiredConcepts,
             AiUserProfile profile,
             AiSearchScope searchScope
     ) {
@@ -855,6 +886,14 @@ public class AiMessageService {
         }
 
         LinkedHashMap<String, AiReferenceDocument> documentsByKey = new LinkedHashMap<>();
+        preserveRequiredConceptDocuments(
+                    requiredConcepts,
+                    searchGoal,
+                    documentsByQuery,
+                    documentsByKey,
+                    profile,
+                    searchScope
+        );
         if (normalizeQuestion(originalQuestion).contains("장애아동")) {
             // 원문·전국·지역 결과 균형 병합
             mergeRoundRobin(documentsByQuery, documentsByKey);
@@ -872,6 +911,114 @@ public class AiMessageService {
                 merged.size()
         );
         return referenceDocumentResolver.resolve(merged);
+    }
+
+    private void preserveRequiredConceptDocuments(
+            List<AiRequiredConcept> requiredConcepts,
+            String searchGoal,
+            List<List<AiReferenceDocument>> documentsByQuery,
+            LinkedHashMap<String, AiReferenceDocument> documentsByKey,
+            AiUserProfile profile,
+            AiSearchScope searchScope
+    ) {
+        if (requiredConcepts == null || requiredConcepts.isEmpty()) {
+            return;
+        }
+
+        List<AiReferenceDocument> candidates = new ArrayList<>(documentsByQuery.stream()
+                .flatMap(List::stream)
+                .toList());
+        for (int conceptIndex = 0; conceptIndex < requiredConcepts.size(); conceptIndex++) {
+            AiRequiredConcept concept = requiredConcepts.get(conceptIndex);
+            Optional<AiReferenceDocument> matched = findConceptDocument(
+                    candidates,
+                    concept,
+                    profile,
+                    documentsByKey.keySet()
+            );
+            if (matched.isEmpty()) {
+                List<AiReferenceDocument> supplemented = documentRetriever.retrieve(
+                        supplementalResultQuery(concept, searchGoal, profile),
+                        profile,
+                        searchScope
+                );
+                candidates.addAll(supplemented);
+                matched = findConceptDocument(
+                        supplemented,
+                        concept,
+                        profile,
+                        documentsByKey.keySet()
+                );
+            }
+            matched.ifPresent(document -> documentsByKey.putIfAbsent(
+                    document.documentKey(), document));
+            if (matched.isEmpty()) {
+                log.warn("[AI] 필수 검색 개념 근거 문서 누락: conceptIndex={}", conceptIndex);
+            }
+        }
+    }
+
+    private String supplementalResultQuery(
+            AiRequiredConcept concept,
+            String searchGoal,
+            AiUserProfile profile
+    ) {
+        StringBuilder query = new StringBuilder();
+        if (concept.requiresUserRegion()
+                && profile != null
+                && profile.region() != null
+                && !profile.region().isBlank()) {
+            query.append(profile.region()).append(' ');
+        }
+        query.append(concept.retrievalQuery());
+        if (searchGoal != null && !searchGoal.isBlank()) {
+            query.append(' ').append(searchGoal.trim());
+        }
+        return query.append("\n요청 결과 개수: ")
+                .append(maxResultCount)
+                .append("개")
+                .toString();
+    }
+
+    private Optional<AiReferenceDocument> findConceptDocument(
+            List<AiReferenceDocument> documents,
+            AiRequiredConcept concept,
+            AiUserProfile profile,
+            Set<String> excludedDocumentKeys
+    ) {
+        List<String> matchTerms = concept.matchTerms().stream()
+                .map(this::normalizeQuestion)
+                .toList();
+        List<String> excludeTerms = concept.excludeTerms().stream()
+                .map(this::normalizeQuestion)
+                .toList();
+        return documents.stream()
+                .filter(document -> !excludedDocumentKeys.contains(document.documentKey()))
+                .filter(document -> {
+                    String searchableText = normalizeQuestion(document.title())
+                            + normalizeQuestion(document.content());
+                    return matchTerms.stream().allMatch(searchableText::contains)
+                            && excludeTerms.stream().noneMatch(searchableText::contains)
+                            && matchesRequiredRegion(searchableText, concept, profile);
+                })
+                .findFirst();
+    }
+
+    private boolean matchesRequiredRegion(
+            String searchableText,
+            AiRequiredConcept concept,
+            AiUserProfile profile
+    ) {
+        if (!concept.requiresUserRegion()) {
+            return true;
+        }
+        if (profile == null) {
+            return false;
+        }
+        String region = normalizeQuestion(profile.region());
+        String regionLevel2 = normalizeQuestion(profile.regionLevel2());
+        return (!region.isBlank() && searchableText.contains(region))
+                || (!regionLevel2.isBlank() && searchableText.contains(regionLevel2));
     }
 
     private void mergeRoundRobin(
@@ -1109,6 +1256,27 @@ public class AiMessageService {
         return createNoEvidenceResponse(chatRoom, userMessage, NO_RESULT_MESSAGE);
     }
 
+    private CreateAiMessageResponse createClarificationRequiredResponse(
+            AiChatRoom chatRoom,
+            AiMessage userMessage,
+            String content
+    ) {
+        AiMessage message = persistenceService.saveAiMessageAndComplete(
+                userMessage.getId(),
+                chatRoom,
+                content,
+                false,
+                AiAnswerStatus.CLARIFICATION_REQUIRED,
+                List.of()
+        );
+        return new CreateAiMessageResponse(AiMessageResponse.clarificationRequired(
+                message.getId(),
+                message.getSenderType(),
+                message.getContent(),
+                message.getCreatedAt()
+        ));
+    }
+
     private CreateAiMessageResponse createNoEvidenceResponse(
             AiChatRoom chatRoom,
             AiMessage userMessage,
@@ -1280,7 +1448,11 @@ public class AiMessageService {
             List<String> retrievalQueries,
             Integer requestedResultCount,
             String resolvedQuestion,
-            boolean followUp
+            boolean followUp,
+            String searchGoal,
+            List<AiRequiredConcept> requiredConcepts,
+            boolean needsClarification,
+            String clarificationQuestion
     ) {
     }
 

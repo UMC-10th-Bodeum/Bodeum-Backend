@@ -26,6 +26,7 @@ import com.bodeum.domain.ai.service.port.AiDocumentRetriever;
 import com.bodeum.domain.ai.service.port.AiExternalAnswerProvider;
 import com.bodeum.domain.ai.service.port.AiQuestionIntentClassifier;
 import com.bodeum.domain.ai.model.rag.AiReferenceDocument;
+import com.bodeum.domain.ai.model.rag.AiRequiredConcept;
 import com.bodeum.domain.ai.model.rag.AiQuestionAnalysis;
 import com.bodeum.domain.ai.model.rag.AiScrapInterests;
 import com.bodeum.domain.ai.model.rag.AiSourceKey;
@@ -160,8 +161,65 @@ class AiMessageServiceTest {
     }
 
     @Test
+    void asksShortClarificationBeforeSearchingWhenTargetIsAmbiguous() {
+        String question = "센터를 알려줘";
+        String clarification = "어떤 종류의 센터를 찾으시나요? 예: 재활센터, 장애인복지관";
+        when(questionIntentClassifier.analyze(question)).thenReturn(
+                AiQuestionAnalysis.forQuestion(
+                        question,
+                        AiQuestionIntent.NONE,
+                        AiSearchScope.GENERAL,
+                        List.of()
+                ).withClarification(true, clarification)
+        );
+        AiMessage saved = savedAiMessage(clarification);
+        when(persistenceService.saveAiMessageAndComplete(
+                11L,
+                chatRoom,
+                clarification,
+                false,
+                AiAnswerStatus.CLARIFICATION_REQUIRED,
+                List.of()
+        )).thenReturn(saved);
+
+        var result = service.createMessage(1L, question);
+
+        assertThat(result.aiMessage().content()).isEqualTo(clarification);
+        assertThat(result.aiMessage().answerStatus())
+                .isEqualTo(AiAnswerStatus.CLARIFICATION_REQUIRED);
+        assertThat(result.aiMessage().sources()).isEmpty();
+        verify(documentRetriever, never()).retrieve(any(), any(), any());
+        verify(answerGenerator, never()).generate(any(), any(), any());
+        verify(externalAnswerProvider, never()).search(any(), any(), any(), any());
+    }
+
+    @Test
+    void asksForRegionWhenRelativeLocalQuestionHasNoProfileRegion() {
+        String question = "우리 지역 특수학교를 알려줘";
+        String message = "어느 지역을 기준으로 찾을까요? 시·도와 시·군·구를 알려주세요.";
+        AiMessage saved = savedAiMessage(message);
+        when(persistenceService.saveAiMessageAndComplete(
+                11L,
+                chatRoom,
+                message,
+                false,
+                AiAnswerStatus.REGION_REQUIRED,
+                List.of()
+        )).thenReturn(saved);
+
+        var result = service.createMessage(1L, question);
+
+        assertThat(result.aiMessage().answerStatus())
+                .isEqualTo(AiAnswerStatus.REGION_REQUIRED);
+        assertThat(result.aiMessage().content()).isEqualTo(message);
+        verify(questionIntentClassifier, never()).analyze(any());
+        verify(documentRetriever, never()).retrieve(any(), any(), any());
+    }
+
+    @Test
     void passesRecentScrapInterestsAsPersonalizationContext() {
         String question = "우리 지역 특수학교 알려줘";
+        user.updateInterestRegion(List.of(), Region.create("경기도", "수원시"));
         when(scrapInterestService.findRecentInterests(1L)).thenReturn(
                 new AiScrapInterests(
                         List.of("수원시 특수교육 기관"),
@@ -345,14 +403,8 @@ class AiMessageServiceTest {
     @Test
     void returnsRegionRequiredWhenLocalCenterQuestionHasNoRegion() {
         String question = AiStarterQuestionType.LOCAL_REHAB_CENTERS.getContent();
-        String regionRequiredMessage = "확인할 시·도와 시·군·구를 알려주세요.";
-        when(starterQuestionRouter.route(
-                eq(AiStarterQuestionType.LOCAL_REHAB_CENTERS),
-                any()
-        ))
-                .thenReturn(Optional.of(
-                        AiStarterQuestionAnswer.regionRequired(regionRequiredMessage)
-                ));
+        String regionRequiredMessage =
+                "어느 지역을 기준으로 찾을까요? 시·도와 시·군·구를 알려주세요.";
         AiMessage saved = savedAiMessage(regionRequiredMessage);
         when(persistenceService.saveAiMessageAndComplete(
                 11L,
@@ -639,7 +691,9 @@ class AiMessageServiceTest {
     @Test
     void usesLlmNormalizedResultCountAndSkipsFixedStarterAnswer() {
         String question = "근처 장애인재활센터 열 개 알려줘";
-        String searchQuestion = question + "\n요청 결과 개수: 10개";
+        String searchQuestion = "경기도 수원시 장애인재활센터 열 개 알려줘"
+                + "\n요청 결과 개수: 10개";
+        user.updateInterestRegion(List.of(), Region.create("경기도", "수원시"));
         when(questionIntentClassifier.analyze(question)).thenReturn(
                 AiQuestionAnalysis.forQuestion(
                         question,
@@ -910,6 +964,23 @@ class AiMessageServiceTest {
                         AiQuestionIntent.NONE,
                         AiSearchScope.NATIONAL_POLICY,
                         List.of("장애인 활동지원서비스 아동 신청 대상 신청 방법")
+                ).withRetrievalPlan(
+                        "활동지원 제도와 신청 조건 안내",
+                        List.of(
+                                new AiRequiredConcept(
+                                        "전국 공통 장애인활동지원",
+                                        "장애인활동지원 전국 공통 국가 복지 서비스",
+                                        List.of("장애인활동지원"),
+                                        List.of("추가지원")
+                                ),
+                                new AiRequiredConcept(
+                                        "지역 활동지원 추가지원",
+                                        "장애인활동지원 지역 추가지원 사업",
+                                        List.of("장애인활동지원", "추가지원"),
+                                        List.of(),
+                                        true
+                                )
+                        )
                 )
         );
 
@@ -949,7 +1020,7 @@ class AiMessageServiceTest {
         when(answerGenerator.generate(
                 eq(question),
                 any(),
-                eq(List.of(originalDocument, nationalDocument, localDocument))
+                eq(List.of(nationalDocument, localDocument, originalDocument))
         )).thenReturn(new GeneratedAiAnswer(
                 "장애인활동지원과 수원시 추가지원 안내입니다.",
                 List.of("INFO-5724-0", "INFO-7183-0")
@@ -971,6 +1042,96 @@ class AiMessageServiceTest {
         verify(documentRetriever).retrieve(eq(question), any(), any());
         verify(documentRetriever).retrieve(eq(broaderTargetQuery), any(), any());
         verify(documentRetriever).retrieve(eq(localBroaderTargetQuery), any(), any());
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void supplementsMissingNationalActivitySupportDocument() {
+        String question = "장애아동 활동지원 서비스를 알려줘";
+        String broaderTargetQuery = "장애인 활동지원 서비스를 알려줘";
+        String localBroaderTargetQuery =
+                "경기도 수원시 장애인 활동지원 서비스를 알려줘";
+        String nationalSupplementQuery = "장애인활동지원 전국 공통 국가 복지 서비스 "
+                + "활동지원 제도 안내"
+                + "\n요청 결과 개수: 10개";
+        user.updateInterestRegion(List.of(), Region.create("경기도", "수원시"));
+        when(questionIntentClassifier.analyze(question)).thenReturn(
+                AiQuestionAnalysis.forQuestion(
+                        question,
+                        AiQuestionIntent.NONE,
+                        AiSearchScope.NATIONAL_POLICY,
+                        List.of()
+                ).withRetrievalPlan(
+                        "활동지원 제도 안내",
+                        List.of(
+                                new AiRequiredConcept(
+                                        "전국 공통 장애인활동지원",
+                                        "장애인활동지원 전국 공통 국가 복지 서비스",
+                                        List.of("장애인활동지원"),
+                                        List.of("추가지원")
+                                ),
+                                new AiRequiredConcept(
+                                        "지역 활동지원 추가지원",
+                                        "장애인활동지원 지역 추가지원 사업",
+                                        List.of("장애인활동지원", "추가지원"),
+                                        List.of(),
+                                        true
+                                )
+                        )
+                )
+        );
+
+        AiReferenceDocument unrelatedDocument = referenceDocument("CHILD-1", 1L);
+        AiReferenceDocument nationalDocument = new AiReferenceDocument(
+                "INFO-5724-0",
+                "장애인활동지원 전국 공통 제도 안내",
+                AiResponseSourceType.INFO,
+                5724L,
+                "장애인활동지원",
+                "https://example.com/info/5724",
+                Instant.parse("2026-07-01T00:00:00Z")
+        );
+        AiReferenceDocument localDocument = new AiReferenceDocument(
+                "INFO-7183-0",
+                "수원시 장애인 활동지원 추가지원 안내",
+                AiResponseSourceType.INFO,
+                7183L,
+                "장애인활동지원 수원시 추가지원 사업",
+                "https://example.com/info/7183",
+                Instant.parse("2026-07-01T00:00:00Z")
+        );
+        when(documentRetriever.retrieve(eq(question), any(), any()))
+                .thenReturn(List.of(unrelatedDocument));
+        when(documentRetriever.retrieve(eq(broaderTargetQuery), any(), any()))
+                .thenReturn(List.of(unrelatedDocument));
+        when(documentRetriever.retrieve(eq(localBroaderTargetQuery), any(), any()))
+                .thenReturn(List.of(localDocument));
+        when(documentRetriever.retrieve(eq(nationalSupplementQuery), any(), any()))
+                .thenReturn(List.of(nationalDocument));
+        when(answerGenerator.generate(eq(question), any(), any()))
+                .thenReturn(new GeneratedAiAnswer(
+                        "전국 공통 및 수원시 추가지원 안내",
+                        List.of("INFO-5724-0", "INFO-7183-0")
+                ));
+        AiMessage saved = savedAiMessage("전국 공통 및 수원시 추가지원 안내");
+        when(persistenceService.saveAiMessageAndComplete(
+                11L,
+                chatRoom,
+                "전국 공통 및 수원시 추가지원 안내",
+                false,
+                AiAnswerStatus.ANSWERED,
+                List.of(nationalDocument, localDocument)
+        )).thenReturn(saved);
+
+        service.createMessage(1L, question);
+
+        ArgumentCaptor<List<AiReferenceDocument>> documentsCaptor =
+                ArgumentCaptor.forClass(List.class);
+        verify(answerGenerator).generate(eq(question), any(), documentsCaptor.capture());
+        assertThat(documentsCaptor.getValue())
+                .startsWith(nationalDocument, localDocument)
+                .contains(unrelatedDocument);
+        verify(documentRetriever).retrieve(eq(nationalSupplementQuery), any(), any());
     }
 
     @Test
@@ -1407,7 +1568,7 @@ class AiMessageServiceTest {
     }
 
     @Test
-    void removesProfileRegionFromGeneralSearchAndAnswerContext() {
+    void keepsProfileRegionAsPriorityContextForNationwideGeneralSearch() {
         String question = "특수학교를 알려줘";
         user.updateInterestRegion(List.of(), Region.create("경기도", "수원시"));
         when(questionIntentClassifier.analyze(question)).thenReturn(
@@ -1431,18 +1592,18 @@ class AiMessageServiceTest {
         verify(documentRetriever).retrieve(
                 eq(question),
                 org.mockito.ArgumentMatchers.argThat(profile ->
-                        profile.region().isBlank()
-                                && profile.regionLevel1().isBlank()
-                                && profile.regionLevel2().isBlank()),
+                        "경기도 수원시".equals(profile.region())
+                                && "경기도".equals(profile.regionLevel1())
+                                && "수원시".equals(profile.regionLevel2())),
                 eq(AiSearchScope.GENERAL)
         );
         verify(externalAnswerProvider).search(
                 eq(question),
                 any(),
                 org.mockito.ArgumentMatchers.argThat(profile ->
-                        profile.region().isBlank()
-                                && profile.regionLevel1().isBlank()
-                                && profile.regionLevel2().isBlank()),
+                        "경기도 수원시".equals(profile.region())
+                                && "경기도".equals(profile.regionLevel1())
+                                && "수원시".equals(profile.regionLevel2())),
                 eq(AiSearchScope.GENERAL)
         );
     }

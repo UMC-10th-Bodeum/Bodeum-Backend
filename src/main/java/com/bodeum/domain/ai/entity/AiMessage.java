@@ -49,7 +49,7 @@ public class AiMessage extends BaseCreatedEntity {
     private AiResponseProcessingStatus aiProcessingStatus;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "ai_answer_status", length = 20)
+    @Column(name = "ai_answer_status", length = 50)
     private AiAnswerStatus aiAnswerStatus;
 
     @Builder

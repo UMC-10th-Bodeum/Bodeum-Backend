@@ -209,6 +209,15 @@ public class AiMessageQueryService {
                     .withFeedback(feedback);
         }
 
+        if (answerStatus == AiAnswerStatus.CLARIFICATION_REQUIRED) {
+            return AiMessageResponse.clarificationRequired(
+                    message.getId(),
+                    message.getSenderType(),
+                    message.getContent(),
+                    message.getCreatedAt())
+                    .withFeedback(feedback);
+        }
+
         if (answerStatus == AiAnswerStatus.GREETING) {
             return AiMessageResponse.greeting(
                     message.getId(),
