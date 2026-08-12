@@ -31,4 +31,21 @@ class AiQueryExpansionPromptTest {
                 "목적이 다른 서비스는 검색 질의의 대체 제도로 사용하지 마세요"
         );
     }
+
+    @Test
+    void normalizesExplicitAndMaximumResultCountExpressions() throws IOException {
+        String prompt = new ClassPathResource(
+                "prompts/ai-question-intent-classifier-system-prompt.txt"
+        ).getContentAsString(StandardCharsets.UTF_8);
+
+        assertThat(prompt).contains(
+                "숫자, 한글 수사, 단위 표현이 달라도",
+                "다섯 군데",
+                "한 스무 곳",
+                "최대한 많이",
+                "가능한 곳 전부",
+                "한 번 응답 최대치인 10",
+                "개수나 최대 범위 요청이 없다면 null"
+        );
+    }
 }

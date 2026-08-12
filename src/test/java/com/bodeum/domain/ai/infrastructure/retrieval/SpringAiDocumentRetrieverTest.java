@@ -165,6 +165,72 @@ class SpringAiDocumentRetrieverTest {
                 );
     }
 
+    @Test
+    void expandsTopKWhenQuestionRequestsTenInstitutions() {
+        SpringAiDocumentRetriever retriever =
+                new SpringAiDocumentRetriever(vectorStoreRetriever, 5, 0.4);
+        AiUserProfile profile = new AiUserProfile(
+                "경기도 수원시",
+                "경기도",
+                "수원시",
+                6,
+                List.of(),
+                List.of(),
+                ""
+        );
+        List<Document> documents = java.util.stream.IntStream.rangeClosed(1, 10)
+                .mapToObj(index -> document("CENTER-" + index, 0.9 - index * 0.01))
+                .toList();
+        when(vectorStoreRetriever.similaritySearch(
+                org.mockito.ArgumentMatchers.any(SearchRequest.class)))
+                .thenReturn(documents, documents);
+
+        var result = retriever.retrieve(
+                "근처 장애인재활센터 10개 알려줘",
+                profile,
+                AiSearchScope.LOCAL_RESOURCE
+        );
+
+        ArgumentCaptor<SearchRequest> requestCaptor =
+                ArgumentCaptor.forClass(SearchRequest.class);
+        verify(vectorStoreRetriever, times(2)).similaritySearch(requestCaptor.capture());
+        assertThat(requestCaptor.getAllValues())
+                .extracting(SearchRequest::getTopK)
+                .containsOnly(10);
+        assertThat(result).hasSize(10);
+    }
+
+    @Test
+    void capsTopKAtTenWhenQuestionRequestsMoreThanTenInstitutions() {
+        SpringAiDocumentRetriever retriever =
+                new SpringAiDocumentRetriever(vectorStoreRetriever, 5, 0.4);
+        AiUserProfile profile = new AiUserProfile(
+                "경기도 수원시",
+                "경기도",
+                "수원시",
+                6,
+                List.of(),
+                List.of(),
+                ""
+        );
+        when(vectorStoreRetriever.similaritySearch(
+                org.mockito.ArgumentMatchers.any(SearchRequest.class)))
+                .thenReturn(List.of());
+
+        retriever.retrieve(
+                "근처 장애인재활센터 20개 알려줘",
+                profile,
+                AiSearchScope.LOCAL_RESOURCE
+        );
+
+        ArgumentCaptor<SearchRequest> requestCaptor =
+                ArgumentCaptor.forClass(SearchRequest.class);
+        verify(vectorStoreRetriever, times(6)).similaritySearch(requestCaptor.capture());
+        assertThat(requestCaptor.getAllValues())
+                .extracting(SearchRequest::getTopK)
+                .containsOnly(10);
+    }
+
     private Document document(String id, double score) {
         Document document = org.mockito.Mockito.mock(Document.class);
         when(document.getId()).thenReturn(id);

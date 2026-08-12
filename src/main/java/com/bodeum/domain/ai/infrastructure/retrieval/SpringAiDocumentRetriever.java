@@ -13,6 +13,8 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStoreRetriever;
@@ -27,6 +29,9 @@ import org.slf4j.LoggerFactory;
 public class SpringAiDocumentRetriever implements AiDocumentRetriever {
 
     private static final Logger log = LoggerFactory.getLogger(SpringAiDocumentRetriever.class);
+    private static final int MAX_REQUESTED_RESULT_COUNT = 10;
+    private static final Pattern REQUESTED_RESULT_COUNT_PATTERN =
+            Pattern.compile("(\\d{1,2})\\s*(?:개|곳)");
     private final VectorStoreRetriever vectorStoreRetriever;
     private final int topK;
     private final double similarityThreshold;
@@ -109,9 +114,12 @@ public class SpringAiDocumentRetriever implements AiDocumentRetriever {
             String filterExpression,
             boolean includeRegion
     ) {
+        int resultCount = resolveResultCount(question);
         String searchQuery = buildSearchQuery(question, profile, includeRegion);
-        List<Document> personalizedDocuments = search(searchQuery, filterExpression);
-        List<Document> questionDocuments = search(question, filterExpression);
+        List<Document> personalizedDocuments = search(
+                searchQuery, filterExpression, resultCount);
+        List<Document> questionDocuments = search(
+                question, filterExpression, resultCount);
 
         Map<String, Document> documentsById = new LinkedHashMap<>();
         addByScore(documentsById, questionDocuments);
@@ -122,7 +130,7 @@ public class SpringAiDocumentRetriever implements AiDocumentRetriever {
                 document.getId(), score(document), similarityThreshold));
 
         return documentsById.values().stream()
-                .limit(topK)
+                .limit(resultCount)
                 .map(this::mapDocument)
                 .toList();
     }
@@ -138,15 +146,31 @@ public class SpringAiDocumentRetriever implements AiDocumentRetriever {
                         document.getId(), document));
     }
 
-    private List<Document> search(String query, String filterExpression) {
+    private List<Document> search(
+            String query,
+            String filterExpression,
+            int resultCount
+    ) {
         SearchRequest.Builder builder = SearchRequest.builder()
                 .query(query)
-                .topK(topK)
+                .topK(resultCount)
                 .similarityThreshold(0.0);
         if (hasText(filterExpression)) {
             builder.filterExpression(filterExpression);
         }
         return vectorStoreRetriever.similaritySearch(builder.build());
+    }
+
+    private int resolveResultCount(String question) {
+        if (question == null || question.isBlank()) {
+            return topK;
+        }
+        Matcher matcher = REQUESTED_RESULT_COUNT_PATTERN.matcher(question);
+        if (!matcher.find()) {
+            return topK;
+        }
+        int requestedCount = Integer.parseInt(matcher.group(1));
+        return Math.max(topK, Math.min(requestedCount, MAX_REQUESTED_RESULT_COUNT));
     }
 
     private double score(Document document) {

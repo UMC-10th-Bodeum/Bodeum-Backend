@@ -631,6 +631,44 @@ class AiMessageServiceTest {
     }
 
     @Test
+    void usesLlmNormalizedResultCountAndSkipsFixedStarterAnswer() {
+        String question = "근처 장애인재활센터 열 개 알려줘";
+        String searchQuestion = question + "\n요청 결과 개수: 10개";
+        when(questionIntentClassifier.analyze(question)).thenReturn(
+                AiQuestionAnalysis.forQuestion(
+                        question,
+                        AiQuestionIntent.LOCAL_REHAB_CENTERS,
+                        AiSearchScope.LOCAL_RESOURCE,
+                        List.of(),
+                        10
+                )
+        );
+        AiReferenceDocument source = referenceDocument("CENTER-1", 1L);
+        when(documentRetriever.retrieve(eq(searchQuestion), any(), any()))
+                .thenReturn(List.of(source));
+        when(answerGenerator.generate(eq(question), any(), eq(List.of(source))))
+                .thenReturn(new GeneratedAiAnswer(
+                        "재활센터 안내",
+                        List.of("CENTER-1")
+                ));
+        AiMessage saved = savedAiMessage("재활센터 안내");
+        when(persistenceService.saveAiMessageAndComplete(
+                11L,
+                chatRoom,
+                "재활센터 안내",
+                false,
+                AiAnswerStatus.ANSWERED,
+                List.of(source)
+        )).thenReturn(saved);
+
+        service.createMessage(1L, question);
+
+        verify(starterQuestionRouter, never()).route(any(), any());
+        verify(documentRetriever).retrieve(
+                eq(searchQuestion), any(), eq(AiSearchScope.LOCAL_RESOURCE));
+    }
+
+    @Test
     void mergesDocumentsRetrievedByOriginalAndExpandedQueries() {
         String question = "장애아동 활동지원 서비스 신청 방법 알려줘";
         String broaderTargetQuery = "장애인 활동지원 서비스 신청 방법 알려줘";

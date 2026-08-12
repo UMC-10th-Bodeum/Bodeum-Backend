@@ -51,7 +51,8 @@ public class SpringAiQuestionIntentClassifier implements AiQuestionIntentClassif
                     question,
                     result == null ? null : result.intent(),
                     result == null ? null : result.searchScope(),
-                    result == null ? List.of() : result.retrievalQueries()
+                    result == null ? List.of() : result.retrievalQueries(),
+                    result == null ? null : result.requestedResultCount()
             );
             log.info(
                     "[AI] 질문 LLM 분석 결과: intent={}, searchScope={}, retrievalQueryCount={}",
@@ -69,7 +70,8 @@ public class SpringAiQuestionIntentClassifier implements AiQuestionIntentClassif
     record ClassificationResult(
             AiQuestionIntent intent,
             AiSearchScope searchScope,
-            List<String> retrievalQueries
+            List<String> retrievalQueries,
+            Integer requestedResultCount
     ) {
     }
 

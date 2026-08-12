@@ -8,11 +8,20 @@ import java.util.stream.Stream;
 public record AiQuestionAnalysis(
         AiQuestionIntent intent,
         AiSearchScope searchScope,
-        List<String> retrievalQueries
+        List<String> retrievalQueries,
+        Integer requestedResultCount
 ) {
 
     public AiQuestionAnalysis(AiQuestionIntent intent, List<String> retrievalQueries) {
-        this(intent, AiSearchScope.GENERAL, retrievalQueries);
+        this(intent, AiSearchScope.GENERAL, retrievalQueries, null);
+    }
+
+    public AiQuestionAnalysis(
+            AiQuestionIntent intent,
+            AiSearchScope searchScope,
+            List<String> retrievalQueries
+    ) {
+        this(intent, searchScope, retrievalQueries, null);
     }
 
     public AiQuestionAnalysis {
@@ -26,10 +35,14 @@ public record AiQuestionAnalysis(
                         .distinct()
                         .limit(3)
                         .toList();
+        requestedResultCount = requestedResultCount != null && requestedResultCount > 0
+                ? requestedResultCount
+                : null;
     }
 
     public static AiQuestionAnalysis fallback() {
-        return new AiQuestionAnalysis(AiQuestionIntent.NONE, AiSearchScope.GENERAL, List.of());
+        return new AiQuestionAnalysis(
+                AiQuestionIntent.NONE, AiSearchScope.GENERAL, List.of(), null);
     }
 
     public static AiQuestionAnalysis fallback(String question) {
@@ -50,11 +63,27 @@ public record AiQuestionAnalysis(
             AiSearchScope searchScope,
             List<String> expandedQueries
     ) {
+        return forQuestion(
+                question, intent, searchScope, expandedQueries, null);
+    }
+
+    public static AiQuestionAnalysis forQuestion(
+            String question,
+            AiQuestionIntent intent,
+            AiSearchScope searchScope,
+            List<String> expandedQueries,
+            Integer requestedResultCount
+    ) {
         AiQuestionIntent resolvedIntent = intent == null
                 ? AiQuestionIntent.NONE
                 : intent;
         if (resolvedIntent != AiQuestionIntent.NONE) {
-            return new AiQuestionAnalysis(resolvedIntent, AiSearchScope.GENERAL, List.of());
+            return new AiQuestionAnalysis(
+                    resolvedIntent,
+                    AiSearchScope.GENERAL,
+                    List.of(),
+                    requestedResultCount
+            );
         }
 
         Stream<String> expansions = expandedQueries == null
@@ -69,6 +98,7 @@ public record AiQuestionAnalysis(
                 .distinct()
                 .limit(3)
                 .toList();
-        return new AiQuestionAnalysis(resolvedIntent, searchScope, retrievalQueries);
+        return new AiQuestionAnalysis(
+                resolvedIntent, searchScope, retrievalQueries, requestedResultCount);
     }
 }

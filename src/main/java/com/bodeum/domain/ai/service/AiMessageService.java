@@ -155,8 +155,10 @@ public class AiMessageService {
 
         AiUserProfile profile = questionContext.profile();
         Optional<AiStarterQuestionAnswer> starterAnswer =
-                questionContext.questionType()
-                        .flatMap(type -> starterQuestionRouter.route(type, profile));
+                questionContext.requestedResultCount() == null
+                        ? questionContext.questionType()
+                                .flatMap(type -> starterQuestionRouter.route(type, profile))
+                        : Optional.empty();
         if (starterAnswer.isPresent()) {
             AiStarterQuestionAnswer answer = starterAnswer.get();
             if (answer.isRegionRequired() || answer.hasEvidence()) {
@@ -165,11 +167,11 @@ public class AiMessageService {
             log.info("[AI] 추천 질문 출처 없음, 일반 질문 흐름으로 전환");
         }
 
-        String searchQuestion = contextualizeLocalRegion(
+        String searchQuestion = appendRequestedResultCount(contextualizeLocalRegion(
                 content,
                 profile,
                 questionContext.searchScope()
-        );
+        ), questionContext.requestedResultCount());
         List<String> searchQueries = ensureBroaderDisabilityTargetQuery(
                 searchQuestion,
                 contextualizeLocalRegions(
@@ -276,7 +278,8 @@ public class AiMessageService {
                 searchScope,
                 intent == AiQuestionIntent.NONE
                         ? analysis.retrievalQueries()
-                        : List.of()
+                        : List.of(),
+                analysis.requestedResultCount()
         );
     }
 
@@ -289,7 +292,8 @@ public class AiMessageService {
                 Optional.of(questionType),
                 Optional.empty(),
                 searchScope(questionType),
-                List.of()
+                List.of(),
+                null
         );
     }
 
@@ -479,6 +483,16 @@ public class AiMessageService {
 
     private String normalizeQuestion(String content) {
         return normalizeSpacing(content).replaceAll("\\s+", "");
+    }
+
+    private String appendRequestedResultCount(
+            String question,
+            Integer requestedResultCount
+    ) {
+        if (requestedResultCount == null || requestedResultCount <= 0) {
+            return question;
+        }
+        return question + "\n요청 결과 개수: " + requestedResultCount + "개";
     }
 
     private String normalizeSpacing(String content) {
@@ -946,7 +960,8 @@ public class AiMessageService {
             Optional<AiStarterQuestionType> questionType,
             Optional<String> safetyGuidance,
             AiSearchScope searchScope,
-            List<String> retrievalQueries
+            List<String> retrievalQueries,
+            Integer requestedResultCount
     ) {
     }
 
