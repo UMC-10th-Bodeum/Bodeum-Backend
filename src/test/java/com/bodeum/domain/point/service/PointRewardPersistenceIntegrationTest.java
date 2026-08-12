@@ -105,6 +105,51 @@ class PointRewardPersistenceIntegrationTest {
         assertThat(pointHistoryRepository.findAll()).hasSize(3);
     }
 
+    @Test
+    void rewardsOnlyFirstThreePostsPerServiceDayWithoutLimitingAnswers() {
+        User recipient = User.createSocialUser(
+                SocialProvider.KAKAO,
+                "daily-limit-recipient",
+                "daily-limit@example.com",
+                "일일 제한 사용자"
+        );
+        entityManager.persistAndFlush(recipient);
+        Long recipientUserId = recipient.getId();
+
+        for (long referenceId = 100L; referenceId < 103L; referenceId++) {
+            assertThat(pointService.grantActivityPoint(
+                    recipientUserId,
+                    PointEventType.COMMUNITY_POST_CREATED,
+                    referenceId,
+                    recipientUserId
+            )).isTrue();
+        }
+        assertThat(pointService.grantActivityPoint(
+                recipientUserId,
+                PointEventType.COMMUNITY_POST_CREATED,
+                103L,
+                recipientUserId
+        )).isFalse();
+
+        for (long referenceId = 200L; referenceId < 204L; referenceId++) {
+            assertThat(pointService.grantActivityPoint(
+                    recipientUserId,
+                    PointEventType.COMMUNITY_ANSWER_CREATED,
+                    referenceId,
+                    recipientUserId
+            )).isTrue();
+        }
+
+        entityManager.flush();
+        entityManager.clear();
+
+        MyPointResponse response = pointService.getMyPoints(recipientUserId);
+        assertThat(response.totalPoint()).isEqualTo(31);
+        assertActivity(response, PointType.POST_CREATED, 15L, 3L);
+        assertActivity(response, PointType.ANSWER_CREATED, 16L, 4L);
+        assertThat(pointHistoryRepository.findAll()).hasSize(7);
+    }
+
     private void assertActivity(
             MyPointResponse response,
             PointType pointType,

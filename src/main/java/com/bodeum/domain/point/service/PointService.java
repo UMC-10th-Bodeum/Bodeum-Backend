@@ -1,5 +1,7 @@
 package com.bodeum.domain.point.service;
 
+import static com.bodeum.global.common.constant.TimeConstants.SERVICE_ZONE_ID;
+
 import com.bodeum.domain.point.dto.response.MyPointResponse;
 import com.bodeum.domain.point.dto.response.MyPointResponse.PointActivity;
 import com.bodeum.domain.point.entity.GuardianPoint;
@@ -13,6 +15,8 @@ import com.bodeum.domain.point.repository.GuardianPointRepository.UserTotalPoint
 import com.bodeum.domain.user.entity.GuardianProfile;
 import com.bodeum.domain.user.entity.User;
 import com.bodeum.domain.user.repository.UserRepository;
+import java.time.Instant;
+import java.time.LocalDate;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.EnumMap;
@@ -27,6 +31,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 public class PointService {
+
+    private static final int DAILY_POST_REWARD_LIMIT = 3;
 
     private final GuardianPointRepository guardianPointRepository;
     private final GuardianPointHistoryRepository pointHistoryRepository;
@@ -63,6 +69,10 @@ public class PointService {
             return false;
         }
 
+        if (hasReachedDailyPostRewardLimit(guardianPoint, eventType)) {
+            return false;
+        }
+
         GuardianPointHistory history = GuardianPointHistory.create(
                 guardianPoint,
                 eventType,
@@ -72,6 +82,32 @@ public class PointService {
         guardianPoint.increasePoint(history.getPointValue());
         pointHistoryRepository.save(history);
         return true;
+    }
+
+    private boolean hasReachedDailyPostRewardLimit(
+            GuardianPoint guardianPoint,
+            PointEventType eventType
+    ) {
+        if (eventType != PointEventType.COMMUNITY_POST_CREATED) {
+            return false;
+        }
+
+        LocalDate today = LocalDate.now(SERVICE_ZONE_ID);
+        Instant startInclusive = today
+                .atStartOfDay(SERVICE_ZONE_ID)
+                .toInstant();
+        Instant endExclusive = today
+                .plusDays(1)
+                .atStartOfDay(SERVICE_ZONE_ID)
+                .toInstant();
+
+        return pointHistoryRepository
+                .countByGuardianPoint_IdAndEventTypeAndCreatedAtGreaterThanEqualAndCreatedAtLessThan(
+                        guardianPoint.getId(),
+                        PointEventType.COMMUNITY_POST_CREATED,
+                        startInclusive,
+                        endExclusive
+                ) >= DAILY_POST_REWARD_LIMIT;
     }
 
     @Transactional
