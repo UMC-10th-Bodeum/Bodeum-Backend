@@ -64,6 +64,9 @@ public class AiMessageService {
             "(학교|센터|기관|병원|의원|약국|복지관|시설|교육원|상담소|지원사업|지원서비스)");
     private static final Pattern RELATIVE_LOCAL_REGION_PATTERN = Pattern.compile(
             "(우리\\s*(지역|동네)|근처|주변)");
+    private static final Pattern CONTEXT_REFERENCE_PATTERN = Pattern.compile(
+            "(그중|그\\s*(학교|센터|기관|곳|서비스|제도)|위\\s*(학교|센터|기관|곳|서비스|제도)"
+                    + "|앞서|이전|방금|해당)");
     private static final String AMBIGUOUS_REGION_MESSAGE_PREFIX =
             "확인할 지역이 여러 곳입니다. ";
     private static final String NO_RESULT_MESSAGE = "관련 정보를 찾을 수 없습니다.";
@@ -365,7 +368,12 @@ public class AiMessageService {
             return localRehabContext(profile, followUpRegion.get());
         }
 
+        AiQuestionRegionResolver.RegionResolution originalRegionResolution =
+                questionRegionResolver.resolve(content, profile);
+        boolean selfContainedLocalResource = isSelfContainedLocalResourceQuestion(
+                content, content, originalRegionResolution);
         AiQuestionAnalysis analysis = conversationContext.hasContext()
+                && !selfContainedLocalResource
                 ? questionIntentClassifier.analyze(
                         content,
                         conversationContext.previousUserQuestion(),
@@ -392,6 +400,7 @@ public class AiMessageService {
                         ? regionResolution.applyTo(profile)
                         : profile)
                 .withInfoSubCategory(infoSubCategory);
+        boolean followUp = analysis.followUp() && !selfContainedLocalResource;
         return new QuestionContext(
                 searchProfile,
                 intent.starterQuestionType(),
@@ -402,12 +411,28 @@ public class AiMessageService {
                         : List.of(),
                 analysis.requestedResultCount(),
                 resolvedQuestion,
-                analysis.followUp(),
+                followUp,
                 analysis.searchGoal(),
                 analysis.requiredConcepts(),
                 analysis.needsClarification(),
                 analysis.clarificationQuestion()
         );
+    }
+
+    private boolean isSelfContainedLocalResourceQuestion(
+            String originalQuestion,
+            String resolvedQuestion,
+            AiQuestionRegionResolver.RegionResolution regionResolution
+    ) {
+        String question = resolvedQuestion == null || resolvedQuestion.isBlank()
+                ? originalQuestion
+                : resolvedQuestion;
+        if (!LOCAL_RESOURCE_PATTERN.matcher(question).find()
+                || CONTEXT_REFERENCE_PATTERN.matcher(originalQuestion).find()) {
+            return false;
+        }
+        return RELATIVE_LOCAL_REGION_PATTERN.matcher(originalQuestion).find()
+                || regionResolution.isResolved();
     }
 
     private QuestionContext starterQuestionContext(
