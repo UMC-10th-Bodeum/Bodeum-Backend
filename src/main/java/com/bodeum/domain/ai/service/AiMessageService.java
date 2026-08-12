@@ -200,9 +200,10 @@ public class AiMessageService {
                 ? content
                 : questionContext.resolvedQuestion();
         if (additionalResultsContext.isFollowUp()
-                && resolvedContent.equals(content)) {
+                && !normalizeQuestion(resolvedContent).contains(normalizeQuestion(
+                        additionalResultsContext.previousQuestion()))) {
             resolvedContent = additionalResultsContext.previousQuestion()
-                    + "\n이전에 안내한 기관을 제외하고 " + content;
+                    + "\n이전에 안내한 항목을 제외하고 " + resolvedContent;
         }
         boolean followUp = questionContext.followUp()
                 || additionalResultsContext.isFollowUp();

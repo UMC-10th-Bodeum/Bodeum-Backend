@@ -241,6 +241,30 @@ class SpringAiDocumentRetrieverTest {
     }
 
     @Test
+    void keepsDefaultTopKAsCandidateMinimumWhenQuestionRequestsThreeInstitutions() {
+        SpringAiDocumentRetriever retriever =
+                new SpringAiDocumentRetriever(vectorStoreRetriever, 5, 10, 0.4);
+        AiUserProfile profile = new AiUserProfile(
+                "", "", "", 6, List.of(), List.of(), "");
+        when(vectorStoreRetriever.similaritySearch(
+                org.mockito.ArgumentMatchers.any(SearchRequest.class)))
+                .thenReturn(List.of());
+
+        retriever.retrieve(
+                "재활센터 3개 알려줘",
+                profile,
+                AiSearchScope.GENERAL
+        );
+
+        ArgumentCaptor<SearchRequest> requestCaptor =
+                ArgumentCaptor.forClass(SearchRequest.class);
+        verify(vectorStoreRetriever, times(2)).similaritySearch(requestCaptor.capture());
+        assertThat(requestCaptor.getAllValues())
+                .extracting(SearchRequest::getTopK)
+                .containsOnly(5);
+    }
+
+    @Test
     void capsTopKAtTenWhenQuestionRequestsMoreThanTenInstitutions() {
         SpringAiDocumentRetriever retriever =
                 new SpringAiDocumentRetriever(vectorStoreRetriever, 5, 10, 0.4);

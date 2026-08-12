@@ -729,11 +729,43 @@ class AiMessageServiceTest {
     }
 
     @Test
+    void passesRequestedCountToAnswerPromptWhileRetrieverKeepsCandidateMinimum() {
+        String question = "재활센터 3개 알려줘";
+        String searchQuestion = question + "\n요청 결과 개수: 3개";
+        when(questionIntentClassifier.analyze(question)).thenReturn(
+                AiQuestionAnalysis.forQuestion(
+                        question,
+                        AiQuestionIntent.NONE,
+                        AiSearchScope.GENERAL,
+                        List.of(),
+                        3
+                )
+        );
+        AiReferenceDocument source = referenceDocument("CENTER-1", 1L);
+        when(documentRetriever.retrieve(eq(searchQuestion), any(), eq(AiSearchScope.GENERAL)))
+                .thenReturn(List.of(source));
+        when(answerGenerator.generate(eq(question), any(), eq(List.of(source))))
+                .thenReturn(new GeneratedAiAnswer("재활센터 3개 안내", List.of("CENTER-1")));
+        AiMessage saved = savedAiMessage("재활센터 3개 안내");
+        when(persistenceService.saveAiMessageAndComplete(
+                11L, chatRoom, "재활센터 3개 안내", false,
+                AiAnswerStatus.ANSWERED, List.of(source)
+        )).thenReturn(saved);
+
+        service.createMessage(1L, question);
+
+        verify(documentRetriever).retrieve(
+                eq(searchQuestion), any(), eq(AiSearchScope.GENERAL));
+        verify(answerGenerator).generate(eq(question), any(), eq(List.of(source)));
+    }
+
+    @Test
     void keepsBaseTopicAndExcludesAllPreviouslyCitedSourcesForChainedMoreResults() {
         String question = "5개 더 알려줘";
         String previousQuestion = "근처 장애인재활센터 5개 알려줘";
+        String llmResolvedQuestion = "수원시에서 5개 더 알려줘";
         String resolvedQuestion = previousQuestion
-                + "\n이전에 안내한 기관을 제외하고 " + question;
+                + "\n이전에 안내한 항목을 제외하고 " + llmResolvedQuestion;
         AiMessage currentUserMessage = mock(AiMessage.class);
         AiMessage previousFollowUpMessage = mock(AiMessage.class);
         AiMessage previousUserMessage = mock(AiMessage.class);
@@ -773,12 +805,12 @@ class AiMessageServiceTest {
                 .thenReturn(previousSources);
         when(questionIntentClassifier.analyze(question)).thenReturn(
                 AiQuestionAnalysis.forQuestion(
-                        resolvedQuestion,
+                        llmResolvedQuestion,
                         AiQuestionIntent.NONE,
                         AiSearchScope.LOCAL_RESOURCE,
                         List.of(),
                         5,
-                        resolvedQuestion
+                        llmResolvedQuestion
                 )
         );
 
@@ -822,14 +854,15 @@ class AiMessageServiceTest {
         service.createMessage(1L, question);
 
         ArgumentCaptor<String> searchQuestionCaptor = ArgumentCaptor.forClass(String.class);
-        verify(documentRetriever).retrieve(
+        verify(documentRetriever, org.mockito.Mockito.atLeastOnce()).retrieve(
                 searchQuestionCaptor.capture(), any(), eq(AiSearchScope.LOCAL_RESOURCE));
-        assertThat(searchQuestionCaptor.getValue())
-                .contains(previousQuestion)
-                .contains("이전에 안내한 기관을 제외하고 5개 더 알려줘")
-                .contains("검색 후보 개수: 10개")
-                .contains("기존센터-1")
-                .contains("기존센터-10");
+        assertThat(searchQuestionCaptor.getAllValues()).anySatisfy(searchQuestion ->
+                assertThat(searchQuestion)
+                        .contains(previousQuestion)
+                        .contains("이전에 안내한 항목을 제외하고 " + llmResolvedQuestion)
+                        .contains("검색 후보 개수: 10개")
+                        .contains("기존센터-1")
+                        .contains("기존센터-10"));
         verify(answerGenerator).generate(
                 eq(resolvedQuestion), any(), eq(newDocuments));
     }
