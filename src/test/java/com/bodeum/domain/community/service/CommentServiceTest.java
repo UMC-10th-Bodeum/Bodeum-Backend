@@ -53,7 +53,7 @@ class CommentServiceTest {
     private CommentService commentService;
 
     @Test
-    void createCommentIncreasesPostCommentCount() {
+    void createCommentOnGeneralPostGrantsAnswerPoint() {
         Post post = post(1L, 10L);
         User author = user(20L, "보듬맘");
         ReflectionTestUtils.setField(
@@ -76,7 +76,12 @@ class CommentServiceTest {
         assertThat(response.isMine()).isTrue();
         assertThat(response.profileImageUrl()).isEqualTo("https://example.com/profile.jpg");
         assertThat(post.getCommentCount()).isOne();
-        then(pointService).shouldHaveNoInteractions();
+        then(pointService).should().grantActivityPoint(
+                20L,
+                PointEventType.COMMUNITY_ANSWER_CREATED,
+                1L,
+                20L
+        );
     }
 
     @Test
@@ -131,6 +136,7 @@ class CommentServiceTest {
 
         assertThat(response.parentCommentId()).isEqualTo(2L);
         assertThat(post.getCommentCount()).isEqualTo(3);
+        then(pointService).shouldHaveNoInteractions();
     }
 
     @Test
