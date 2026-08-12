@@ -23,18 +23,22 @@ class CommentResponseTest {
     @Test
     void exposesAuthorIdWhenAuthorIsActive() {
         CommentResponse response = CommentResponse.of(
-                comment(), null, 99L, false, false, "보듬맘", List.of());
+                comment(), null, 99L, false, false, "보듬맘",
+                "https://example.com/profile.jpg", List.of());
 
         assertThat(response.authorId()).isEqualTo(10L);
         assertThat(response.authorNickname()).isEqualTo("보듬맘");
+        assertThat(response.profileImageUrl()).isEqualTo("https://example.com/profile.jpg");
     }
 
     @Test
     void anonymizesWithdrawnAuthor() {
         CommentResponse response = CommentResponse.of(
-                comment(), null, 99L, false, true, "보듬맘", List.of());
+                comment(), null, 99L, false, true, "보듬맘",
+                "https://example.com/profile.jpg", List.of());
 
         assertThat(response.authorId()).isNull();
         assertThat(response.authorNickname()).isEqualTo("탈퇴한 사용자");
+        assertThat(response.profileImageUrl()).isNull();
     }
 }

@@ -4,21 +4,34 @@ import io.swagger.v3.oas.annotations.media.Schema;
 
 public record PostSearchSuggestionResponse(
         @Schema(
-                description = "검색어와 일치하는 게시글 제목 또는 검색어 주변의 본문 1~2문장",
+                description = "추천 게시글 제목",
                 example = "자폐스펙트럼 아이의 치료 기록"
         )
-        String text,
+        String title,
 
-        @Schema(description = "추천 검색어 유형", example = "POST_TITLE")
+        @Schema(
+                description = "게시글 본문 미리보기. 본문에서 검색어가 일치하면 검색어 주변 1~2문장, "
+                        + "제목에서만 일치하면 본문 첫 1~2문장",
+                example = "치료를 시작한 뒤 아이에게 나타난 변화를 기록했습니다."
+        )
+        String content,
+
+        @Schema(description = "검색어가 일치한 영역", example = "POST_TITLE")
         Type type
 ) {
 
-    public static PostSearchSuggestionResponse fromTitle(String title) {
-        return new PostSearchSuggestionResponse(title, Type.POST_TITLE);
+    public static PostSearchSuggestionResponse fromTitle(
+            String title,
+            String content
+    ) {
+        return new PostSearchSuggestionResponse(title, content, Type.POST_TITLE);
     }
 
-    public static PostSearchSuggestionResponse fromContent(String contentSnippet) {
-        return new PostSearchSuggestionResponse(contentSnippet, Type.POST_CONTENT);
+    public static PostSearchSuggestionResponse fromContent(
+            String title,
+            String content
+    ) {
+        return new PostSearchSuggestionResponse(title, content, Type.POST_CONTENT);
     }
 
     public enum Type {

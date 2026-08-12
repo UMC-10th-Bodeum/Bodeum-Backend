@@ -55,6 +55,12 @@ class CommentServiceTest {
     @Test
     void createCommentIncreasesPostCommentCount() {
         Post post = post(1L, 10L);
+        User author = user(20L, "보듬맘");
+        ReflectionTestUtils.setField(
+                author,
+                "profileImageUrl",
+                "https://example.com/profile.jpg"
+        );
         given(postRepository.findByIdAndStatusForUpdate(1L, PostStatus.ACTIVE))
                 .willReturn(Optional.of(post));
         given(commentRepository.save(any(Comment.class))).willAnswer(invocation -> {
@@ -62,11 +68,13 @@ class CommentServiceTest {
             ReflectionTestUtils.setField(comment, "id", 1L);
             return comment;
         });
+        given(userRepository.findAllById(any())).willReturn(List.of(author));
 
         var response = commentService.createComment(20L, 1L, new CreateCommentRequest("댓글"));
 
         assertThat(response.commentId()).isEqualTo(1L);
         assertThat(response.isMine()).isTrue();
+        assertThat(response.profileImageUrl()).isEqualTo("https://example.com/profile.jpg");
         assertThat(post.getCommentCount()).isOne();
         then(pointService).shouldHaveNoInteractions();
     }
@@ -174,6 +182,11 @@ class CommentServiceTest {
         Comment sameAsFirst = comment(4L, post, 20L, null, "첫 번째 익명 작성자의 추가 댓글");
         User anonymousAuthor1 = user(20L, null);
         User namedAuthor = user(21L, "보듬맘");
+        ReflectionTestUtils.setField(
+                namedAuthor,
+                "profileImageUrl",
+                "https://example.com/profile.jpg"
+        );
         User anonymousAuthor2 = user(22L, " ");
         given(postRepository.findByIdAndStatusAndDeletedAtIsNull(1L, PostStatus.ACTIVE))
                 .willReturn(Optional.of(post));
@@ -187,6 +200,9 @@ class CommentServiceTest {
         assertThat(response.comments())
                 .extracting(comment -> comment.authorNickname())
                 .containsExactly("익명 1", "보듬맘", "익명 2", "익명 1");
+        assertThat(response.comments())
+                .extracting(comment -> comment.profileImageUrl())
+                .containsExactly(null, "https://example.com/profile.jpg", null, null);
     }
 
     @Test
@@ -392,6 +408,7 @@ class CommentServiceTest {
 
         assertThat(response.authorId()).isNull();
         assertThat(response.authorNickname()).isEqualTo("탈퇴한 사용자");
+        assertThat(response.profileImageUrl()).isNull();
     }
 
     private Post post(Long postId, Long userId) {

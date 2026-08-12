@@ -83,7 +83,7 @@ public class CommentService {
         );
         Set<Long> likedCommentIds = findLikedCommentIds(userId, comments);
         Set<Long> withdrawnAuthorIds = findWithdrawnAuthorIds(comments);
-        Map<Long, String> authorDisplayNames = buildAuthorDisplayNames(comments, withdrawnAuthorIds);
+        Map<Long, CommentAuthorProfile> authorProfiles = buildAuthorProfiles(comments, withdrawnAuthorIds);
 
         return new CommentListResponse(
                 post.getCommentCount(),
@@ -92,7 +92,7 @@ public class CommentService {
                         userId,
                         likedCommentIds,
                         withdrawnAuthorIds,
-                        authorDisplayNames
+                        authorProfiles
                 )
         );
     }
@@ -278,7 +278,7 @@ public class CommentService {
                 .findWithdrawnUserIdsByIdIn(List.of(comment.getUserId()))
                 .isEmpty();
         Long parentCommentId = comment.getParent() == null ? null : comment.getParent().getId();
-        String authorDisplayName = resolveAuthorDisplayName(comment, authorWithdrawn);
+        CommentAuthorProfile authorProfile = resolveAuthorProfile(comment, authorWithdrawn);
 
         return CommentResponse.of(
                 comment,
@@ -286,14 +286,15 @@ public class CommentService {
                 viewerId,
                 liked,
                 authorWithdrawn,
-                authorDisplayName,
+                authorProfile.displayName(),
+                authorProfile.profileImageUrl(),
                 List.of()
         );
     }
 
-    private String resolveAuthorDisplayName(Comment comment, boolean authorWithdrawn) {
+    private CommentAuthorProfile resolveAuthorProfile(Comment comment, boolean authorWithdrawn) {
         if (authorWithdrawn) {
-            return WithdrawalConstants.WITHDRAWN_DISPLAY_NAME;
+            return new CommentAuthorProfile(WithdrawalConstants.WITHDRAWN_DISPLAY_NAME, null);
         }
 
         List<Comment> postComments = new ArrayList<>(commentRepository.findAllActiveByPostIdWithParent(
@@ -307,7 +308,7 @@ public class CommentService {
         }
 
         Set<Long> withdrawnAuthorIds = findWithdrawnAuthorIds(postComments);
-        return buildAuthorDisplayNames(postComments, withdrawnAuthorIds).get(comment.getUserId());
+        return buildAuthorProfiles(postComments, withdrawnAuthorIds).get(comment.getUserId());
     }
 
     private Set<Long> findLikedCommentIds(Long userId, List<Comment> comments) {
@@ -339,7 +340,7 @@ public class CommentService {
         return new HashSet<>(userRepository.findWithdrawnUserIdsByIdIn(authorIds));
     }
 
-    private Map<Long, String> buildAuthorDisplayNames(
+    private Map<Long, CommentAuthorProfile> buildAuthorProfiles(
             List<Comment> comments,
             Set<Long> withdrawnAuthorIds
     ) {
@@ -353,29 +354,38 @@ public class CommentService {
         Map<Long, User> authorsById = userRepository.findAllById(activeAuthorIds).stream()
                 .collect(Collectors.toMap(User::getId, Function.identity()));
 
-        Map<Long, String> displayNamesByAuthorId = new LinkedHashMap<>();
+        Map<Long, CommentAuthorProfile> profilesByAuthorId = new LinkedHashMap<>();
         int anonymousNumber = 1;
         for (Comment comment : orderedComments) {
             Long authorId = comment.getUserId();
-            if (displayNamesByAuthorId.containsKey(authorId)) {
+            if (profilesByAuthorId.containsKey(authorId)) {
                 continue;
             }
             if (withdrawnAuthorIds.contains(authorId)) {
-                displayNamesByAuthorId.put(authorId, WithdrawalConstants.WITHDRAWN_DISPLAY_NAME);
+                profilesByAuthorId.put(
+                        authorId,
+                        new CommentAuthorProfile(WithdrawalConstants.WITHDRAWN_DISPLAY_NAME, null)
+                );
                 continue;
             }
 
             User author = authorsById.get(authorId);
             String nickname = author == null ? null : author.getNickname();
             if (nickname != null && !nickname.isBlank()) {
-                displayNamesByAuthorId.put(authorId, nickname);
+                profilesByAuthorId.put(
+                        authorId,
+                        new CommentAuthorProfile(nickname, author.getProfileImageUrl())
+                );
                 continue;
             }
 
-            displayNamesByAuthorId.put(authorId, "익명 " + anonymousNumber);
+            profilesByAuthorId.put(
+                    authorId,
+                    new CommentAuthorProfile("익명 " + anonymousNumber, null)
+            );
             anonymousNumber++;
         }
-        return Map.copyOf(displayNamesByAuthorId);
+        return Map.copyOf(profilesByAuthorId);
     }
 
     private List<CommentResponse> buildCommentTree(
@@ -383,7 +393,7 @@ public class CommentService {
             Long viewerId,
             Set<Long> likedCommentIds,
             Set<Long> withdrawnAuthorIds,
-            Map<Long, String> authorDisplayNames
+            Map<Long, CommentAuthorProfile> authorProfiles
     ) {
         List<Comment> orderedComments = comments.stream()
                 .sorted(Comparator.comparing(Comment::getId))
@@ -398,13 +408,15 @@ public class CommentService {
             List<CommentResponse> replies = reverseCopy(repliesByParentId.get(comment.getId()));
             Long parentId = comment.getParent() == null ? null : comment.getParent().getId();
             Long visibleParentId = parentId != null && commentsById.containsKey(parentId) ? parentId : null;
+            CommentAuthorProfile authorProfile = authorProfiles.get(comment.getUserId());
             CommentResponse response = CommentResponse.of(
                     comment,
                     visibleParentId,
                     viewerId,
                     likedCommentIds.contains(comment.getId()),
                     withdrawnAuthorIds.contains(comment.getUserId()),
-                    authorDisplayNames.get(comment.getUserId()),
+                    authorProfile.displayName(),
+                    authorProfile.profileImageUrl(),
                     replies
             );
 
@@ -427,6 +439,12 @@ public class CommentService {
         List<CommentResponse> orderedResponses = new ArrayList<>(responses);
         Collections.reverse(orderedResponses);
         return List.copyOf(orderedResponses);
+    }
+
+    private record CommentAuthorProfile(
+            String displayName,
+            String profileImageUrl
+    ) {
     }
 
     private void validateAuthenticatedUser(Long userId) {

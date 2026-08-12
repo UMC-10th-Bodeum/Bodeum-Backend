@@ -110,17 +110,31 @@ public class PostListService {
     }
 
     private PostSearchSuggestionResponse toSearchSuggestion(Post post, String keyword) {
-        if (containsIgnoreCase(post.getTitle(), keyword)) {
-            return PostSearchSuggestionResponse.fromTitle(post.getTitle());
+        boolean contentMatched = containsIgnoreCase(post.getContent(), keyword);
+        String contentSnippet = contentMatched
+                ? extractContentSnippet(post.getContent(), keyword)
+                : extractLeadingContentSnippet(post.getContent());
+
+        return contentMatched
+                ? PostSearchSuggestionResponse.fromContent(post.getTitle(), contentSnippet)
+                : PostSearchSuggestionResponse.fromTitle(post.getTitle(), contentSnippet);
+    }
+
+    private String extractLeadingContentSnippet(String content) {
+        List<SentenceRange> sentences = splitSentences(content);
+        if (sentences.isEmpty()) {
+            return content;
         }
 
-        if (containsIgnoreCase(post.getContent(), keyword)) {
-            return PostSearchSuggestionResponse.fromContent(
-                    extractContentSnippet(post.getContent(), keyword)
-            );
+        int endSentenceIndex = Math.min(1, sentences.size() - 1);
+        String snippet = content.substring(
+                sentences.get(0).start(),
+                sentences.get(endSentenceIndex).end()
+        ).trim();
+        if (endSentenceIndex < sentences.size() - 1) {
+            snippet = snippet + " …";
         }
-
-        return PostSearchSuggestionResponse.fromTitle(post.getTitle());
+        return snippet;
     }
 
     private String extractContentSnippet(String content, String keyword) {
