@@ -14,6 +14,7 @@ import com.bodeum.domain.ai.model.rag.AiReferenceDocument;
 import com.bodeum.domain.ai.model.rag.AiUserProfile;
 import com.bodeum.domain.ai.repository.AiExternalSourceRepository;
 import com.bodeum.domain.info.entity.InfoItem;
+import com.bodeum.domain.info.entity.enums.InfoSubCategory;
 import com.bodeum.domain.info.repository.InfoItemRepository;
 import com.bodeum.global.common.constant.TimeConstants;
 import com.bodeum.global.apiPayload.exception.ProjectException;
@@ -260,6 +261,7 @@ public class AiStarterQuestionRouter {
         List<InfoItem> centers = infoItemRepository.findRehabCentersByRegion(
                 profile.regionLevel1(),
                 profile.regionLevel2(),
+                InfoSubCategory.THERAPY_REHAB,
                 PageRequest.of(0, LOCAL_CENTER_LIMIT)
         );
         if (centers.isEmpty()) {
@@ -532,9 +534,10 @@ public class AiStarterQuestionRouter {
                 .append("**\n\n`")
                 .append(info.getInfoCategory().getSubCategoryKo())
                 .append("` — ")
-                .append(info.getAddress())
-                .append("\n\n")
-                .append(value(info.getIntroduction()));
+                .append(info.getAddress());
+        if (info.getIntroduction() != null && !info.getIntroduction().isBlank()) {
+            card.append("\n\n").append(info.getIntroduction());
+        }
         return card.toString();
     }
 

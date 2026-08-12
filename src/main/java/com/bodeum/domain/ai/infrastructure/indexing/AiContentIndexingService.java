@@ -173,7 +173,7 @@ public class AiContentIndexingService {
         metadata.put("infoCategoryId", category.getId());
         metadata.put("mainCategory", category.getMainCategory().name());
         metadata.put("mainCategoryKo", category.getMainCategoryKo());
-        metadata.put("subCategory", category.getSubCategory());
+        metadata.put("subCategory", category.getSubCategory().name());
         metadata.put("subCategoryKo", category.getSubCategoryKo());
 
         // ★ null 또는 공백인 경우 metadata Map에 넣지 않아 Spring AI VectorStore 에러 방지
@@ -185,7 +185,7 @@ public class AiContentIndexingService {
                 line("대분류", category.getMainCategoryKo()),
                 line("대분류 코드", category.getMainCategory().name()),
                 line("세부 분류", category.getSubCategoryKo()),
-                line("세부 분류 코드", category.getSubCategory()),
+                line("세부 분류 코드", category.getSubCategory().name()),
                 line("소개", item.getIntroduction()),
                 line("주소", item.getAddress()),
                 line("지역", "%s %s".formatted(

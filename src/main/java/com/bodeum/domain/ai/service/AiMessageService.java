@@ -10,6 +10,8 @@ import com.bodeum.domain.ai.enums.AiStarterQuestionType;
 import com.bodeum.domain.ai.enums.SenderType;
 import com.bodeum.domain.ai.exception.AiErrorCode;
 import com.bodeum.domain.ai.model.rag.AiReferenceDocument;
+import com.bodeum.domain.ai.model.rag.AiRequiredConcept;
+import com.bodeum.domain.info.entity.enums.InfoSubCategory;
 import com.bodeum.domain.ai.model.rag.AiQuestionAnalysis;
 import com.bodeum.domain.ai.model.rag.AiScrapInterests;
 import com.bodeum.domain.ai.model.rag.AiSourceKey;
@@ -24,7 +26,9 @@ import com.bodeum.domain.ai.service.port.AiExternalAnswerProvider;
 import com.bodeum.domain.ai.service.port.AiQuestionIntentClassifier;
 import com.bodeum.domain.ai.repository.AiChatRoomRepository;
 import com.bodeum.domain.ai.repository.AiMessageRepository;
+import com.bodeum.domain.ai.repository.AiResponseSourceRepository;
 import com.bodeum.domain.ai.repository.AiSourceReviewRepository;
+import com.bodeum.domain.ai.repository.projection.AiResponseSourceProjection;
 import com.bodeum.domain.region.entity.Region;
 import com.bodeum.domain.region.repository.RegionRepository;
 import com.bodeum.domain.user.entity.User;
@@ -36,15 +40,17 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.net.URI;
+import java.util.Locale;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -52,24 +58,35 @@ import org.springframework.stereotype.Service;
 @Slf4j
 public class AiMessageService {
 
-    private static final int MAX_RETRIEVED_DOCUMENTS = 10;
-    private static final Pattern REGION_LEVEL_2_PATTERN =
-            Pattern.compile("([가-힣]+(?:시|군|구))");
-    private static final Map<String, String> REGION_LEVEL_1_ALIASES = Map.of(
-            "서울시", "서울특별시",
-            "부산시", "부산광역시",
-            "대구시", "대구광역시",
-            "인천시", "인천광역시",
-            "대전시", "대전광역시",
-            "울산시", "울산광역시",
-            "세종시", "세종특별자치시"
-    );
+    private static final Pattern PHONE_NUMBER_PATTERN = Pattern.compile(
+            "(?<!\\d)(?:0\\d{1,2})[- .]?\\d{3,4}[- .]?\\d{4}(?!\\d)");
+    private static final Pattern LOCAL_RESOURCE_PATTERN = Pattern.compile(
+            "(학교|센터|기관|병원|의원|약국|복지관|시설|교육원|상담소|지원사업|지원서비스)");
+    private static final Pattern RELATIVE_LOCAL_REGION_PATTERN = Pattern.compile(
+            "(우리\\s*(지역|동네)|근처|주변)");
+    private static final String AMBIGUOUS_REGION_MESSAGE_PREFIX =
+            "확인할 지역이 여러 곳입니다. ";
     private static final String NO_RESULT_MESSAGE = "관련 정보를 찾을 수 없습니다.";
     private static final Set<String> EXPLICIT_REGION_REHAB_QUESTIONS = Set.of(
             "재활센터추천해줘",
             "재활센터를추천해줘",
             "재활센터알려줘",
             "재활센터를알려줘"
+    );
+    private static final Set<InfoSubCategory> AI_SEARCHABLE_INFO_SUB_CATEGORIES = Set.of(
+            InfoSubCategory.PRIMARY_CARE,
+            InfoSubCategory.EMERGENCY_CLINIC,
+            InfoSubCategory.THERAPY_REHAB,
+            InfoSubCategory.WELFARE_CENTER,
+            InfoSubCategory.FAMILY_SUPPORT,
+            InfoSubCategory.PRIVATE_WELFARE,
+            InfoSubCategory.NATIONAL_WELFARE,
+            InfoSubCategory.LOCAL_WELFARE,
+            InfoSubCategory.SPECIAL_SCHOOL,
+            InfoSubCategory.SPECIAL_EDU_SUPPORT,
+            InfoSubCategory.LIFELONG_EDU,
+            InfoSubCategory.REALTIME_JOB,
+            InfoSubCategory.STANDARD_WORKPLACE
     );
     private final AiChatRoomRepository aiChatRoomRepository;
     private final AiMessageRepository aiMessageRepository;
@@ -81,11 +98,19 @@ public class AiMessageService {
     private final AiMessagePersistenceService persistenceService;
     private final AiMessageFailureService failureService;
     private final AiSourceReviewRepository aiSourceReviewRepository;
+    private final AiResponseSourceRepository aiResponseSourceRepository;
     private final AiRequestGuard requestGuard;
     private final AiReferenceDocumentResolver referenceDocumentResolver;
     private final AiStarterQuestionRouter starterQuestionRouter;
     private final AiQuestionIntentClassifier questionIntentClassifier;
     private final AiScrapInterestService scrapInterestService;
+    private final AiQuestionRegionResolver questionRegionResolver;
+
+    @Value("${bodeum.ai.conversation.recent-turn-count:3}")
+    private int recentConversationTurnCount = 3;
+
+    @Value("${bodeum.ai.result.max-count:10}")
+    private int maxResultCount = 10;
 
     public CreateAiMessageResponse createMessage(Long userId, String content) {
         AiChatRoom chatRoom = aiChatRoomRepository.findByUserId(userId)
@@ -139,10 +164,55 @@ public class AiMessageService {
             AiScrapInterests scrapInterests
     ) {
 
+        AdditionalResultsContext additionalResultsContext =
+                resolveAdditionalResultsContext(chatRoom.getId(), content);
+        ConversationContext conversationContext =
+                resolveConversationContext(chatRoom.getId());
+        AiUserProfile baseProfile = toProfile(
+                user, userWithDisabilities, scrapInterests);
+        if (RELATIVE_LOCAL_REGION_PATTERN.matcher(content).find()
+                && (baseProfile.region() == null || baseProfile.region().isBlank())) {
+            persistenceService.updateUserMessageContext(
+                    userMessage.getId(), content, null, userMessage.getId());
+            return createRegionRequiredResponse(
+                    chatRoom,
+                    userMessage,
+                    "어느 지역을 기준으로 찾을까요? 시·도와 시·군·구를 알려주세요."
+            );
+        }
+        AiQuestionRegionResolver.RegionResolution regionResolution =
+                questionRegionResolver.resolve(content, baseProfile);
+        if (LOCAL_RESOURCE_PATTERN.matcher(content).find()
+                && regionResolution.isAmbiguous()) {
+            persistenceService.updateUserMessageContext(
+                    userMessage.getId(), content, null, userMessage.getId());
+            return createRegionRequiredResponse(
+                    chatRoom, userMessage, regionResolution.ambiguityMessage());
+        }
+
         QuestionContext questionContext = resolveQuestionContext(
                 chatRoom.getId(),
                 content,
-                toProfile(user, userWithDisabilities, scrapInterests)
+                baseProfile,
+                conversationContext
+        );
+        String resolvedContent = questionContext.resolvedQuestion() == null
+                ? content
+                : questionContext.resolvedQuestion();
+        if (additionalResultsContext.isFollowUp()
+                && resolvedContent.equals(content)) {
+            resolvedContent = additionalResultsContext.previousQuestion()
+                    + "\n이전에 안내한 기관을 제외하고 " + content;
+        }
+        boolean followUp = questionContext.followUp()
+                || additionalResultsContext.isFollowUp();
+        persistenceService.updateUserMessageContext(
+                userMessage.getId(),
+                resolvedContent,
+                followUp ? conversationContext.parentUserMessageId() : null,
+                !followUp || conversationContext.rootUserMessageId() == null
+                        ? userMessage.getId()
+                        : conversationContext.rootUserMessageId()
         );
         if (questionContext.safetyGuidance().isPresent()) {
             log.info("[AI] 안전 응답 안내로 전환");
@@ -152,11 +222,21 @@ public class AiMessageService {
                     questionContext.safetyGuidance().get()
             );
         }
+        if (questionContext.needsClarification()) {
+            log.info("[AI] 사용자 확인 질문으로 전환");
+            return createClarificationRequiredResponse(
+                    chatRoom,
+                    userMessage,
+                    questionContext.clarificationQuestion()
+            );
+        }
 
         AiUserProfile profile = questionContext.profile();
         Optional<AiStarterQuestionAnswer> starterAnswer =
-                questionContext.questionType()
-                        .flatMap(type -> starterQuestionRouter.route(type, profile));
+                questionContext.requestedResultCount() == null
+                        ? questionContext.questionType()
+                                .flatMap(type -> starterQuestionRouter.route(type, profile))
+                        : Optional.empty();
         if (starterAnswer.isPresent()) {
             AiStarterQuestionAnswer answer = starterAnswer.get();
             if (answer.isRegionRequired() || answer.hasEvidence()) {
@@ -165,18 +245,29 @@ public class AiMessageService {
             log.info("[AI] 추천 질문 출처 없음, 일반 질문 흐름으로 전환");
         }
 
-        String searchQuestion = contextualizeLocalRegion(
-                content,
+        String searchQuestion = appendRequestedResultCount(contextualizeLocalRegion(
+                resolvedContent,
                 profile,
                 questionContext.searchScope()
-        );
+        ), questionContext.requestedResultCount());
+        searchQuestion = appendAdditionalResultsSearchContext(
+                searchQuestion, additionalResultsContext);
         List<String> searchQueries = ensureBroaderDisabilityTargetQuery(
                 searchQuestion,
                 contextualizeLocalRegions(
                         questionContext.retrievalQueries(),
                         profile,
                         questionContext.searchScope()
-                ),
+                ).stream()
+                        .map(query -> appendRequestedResultCount(
+                                query,
+                                questionContext.requestedResultCount()
+                        ))
+                        .map(query -> appendAdditionalResultsSearchContext(
+                                query,
+                                additionalResultsContext
+                        ))
+                        .toList(),
                 profile,
                 questionContext.searchScope()
         );
@@ -185,9 +276,19 @@ public class AiMessageService {
         List<AiReferenceDocument> retrievedDocuments = retrieveDocuments(
                 searchQuestion,
                 searchQueries,
+                questionContext.searchGoal(),
+                questionContext.requiredConcepts(),
                 profile,
                 questionContext.searchScope()
-        );
+        ).stream()
+                .filter(document -> !additionalResultsContext.excludedSources().contains(
+                        new AiSourceKey(document.sourceType(), document.sourceId())))
+                .filter(document -> documentIdentityKeys(document).stream()
+                        .noneMatch(additionalResultsContext.excludedIdentityKeys()::contains))
+                .toList();
+        if (additionalResultsContext.isFollowUp()) {
+            retrievedDocuments = deduplicateInstitutions(retrievedDocuments);
+        }
 
         log.info("[AI] 검색 문서 수: {}", retrievedDocuments.size());
         log.debug("[AI] 검색 documentKeys: {}",
@@ -210,7 +311,7 @@ public class AiMessageService {
         log.debug("[AI] 답변 생성 시작");
 
         GeneratedAiAnswer generated = answerGenerator.generate(
-                content, profile, retrievedDocuments
+                resolvedContent, profile, retrievedDocuments
         );
 
         log.debug("[AI] 답변 생성 완료");
@@ -245,7 +346,8 @@ public class AiMessageService {
     private QuestionContext resolveQuestionContext(
             Long chatRoomId,
             String content,
-            AiUserProfile profile
+            AiUserProfile profile,
+            ConversationContext conversationContext
     ) {
         Optional<Region> explicitRegion = resolveExplicitRehabRegion(content);
         if (explicitRegion.isPresent()) {
@@ -263,12 +365,33 @@ public class AiMessageService {
             return localRehabContext(profile, followUpRegion.get());
         }
 
-        AiQuestionAnalysis analysis = questionIntentClassifier.analyze(content);
+        AiQuestionAnalysis analysis = conversationContext.hasContext()
+                ? questionIntentClassifier.analyze(
+                        content,
+                        conversationContext.previousUserQuestion(),
+                        conversationContext.previousAiAnswer()
+                )
+                : questionIntentClassifier.analyze(content);
         AiQuestionIntent intent = analysis.intent();
+        String resolvedQuestion = analysis.resolvedQuestion() == null
+                ? content
+                : analysis.resolvedQuestion();
         AiSearchScope searchScope = resolveSearchScope(intent, analysis.searchScope());
-        AiUserProfile searchProfile = searchScope == AiSearchScope.GENERAL
-                ? profile.withRegion("", "", "")
-                : applyExplicitSearchRegion(content, profile, searchScope);
+        AiQuestionRegionResolver.RegionResolution regionResolution =
+                questionRegionResolver.resolve(resolvedQuestion, profile);
+        if (intent == AiQuestionIntent.NONE
+                && !regionResolution.isNotFound()
+                && LOCAL_RESOURCE_PATTERN.matcher(resolvedQuestion).find()) {
+            searchScope = AiSearchScope.LOCAL_RESOURCE;
+        }
+        InfoSubCategory infoSubCategory = resolveInfoSubCategory(
+                resolvedQuestion,
+                analysis.infoSubCategory()
+        );
+        AiUserProfile searchProfile = (regionResolution.isResolved()
+                        ? regionResolution.applyTo(profile)
+                        : profile)
+                .withInfoSubCategory(infoSubCategory);
         return new QuestionContext(
                 searchProfile,
                 intent.starterQuestionType(),
@@ -276,7 +399,14 @@ public class AiMessageService {
                 searchScope,
                 intent == AiQuestionIntent.NONE
                         ? analysis.retrievalQueries()
-                        : List.of()
+                        : List.of(),
+                analysis.requestedResultCount(),
+                resolvedQuestion,
+                analysis.followUp(),
+                analysis.searchGoal(),
+                analysis.requiredConcepts(),
+                analysis.needsClarification(),
+                analysis.clarificationQuestion()
         );
     }
 
@@ -289,7 +419,14 @@ public class AiMessageService {
                 Optional.of(questionType),
                 Optional.empty(),
                 searchScope(questionType),
-                List.of()
+                List.of(),
+                null,
+                null,
+                false,
+                null,
+                List.of(),
+                false,
+                null
         );
     }
 
@@ -307,89 +444,40 @@ public class AiMessageService {
         };
     }
 
-    private AiUserProfile applyExplicitSearchRegion(
+    private InfoSubCategory resolveInfoSubCategory(
             String question,
-            AiUserProfile profile,
-            AiSearchScope searchScope
+            InfoSubCategory analyzedCategory
     ) {
-        if (searchScope != AiSearchScope.LOCAL_RESOURCE) {
-            return profile;
-        }
-
-        Optional<Region> fullNameRegion = regionRepository.findMentionedInQuestion(
-                        normalizeSpacing(question),
-                        PageRequest.of(0, 1)
-                )
-                .stream()
-                .findFirst();
-        if (fullNameRegion.isPresent()) {
-            return withRegion(profile, fullNameRegion.get());
-        }
-
         String normalizedQuestion = normalizeQuestion(question);
-        String explicitRegionLevel1 = null;
-        for (Map.Entry<String, String> alias : REGION_LEVEL_1_ALIASES.entrySet()) {
-            if (normalizedQuestion.contains(normalizeQuestion(alias.getKey()))) {
-                Optional<Region> region = regionRepository
-                        .findFirstByRegionLevel1OrderByIdAsc(alias.getValue());
-                if (region.isPresent()) {
-                    explicitRegionLevel1 = alias.getValue();
-                    break;
-                }
-            }
+        if (normalizedQuestion.contains("특수교육지원센터")) {
+            return InfoSubCategory.SPECIAL_EDU_SUPPORT;
         }
-        String matchedRegionLevel1 = explicitRegionLevel1;
-
-        Matcher matcher = REGION_LEVEL_2_PATTERN.matcher(normalizeSpacing(question));
-        while (matcher.find()) {
-            String regionLevel2 = matcher.group(1);
-            List<Region> candidates = regionRepository
-                    .findAllByRegionLevel2OrderByIdAsc(regionLevel2);
-            if (matchedRegionLevel1 != null) {
-                Optional<Region> explicitRegionCandidate = candidates.stream()
-                        .filter(region -> region.getRegionLevel1()
-                                .equals(matchedRegionLevel1))
-                        .findFirst();
-                if (explicitRegionCandidate.isPresent()) {
-                    return withRegion(profile, explicitRegionCandidate.get());
-                }
-                continue;
-            }
-            Optional<Region> profileRegionCandidate = candidates.stream()
-                    .filter(region -> region.getRegionLevel1()
-                            .equals(profile.regionLevel1()))
-                    .findFirst();
-            if (profileRegionCandidate.isPresent()) {
-                return withRegion(profile, profileRegionCandidate.get());
-            }
-            if (candidates.size() == 1) {
-                return withRegion(profile, candidates.getFirst());
-            }
-            if (candidates.size() > 1) {
-                log.info(
-                        "[AI] 질문의 지역명이 모호하여 프로필 지역을 유지합니다: "
-                                + "regionLevel2={}, candidateCount={}",
-                        regionLevel2,
-                        candidates.size()
-                );
-            }
+        if (normalizedQuestion.contains("특수학교")) {
+            return InfoSubCategory.SPECIAL_SCHOOL;
         }
-        if (matchedRegionLevel1 != null) {
-            return profile.withRegion(
-                    matchedRegionLevel1,
-                    matchedRegionLevel1,
-                    ""
-            );
+        if (normalizedQuestion.contains("장애인평생교육")) {
+            return InfoSubCategory.LIFELONG_EDU;
         }
-        return profile;
-    }
-
-    private AiUserProfile withRegion(AiUserProfile profile, Region region) {
-        return profile.withRegion(
-                region.getFullName(),
-                region.getRegionLevel1(),
-                region.getRegionLevel2()
-        );
+        if (normalizedQuestion.contains("응급의료기관")) {
+            return InfoSubCategory.EMERGENCY_CLINIC;
+        }
+        if (normalizedQuestion.contains("치료재활기관")
+                || normalizedQuestion.contains("재활센터")) {
+            return InfoSubCategory.THERAPY_REHAB;
+        }
+        if (normalizedQuestion.contains("장애인복지관")) {
+            return InfoSubCategory.WELFARE_CENTER;
+        }
+        if (normalizedQuestion.contains("장애인가족지원센터")) {
+            return InfoSubCategory.FAMILY_SUPPORT;
+        }
+        if (normalizedQuestion.contains("장애인표준사업장")) {
+            return InfoSubCategory.STANDARD_WORKPLACE;
+        }
+        return analyzedCategory != null
+                && AI_SEARCHABLE_INFO_SUB_CATEGORIES.contains(analyzedCategory)
+                ? analyzedCategory
+                : null;
     }
 
     private AiSearchScope searchScope(AiStarterQuestionType questionType) {
@@ -461,6 +549,9 @@ public class AiMessageService {
                         chatRoomId,
                         SenderType.AI
                 )
+                .filter(message -> message.getContent() == null
+                        || !message.getContent().startsWith(
+                        AMBIGUOUS_REGION_MESSAGE_PREFIX))
                 .map(AiMessage::getAiAnswerStatus)
                 .filter(status -> status == AiAnswerStatus.REGION_REQUIRED)
                 .isPresent();
@@ -481,6 +572,276 @@ public class AiMessageService {
         return normalizeSpacing(content).replaceAll("\\s+", "");
     }
 
+    private String appendRequestedResultCount(
+            String question,
+            Integer requestedResultCount
+    ) {
+        if (requestedResultCount == null || requestedResultCount <= 0) {
+            return question;
+        }
+        int searchResultCount = Math.min(requestedResultCount, maxResultCount);
+        return question + "\n요청 결과 개수: " + searchResultCount + "개";
+    }
+
+    private AdditionalResultsContext resolveAdditionalResultsContext(
+            Long chatRoomId,
+            String content
+    ) {
+        if (!isAdditionalResultsQuestion(content)) {
+            return AdditionalResultsContext.empty();
+        }
+
+        List<AiMessage> nearestUserMessages = aiMessageRepository
+                .findByChatRoomIdAndSenderTypeOrderByCreatedAtDescIdDesc(
+                        chatRoomId,
+                        SenderType.USER,
+                        PageRequest.of(0, 2)
+                );
+        if (nearestUserMessages.size() >= 2) {
+            AiMessage previousUserMessage = nearestUserMessages.get(1);
+            Long rootMessageId = previousUserMessage.getContextRootMessageId();
+            if (rootMessageId != null && rootMessageId > 0) {
+                Optional<AiMessage> rootMessage = aiMessageRepository.findById(rootMessageId);
+                List<AiMessage> previousAiMessages = aiMessageRepository
+                        .findByChatRoomIdAndContextRootMessageIdAndSenderTypeOrderByCreatedAtDescIdDesc(
+                                chatRoomId,
+                                rootMessageId,
+                                SenderType.AI
+                        );
+                if (rootMessage.isPresent() && !previousAiMessages.isEmpty()) {
+                    return additionalResultsContext(
+                            rootMessage.get(),
+                            previousAiMessages
+                    );
+                }
+            }
+        }
+
+        return AdditionalResultsContext.empty();
+    }
+
+    private AdditionalResultsContext additionalResultsContext(
+            AiMessage baseQuestion,
+            List<AiMessage> previousAiMessages
+    ) {
+        List<AiResponseSourceProjection> previousSources = aiResponseSourceRepository
+                .findAllByMessageIds(previousAiMessages.stream()
+                        .map(AiMessage::getId)
+                        .toList());
+        if (previousSources.isEmpty()) {
+            return AdditionalResultsContext.empty();
+        }
+
+        Set<AiSourceKey> excludedSources = previousSources.stream()
+                .map(source -> new AiSourceKey(source.getSourceType(), source.getSourceId()))
+                .collect(java.util.stream.Collectors.toSet());
+        List<String> excludedTitles = previousSources.stream()
+                .map(AiResponseSourceProjection::getSourceTitle)
+                .filter(title -> title != null && !title.isBlank())
+                .distinct()
+                .toList();
+        Set<String> excludedIdentityKeys = previousSources.stream()
+                .flatMap(source -> sourceIdentityKeys(
+                        source.getSourceTitle(),
+                        source.getSourceUrl()
+                ).stream())
+                .collect(java.util.stream.Collectors.toSet());
+        return new AdditionalResultsContext(
+                baseQuestion.getResolvedQuestion() == null
+                        || baseQuestion.getResolvedQuestion().isBlank()
+                        ? baseQuestion.getContent()
+                        : baseQuestion.getResolvedQuestion(),
+                excludedSources,
+                excludedTitles,
+                excludedIdentityKeys
+        );
+    }
+
+    private List<AiReferenceDocument> deduplicateInstitutions(
+            List<AiReferenceDocument> documents
+    ) {
+        Set<String> seenIdentityKeys = new HashSet<>();
+        List<AiReferenceDocument> distinctDocuments = new ArrayList<>();
+        for (AiReferenceDocument document : documents) {
+            Set<String> identityKeys = documentIdentityKeys(document);
+            if (!identityKeys.isEmpty()
+                    && identityKeys.stream().anyMatch(seenIdentityKeys::contains)) {
+                continue;
+            }
+            distinctDocuments.add(document);
+            seenIdentityKeys.addAll(identityKeys);
+        }
+        return List.copyOf(distinctDocuments);
+    }
+
+    private Set<String> documentIdentityKeys(AiReferenceDocument document) {
+        Set<String> identityKeys = new HashSet<>(
+                sourceIdentityKeys(document.title(), document.url()));
+        Matcher phoneMatcher = PHONE_NUMBER_PATTERN.matcher(
+                document.content() == null ? "" : document.content());
+        while (phoneMatcher.find()) {
+            identityKeys.add("phone:" + phoneMatcher.group().replaceAll("\\D", ""));
+        }
+        return identityKeys;
+    }
+
+    private Set<String> sourceIdentityKeys(String title, String url) {
+        Set<String> identityKeys = new HashSet<>();
+        String normalizedTitle = normalizeInstitutionTitle(title);
+        if (!normalizedTitle.isBlank()) {
+            identityKeys.add("title:" + normalizedTitle);
+        }
+        String normalizedUrl = normalizeInstitutionUrl(url);
+        if (!normalizedUrl.isBlank()) {
+            identityKeys.add("url:" + normalizedUrl);
+        }
+        return identityKeys;
+    }
+
+    private String normalizeInstitutionTitle(String title) {
+        if (title == null) {
+            return "";
+        }
+        return title.toLowerCase(Locale.ROOT)
+                .replaceAll("^\\s*\\[[^]]+]\\s*", "")
+                .replaceAll("[^\\p{L}\\p{N}]", "");
+    }
+
+    private String normalizeInstitutionUrl(String url) {
+        if (url == null || url.isBlank()) {
+            return "";
+        }
+        try {
+            String absoluteUrl = url.contains("://") ? url : "https://" + url;
+            URI uri = URI.create(absoluteUrl.trim()).normalize();
+            String host = uri.getHost();
+            if (host == null || host.isBlank()) {
+                return "";
+            }
+            String path = uri.getPath() == null ? "" : uri.getPath();
+            path = path.replaceAll("/+$", "");
+            return host.toLowerCase(Locale.ROOT).replaceFirst("^www\\.", "") + path;
+        } catch (IllegalArgumentException ignored) {
+            return url.trim().toLowerCase(Locale.ROOT).replaceAll("/+$", "");
+        }
+    }
+
+    private ConversationContext resolveConversationContext(Long chatRoomId) {
+        int resolvedTurnCount = Math.max(1, recentConversationTurnCount);
+        List<AiMessage> recentUserMessages = aiMessageRepository
+                .findByChatRoomIdAndSenderTypeOrderByCreatedAtDescIdDesc(
+                        chatRoomId,
+                        SenderType.USER,
+                        PageRequest.of(0, resolvedTurnCount + 1)
+                );
+        if (recentUserMessages.size() < 2) {
+            return ConversationContext.empty();
+        }
+        List<AiMessage> previousAiMessages = aiMessageRepository
+                .findByChatRoomIdAndSenderTypeOrderByCreatedAtDescIdDesc(
+                        chatRoomId,
+                        SenderType.AI,
+                        PageRequest.of(0, resolvedTurnCount)
+                );
+        if (previousAiMessages.isEmpty()) {
+            previousAiMessages = aiMessageRepository
+                    .findTopByChatRoomIdAndSenderTypeOrderByCreatedAtDescIdDesc(
+                            chatRoomId,
+                            SenderType.AI
+                    )
+                    .map(List::of)
+                    .orElseGet(List::of);
+        }
+        if (previousAiMessages.isEmpty()) {
+            return ConversationContext.empty();
+        }
+        List<AiMessage> previousUserMessages = recentUserMessages.subList(
+                1,
+                Math.min(
+                        recentUserMessages.size(),
+                        resolvedTurnCount + 1
+                )
+        );
+        return new ConversationContext(
+                formatPreviousUserQuestions(previousUserMessages),
+                formatPreviousAiAnswers(previousAiMessages),
+                previousUserMessages.getFirst().getId(),
+                previousUserMessages.getFirst().getContextRootMessageId() == null
+                        || previousUserMessages.getFirst().getContextRootMessageId() <= 0
+                        ? previousUserMessages.getFirst().getId()
+                        : previousUserMessages.getFirst().getContextRootMessageId()
+        );
+    }
+
+    private String formatPreviousUserQuestions(List<AiMessage> messages) {
+        if (messages.size() == 1) {
+            AiMessage message = messages.getFirst();
+            return message.getResolvedQuestion() == null
+                    || message.getResolvedQuestion().isBlank()
+                    ? message.getContent()
+                    : message.getResolvedQuestion();
+        }
+        StringBuilder context = new StringBuilder();
+        for (int index = messages.size() - 1; index >= 0; index--) {
+            AiMessage message = messages.get(index);
+            String question = message.getResolvedQuestion() == null
+                    || message.getResolvedQuestion().isBlank()
+                    ? message.getContent()
+                    : message.getResolvedQuestion();
+            if (question != null && !question.isBlank()) {
+                context.append("- ").append(question).append('\n');
+            }
+        }
+        return context.toString().trim();
+    }
+
+    private String formatPreviousAiAnswers(List<AiMessage> messages) {
+        if (messages.size() == 1) {
+            return messages.getFirst().getContent();
+        }
+        StringBuilder context = new StringBuilder();
+        for (int index = messages.size() - 1; index >= 0; index--) {
+            String answer = messages.get(index).getContent();
+            if (answer != null && !answer.isBlank()) {
+                context.append("- ").append(answer).append('\n');
+            }
+        }
+        return context.toString().trim();
+    }
+
+    private boolean isAdditionalResultsQuestion(String content) {
+        String normalized = normalizeQuestion(content);
+        if (!normalized.contains("더")) {
+            return false;
+        }
+        if (normalized.contains("자세히")
+                || normalized.contains("상세히")
+                || normalized.contains("내용")
+                || normalized.contains("방법")) {
+            return false;
+        }
+        return normalized.endsWith("알려줘")
+                || normalized.endsWith("알려주세요")
+                || normalized.endsWith("추천해줘")
+                || normalized.endsWith("추천해주세요");
+    }
+
+    private String appendAdditionalResultsSearchContext(
+            String question,
+            AdditionalResultsContext context
+    ) {
+        if (!context.isFollowUp()) {
+            return question;
+        }
+        StringBuilder contextualized = new StringBuilder(question)
+                .append("\n검색 후보 개수: ").append(maxResultCount).append("개");
+        if (!context.excludedTitles().isEmpty()) {
+            contextualized.append("\n이전에 안내하여 제외할 기관: ")
+                    .append(String.join(", ", context.excludedTitles()));
+        }
+        return contextualized.toString();
+    }
+
     private String normalizeSpacing(String content) {
         return content == null
                 ? ""
@@ -493,6 +854,8 @@ public class AiMessageService {
     private List<AiReferenceDocument> retrieveDocuments(
             String originalQuestion,
             List<String> expandedQueries,
+            String searchGoal,
+            List<AiRequiredConcept> requiredConcepts,
             AiUserProfile profile,
             AiSearchScope searchScope
     ) {
@@ -524,6 +887,14 @@ public class AiMessageService {
         }
 
         LinkedHashMap<String, AiReferenceDocument> documentsByKey = new LinkedHashMap<>();
+        preserveRequiredConceptDocuments(
+                    requiredConcepts,
+                    searchGoal,
+                    documentsByQuery,
+                    documentsByKey,
+                    profile,
+                    searchScope
+        );
         if (normalizeQuestion(originalQuestion).contains("장애아동")) {
             // 원문·전국·지역 결과 균형 병합
             mergeRoundRobin(documentsByQuery, documentsByKey);
@@ -533,7 +904,7 @@ public class AiMessageService {
         }
 
         List<AiReferenceDocument> merged = documentsByKey.values().stream()
-                .limit(MAX_RETRIEVED_DOCUMENTS)
+                .limit(maxResultCount)
                 .toList();
         log.info(
                 "[AI] 다중 검색 완료: queryCount={}, uniqueDocumentCount={}",
@@ -541,6 +912,114 @@ public class AiMessageService {
                 merged.size()
         );
         return referenceDocumentResolver.resolve(merged);
+    }
+
+    private void preserveRequiredConceptDocuments(
+            List<AiRequiredConcept> requiredConcepts,
+            String searchGoal,
+            List<List<AiReferenceDocument>> documentsByQuery,
+            LinkedHashMap<String, AiReferenceDocument> documentsByKey,
+            AiUserProfile profile,
+            AiSearchScope searchScope
+    ) {
+        if (requiredConcepts == null || requiredConcepts.isEmpty()) {
+            return;
+        }
+
+        List<AiReferenceDocument> candidates = new ArrayList<>(documentsByQuery.stream()
+                .flatMap(List::stream)
+                .toList());
+        for (int conceptIndex = 0; conceptIndex < requiredConcepts.size(); conceptIndex++) {
+            AiRequiredConcept concept = requiredConcepts.get(conceptIndex);
+            Optional<AiReferenceDocument> matched = findConceptDocument(
+                    candidates,
+                    concept,
+                    profile,
+                    documentsByKey.keySet()
+            );
+            if (matched.isEmpty()) {
+                List<AiReferenceDocument> supplemented = documentRetriever.retrieve(
+                        supplementalResultQuery(concept, searchGoal, profile),
+                        profile,
+                        searchScope
+                );
+                candidates.addAll(supplemented);
+                matched = findConceptDocument(
+                        supplemented,
+                        concept,
+                        profile,
+                        documentsByKey.keySet()
+                );
+            }
+            matched.ifPresent(document -> documentsByKey.putIfAbsent(
+                    document.documentKey(), document));
+            if (matched.isEmpty()) {
+                log.warn("[AI] 필수 검색 개념 근거 문서 누락: conceptIndex={}", conceptIndex);
+            }
+        }
+    }
+
+    private String supplementalResultQuery(
+            AiRequiredConcept concept,
+            String searchGoal,
+            AiUserProfile profile
+    ) {
+        StringBuilder query = new StringBuilder();
+        if (concept.requiresUserRegion()
+                && profile != null
+                && profile.region() != null
+                && !profile.region().isBlank()) {
+            query.append(profile.region()).append(' ');
+        }
+        query.append(concept.retrievalQuery());
+        if (searchGoal != null && !searchGoal.isBlank()) {
+            query.append(' ').append(searchGoal.trim());
+        }
+        return query.append("\n요청 결과 개수: ")
+                .append(maxResultCount)
+                .append("개")
+                .toString();
+    }
+
+    private Optional<AiReferenceDocument> findConceptDocument(
+            List<AiReferenceDocument> documents,
+            AiRequiredConcept concept,
+            AiUserProfile profile,
+            Set<String> excludedDocumentKeys
+    ) {
+        List<String> matchTerms = concept.matchTerms().stream()
+                .map(this::normalizeQuestion)
+                .toList();
+        List<String> excludeTerms = concept.excludeTerms().stream()
+                .map(this::normalizeQuestion)
+                .toList();
+        return documents.stream()
+                .filter(document -> !excludedDocumentKeys.contains(document.documentKey()))
+                .filter(document -> {
+                    String searchableText = normalizeQuestion(document.title())
+                            + normalizeQuestion(document.content());
+                    return matchTerms.stream().allMatch(searchableText::contains)
+                            && excludeTerms.stream().noneMatch(searchableText::contains)
+                            && matchesRequiredRegion(searchableText, concept, profile);
+                })
+                .findFirst();
+    }
+
+    private boolean matchesRequiredRegion(
+            String searchableText,
+            AiRequiredConcept concept,
+            AiUserProfile profile
+    ) {
+        if (!concept.requiresUserRegion()) {
+            return true;
+        }
+        if (profile == null) {
+            return false;
+        }
+        String region = normalizeQuestion(profile.region());
+        String regionLevel2 = normalizeQuestion(profile.regionLevel2());
+        return (!region.isBlank() && searchableText.contains(region))
+                || (!regionLevel2.isBlank() && searchableText.contains(regionLevel2));
     }
 
     private void mergeRoundRobin(
@@ -552,14 +1031,14 @@ public class AiMessageService {
                 .max()
                 .orElse(0);
         for (int rank = 0;
-             rank < maxRank && documentsByKey.size() < MAX_RETRIEVED_DOCUMENTS;
+             rank < maxRank && documentsByKey.size() < maxResultCount;
              rank++) {
             for (List<AiReferenceDocument> queryDocuments : documentsByQuery) {
                 if (rank < queryDocuments.size()) {
                     AiReferenceDocument document = queryDocuments.get(rank);
                     documentsByKey.putIfAbsent(document.documentKey(), document);
                 }
-                if (documentsByKey.size() >= MAX_RETRIEVED_DOCUMENTS) {
+                if (documentsByKey.size() >= maxResultCount) {
                     break;
                 }
             }
@@ -573,9 +1052,9 @@ public class AiMessageService {
         if (!documentsByQuery.isEmpty()) {
             int reservedExpandedSlots = Math.min(
                     documentsByQuery.size() - 1,
-                    MAX_RETRIEVED_DOCUMENTS
+                    maxResultCount
             );
-            int originalLimit = MAX_RETRIEVED_DOCUMENTS - reservedExpandedSlots;
+            int originalLimit = maxResultCount - reservedExpandedSlots;
             for (AiReferenceDocument document : documentsByQuery.getFirst()) {
                 documentsByKey.putIfAbsent(document.documentKey(), document);
                 if (documentsByKey.size() >= originalLimit) {
@@ -586,7 +1065,7 @@ public class AiMessageService {
 
         for (int queryIndex = 1;
              queryIndex < documentsByQuery.size()
-                     && documentsByKey.size() < MAX_RETRIEVED_DOCUMENTS;
+                     && documentsByKey.size() < maxResultCount;
              queryIndex++) {
             List<AiReferenceDocument> queryDocuments = documentsByQuery.get(queryIndex);
             if (!queryDocuments.isEmpty()) {
@@ -602,7 +1081,7 @@ public class AiMessageService {
                 .orElse(0);
         for (int rank = 1;
              rank < maxExpandedRank
-                     && documentsByKey.size() < MAX_RETRIEVED_DOCUMENTS;
+                     && documentsByKey.size() < maxResultCount;
              rank++) {
             for (int queryIndex = 1;
                  queryIndex < documentsByQuery.size();
@@ -613,7 +1092,7 @@ public class AiMessageService {
                     AiReferenceDocument document = queryDocuments.get(rank);
                     documentsByKey.putIfAbsent(document.documentKey(), document);
                 }
-                if (documentsByKey.size() >= MAX_RETRIEVED_DOCUMENTS) {
+                if (documentsByKey.size() >= maxResultCount) {
                     break;
                 }
             }
@@ -622,7 +1101,7 @@ public class AiMessageService {
         if (!documentsByQuery.isEmpty()) {
             for (AiReferenceDocument document : documentsByQuery.getFirst()) {
                 documentsByKey.putIfAbsent(document.documentKey(), document);
-                if (documentsByKey.size() >= MAX_RETRIEVED_DOCUMENTS) {
+                if (documentsByKey.size() >= maxResultCount) {
                     break;
                 }
             }
@@ -776,6 +1255,27 @@ public class AiMessageService {
             AiMessage userMessage
     ) {
         return createNoEvidenceResponse(chatRoom, userMessage, NO_RESULT_MESSAGE);
+    }
+
+    private CreateAiMessageResponse createClarificationRequiredResponse(
+            AiChatRoom chatRoom,
+            AiMessage userMessage,
+            String content
+    ) {
+        AiMessage message = persistenceService.saveAiMessageAndComplete(
+                userMessage.getId(),
+                chatRoom,
+                content,
+                false,
+                AiAnswerStatus.CLARIFICATION_REQUIRED,
+                List.of()
+        );
+        return new CreateAiMessageResponse(AiMessageResponse.clarificationRequired(
+                message.getId(),
+                message.getSenderType(),
+                message.getContent(),
+                message.getCreatedAt()
+        ));
     }
 
     private CreateAiMessageResponse createNoEvidenceResponse(
@@ -946,8 +1446,49 @@ public class AiMessageService {
             Optional<AiStarterQuestionType> questionType,
             Optional<String> safetyGuidance,
             AiSearchScope searchScope,
-            List<String> retrievalQueries
+            List<String> retrievalQueries,
+            Integer requestedResultCount,
+            String resolvedQuestion,
+            boolean followUp,
+            String searchGoal,
+            List<AiRequiredConcept> requiredConcepts,
+            boolean needsClarification,
+            String clarificationQuestion
     ) {
+    }
+
+    private record ConversationContext(
+            String previousUserQuestion,
+            String previousAiAnswer,
+            Long parentUserMessageId,
+            Long rootUserMessageId
+    ) {
+        private static ConversationContext empty() {
+            return new ConversationContext(null, null, null, null);
+        }
+
+        private boolean hasContext() {
+            return previousUserQuestion != null
+                    && !previousUserQuestion.isBlank()
+                    && previousAiAnswer != null
+                    && !previousAiAnswer.isBlank();
+        }
+    }
+
+    private record AdditionalResultsContext(
+            String previousQuestion,
+            Set<AiSourceKey> excludedSources,
+            List<String> excludedTitles,
+            Set<String> excludedIdentityKeys
+    ) {
+        private static AdditionalResultsContext empty() {
+            return new AdditionalResultsContext(
+                    null, Set.of(), List.of(), Set.of());
+        }
+
+        private boolean isFollowUp() {
+            return previousQuestion != null && !previousQuestion.isBlank();
+        }
     }
 
 }

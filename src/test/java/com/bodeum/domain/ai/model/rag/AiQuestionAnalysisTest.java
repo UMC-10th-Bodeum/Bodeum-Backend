@@ -80,4 +80,34 @@ class AiQuestionAnalysisTest {
         assertThat(analysis.intent()).isEqualTo(AiQuestionIntent.MEDICAL_DIAGNOSIS);
         assertThat(analysis.retrievalQueries()).isEmpty();
     }
+
+    @Test
+    void keepsRequestedResultCountFromClassifier() {
+        AiQuestionAnalysis analysis = AiQuestionAnalysis.forQuestion(
+                "근처 장애인재활센터 열 개 알려줘",
+                AiQuestionIntent.NONE,
+                AiSearchScope.LOCAL_RESOURCE,
+                List.of(),
+                10
+        );
+
+        assertThat(analysis.requestedResultCount()).isEqualTo(10);
+    }
+
+    @Test
+    void enablesClarificationOnlyWhenQuestionTextExists() {
+        AiQuestionAnalysis analysis = AiQuestionAnalysis.forQuestion(
+                "센터를 알려줘",
+                AiQuestionIntent.NONE,
+                List.of()
+        ).withClarification(true, " 어떤 종류의 센터를 찾으시나요? ");
+
+        assertThat(analysis.needsClarification()).isTrue();
+        assertThat(analysis.clarificationQuestion())
+                .isEqualTo("어떤 종류의 센터를 찾으시나요?");
+
+        AiQuestionAnalysis invalid = analysis.withClarification(true, " ");
+        assertThat(invalid.needsClarification()).isFalse();
+        assertThat(invalid.clarificationQuestion()).isNull();
+    }
 }

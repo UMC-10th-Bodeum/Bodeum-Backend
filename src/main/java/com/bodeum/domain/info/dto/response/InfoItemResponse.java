@@ -33,7 +33,7 @@ public record InfoItemResponse(
                 category != null ? category.getMainCategory() : null,
                 category != null ? category.getMainCategoryKo() : null,
                 category != null ? category.getId() : null,
-                category != null ? category.getSubCategory() : null,
+                category != null ? category.getSubCategory().name() : null,
                 category != null ? category.getSubCategoryKo() : null,
                 entity.getAddress(),
                 entity.getSido(),

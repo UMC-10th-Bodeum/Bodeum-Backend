@@ -118,7 +118,7 @@ public class AiReferenceDocumentResolver {
                 line("대분류", category.getMainCategoryKo()),
                 line("대분류 코드", category.getMainCategory()),
                 line("세부 분류", category.getSubCategoryKo()),
-                line("세부 분류 코드", category.getSubCategory()),
+                line("세부 분류 코드", category.getSubCategory().name()),
                 line("소개", info.getIntroduction()),
                 line("주소", info.getAddress()),
                 line("지역", "%s %s".formatted(info.getSido(), info.getSigungu())),

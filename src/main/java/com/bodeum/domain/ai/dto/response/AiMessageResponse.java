@@ -41,6 +41,11 @@ public record AiMessageResponse(
                 throw new IllegalArgumentException(
                         "REGION_REQUIRED message must not have sources");
             }
+            if (answerStatus == AiAnswerStatus.CLARIFICATION_REQUIRED
+                    && !sources.isEmpty()) {
+                throw new IllegalArgumentException(
+                        "CLARIFICATION_REQUIRED message must not have sources");
+            }
             if (answerStatus == AiAnswerStatus.GREETING
                     && (!sources.isEmpty() || warning != null)) {
                 throw new IllegalArgumentException(
@@ -119,6 +124,24 @@ public record AiMessageResponse(
                 aiMessageId,
                 senderType,
                 AiAnswerStatus.REGION_REQUIRED,
+                content,
+                createdAt,
+                List.of(),
+                null,
+                null
+        );
+    }
+
+    public static AiMessageResponse clarificationRequired(
+            Long aiMessageId,
+            SenderType senderType,
+            String content,
+            Instant createdAt
+    ) {
+        return new AiMessageResponse(
+                aiMessageId,
+                senderType,
+                AiAnswerStatus.CLARIFICATION_REQUIRED,
                 content,
                 createdAt,
                 List.of(),

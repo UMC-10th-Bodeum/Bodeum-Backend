@@ -1,6 +1,7 @@
 package com.bodeum.domain.info.entity;
 
 import com.bodeum.domain.info.entity.enums.MainCategory;
+import com.bodeum.domain.info.entity.enums.InfoSubCategory;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Builder;
@@ -27,14 +28,16 @@ public class InfoCategory {
     @Column(name = "main_category_ko", nullable = false, length = MAX_LENGTH)
     private String mainCategoryKo;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "sub_category", nullable = false, length = MAX_LENGTH)
-    private String subCategory;
+    private InfoSubCategory subCategory;
 
     @Column(name = "sub_category_ko", nullable = false, length = MAX_LENGTH)
     private String subCategoryKo;
 
     @Builder
-    public InfoCategory(Long id, MainCategory mainCategory, String mainCategoryKo, String subCategory, String subCategoryKo) {
+    public InfoCategory(Long id, MainCategory mainCategory, String mainCategoryKo,
+                        InfoSubCategory subCategory, String subCategoryKo) {
         this.id = id;
         this.mainCategory = mainCategory;
         this.mainCategoryKo = mainCategoryKo;

@@ -35,7 +35,7 @@ public record InfoItemDetailResponse(
                 entity.getInfoCategory().getMainCategory(),
                 entity.getInfoCategory().getMainCategoryKo(),
                 entity.getInfoCategory().getId(),
-                entity.getInfoCategory().getSubCategory(),
+                entity.getInfoCategory().getSubCategory().name(),
                 entity.getInfoCategory().getSubCategoryKo(),
                 entity.getIntroduction(),
                 entity.getAddress(),

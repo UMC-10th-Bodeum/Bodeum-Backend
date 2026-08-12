@@ -2,8 +2,11 @@ package com.bodeum.domain.ai.infrastructure.generation;
 
 import com.bodeum.domain.ai.enums.AiQuestionIntent;
 import com.bodeum.domain.ai.enums.AiSearchScope;
+import com.bodeum.domain.ai.infrastructure.support.AiPromptTemplate;
 import com.bodeum.domain.ai.model.rag.AiQuestionAnalysis;
+import com.bodeum.domain.ai.model.rag.AiRequiredConcept;
 import com.bodeum.domain.ai.service.port.AiQuestionIntentClassifier;
+import com.bodeum.domain.info.entity.enums.InfoSubCategory;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -23,12 +26,17 @@ public class SpringAiQuestionIntentClassifier implements AiQuestionIntentClassif
 
     public SpringAiQuestionIntentClassifier(
             ChatClient.Builder builder,
+            @Value("${bodeum.ai.result.max-count:10}") int maxResultCount,
             @Value("classpath:prompts/ai-question-intent-classifier-system-prompt.txt")
             Resource systemPromptResource,
             @Value("classpath:prompts/ai-query-expansion-system-prompt.txt")
             Resource queryExpansionPromptResource
     ) {
-        String systemPrompt = readPrompt(systemPromptResource)
+        String systemPrompt = AiPromptTemplate.replaceRequiredPlaceholder(
+                readPrompt(systemPromptResource),
+                "{{maxResultCount}}",
+                Integer.toString(maxResultCount)
+        )
                 + "\n\n"
                 + readPrompt(queryExpansionPromptResource);
         this.chatClient = builder.defaultSystem(systemPrompt).build();
@@ -36,22 +44,56 @@ public class SpringAiQuestionIntentClassifier implements AiQuestionIntentClassif
 
     @Override
     public AiQuestionAnalysis analyze(String question) {
+        return analyze(question, null, null);
+    }
+
+    @Override
+    public AiQuestionAnalysis analyze(
+            String question,
+            String previousUserQuestion,
+            String previousAiAnswer
+    ) {
         if (question == null || question.isBlank()) {
             return AiQuestionAnalysis.fallback();
         }
 
         try {
+            StringBuilder userPrompt = new StringBuilder();
+            if (previousUserQuestion != null && !previousUserQuestion.isBlank()
+                    && previousAiAnswer != null && !previousAiAnswer.isBlank()) {
+                userPrompt.append("[직전 사용자 질문]\n")
+                        .append(previousUserQuestion.trim())
+                        .append("\n\n[직전 AI 답변]\n")
+                        .append(previousAiAnswer.trim())
+                        .append("\n\n");
+            }
+            userPrompt.append("[분류할 현재 사용자 질문]\n").append(question.trim());
             ClassificationResult result = chatClient.prompt()
-                    .user("[분류할 사용자 질문]\n" + question.trim())
+                    .user(userPrompt.toString())
                     .call()
                     .entity(ClassificationResult.class, spec -> spec
                             .useProviderStructuredOutput()
                             .validateSchema());
+            String resolvedQuestion = result == null
+                    || result.resolvedQuestion() == null
+                    || result.resolvedQuestion().isBlank()
+                    ? question
+                    : result.resolvedQuestion().trim();
             AiQuestionAnalysis analysis = AiQuestionAnalysis.forQuestion(
-                    question,
+                    resolvedQuestion,
                     result == null ? null : result.intent(),
                     result == null ? null : result.searchScope(),
-                    result == null ? List.of() : result.retrievalQueries()
+                    result == null ? List.of() : result.retrievalQueries(),
+                    result == null ? null : result.requestedResultCount(),
+                    resolvedQuestion,
+                    result != null && result.isFollowUp(),
+                    result == null ? null : result.infoSubCategory()
+            ).withRetrievalPlan(
+                    result == null ? null : result.searchGoal(),
+                    result == null ? List.of() : result.requiredConcepts()
+            ).withClarification(
+                    result != null && result.needsClarification(),
+                    result == null ? null : result.clarificationQuestion()
             );
             log.info(
                     "[AI] 질문 LLM 분석 결과: intent={}, searchScope={}, retrievalQueryCount={}",
@@ -69,7 +111,15 @@ public class SpringAiQuestionIntentClassifier implements AiQuestionIntentClassif
     record ClassificationResult(
             AiQuestionIntent intent,
             AiSearchScope searchScope,
-            List<String> retrievalQueries
+            List<String> retrievalQueries,
+            Integer requestedResultCount,
+            String resolvedQuestion,
+            boolean isFollowUp,
+            InfoSubCategory infoSubCategory,
+            String searchGoal,
+            List<AiRequiredConcept> requiredConcepts,
+            boolean needsClarification,
+            String clarificationQuestion
     ) {
     }
 
