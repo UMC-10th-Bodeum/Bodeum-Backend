@@ -2,10 +2,11 @@ package com.bodeum.domain.ai.infrastructure.generation;
 
 import com.bodeum.domain.ai.enums.AiQuestionIntent;
 import com.bodeum.domain.ai.enums.AiSearchScope;
+import com.bodeum.domain.ai.infrastructure.support.AiPromptTemplate;
 import com.bodeum.domain.ai.model.rag.AiQuestionAnalysis;
 import com.bodeum.domain.ai.model.rag.AiRequiredConcept;
-import com.bodeum.domain.info.entity.enums.InfoSubCategory;
 import com.bodeum.domain.ai.service.port.AiQuestionIntentClassifier;
+import com.bodeum.domain.info.entity.enums.InfoSubCategory;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -31,8 +32,11 @@ public class SpringAiQuestionIntentClassifier implements AiQuestionIntentClassif
             @Value("classpath:prompts/ai-query-expansion-system-prompt.txt")
             Resource queryExpansionPromptResource
     ) {
-        String systemPrompt = readPrompt(systemPromptResource)
-                .replace("{{maxResultCount}}", Integer.toString(maxResultCount))
+        String systemPrompt = AiPromptTemplate.replaceRequiredPlaceholder(
+                readPrompt(systemPromptResource),
+                "{{maxResultCount}}",
+                Integer.toString(maxResultCount)
+        )
                 + "\n\n"
                 + readPrompt(queryExpansionPromptResource);
         this.chatClient = builder.defaultSystem(systemPrompt).build();

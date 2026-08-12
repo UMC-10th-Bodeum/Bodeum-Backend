@@ -7,6 +7,7 @@ import com.bodeum.domain.ai.enums.AiResponseSourceType;
 import com.bodeum.domain.ai.enums.AiSearchScope;
 import com.bodeum.domain.ai.exception.AiErrorCode;
 import com.bodeum.domain.ai.infrastructure.generation.AiPromptFormatter;
+import com.bodeum.domain.ai.infrastructure.support.AiPromptTemplate;
 import com.bodeum.domain.ai.infrastructure.support.AiTimeoutDetector;
 import com.bodeum.domain.ai.model.rag.AiReferenceDocument;
 import com.bodeum.domain.ai.model.rag.AiUserProfile;
@@ -81,8 +82,11 @@ public class OpenAiExternalAnswerProvider implements AiExternalAnswerProvider {
                 .build();
         this.model = model;
         this.maxOutputTokens = maxOutputTokens;
-        this.externalSearchSystemPrompt = readPrompt(promptResource)
-                .replace("{{maxResultCount}}", Integer.toString(maxResultCount));
+        this.externalSearchSystemPrompt = AiPromptTemplate.replaceRequiredPlaceholder(
+                readPrompt(promptResource),
+                "{{maxResultCount}}",
+                Integer.toString(maxResultCount)
+        );
         this.promptFormatter = promptFormatter;
     }
 
