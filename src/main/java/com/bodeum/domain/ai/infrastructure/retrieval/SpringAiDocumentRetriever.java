@@ -123,12 +123,12 @@ public class SpringAiDocumentRetriever implements AiDocumentRetriever {
             String filterExpression,
             boolean includeRegion
     ) {
-        int resultCount = resolveResultCount(question);
+        int searchCandidateCount = resolveSearchCandidateCount(question);
         String searchQuery = buildSearchQuery(question, profile, includeRegion);
         List<Document> personalizedDocuments = search(
-                searchQuery, filterExpression, resultCount);
+                searchQuery, filterExpression, searchCandidateCount);
         List<Document> questionDocuments = search(
-                question, filterExpression, resultCount);
+                question, filterExpression, searchCandidateCount);
 
         Map<String, Document> documentsById = new LinkedHashMap<>();
         if (includeRegion) {
@@ -143,7 +143,7 @@ public class SpringAiDocumentRetriever implements AiDocumentRetriever {
                 document.getId(), score(document), similarityThreshold));
 
         return documentsById.values().stream()
-                .limit(resultCount)
+                .limit(searchCandidateCount)
                 .map(this::mapDocument)
                 .toList();
     }
@@ -199,11 +199,13 @@ public class SpringAiDocumentRetriever implements AiDocumentRetriever {
                 && profile.regionLevel1().equals(sido);
     }
 
-    private int resolveResultCount(String question) {
+    private int resolveSearchCandidateCount(String question) {
         if (question == null || question.isBlank()) {
             return topK;
         }
         Matcher matcher = REQUESTED_RESULT_COUNT_PATTERN.matcher(question);
+        // 요청 개수보다 넉넉한 후보를 확보해 중복 제거와 관련성 검증 후에도
+        // 답변 모델이 요청 개수를 충족할 수 있도록 기본 topK를 후보 수의 하한으로 둔다.
         int requestedCount = topK;
         while (matcher.find()) {
             try {
@@ -212,6 +214,7 @@ public class SpringAiDocumentRetriever implements AiDocumentRetriever {
                         Integer.parseInt(matcher.group(1))
                 );
             } catch (NumberFormatException ignored) {
+                // 정수 범위를 넘는 요청은 검색 가능한 최대 후보 수로 제한한다.
                 requestedCount = maxResultCount;
             }
         }

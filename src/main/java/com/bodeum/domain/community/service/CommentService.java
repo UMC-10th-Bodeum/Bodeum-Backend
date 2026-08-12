@@ -53,14 +53,12 @@ public class CommentService {
         validateAuthenticatedUser(userId);
         Post post = findPostForUpdate(postId);
         Comment comment = commentRepository.save(Comment.create(post, userId, request.content()));
-        if (post.isQuestion()) {
-            pointService.grantActivityPoint(
-                    userId,
-                    PointEventType.COMMUNITY_ANSWER_CREATED,
-                    comment.getId(),
-                    userId
-            );
-        }
+        pointService.grantActivityPoint(
+                userId,
+                PointEventType.COMMUNITY_ANSWER_CREATED,
+                comment.getId(),
+                userId
+        );
 
         return getCommentResponse(comment, userId, false);
     }

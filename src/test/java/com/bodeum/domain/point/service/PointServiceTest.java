@@ -2,6 +2,7 @@ package com.bodeum.domain.point.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 import static org.mockito.Mockito.never;
@@ -20,6 +21,7 @@ import com.bodeum.domain.point.repository.GuardianPointRepository.UserTotalPoint
 import com.bodeum.domain.user.entity.GuardianProfile;
 import com.bodeum.domain.user.entity.User;
 import com.bodeum.domain.user.repository.UserRepository;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -111,6 +113,91 @@ class PointServiceTest {
         assertThat(granted).isFalse();
         assertThat(guardianPoint.getTotalPoint()).isEqualTo(5);
         then(pointHistoryRepository).should(never()).save(any(GuardianPointHistory.class));
+    }
+
+    @Test
+    void grantActivityPointSkipsFourthPostRewardOfServiceDay() {
+        User user = activeUser(1L);
+        GuardianProfile guardianProfile = user.ensureGuardianProfile();
+        ReflectionTestUtils.setField(guardianProfile, "id", 11L);
+        GuardianPoint guardianPoint = guardianPoint(7L, 11L, 15);
+
+        given(userRepository.findByIdForUpdate(1L)).willReturn(Optional.of(user));
+        given(guardianPointRepository.findByGuardianProfileId(11L))
+                .willReturn(Optional.of(guardianPoint));
+        given(pointHistoryRepository
+                .existsByGuardianPoint_IdAndEventTypeAndReferenceIdAndActorUserId(
+                        7L,
+                        PointEventType.COMMUNITY_POST_CREATED,
+                        104L,
+                        1L
+                )).willReturn(false);
+        given(pointHistoryRepository
+                .countByGuardianPoint_IdAndEventTypeAndCreatedAtGreaterThanEqualAndCreatedAtLessThan(
+                        eq(7L),
+                        eq(PointEventType.COMMUNITY_POST_CREATED),
+                        any(Instant.class),
+                        any(Instant.class)
+                )).willReturn(3L);
+
+        boolean granted = pointService.grantActivityPoint(
+                1L,
+                PointEventType.COMMUNITY_POST_CREATED,
+                104L,
+                1L
+        );
+
+        assertThat(granted).isFalse();
+        assertThat(guardianPoint.getTotalPoint()).isEqualTo(15);
+        then(pointHistoryRepository).should(never()).save(any(GuardianPointHistory.class));
+    }
+
+    @Test
+    void grantActivityPointDoesNotApplyDailyLimitToOtherEvents() {
+        User user = activeUser(1L);
+        GuardianProfile guardianProfile = user.ensureGuardianProfile();
+        ReflectionTestUtils.setField(guardianProfile, "id", 11L);
+        GuardianPoint guardianPoint = guardianPoint(7L, 11L, 0);
+
+        given(userRepository.findByIdForUpdate(1L)).willReturn(Optional.of(user));
+        given(guardianPointRepository.findByGuardianProfileId(11L))
+                .willReturn(Optional.of(guardianPoint));
+
+        List<PointEventType> unlimitedEvents = List.of(
+                PointEventType.COMMUNITY_ANSWER_CREATED,
+                PointEventType.COMMUNITY_POST_LIKE_RECEIVED,
+                PointEventType.COMMUNITY_ANSWER_LIKE_RECEIVED,
+                PointEventType.COMMUNITY_ANSWER_ACCEPTED
+        );
+
+        for (int index = 0; index < unlimitedEvents.size(); index++) {
+            PointEventType eventType = unlimitedEvents.get(index);
+            long referenceId = 200L + index;
+            long actorUserId = 20L + index;
+            given(pointHistoryRepository
+                    .existsByGuardianPoint_IdAndEventTypeAndReferenceIdAndActorUserId(
+                            7L,
+                            eventType,
+                            referenceId,
+                            actorUserId
+                    )).willReturn(false);
+
+            assertThat(pointService.grantActivityPoint(
+                    1L,
+                    eventType,
+                    referenceId,
+                    actorUserId
+            )).isTrue();
+        }
+
+        assertThat(guardianPoint.getTotalPoint()).isEqualTo(34);
+        then(pointHistoryRepository).should(never())
+                .countByGuardianPoint_IdAndEventTypeAndCreatedAtGreaterThanEqualAndCreatedAtLessThan(
+                        any(Long.class),
+                        any(PointEventType.class),
+                        any(Instant.class),
+                        any(Instant.class)
+                );
     }
 
     @Test
