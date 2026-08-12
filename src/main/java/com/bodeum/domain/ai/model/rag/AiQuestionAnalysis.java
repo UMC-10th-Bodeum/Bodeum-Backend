@@ -11,11 +11,12 @@ public record AiQuestionAnalysis(
         List<String> retrievalQueries,
         Integer requestedResultCount,
         String resolvedQuestion,
-        boolean followUp
+        boolean followUp,
+        AiInfoSubCategory infoSubCategory
 ) {
 
     public AiQuestionAnalysis(AiQuestionIntent intent, List<String> retrievalQueries) {
-        this(intent, AiSearchScope.GENERAL, retrievalQueries, null, null, false);
+        this(intent, AiSearchScope.GENERAL, retrievalQueries, null, null, false, null);
     }
 
     public AiQuestionAnalysis(
@@ -23,7 +24,7 @@ public record AiQuestionAnalysis(
             AiSearchScope searchScope,
             List<String> retrievalQueries
     ) {
-        this(intent, searchScope, retrievalQueries, null, null, false);
+        this(intent, searchScope, retrievalQueries, null, null, false, null);
     }
 
     public AiQuestionAnalysis(
@@ -32,7 +33,7 @@ public record AiQuestionAnalysis(
             List<String> retrievalQueries,
             Integer requestedResultCount
     ) {
-        this(intent, searchScope, retrievalQueries, requestedResultCount, null, false);
+        this(intent, searchScope, retrievalQueries, requestedResultCount, null, false, null);
     }
 
     public AiQuestionAnalysis {
@@ -56,7 +57,7 @@ public record AiQuestionAnalysis(
 
     public static AiQuestionAnalysis fallback() {
         return new AiQuestionAnalysis(
-                AiQuestionIntent.NONE, AiSearchScope.GENERAL, List.of(), null, null, false);
+                AiQuestionIntent.NONE, AiSearchScope.GENERAL, List.of(), null, null, false, null);
     }
 
     public static AiQuestionAnalysis fallback(String question) {
@@ -127,6 +128,20 @@ public record AiQuestionAnalysis(
             String resolvedQuestion,
             boolean followUp
     ) {
+        return forQuestion(question, intent, searchScope, expandedQueries,
+                requestedResultCount, resolvedQuestion, followUp, null);
+    }
+
+    public static AiQuestionAnalysis forQuestion(
+            String question,
+            AiQuestionIntent intent,
+            AiSearchScope searchScope,
+            List<String> expandedQueries,
+            Integer requestedResultCount,
+            String resolvedQuestion,
+            boolean followUp,
+            AiInfoSubCategory infoSubCategory
+    ) {
         AiQuestionIntent resolvedIntent = intent == null
                 ? AiQuestionIntent.NONE
                 : intent;
@@ -137,7 +152,8 @@ public record AiQuestionAnalysis(
                     List.of(),
                     requestedResultCount,
                     resolvedQuestion,
-                    followUp
+                    followUp,
+                    infoSubCategory
             );
         }
 
@@ -159,7 +175,8 @@ public record AiQuestionAnalysis(
                 retrievalQueries,
                 requestedResultCount,
                 resolvedQuestion,
-                followUp
+                followUp,
+                infoSubCategory
         );
     }
 }

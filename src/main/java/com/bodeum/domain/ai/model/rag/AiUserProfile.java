@@ -12,7 +12,8 @@ public record AiUserProfile(
         String keywordText,
         List<String> scrappedInfoTitles,
         List<String> scrappedNewsTitles,
-        List<String> scrappedCommunityTopics
+        List<String> scrappedCommunityTopics,
+        AiInfoSubCategory infoSubCategory
 ) {
 
     public AiUserProfile {
@@ -21,6 +22,23 @@ public record AiUserProfile(
         scrappedInfoTitles = copyOfNullable(scrappedInfoTitles);
         scrappedNewsTitles = copyOfNullable(scrappedNewsTitles);
         scrappedCommunityTopics = copyOfNullable(scrappedCommunityTopics);
+    }
+
+    public AiUserProfile(
+            String region,
+            String regionLevel1,
+            String regionLevel2,
+            Integer childAge,
+            List<String> disabilityTypes,
+            List<String> interests,
+            String keywordText,
+            List<String> scrappedInfoTitles,
+            List<String> scrappedNewsTitles,
+            List<String> scrappedCommunityTopics
+    ) {
+        this(region, regionLevel1, regionLevel2, childAge, disabilityTypes, interests,
+                keywordText, scrappedInfoTitles, scrappedNewsTitles,
+                scrappedCommunityTopics, null);
     }
 
     public AiUserProfile(
@@ -42,7 +60,8 @@ public record AiUserProfile(
                 keywordText,
                 List.of(),
                 List.of(),
-                List.of()
+                List.of(),
+                null
         );
     }
 
@@ -61,7 +80,16 @@ public record AiUserProfile(
                 keywordText,
                 scrappedInfoTitles,
                 scrappedNewsTitles,
-                scrappedCommunityTopics
+                scrappedCommunityTopics,
+                infoSubCategory
+        );
+    }
+
+    public AiUserProfile withInfoSubCategory(AiInfoSubCategory subCategory) {
+        return new AiUserProfile(
+                region, regionLevel1, regionLevel2, childAge, disabilityTypes,
+                interests, keywordText, scrappedInfoTitles, scrappedNewsTitles,
+                scrappedCommunityTopics, subCategory
         );
     }
 

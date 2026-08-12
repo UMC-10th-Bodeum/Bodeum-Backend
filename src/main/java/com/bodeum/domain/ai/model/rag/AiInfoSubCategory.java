@@ -1,0 +1,17 @@
+package com.bodeum.domain.ai.model.rag;
+
+public enum AiInfoSubCategory {
+    PRIMARY_CARE,
+    EMERGENCY_CLINIC,
+    THERAPY_REHAB,
+    WELFARE_CENTER,
+    FAMILY_SUPPORT,
+    PRIVATE_WELFARE,
+    NATIONAL_WELFARE,
+    LOCAL_WELFARE,
+    SPECIAL_SCHOOL,
+    SPECIAL_EDU_SUPPORT,
+    LIFELONG_EDU,
+    REALTIME_JOB,
+    STANDARD_WORKPLACE
+}

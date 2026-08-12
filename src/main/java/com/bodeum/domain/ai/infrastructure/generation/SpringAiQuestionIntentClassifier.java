@@ -3,6 +3,7 @@ package com.bodeum.domain.ai.infrastructure.generation;
 import com.bodeum.domain.ai.enums.AiQuestionIntent;
 import com.bodeum.domain.ai.enums.AiSearchScope;
 import com.bodeum.domain.ai.model.rag.AiQuestionAnalysis;
+import com.bodeum.domain.ai.model.rag.AiInfoSubCategory;
 import com.bodeum.domain.ai.service.port.AiQuestionIntentClassifier;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -80,7 +81,8 @@ public class SpringAiQuestionIntentClassifier implements AiQuestionIntentClassif
                     result == null ? List.of() : result.retrievalQueries(),
                     result == null ? null : result.requestedResultCount(),
                     resolvedQuestion,
-                    result != null && result.isFollowUp()
+                    result != null && result.isFollowUp(),
+                    result == null ? null : result.infoSubCategory()
             );
             log.info(
                     "[AI] 질문 LLM 분석 결과: intent={}, searchScope={}, retrievalQueryCount={}",
@@ -101,7 +103,8 @@ public class SpringAiQuestionIntentClassifier implements AiQuestionIntentClassif
             List<String> retrievalQueries,
             Integer requestedResultCount,
             String resolvedQuestion,
-            boolean isFollowUp
+            boolean isFollowUp,
+            AiInfoSubCategory infoSubCategory
     ) {
     }
 

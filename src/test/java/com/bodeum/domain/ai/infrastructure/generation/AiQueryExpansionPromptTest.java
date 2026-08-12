@@ -67,4 +67,22 @@ class AiQueryExpansionPromptTest {
                 "변경하지 않은 이전 조건은 유지"
         );
     }
+
+    @Test
+    void limitsInfoSubCategoryToSearchableVectorData() throws IOException {
+        String prompt = new ClassPathResource(
+                "prompts/ai-question-intent-classifier-system-prompt.txt"
+        ).getContentAsString(StandardCharsets.UTF_8);
+
+        assertThat(prompt).contains(
+                "infoSubCategory",
+                "SPECIAL_SCHOOL",
+                "EMERGENCY_CLINIC",
+                "STANDARD_WORKPLACE",
+                "*_ETC",
+                "GENERAL_HOSPITAL",
+                "YOUTH_CENTER",
+                "KEAD_JOB"
+        );
+    }
 }

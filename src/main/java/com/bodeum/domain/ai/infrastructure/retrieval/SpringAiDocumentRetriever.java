@@ -64,7 +64,7 @@ public class SpringAiDocumentRetriever implements AiDocumentRetriever {
             return retrieveAtScope(
                     question,
                     profile,
-                    null,
+                    categoryFilter(profile),
                     false
             );
         } catch (ProjectException e) {
@@ -79,8 +79,11 @@ public class SpringAiDocumentRetriever implements AiDocumentRetriever {
             AiUserProfile profile
     ) {
         if (hasText(profile.regionLevel1()) && hasText(profile.regionLevel2())) {
-            String cityFilter = equalsFilter("sido", profile.regionLevel1())
-                    + " && " + equalsFilter("sigungu", profile.regionLevel2());
+            String cityFilter = combineFilters(
+                    equalsFilter("sido", profile.regionLevel1())
+                            + " && " + equalsFilter("sigungu", profile.regionLevel2()),
+                    categoryFilter(profile)
+            );
             List<AiReferenceDocument> cityDocuments = retrieveAtScope(
                     question, profile, cityFilter, false);
             if (!cityDocuments.isEmpty()) {
@@ -94,7 +97,10 @@ public class SpringAiDocumentRetriever implements AiDocumentRetriever {
             List<AiReferenceDocument> provinceDocuments = retrieveAtScope(
                     question,
                     profile,
-                    equalsFilter("sido", profile.regionLevel1()),
+                    combineFilters(
+                            equalsFilter("sido", profile.regionLevel1()),
+                            categoryFilter(profile)
+                    ),
                     false
             );
             if (!provinceDocuments.isEmpty()) {
@@ -105,7 +111,7 @@ public class SpringAiDocumentRetriever implements AiDocumentRetriever {
         }
 
         List<AiReferenceDocument> allDocuments = retrieveAtScope(
-                question, profile, null, false);
+                question, profile, categoryFilter(profile), false);
         log.info("[AI] 지역 기관 검색 범위 확대: scope=ALL, count={}", allDocuments.size());
         return allDocuments;
     }
@@ -199,6 +205,22 @@ public class SpringAiDocumentRetriever implements AiDocumentRetriever {
 
     private String equalsFilter(String field, String value) {
         return field + " == '" + value.replace("'", "\\'") + "'";
+    }
+
+    private String categoryFilter(AiUserProfile profile) {
+        return profile.infoSubCategory() == null
+                ? null
+                : equalsFilter("subCategory", profile.infoSubCategory().name());
+    }
+
+    private String combineFilters(String first, String second) {
+        if (!hasText(first)) {
+            return second;
+        }
+        if (!hasText(second)) {
+            return first;
+        }
+        return first + " && " + second;
     }
 
     private boolean hasText(String value) {

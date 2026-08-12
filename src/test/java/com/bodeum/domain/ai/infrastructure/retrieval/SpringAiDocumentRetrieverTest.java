@@ -9,6 +9,7 @@ import static org.mockito.Mockito.when;
 import com.bodeum.domain.ai.enums.AiResponseSourceType;
 import com.bodeum.domain.ai.enums.AiSearchScope;
 import com.bodeum.domain.ai.model.rag.AiUserProfile;
+import com.bodeum.domain.ai.model.rag.AiInfoSubCategory;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -229,6 +230,42 @@ class SpringAiDocumentRetrieverTest {
         assertThat(requestCaptor.getAllValues())
                 .extracting(SearchRequest::getTopK)
                 .containsOnly(10);
+    }
+
+    @Test
+    void combinesRegionAndSubCategoryFiltersForLocalVectorSearch() {
+        SpringAiDocumentRetriever retriever =
+                new SpringAiDocumentRetriever(vectorStoreRetriever, 5, 10, 0.4);
+        AiUserProfile profile = new AiUserProfile(
+                "경기도 수원시", "경기도", "수원시", 6,
+                List.of(), List.of(), ""
+        ).withInfoSubCategory(AiInfoSubCategory.SPECIAL_SCHOOL);
+        when(vectorStoreRetriever.similaritySearch(
+                org.mockito.ArgumentMatchers.any(SearchRequest.class)))
+                .thenReturn(List.of());
+
+        retriever.retrieve(
+                "경기도 수원시 특수학교를 알려줘",
+                profile,
+                AiSearchScope.LOCAL_RESOURCE
+        );
+
+        ArgumentCaptor<SearchRequest> requestCaptor =
+                ArgumentCaptor.forClass(SearchRequest.class);
+        verify(vectorStoreRetriever, times(6)).similaritySearch(requestCaptor.capture());
+        assertThat(requestCaptor.getAllValues().subList(0, 2))
+                .extracting(request -> request.getFilterExpression().toString())
+                .allMatch(filter -> filter.contains("경기도")
+                        && filter.contains("수원시")
+                        && filter.contains("SPECIAL_SCHOOL"));
+        assertThat(requestCaptor.getAllValues().subList(2, 4))
+                .extracting(request -> request.getFilterExpression().toString())
+                .allMatch(filter -> filter.contains("경기도")
+                        && !filter.contains("수원시")
+                        && filter.contains("SPECIAL_SCHOOL"));
+        assertThat(requestCaptor.getAllValues().subList(4, 6))
+                .extracting(request -> request.getFilterExpression().toString())
+                .allMatch(filter -> filter.contains("SPECIAL_SCHOOL"));
     }
 
     private Document document(String id, double score) {

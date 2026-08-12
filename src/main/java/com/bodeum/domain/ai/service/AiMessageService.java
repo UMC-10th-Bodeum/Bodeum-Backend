@@ -10,6 +10,7 @@ import com.bodeum.domain.ai.enums.AiStarterQuestionType;
 import com.bodeum.domain.ai.enums.SenderType;
 import com.bodeum.domain.ai.exception.AiErrorCode;
 import com.bodeum.domain.ai.model.rag.AiReferenceDocument;
+import com.bodeum.domain.ai.model.rag.AiInfoSubCategory;
 import com.bodeum.domain.ai.model.rag.AiQuestionAnalysis;
 import com.bodeum.domain.ai.model.rag.AiScrapInterests;
 import com.bodeum.domain.ai.model.rag.AiSourceKey;
@@ -38,7 +39,6 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.Optional;
 import java.util.regex.Matcher;
@@ -59,42 +59,10 @@ public class AiMessageService {
 
     private static final Pattern PHONE_NUMBER_PATTERN = Pattern.compile(
             "(?<!\\d)(?:0\\d{1,2})[- .]?\\d{3,4}[- .]?\\d{4}(?!\\d)");
-    private static final Pattern REGION_LEVEL_2_PATTERN =
-            Pattern.compile("([가-힣]+(?:시|군|구))");
     private static final Pattern LOCAL_RESOURCE_PATTERN = Pattern.compile(
             "(학교|센터|기관|병원|의원|약국|복지관|시설|교육원|상담소|지원사업|지원서비스)");
-    private static final String AMBIGUOUS_GWANGJU_REGION_MESSAGE =
-            "광주광역시와 경기도 광주시 중 어느 지역을 말씀하시나요? "
-                    + "원하시는 지역명을 알려주세요.";
-    private static final Map<String, String> REGION_FULL_NAME_ALIASES = Map.of(
-            "경기광주", "경기도 광주시"
-    );
-    private static final Map<String, String> REGION_LEVEL_1_ALIASES = Map.ofEntries(
-            Map.entry("서울", "서울특별시"),
-            Map.entry("서울시", "서울특별시"),
-            Map.entry("부산", "부산광역시"),
-            Map.entry("부산시", "부산광역시"),
-            Map.entry("대구", "대구광역시"),
-            Map.entry("대구시", "대구광역시"),
-            Map.entry("인천", "인천광역시"),
-            Map.entry("인천시", "인천광역시"),
-            Map.entry("광주광역시", "광주광역시"),
-            Map.entry("대전", "대전광역시"),
-            Map.entry("대전시", "대전광역시"),
-            Map.entry("울산", "울산광역시"),
-            Map.entry("울산시", "울산광역시"),
-            Map.entry("세종", "세종특별자치시"),
-            Map.entry("세종시", "세종특별자치시"),
-            Map.entry("경기", "경기도"),
-            Map.entry("강원", "강원특별자치도"),
-            Map.entry("충북", "충청북도"),
-            Map.entry("충남", "충청남도"),
-            Map.entry("전북", "전북특별자치도"),
-            Map.entry("전남", "전라남도"),
-            Map.entry("경북", "경상북도"),
-            Map.entry("경남", "경상남도"),
-            Map.entry("제주", "제주특별자치도")
-    );
+    private static final String AMBIGUOUS_REGION_MESSAGE_PREFIX =
+            "확인할 지역이 여러 곳입니다. ";
     private static final String NO_RESULT_MESSAGE = "관련 정보를 찾을 수 없습니다.";
     private static final Set<String> EXPLICIT_REGION_REHAB_QUESTIONS = Set.of(
             "재활센터추천해줘",
@@ -118,6 +86,7 @@ public class AiMessageService {
     private final AiStarterQuestionRouter starterQuestionRouter;
     private final AiQuestionIntentClassifier questionIntentClassifier;
     private final AiScrapInterestService scrapInterestService;
+    private final AiQuestionRegionResolver questionRegionResolver;
 
     @Value("${bodeum.ai.conversation.recent-turn-count:3}")
     private int recentConversationTurnCount = 3;
@@ -181,25 +150,22 @@ public class AiMessageService {
                 resolveAdditionalResultsContext(chatRoom.getId(), content);
         ConversationContext conversationContext =
                 resolveConversationContext(chatRoom.getId());
-
-        if (isAmbiguousGwangjuResourceQuestion(content)) {
+        AiUserProfile baseProfile = toProfile(
+                user, userWithDisabilities, scrapInterests);
+        AiQuestionRegionResolver.RegionResolution regionResolution =
+                questionRegionResolver.resolve(content, baseProfile);
+        if (LOCAL_RESOURCE_PATTERN.matcher(content).find()
+                && regionResolution.isAmbiguous()) {
             persistenceService.updateUserMessageContext(
-                    userMessage.getId(),
-                    content,
-                    null,
-                    userMessage.getId()
-            );
+                    userMessage.getId(), content, null, userMessage.getId());
             return createRegionRequiredResponse(
-                    chatRoom,
-                    userMessage,
-                    AMBIGUOUS_GWANGJU_REGION_MESSAGE
-            );
+                    chatRoom, userMessage, regionResolution.ambiguityMessage());
         }
 
         QuestionContext questionContext = resolveQuestionContext(
                 chatRoom.getId(),
                 content,
-                toProfile(user, userWithDisabilities, scrapInterests),
+                baseProfile,
                 conversationContext
         );
         String resolvedContent = questionContext.resolvedQuestion() == null
@@ -373,14 +339,23 @@ public class AiMessageService {
                 ? content
                 : analysis.resolvedQuestion();
         AiSearchScope searchScope = resolveSearchScope(intent, analysis.searchScope());
+        AiQuestionRegionResolver.RegionResolution regionResolution =
+                questionRegionResolver.resolve(resolvedQuestion, profile);
         if (intent == AiQuestionIntent.NONE
-                && hasExplicitSearchRegion(resolvedQuestion)
+                && !regionResolution.isNotFound()
                 && LOCAL_RESOURCE_PATTERN.matcher(resolvedQuestion).find()) {
             searchScope = AiSearchScope.LOCAL_RESOURCE;
         }
-        AiUserProfile searchProfile = searchScope == AiSearchScope.GENERAL
+        AiInfoSubCategory infoSubCategory = resolveInfoSubCategory(
+                resolvedQuestion,
+                analysis.infoSubCategory()
+        );
+        AiUserProfile searchProfile = (searchScope == AiSearchScope.GENERAL
                 ? profile.withRegion("", "", "")
-                : applyExplicitSearchRegion(resolvedQuestion, profile, searchScope);
+                : regionResolution.isResolved()
+                        ? regionResolution.applyTo(profile)
+                        : profile)
+                .withInfoSubCategory(infoSubCategory);
         return new QuestionContext(
                 searchProfile,
                 intent.starterQuestionType(),
@@ -425,128 +400,37 @@ public class AiMessageService {
         };
     }
 
-    private AiUserProfile applyExplicitSearchRegion(
+    private AiInfoSubCategory resolveInfoSubCategory(
             String question,
-            AiUserProfile profile,
-            AiSearchScope searchScope
+            AiInfoSubCategory analyzedCategory
     ) {
-        if (searchScope != AiSearchScope.LOCAL_RESOURCE) {
-            return profile;
-        }
-
         String normalizedQuestion = normalizeQuestion(question);
-        for (Map.Entry<String, String> alias : REGION_FULL_NAME_ALIASES.entrySet()) {
-            if (normalizedQuestion.contains(alias.getKey())) {
-                Optional<Region> region = regionRepository.findByFullName(alias.getValue());
-                if (region.isPresent()) {
-                    return withRegion(profile, region.get());
-                }
-            }
+        if (normalizedQuestion.contains("특수교육지원센터")) {
+            return AiInfoSubCategory.SPECIAL_EDU_SUPPORT;
         }
-
-        Optional<Region> fullNameRegion = regionRepository.findMentionedInQuestion(
-                        normalizeSpacing(question),
-                        PageRequest.of(0, 1)
-                )
-                .stream()
-                .findFirst();
-        if (fullNameRegion.isPresent()) {
-            return withRegion(profile, fullNameRegion.get());
+        if (normalizedQuestion.contains("특수학교")) {
+            return AiInfoSubCategory.SPECIAL_SCHOOL;
         }
-
-        String explicitRegionLevel1 = null;
-        for (Map.Entry<String, String> alias : REGION_LEVEL_1_ALIASES.entrySet()) {
-            if (normalizedQuestion.contains(normalizeQuestion(alias.getKey()))) {
-                Optional<Region> region = regionRepository
-                        .findFirstByRegionLevel1OrderByIdAsc(alias.getValue());
-                if (region.isPresent()) {
-                    explicitRegionLevel1 = alias.getValue();
-                    break;
-                }
-            }
+        if (normalizedQuestion.contains("장애인평생교육")) {
+            return AiInfoSubCategory.LIFELONG_EDU;
         }
-        String matchedRegionLevel1 = explicitRegionLevel1;
-
-        Matcher matcher = REGION_LEVEL_2_PATTERN.matcher(normalizeSpacing(question));
-        while (matcher.find()) {
-            String regionLevel2 = matcher.group(1);
-            List<Region> candidates = regionRepository
-                    .findAllByRegionLevel2OrderByIdAsc(regionLevel2);
-            if (matchedRegionLevel1 != null) {
-                Optional<Region> explicitRegionCandidate = candidates.stream()
-                        .filter(region -> region.getRegionLevel1()
-                                .equals(matchedRegionLevel1))
-                        .findFirst();
-                if (explicitRegionCandidate.isPresent()) {
-                    return withRegion(profile, explicitRegionCandidate.get());
-                }
-                continue;
-            }
-            Optional<Region> profileRegionCandidate = candidates.stream()
-                    .filter(region -> region.getRegionLevel1()
-                            .equals(profile.regionLevel1()))
-                    .findFirst();
-            if (profileRegionCandidate.isPresent()) {
-                return withRegion(profile, profileRegionCandidate.get());
-            }
-            if (candidates.size() == 1) {
-                return withRegion(profile, candidates.getFirst());
-            }
-            if (candidates.size() > 1) {
-                log.info(
-                        "[AI] 질문의 지역명이 모호하여 프로필 지역을 유지합니다: "
-                                + "regionLevel2={}, candidateCount={}",
-                        regionLevel2,
-                        candidates.size()
-                );
-            }
+        if (normalizedQuestion.contains("응급의료기관")) {
+            return AiInfoSubCategory.EMERGENCY_CLINIC;
         }
-        if (matchedRegionLevel1 != null) {
-            return profile.withRegion(
-                    matchedRegionLevel1,
-                    matchedRegionLevel1,
-                    ""
-            );
+        if (normalizedQuestion.contains("치료재활기관")
+                || normalizedQuestion.contains("재활센터")) {
+            return AiInfoSubCategory.THERAPY_REHAB;
         }
-        return profile;
-    }
-
-    private boolean hasExplicitSearchRegion(String question) {
-        String normalizedQuestion = normalizeQuestion(question);
-        if (REGION_FULL_NAME_ALIASES.keySet().stream()
-                .anyMatch(normalizedQuestion::contains)) {
-            return true;
+        if (normalizedQuestion.contains("장애인복지관")) {
+            return AiInfoSubCategory.WELFARE_CENTER;
         }
-        boolean hasRegionLevel1Alias = REGION_LEVEL_1_ALIASES.keySet().stream()
-                .map(this::normalizeQuestion)
-                .anyMatch(normalizedQuestion::contains);
-        if (hasRegionLevel1Alias) {
-            return true;
+        if (normalizedQuestion.contains("장애인가족지원센터")) {
+            return AiInfoSubCategory.FAMILY_SUPPORT;
         }
-        return !regionRepository.findMentionedInQuestion(
-                normalizeSpacing(question),
-                PageRequest.of(0, 1)
-        ).isEmpty();
-    }
-
-    private boolean isAmbiguousGwangjuResourceQuestion(String question) {
-        String normalizedQuestion = normalizeQuestion(question);
-        if (!normalizedQuestion.contains("광주")
-                || !LOCAL_RESOURCE_PATTERN.matcher(question).find()) {
-            return false;
+        if (normalizedQuestion.contains("장애인표준사업장")) {
+            return AiInfoSubCategory.STANDARD_WORKPLACE;
         }
-        return !normalizedQuestion.contains("광주광역시")
-                && !normalizedQuestion.contains("경기도광주")
-                && !normalizedQuestion.contains("경기광주")
-                && !normalizedQuestion.contains("광주시");
-    }
-
-    private AiUserProfile withRegion(AiUserProfile profile, Region region) {
-        return profile.withRegion(
-                region.getFullName(),
-                region.getRegionLevel1(),
-                region.getRegionLevel2()
-        );
+        return analyzedCategory;
     }
 
     private AiSearchScope searchScope(AiStarterQuestionType questionType) {
@@ -618,8 +502,9 @@ public class AiMessageService {
                         chatRoomId,
                         SenderType.AI
                 )
-                .filter(message -> !AMBIGUOUS_GWANGJU_REGION_MESSAGE.equals(
-                        message.getContent()))
+                .filter(message -> message.getContent() == null
+                        || !message.getContent().startsWith(
+                        AMBIGUOUS_REGION_MESSAGE_PREFIX))
                 .map(AiMessage::getAiAnswerStatus)
                 .filter(status -> status == AiAnswerStatus.REGION_REQUIRED)
                 .isPresent();
