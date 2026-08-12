@@ -17,6 +17,7 @@ import org.springframework.stereotype.Component;
 @Component
 public class AiQuestionRegionResolver {
 
+    private static final String GWANGJU_METROPOLITAN_CITY = "광주광역시";
     private static final Pattern REGION_LEVEL_2_PATTERN =
             Pattern.compile("([가-힣]+(?:시|군|구))");
     private static final Pattern KOREAN_WORD_PATTERN = Pattern.compile("[가-힣]{2,}");
@@ -48,8 +49,12 @@ public class AiQuestionRegionResolver {
     public RegionResolution resolve(String question, AiUserProfile profile) {
         String normalizedQuestion = normalize(question);
         if (isBareGwangju(normalizedQuestion)) {
+            Optional<Region> gwangjuSubregion = resolveGwangjuSubregion(question);
+            if (gwangjuSubregion.isPresent()) {
+                return RegionResolution.resolved(gwangjuSubregion.get());
+            }
             return RegionResolution.ambiguous(List.of(
-                    "광주광역시", "경기도 광주시"));
+                    GWANGJU_METROPOLITAN_CITY, "경기도 광주시"));
         }
 
         for (Map.Entry<String, String> alias : REGION_FULL_NAME_ALIASES.entrySet()) {
@@ -151,6 +156,22 @@ public class AiQuestionRegionResolver {
                 && !normalizedQuestion.contains("경기도광주")
                 && !normalizedQuestion.contains("경기광주")
                 && !normalizedQuestion.contains("광주시");
+    }
+
+    private Optional<Region> resolveGwangjuSubregion(String question) {
+        Matcher matcher = REGION_LEVEL_2_PATTERN.matcher(normalizeSpacing(question));
+        while (matcher.find()) {
+            Optional<Region> candidate = regionRepository
+                    .findAllByRegionLevel2OrderByIdAsc(matcher.group(1))
+                    .stream()
+                    .filter(region -> GWANGJU_METROPOLITAN_CITY.equals(
+                            region.getRegionLevel1()))
+                    .findFirst();
+            if (candidate.isPresent()) {
+                return candidate;
+            }
+        }
+        return Optional.empty();
     }
 
     private String normalize(String value) {
