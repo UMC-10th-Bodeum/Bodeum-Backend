@@ -71,7 +71,9 @@ class CommentControllerTest {
                                 """))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.code").value("COMMON201_1"))
-                .andExpect(jsonPath("$.result.commentId").value(1));
+                .andExpect(jsonPath("$.result.commentId").value(1))
+                .andExpect(jsonPath("$.result.profileImageUrl")
+                        .value("https://example.com/profile.jpg"));
     }
 
     @Test
@@ -103,6 +105,8 @@ class CommentControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.result.totalCount").value(3))
                 .andExpect(jsonPath("$.result.comments[0].commentId").value(1))
+                .andExpect(jsonPath("$.result.comments[0].profileImageUrl")
+                        .value("https://example.com/profile.jpg"))
                 .andExpect(jsonPath("$.result.comments[0].replies[0].commentId").value(2))
                 .andExpect(jsonPath("$.result.comments[0].replies[0].replies[0].commentId").value(3));
     }
@@ -228,6 +232,7 @@ class CommentControllerTest {
                 parentCommentId,
                 10L,
                 null,
+                "https://example.com/profile.jpg",
                 true,
                 "댓글 내용",
                 accepted,

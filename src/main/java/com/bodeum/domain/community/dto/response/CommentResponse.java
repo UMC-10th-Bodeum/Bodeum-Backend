@@ -19,6 +19,8 @@ public record CommentResponse(
                 nullable = true
         )
         String authorNickname,
+        @Schema(description = "작성자 프로필 이미지 URL. 탈퇴 회원이거나 이미지가 없으면 null", nullable = true)
+        String profileImageUrl,
         boolean isMine,
         String content,
         boolean isAccepted,
@@ -39,7 +41,7 @@ public record CommentResponse(
             List<CommentResponse> replies
     ) {
         Long parentCommentId = comment.getParent() == null ? null : comment.getParent().getId();
-        return of(comment, parentCommentId, viewerId, liked, false, null, replies);
+        return of(comment, parentCommentId, viewerId, liked, false, null, null, replies);
     }
 
     public static CommentResponse of(
@@ -49,18 +51,21 @@ public record CommentResponse(
             boolean liked,
             boolean authorWithdrawn,
             String activeAuthorNickname,
+            String activeAuthorProfileImageUrl,
             List<CommentResponse> replies
     ) {
         Long authorId = authorWithdrawn ? null : comment.getUserId();
         String authorNickname = authorWithdrawn
                 ? WithdrawalConstants.WITHDRAWN_DISPLAY_NAME
                 : activeAuthorNickname;
+        String profileImageUrl = authorWithdrawn ? null : activeAuthorProfileImageUrl;
 
         return new CommentResponse(
                 comment.getId(),
                 parentCommentId,
                 authorId,
                 authorNickname,
+                profileImageUrl,
                 Objects.equals(comment.getUserId(), viewerId),
                 comment.getContent(),
                 comment.isAccepted(),

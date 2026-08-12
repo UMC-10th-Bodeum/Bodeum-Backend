@@ -12,14 +12,6 @@ public record PostSearchSuggestionsResponse(
         suggestions = List.copyOf(suggestions);
     }
 
-    public static PostSearchSuggestionsResponse fromTitles(List<String> titles) {
-        return new PostSearchSuggestionsResponse(
-                titles.stream()
-                        .map(PostSearchSuggestionResponse::fromTitle)
-                        .toList()
-        );
-    }
-
     public static PostSearchSuggestionsResponse fromSuggestions(
             List<PostSearchSuggestionResponse> suggestions
     ) {
