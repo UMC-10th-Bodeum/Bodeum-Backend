@@ -237,6 +237,33 @@ class PostListServiceTest {
     }
 
     @Test
+    void getSearchSuggestionsPrioritizesContentWhenTitleAndContentMatch() {
+        Post titleAndContentMatch = post(
+                1L,
+                10L,
+                PostAnonymityType.PROFILE_TAG_VISIBLE,
+                "자폐스펙트럼 치료 기록",
+                "치료를 시작했습니다. 자폐스펙트럼 아이의 경험을 공유합니다. 비슷한 고민에 도움이 되길 바랍니다. 마지막 문장입니다."
+        );
+        given(postRepository.findActivePosts(
+                eq(PostStatus.ACTIVE),
+                eq("자폐스펙트럼"),
+                eq(null),
+                any(Pageable.class)
+        )).willReturn(new PageImpl<>(List.of(titleAndContentMatch), PageRequest.of(0, 10), 1));
+
+        var response = postListService.getSearchSuggestions("자폐스펙트럼", 10);
+
+        assertThat(response.suggestions()).singleElement().satisfies(suggestion -> {
+            assertThat(suggestion.title()).isEqualTo("자폐스펙트럼 치료 기록");
+            assertThat(suggestion.content()).isEqualTo(
+                    "… 자폐스펙트럼 아이의 경험을 공유합니다. 비슷한 고민에 도움이 되길 바랍니다. …"
+            );
+            assertThat(suggestion.type().name()).isEqualTo("POST_CONTENT");
+        });
+    }
+
+    @Test
     void getPostsMasksFullyAnonymousAuthor() {
         Post post = post(1L, 10L, PostAnonymityType.FULLY_ANONYMOUS);
         given(postRepository.findActivePosts(

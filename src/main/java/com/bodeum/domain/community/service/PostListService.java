@@ -110,15 +110,14 @@ public class PostListService {
     }
 
     private PostSearchSuggestionResponse toSearchSuggestion(Post post, String keyword) {
-        boolean titleMatched = containsIgnoreCase(post.getTitle(), keyword);
         boolean contentMatched = containsIgnoreCase(post.getContent(), keyword);
         String contentSnippet = contentMatched
                 ? extractContentSnippet(post.getContent(), keyword)
                 : extractLeadingContentSnippet(post.getContent());
 
-        return titleMatched
-                ? PostSearchSuggestionResponse.fromTitle(post.getTitle(), contentSnippet)
-                : PostSearchSuggestionResponse.fromContent(post.getTitle(), contentSnippet);
+        return contentMatched
+                ? PostSearchSuggestionResponse.fromContent(post.getTitle(), contentSnippet)
+                : PostSearchSuggestionResponse.fromTitle(post.getTitle(), contentSnippet);
     }
 
     private String extractLeadingContentSnippet(String content) {
