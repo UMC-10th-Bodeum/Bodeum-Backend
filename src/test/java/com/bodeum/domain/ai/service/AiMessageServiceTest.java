@@ -46,6 +46,7 @@ import com.bodeum.domain.user.repository.UserRepository;
 import com.bodeum.global.apiPayload.exception.ProjectException;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -59,6 +60,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
 class AiMessageServiceTest {
@@ -729,11 +731,101 @@ class AiMessageServiceTest {
     }
 
     @Test
+    void passesRequestedCountToAnswerPromptWhileRetrieverKeepsCandidateMinimum() {
+        String question = "재활센터 3개 알려줘";
+        String searchQuestion = question + "\n요청 결과 개수: 3개";
+        when(questionIntentClassifier.analyze(question)).thenReturn(
+                AiQuestionAnalysis.forQuestion(
+                        question,
+                        AiQuestionIntent.NONE,
+                        AiSearchScope.GENERAL,
+                        List.of(),
+                        3
+                )
+        );
+        AiReferenceDocument source = referenceDocument("CENTER-1", 1L);
+        when(documentRetriever.retrieve(eq(searchQuestion), any(), eq(AiSearchScope.GENERAL)))
+                .thenReturn(List.of(source));
+        when(answerGenerator.generate(eq(question), any(), eq(List.of(source))))
+                .thenReturn(new GeneratedAiAnswer("재활센터 3개 안내", List.of("CENTER-1")));
+        AiMessage saved = savedAiMessage("재활센터 3개 안내");
+        when(persistenceService.saveAiMessageAndComplete(
+                11L, chatRoom, "재활센터 3개 안내", false,
+                AiAnswerStatus.ANSWERED, List.of(source)
+        )).thenReturn(saved);
+
+        service.createMessage(1L, question);
+
+        verify(documentRetriever).retrieve(
+                eq(searchQuestion), any(), eq(AiSearchScope.GENERAL));
+        verify(answerGenerator).generate(eq(question), any(), eq(List.of(source)));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void keepsDifferentInstitutionsThatShareTheSamePhoneNumber() {
+        AiReferenceDocument first = identityDocument(
+                "CENTER-1", "첫 번째 센터", "https://first.example.com", "031-123-4567");
+        AiReferenceDocument second = identityDocument(
+                "CENTER-2", "두 번째 센터", "https://second.example.com", "031-123-4567");
+
+        List<AiReferenceDocument> result = ReflectionTestUtils.invokeMethod(
+                service, "deduplicateInstitutions", List.of(first, second));
+
+        assertThat(result).containsExactly(first, second);
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void usesPhoneAsFallbackWhenTitleAndUrlAreMissing() {
+        AiReferenceDocument first = identityDocument(
+                "CENTER-1", null, null, "031-123-4567");
+        AiReferenceDocument duplicate = identityDocument(
+                "CENTER-2", null, null, "031-123-4567");
+
+        List<AiReferenceDocument> result = ReflectionTestUtils.invokeMethod(
+                service, "deduplicateInstitutions", List.of(first, duplicate));
+
+        assertThat(result).containsExactly(first);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "5개 더 알려줘",
+            "더 알려줘",
+            "좀 더 추천해줘",
+            "더 5곳 알려주세요",
+            "추가로 알려줘",
+            "추가로 5개 알려줘",
+            "다른 곳 추천해주세요",
+            "더 많은 기관 알려줘"
+    })
+    void recognizesAdditionalResultsQuestions(String question) {
+        assertThat((Boolean) ReflectionTestUtils.invokeMethod(
+                service, "isAdditionalResultsQuestion", question)).isTrue();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "더봄재활센터 알려줘",
+            "더 자세히 알려줘",
+            "상세히 알려주세요",
+            "지원 내용을 더 알려줘",
+            "신청 방법을 더 알려줘",
+            "재활센터 알려줘"
+    })
+    void doesNotTreatNamesOrDetailQuestionsAsAdditionalResults(String question) {
+        assertThat((Boolean) ReflectionTestUtils.invokeMethod(
+                service, "isAdditionalResultsQuestion", question)).isFalse();
+    }
+
+    @Test
     void keepsBaseTopicAndExcludesAllPreviouslyCitedSourcesForChainedMoreResults() {
         String question = "5개 더 알려줘";
         String previousQuestion = "근처 장애인재활센터 5개 알려줘";
+        String llmResolvedQuestion = "수원시에서 5개 더 알려줘";
         String resolvedQuestion = previousQuestion
-                + "\n이전에 안내한 기관을 제외하고 " + question;
+                + "\n이전에 안내한 항목을 제외하고 " + llmResolvedQuestion;
         AiMessage currentUserMessage = mock(AiMessage.class);
         AiMessage previousFollowUpMessage = mock(AiMessage.class);
         AiMessage previousUserMessage = mock(AiMessage.class);
@@ -773,12 +865,12 @@ class AiMessageServiceTest {
                 .thenReturn(previousSources);
         when(questionIntentClassifier.analyze(question)).thenReturn(
                 AiQuestionAnalysis.forQuestion(
-                        resolvedQuestion,
+                        llmResolvedQuestion,
                         AiQuestionIntent.NONE,
                         AiSearchScope.LOCAL_RESOURCE,
                         List.of(),
                         5,
-                        resolvedQuestion
+                        llmResolvedQuestion
                 )
         );
 
@@ -822,14 +914,15 @@ class AiMessageServiceTest {
         service.createMessage(1L, question);
 
         ArgumentCaptor<String> searchQuestionCaptor = ArgumentCaptor.forClass(String.class);
-        verify(documentRetriever).retrieve(
+        verify(documentRetriever, org.mockito.Mockito.atLeastOnce()).retrieve(
                 searchQuestionCaptor.capture(), any(), eq(AiSearchScope.LOCAL_RESOURCE));
-        assertThat(searchQuestionCaptor.getValue())
-                .contains(previousQuestion)
-                .contains("이전에 안내한 기관을 제외하고 5개 더 알려줘")
-                .contains("검색 후보 개수: 10개")
-                .contains("기존센터-1")
-                .contains("기존센터-10");
+        assertThat(searchQuestionCaptor.getAllValues()).anySatisfy(searchQuestion ->
+                assertThat(searchQuestion)
+                        .contains(previousQuestion)
+                        .contains("이전에 안내한 항목을 제외하고 " + llmResolvedQuestion)
+                        .contains("검색 후보 개수: 10개")
+                        .contains("기존센터-1")
+                        .contains("기존센터-10"));
         verify(answerGenerator).generate(
                 eq(resolvedQuestion), any(), eq(newDocuments));
     }
@@ -1132,6 +1225,33 @@ class AiMessageServiceTest {
                 .startsWith(nationalDocument, localDocument)
                 .contains(unrelatedDocument);
         verify(documentRetriever).retrieve(eq(nationalSupplementQuery), any(), any());
+    }
+
+    @Test
+    void limitsSupplementalConceptSearches() {
+        List<AiRequiredConcept> concepts = IntStream.rangeClosed(1, 5)
+                .mapToObj(index -> new AiRequiredConcept(
+                        "필수 개념 " + index,
+                        "보충 검색어 " + index,
+                        List.of("일치어-" + index),
+                        List.of()
+                ))
+                .toList();
+        when(documentRetriever.retrieve(any(), any(), any())).thenReturn(List.of());
+
+        ReflectionTestUtils.invokeMethod(
+                service,
+                "preserveRequiredConceptDocuments",
+                concepts,
+                "검색 목표",
+                List.<List<AiReferenceDocument>>of(),
+                new LinkedHashMap<String, AiReferenceDocument>(),
+                null,
+                AiSearchScope.GENERAL
+        );
+
+        verify(documentRetriever, org.mockito.Mockito.times(3))
+                .retrieve(any(), any(), eq(AiSearchScope.GENERAL));
     }
 
     @Test
@@ -1751,6 +1871,23 @@ class AiMessageServiceTest {
                 sourceId,
                 documentKey,
                 "https://example.com/" + sourceId,
+                Instant.parse("2026-07-01T00:00:00Z")
+        );
+    }
+
+    private AiReferenceDocument identityDocument(
+            String documentKey,
+            String title,
+            String url,
+            String phone
+    ) {
+        return new AiReferenceDocument(
+                documentKey,
+                "전화번호: " + phone,
+                AiResponseSourceType.INFO,
+                null,
+                title,
+                url,
                 Instant.parse("2026-07-01T00:00:00Z")
         );
     }

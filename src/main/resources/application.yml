@@ -134,6 +134,7 @@ bodeum:
     rag:
       top-k: ${AI_RAG_TOP_K:5}
       similarity-threshold: ${AI_RAG_SIMILARITY_THRESHOLD:0.4}
+      max-supplemental-concept-searches: ${AI_RAG_MAX_SUPPLEMENTAL_CONCEPT_SEARCHES:3}
     web-search:
       model: ${OPENAI_WEB_SEARCH_MODEL:gpt-5.4-mini}
       max-output-tokens: ${OPENAI_WEB_SEARCH_MAX_OUTPUT_TOKENS:1200}

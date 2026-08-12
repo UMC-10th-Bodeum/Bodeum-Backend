@@ -64,6 +64,13 @@ public class AiMessageService {
             "(학교|센터|기관|병원|의원|약국|복지관|시설|교육원|상담소|지원사업|지원서비스)");
     private static final Pattern RELATIVE_LOCAL_REGION_PATTERN = Pattern.compile(
             "(우리\\s*(지역|동네)|근처|주변)");
+    private static final Pattern ADDITIONAL_RESULTS_PATTERN = Pattern.compile(
+            "(?:"
+                    + "(?:\\d+(?:개|곳))?더(?:\\d+(?:개|곳))?"
+                    + "|더많은(?:곳|기관|학교|센터|서비스|제도|항목)?"
+                    + "|추가로?(?:\\d+(?:개|곳))?"
+                    + "|다른(?:곳|기관|학교|센터|서비스|제도|항목)"
+                    + ")(?:알려줘|알려주세요|추천해줘|추천해주세요)$");
     private static final String AMBIGUOUS_REGION_MESSAGE_PREFIX =
             "확인할 지역이 여러 곳입니다. ";
     private static final String NO_RESULT_MESSAGE = "관련 정보를 찾을 수 없습니다.";
@@ -111,6 +118,9 @@ public class AiMessageService {
 
     @Value("${bodeum.ai.result.max-count:10}")
     private int maxResultCount = 10;
+
+    @Value("${bodeum.ai.rag.max-supplemental-concept-searches:3}")
+    private int maxSupplementalConceptSearches = 3;
 
     public CreateAiMessageResponse createMessage(Long userId, String content) {
         AiChatRoom chatRoom = aiChatRoomRepository.findByUserId(userId)
@@ -200,9 +210,10 @@ public class AiMessageService {
                 ? content
                 : questionContext.resolvedQuestion();
         if (additionalResultsContext.isFollowUp()
-                && resolvedContent.equals(content)) {
+                && !normalizeQuestion(resolvedContent).contains(normalizeQuestion(
+                        additionalResultsContext.previousQuestion()))) {
             resolvedContent = additionalResultsContext.previousQuestion()
-                    + "\n이전에 안내한 기관을 제외하고 " + content;
+                    + "\n이전에 안내한 항목을 제외하고 " + resolvedContent;
         }
         boolean followUp = questionContext.followUp()
                 || additionalResultsContext.isFollowUp();
@@ -677,6 +688,9 @@ public class AiMessageService {
     private Set<String> documentIdentityKeys(AiReferenceDocument document) {
         Set<String> identityKeys = new HashSet<>(
                 sourceIdentityKeys(document.title(), document.url()));
+        if (!identityKeys.isEmpty()) {
+            return identityKeys;
+        }
         Matcher phoneMatcher = PHONE_NUMBER_PATTERN.matcher(
                 document.content() == null ? "" : document.content());
         while (phoneMatcher.find()) {
@@ -811,19 +825,13 @@ public class AiMessageService {
 
     private boolean isAdditionalResultsQuestion(String content) {
         String normalized = normalizeQuestion(content);
-        if (!normalized.contains("더")) {
-            return false;
-        }
         if (normalized.contains("자세히")
                 || normalized.contains("상세히")
                 || normalized.contains("내용")
                 || normalized.contains("방법")) {
             return false;
         }
-        return normalized.endsWith("알려줘")
-                || normalized.endsWith("알려주세요")
-                || normalized.endsWith("추천해줘")
-                || normalized.endsWith("추천해주세요");
+        return ADDITIONAL_RESULTS_PATTERN.matcher(normalized).find();
     }
 
     private String appendAdditionalResultsSearchContext(
@@ -929,6 +937,7 @@ public class AiMessageService {
         List<AiReferenceDocument> candidates = new ArrayList<>(documentsByQuery.stream()
                 .flatMap(List::stream)
                 .toList());
+        int supplementalSearchCount = 0;
         for (int conceptIndex = 0; conceptIndex < requiredConcepts.size(); conceptIndex++) {
             AiRequiredConcept concept = requiredConcepts.get(conceptIndex);
             Optional<AiReferenceDocument> matched = findConceptDocument(
@@ -937,7 +946,9 @@ public class AiMessageService {
                     profile,
                     documentsByKey.keySet()
             );
-            if (matched.isEmpty()) {
+            if (matched.isEmpty()
+                    && supplementalSearchCount < maxSupplementalConceptSearches) {
+                supplementalSearchCount++;
                 List<AiReferenceDocument> supplemented = documentRetriever.retrieve(
                         supplementalResultQuery(concept, searchGoal, profile),
                         profile,
