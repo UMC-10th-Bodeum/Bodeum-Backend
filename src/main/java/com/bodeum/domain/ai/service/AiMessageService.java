@@ -452,15 +452,17 @@ public class AiMessageService {
             resolvedQuestion = resolvedContext.toResolvedQuestion(resolvedQuestion);
             regionResolution = questionRegionResolver.resolve(resolvedQuestion, profile);
         }
+        boolean finalSiteListRequest = siteListRequest
+                || siteListAnswerValidator.requiresValidation(resolvedQuestion);
         if (intent == AiQuestionIntent.NONE
                 && !regionResolution.isNotFound()
                 && isLocalResourceTarget(resolvedQuestion)) {
             searchScope = AiSearchScope.LOCAL_RESOURCE;
         }
-        if (siteListRequest && !regionResolution.isNotFound()) {
+        if (finalSiteListRequest && regionResolution.isResolved()) {
             searchScope = AiSearchScope.LOCAL_RESOURCE;
         }
-        InfoSubCategory infoSubCategory = siteListRequest
+        InfoSubCategory infoSubCategory = finalSiteListRequest
                 ? null
                 : resolveInfoSubCategory(resolvedQuestion, analysis.infoSubCategory());
         AiUserProfile searchProfile = (regionResolution.isResolved()
