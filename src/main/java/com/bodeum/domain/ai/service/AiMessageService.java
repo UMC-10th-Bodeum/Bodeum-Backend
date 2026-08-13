@@ -10,6 +10,7 @@ import com.bodeum.domain.ai.enums.AiStarterQuestionType;
 import com.bodeum.domain.ai.enums.SenderType;
 import com.bodeum.domain.ai.exception.AiErrorCode;
 import com.bodeum.domain.ai.model.rag.AiReferenceDocument;
+import com.bodeum.domain.ai.model.context.AiResolvedContext;
 import com.bodeum.domain.ai.model.rag.AiRequiredConcept;
 import com.bodeum.domain.info.entity.enums.InfoSubCategory;
 import com.bodeum.domain.ai.model.rag.AiQuestionAnalysis;
@@ -115,6 +116,7 @@ public class AiMessageService {
     private final AiQuestionIntentClassifier questionIntentClassifier;
     private final AiScrapInterestService scrapInterestService;
     private final AiQuestionRegionResolver questionRegionResolver;
+    private final AiSiteListAnswerValidator siteListAnswerValidator;
 
     @Value("${bodeum.ai.conversation.recent-turn-count:3}")
     private int recentConversationTurnCount = 3;
@@ -186,7 +188,7 @@ public class AiMessageService {
         if (RELATIVE_LOCAL_REGION_PATTERN.matcher(content).find()
                 && (baseProfile.region() == null || baseProfile.region().isBlank())) {
             persistenceService.updateUserMessageContext(
-                    userMessage.getId(), content, null, userMessage.getId());
+                    userMessage.getId(), content, null, null, userMessage.getId());
             return createRegionRequiredResponse(
                     chatRoom,
                     userMessage,
@@ -195,10 +197,10 @@ public class AiMessageService {
         }
         AiQuestionRegionResolver.RegionResolution regionResolution =
                 questionRegionResolver.resolve(content, baseProfile);
-        if (LOCAL_RESOURCE_PATTERN.matcher(content).find()
+        if (isLocalResourceTarget(content)
                 && regionResolution.isAmbiguous()) {
             persistenceService.updateUserMessageContext(
-                    userMessage.getId(), content, null, userMessage.getId());
+                    userMessage.getId(), content, null, null, userMessage.getId());
             return createRegionRequiredResponse(
                     chatRoom, userMessage, regionResolution.ambiguityMessage());
         }
@@ -223,6 +225,7 @@ public class AiMessageService {
         persistenceService.updateUserMessageContext(
                 userMessage.getId(),
                 resolvedContent,
+                questionContext.resolvedContext(),
                 followUp ? conversationContext.parentUserMessageId() : null,
                 !followUp || conversationContext.rootUserMessageId() == null
                         ? userMessage.getId()
@@ -248,6 +251,7 @@ public class AiMessageService {
         AiUserProfile profile = questionContext.profile();
         Optional<AiStarterQuestionAnswer> starterAnswer =
                 questionContext.requestedResultCount() == null
+                        && shouldRouteStarterQuestion(questionContext)
                         ? questionContext.questionType()
                                 .flatMap(type -> starterQuestionRouter.route(type, profile))
                         : Optional.empty();
@@ -327,9 +331,28 @@ public class AiMessageService {
         GeneratedAiAnswer generated = answerGenerator.generate(
                 resolvedContent, profile, retrievedDocuments
         );
+        generated = normalizeListedResultCount(
+                generated,
+                questionContext.requestedResultCount(),
+                additionalResultsContext.isFollowUp()
+        );
 
         log.debug("[AI] 답변 생성 완료");
         log.debug("[AI] citedDocumentKeys: {}", generated.citedDocumentKeys());
+
+        if ((siteListAnswerValidator.requiresValidation(content)
+                || siteListAnswerValidator.requiresValidation(resolvedContent))
+                && !siteListAnswerValidator.isValid(generated, retrievedDocuments)) {
+            log.warn("[AI] 사이트 목록 항목과 인용 근거 검증 실패, 외부 검색 시작");
+            return createExternalOrNoResultResponse(
+                    chatRoom,
+                    userMessage,
+                    searchQuestion,
+                    searchQueries,
+                    profile,
+                    questionContext.searchScope()
+            );
+        }
 
         List<AiReferenceDocument> citedSources =
                 validateCitations(generated, retrievedDocuments);
@@ -383,24 +406,56 @@ public class AiMessageService {
                 questionRegionResolver.resolve(content, profile);
         boolean selfContainedLocalResource = isSelfContainedLocalResourceQuestion(
                 content, content, originalRegionResolution);
-        AiQuestionAnalysis analysis = conversationContext.hasContext()
-                && !selfContainedLocalResource
-                ? questionIntentClassifier.analyze(
-                        content,
-                        conversationContext.previousUserQuestion(),
-                        conversationContext.previousAiAnswer()
-                )
-                : questionIntentClassifier.analyze(content);
+        Optional<String> regionFollowUpQuestion = resolveRegionOnlyFollowUpQuestion(
+                content,
+                profile,
+                conversationContext,
+                originalRegionResolution
+        );
+        AiQuestionAnalysis analysis;
+        if (regionFollowUpQuestion.isPresent()) {
+            String resolvedRegionQuestion = regionFollowUpQuestion.get();
+            analysis = forceResolvedFollowUp(
+                    questionIntentClassifier.analyze(resolvedRegionQuestion),
+                    resolvedRegionQuestion
+            );
+        } else {
+            analysis = conversationContext.hasContext()
+                    && !selfContainedLocalResource
+                    ? analyzeWithConversationContext(content, conversationContext)
+                    : questionIntentClassifier.analyze(content);
+        }
+        boolean explicitSiteListRequest =
+                siteListAnswerValidator.requiresValidation(content);
+        if (explicitSiteListRequest && regionFollowUpQuestion.isEmpty()) {
+            analysis = forceResolvedTarget(analysis, content, analysis.followUp());
+        }
         AiQuestionIntent intent = analysis.intent();
         String resolvedQuestion = analysis.resolvedQuestion() == null
                 ? content
                 : analysis.resolvedQuestion();
+        boolean followUp = analysis.followUp() && !selfContainedLocalResource;
         AiSearchScope searchScope = resolveSearchScope(intent, analysis.searchScope());
         AiQuestionRegionResolver.RegionResolution regionResolution =
                 questionRegionResolver.resolve(resolvedQuestion, profile);
+        AiResolvedContext resolvedContext = resolveStructuredContext(
+                content,
+                analysis.resolvedContext(),
+                conversationContext.immediatePreviousResolvedContext(),
+                regionResolution,
+                followUp || regionFollowUpQuestion.isPresent(),
+                analysis.requestedResultCount()
+        );
+        if (followUp && resolvedContext != null) {
+            resolvedQuestion = resolvedContext.toResolvedQuestion(resolvedQuestion);
+            regionResolution = questionRegionResolver.resolve(resolvedQuestion, profile);
+        }
         if (intent == AiQuestionIntent.NONE
                 && !regionResolution.isNotFound()
-                && LOCAL_RESOURCE_PATTERN.matcher(resolvedQuestion).find()) {
+                && isLocalResourceTarget(resolvedQuestion)) {
+            searchScope = AiSearchScope.LOCAL_RESOURCE;
+        }
+        if (explicitSiteListRequest && !regionResolution.isNotFound()) {
             searchScope = AiSearchScope.LOCAL_RESOURCE;
         }
         InfoSubCategory infoSubCategory = resolveInfoSubCategory(
@@ -411,7 +466,6 @@ public class AiMessageService {
                         ? regionResolution.applyTo(profile)
                         : profile)
                 .withInfoSubCategory(infoSubCategory);
-        boolean followUp = analysis.followUp() && !selfContainedLocalResource;
         return new QuestionContext(
                 searchProfile,
                 intent.starterQuestionType(),
@@ -420,13 +474,165 @@ public class AiMessageService {
                 intent == AiQuestionIntent.NONE
                         ? analysis.retrievalQueries()
                         : List.of(),
-                analysis.requestedResultCount(),
+                analysis.requestedResultCount() == null && resolvedContext != null
+                        ? resolvedContext.requestedResultCount()
+                        : analysis.requestedResultCount(),
                 resolvedQuestion,
                 followUp,
                 analysis.searchGoal(),
                 analysis.requiredConcepts(),
                 analysis.needsClarification(),
-                analysis.clarificationQuestion()
+                analysis.clarificationQuestion(),
+                resolvedContext
+        );
+    }
+
+    private AiQuestionAnalysis analyzeWithConversationContext(
+            String content,
+            ConversationContext conversationContext
+    ) {
+        AiResolvedContext previousContext =
+                conversationContext.immediatePreviousResolvedContext();
+        if (previousContext == null) {
+            return questionIntentClassifier.analyze(
+                    content,
+                    conversationContext.previousUserQuestion(),
+                    conversationContext.previousAiAnswer()
+            );
+        }
+        return questionIntentClassifier.analyze(
+                content,
+                conversationContext.previousUserQuestion(),
+                conversationContext.previousAiAnswer(),
+                previousContext
+        );
+    }
+
+    private AiResolvedContext resolveStructuredContext(
+            String content,
+            AiResolvedContext analyzedContext,
+            AiResolvedContext previousContext,
+            AiQuestionRegionResolver.RegionResolution regionResolution,
+            boolean followUp,
+            Integer requestedResultCount
+    ) {
+        AiResolvedContext resolved = followUp && previousContext != null
+                ? previousContext.merge(analyzedContext)
+                : analyzedContext;
+        if (resolved == null) {
+            if (requestedResultCount == null && !regionResolution.isResolved()) {
+                return null;
+            }
+            resolved = new AiResolvedContext(
+                    null, null, java.util.Map.of(), null, requestedResultCount);
+        }
+        if (requestedResultCount != null) {
+            resolved = resolved.withRequestedResultCount(requestedResultCount);
+        }
+        if (regionResolution.isResolved()) {
+            Region region = regionResolution.region();
+            resolved = resolved.withRegion(
+                    region == null ? regionResolution.regionLevel1()
+                            : region.getRegionLevel1(),
+                    region == null ? null : region.getRegionLevel2()
+            );
+        }
+        String normalized = normalizeQuestion(content);
+        if (followUp) {
+            if (normalized.contains("공립")) {
+                resolved = resolved.withFilter("설립구분", "공립");
+            } else if (normalized.contains("사립")) {
+                resolved = resolved.withFilter("설립구분", "사립");
+            }
+        }
+        return resolved.isEmpty() ? null : resolved;
+    }
+
+    private GeneratedAiAnswer normalizeListedResultCount(
+            GeneratedAiAnswer generated,
+            Integer requestedResultCount,
+            boolean additionalResults
+    ) {
+        int actualCount = generated.answerItems().size();
+        if (actualCount == 0
+                || requestedResultCount == null
+                || actualCount >= requestedResultCount) {
+            return generated;
+        }
+        String answer = generated.answer()
+                .replaceAll(
+                        "(?m)\\s*현재 확인 가능한 관련 (?:항목|학교|기관|사이트)은? "
+                                + "\\d+개입니다\\.\\s*",
+                        "\n"
+                )
+                .replaceAll(
+                        "(?m)\\s*이전에 안내한 항목을 제외하면,? 추가로 확인 가능한 "
+                                + "관련 항목은 \\d+개입니다\\.\\s*",
+                        "\n"
+                )
+                .trim();
+        String countMessage = additionalResults
+                ? "이전에 안내한 항목을 제외하면, 추가로 확인 가능한 관련 항목은 "
+                        + actualCount + "개입니다."
+                : "현재 확인 가능한 관련 항목은 " + actualCount + "개입니다.";
+        answer = answer + "\n\n" + countMessage;
+        return new GeneratedAiAnswer(
+                answer,
+                generated.citedDocumentKeys(),
+                generated.answerItems()
+        );
+    }
+
+    private Optional<String> resolveRegionOnlyFollowUpQuestion(
+            String content,
+            AiUserProfile profile,
+            ConversationContext conversationContext,
+            AiQuestionRegionResolver.RegionResolution currentResolution
+    ) {
+        if (!conversationContext.hasContext()
+                || conversationContext.immediatePreviousUserQuestion() == null
+                || !questionRegionResolver.isRegionOnlyQuestion(
+                        content, currentResolution)) {
+            return Optional.empty();
+        }
+        String previousQuestion = conversationContext.immediatePreviousUserQuestion();
+        AiQuestionRegionResolver.RegionResolution previousResolution =
+                questionRegionResolver.resolve(previousQuestion, profile);
+        return Optional.of(questionRegionResolver.replaceRegion(
+                previousQuestion,
+                previousResolution,
+                currentResolution
+        ));
+    }
+
+    private AiQuestionAnalysis forceResolvedFollowUp(
+            AiQuestionAnalysis analysis,
+            String resolvedQuestion
+    ) {
+        return forceResolvedTarget(analysis, resolvedQuestion, true);
+    }
+
+    private AiQuestionAnalysis forceResolvedTarget(
+            AiQuestionAnalysis analysis,
+            String resolvedQuestion,
+            boolean followUp
+    ) {
+        List<String> retrievalQueries = new ArrayList<>();
+        retrievalQueries.add(resolvedQuestion);
+        retrievalQueries.addAll(analysis.retrievalQueries());
+        return new AiQuestionAnalysis(
+                analysis.intent(),
+                analysis.searchScope(),
+                retrievalQueries,
+                analysis.requestedResultCount(),
+                resolvedQuestion,
+                followUp,
+                analysis.infoSubCategory(),
+                analysis.searchGoal(),
+                analysis.requiredConcepts(),
+                false,
+                null,
+                analysis.resolvedContext()
         );
     }
 
@@ -438,12 +644,23 @@ public class AiMessageService {
         String question = resolvedQuestion == null || resolvedQuestion.isBlank()
                 ? originalQuestion
                 : resolvedQuestion;
-        if (!LOCAL_RESOURCE_PATTERN.matcher(question).find()
+        if (!isLocalResourceTarget(question)
                 || CONTEXT_REFERENCE_PATTERN.matcher(originalQuestion).find()) {
             return false;
         }
         return RELATIVE_LOCAL_REGION_PATTERN.matcher(originalQuestion).find()
                 || regionResolution.isResolved();
+    }
+
+    private boolean isLocalResourceTarget(String question) {
+        return question != null
+                && (LOCAL_RESOURCE_PATTERN.matcher(question).find()
+                || siteListAnswerValidator.requiresValidation(question));
+    }
+
+    private boolean shouldRouteStarterQuestion(QuestionContext context) {
+        return context.questionType().orElse(null) != AiStarterQuestionType.WELFARE_SITES
+                || context.searchScope() != AiSearchScope.LOCAL_RESOURCE;
     }
 
     private QuestionContext starterQuestionContext(
@@ -462,6 +679,7 @@ public class AiMessageService {
                 null,
                 List.of(),
                 false,
+                null,
                 null
         );
     }
@@ -804,12 +1022,21 @@ public class AiMessageService {
         return new ConversationContext(
                 formatPreviousUserQuestions(previousUserMessages),
                 formatPreviousAiAnswers(previousAiMessages),
+                resolvedQuestion(previousUserMessages.getFirst()),
+                previousUserMessages.getFirst().getResolvedContext(),
                 previousUserMessages.getFirst().getId(),
                 previousUserMessages.getFirst().getContextRootMessageId() == null
                         || previousUserMessages.getFirst().getContextRootMessageId() <= 0
                         ? previousUserMessages.getFirst().getId()
                         : previousUserMessages.getFirst().getContextRootMessageId()
         );
+    }
+
+    private String resolvedQuestion(AiMessage message) {
+        return message.getResolvedQuestion() == null
+                || message.getResolvedQuestion().isBlank()
+                ? message.getContent()
+                : message.getResolvedQuestion();
     }
 
     private String formatPreviousUserQuestions(List<AiMessage> messages) {
@@ -1250,7 +1477,12 @@ public class AiMessageService {
                 searchScope
         );
         if (!externalAnswer.hasEvidence()) {
-            return createNoEvidenceResponse(chatRoom, userMessage);
+            String noEvidenceMessage = externalAnswer.answer() == null
+                    || externalAnswer.answer().isBlank()
+                    ? NO_RESULT_MESSAGE
+                    : externalAnswer.answer();
+            return createNoEvidenceResponse(
+                    chatRoom, userMessage, noEvidenceMessage);
         }
 
         boolean warning = hasIncorrectFeedback(externalAnswer.sources());
@@ -1489,18 +1721,21 @@ public class AiMessageService {
             String searchGoal,
             List<AiRequiredConcept> requiredConcepts,
             boolean needsClarification,
-            String clarificationQuestion
+            String clarificationQuestion,
+            AiResolvedContext resolvedContext
     ) {
     }
 
     private record ConversationContext(
             String previousUserQuestion,
             String previousAiAnswer,
+            String immediatePreviousUserQuestion,
+            AiResolvedContext immediatePreviousResolvedContext,
             Long parentUserMessageId,
             Long rootUserMessageId
     ) {
         private static ConversationContext empty() {
-            return new ConversationContext(null, null, null, null);
+            return new ConversationContext(null, null, null, null, null, null);
         }
 
         private boolean hasContext() {

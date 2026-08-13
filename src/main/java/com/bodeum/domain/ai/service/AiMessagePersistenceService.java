@@ -6,6 +6,7 @@ import com.bodeum.domain.ai.entity.AiResponseSource;
 import com.bodeum.domain.ai.enums.AiAnswerStatus;
 import com.bodeum.domain.ai.exception.AiErrorCode;
 import com.bodeum.domain.ai.model.rag.AiReferenceDocument;
+import com.bodeum.domain.ai.model.context.AiResolvedContext;
 import com.bodeum.domain.ai.repository.AiChatRoomRepository;
 import com.bodeum.domain.ai.repository.AiMessageRepository;
 import com.bodeum.domain.ai.repository.AiResponseSourceRepository;
@@ -36,6 +37,7 @@ public class AiMessagePersistenceService {
     public void updateUserMessageContext(
             Long userMessageId,
             String resolvedQuestion,
+            AiResolvedContext resolvedContext,
             Long contextParentMessageId,
             Long contextRootMessageId
     ) {
@@ -43,6 +45,7 @@ public class AiMessagePersistenceService {
                 .orElseThrow(() -> new ProjectException(AiErrorCode.AI_RESPONSE_FAILED));
         userMessage.updateConversationContext(
                 resolvedQuestion,
+                resolvedContext,
                 contextParentMessageId,
                 contextRootMessageId
         );

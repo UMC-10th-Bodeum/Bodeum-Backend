@@ -4,6 +4,7 @@ import com.bodeum.domain.info.entity.enums.InfoSubCategory;
 
 import com.bodeum.domain.ai.enums.AiQuestionIntent;
 import com.bodeum.domain.ai.enums.AiSearchScope;
+import com.bodeum.domain.ai.model.context.AiResolvedContext;
 import java.util.List;
 import java.util.stream.Stream;
 
@@ -18,12 +19,13 @@ public record AiQuestionAnalysis(
         String searchGoal,
         List<AiRequiredConcept> requiredConcepts,
         boolean needsClarification,
-        String clarificationQuestion
+        String clarificationQuestion,
+        AiResolvedContext resolvedContext
 ) {
 
     public AiQuestionAnalysis(AiQuestionIntent intent, List<String> retrievalQueries) {
         this(intent, AiSearchScope.GENERAL, retrievalQueries, null, null, false,
-                null, null, List.of(), false, null);
+                null, null, List.of(), false, null, null);
     }
 
     public AiQuestionAnalysis(
@@ -32,7 +34,7 @@ public record AiQuestionAnalysis(
             List<String> retrievalQueries
     ) {
         this(intent, searchScope, retrievalQueries, null, null, false,
-                null, null, List.of(), false, null);
+                null, null, List.of(), false, null, null);
     }
 
     public AiQuestionAnalysis(
@@ -42,7 +44,7 @@ public record AiQuestionAnalysis(
             Integer requestedResultCount
     ) {
         this(intent, searchScope, retrievalQueries, requestedResultCount, null, false,
-                null, null, List.of(), false, null);
+                null, null, List.of(), false, null, null);
     }
 
     public AiQuestionAnalysis {
@@ -82,7 +84,7 @@ public record AiQuestionAnalysis(
     public static AiQuestionAnalysis fallback() {
         return new AiQuestionAnalysis(
                 AiQuestionIntent.NONE, AiSearchScope.GENERAL, List.of(), null, null, false,
-                null, null, List.of(), false, null);
+                null, null, List.of(), false, null, null);
     }
 
     public static AiQuestionAnalysis fallback(String question) {
@@ -182,6 +184,7 @@ public record AiQuestionAnalysis(
                     null,
                     List.of(),
                     false,
+                    null,
                     null
             );
         }
@@ -209,6 +212,7 @@ public record AiQuestionAnalysis(
                 null,
                 List.of(),
                 false,
+                null,
                 null
         );
     }
@@ -228,7 +232,8 @@ public record AiQuestionAnalysis(
                 resolvedSearchGoal,
                 resolvedRequiredConcepts,
                 needsClarification,
-                clarificationQuestion
+                clarificationQuestion,
+                resolvedContext
         );
     }
 
@@ -247,7 +252,25 @@ public record AiQuestionAnalysis(
                 searchGoal,
                 requiredConcepts,
                 clarificationRequired,
-                question
+                question,
+                resolvedContext
+        );
+    }
+
+    public AiQuestionAnalysis withResolvedContext(AiResolvedContext context) {
+        return new AiQuestionAnalysis(
+                intent,
+                searchScope,
+                retrievalQueries,
+                requestedResultCount,
+                resolvedQuestion,
+                followUp,
+                infoSubCategory,
+                searchGoal,
+                requiredConcepts,
+                needsClarification,
+                clarificationQuestion,
+                context
         );
     }
 }

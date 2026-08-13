@@ -19,7 +19,7 @@ public interface HomeNewsRepository extends JpaRepository<News, Long> {
             SELECT n FROM News n
             WHERE n.active = true
               AND n.deletedAt IS NULL
-              AND n.regionId = :regionId
+              AND n.region.id = :regionId
             ORDER BY (n.viewCount + n.scrapCount) DESC
             """)
     List<News> findTopRecommendedByRegion(@Param("regionId") Long regionId, Pageable pageable);
@@ -33,7 +33,7 @@ public interface HomeNewsRepository extends JpaRepository<News, Long> {
             WHERE nc.newsType = :newsType
               AND n.active = true
               AND n.deletedAt IS NULL
-              AND n.regionId = :regionId
+              AND n.region.id = :regionId
             ORDER BY n.createdAt DESC
             """)
     List<News> findByNewsTypeAndRegion(

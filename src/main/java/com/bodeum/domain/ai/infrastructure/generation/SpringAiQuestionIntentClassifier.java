@@ -5,6 +5,7 @@ import com.bodeum.domain.ai.enums.AiSearchScope;
 import com.bodeum.domain.ai.infrastructure.support.AiPromptTemplate;
 import com.bodeum.domain.ai.model.rag.AiQuestionAnalysis;
 import com.bodeum.domain.ai.model.rag.AiRequiredConcept;
+import com.bodeum.domain.ai.model.context.AiResolvedContext;
 import com.bodeum.domain.ai.service.port.AiQuestionIntentClassifier;
 import com.bodeum.domain.info.entity.enums.InfoSubCategory;
 import java.io.IOException;
@@ -53,6 +54,16 @@ public class SpringAiQuestionIntentClassifier implements AiQuestionIntentClassif
             String previousUserQuestion,
             String previousAiAnswer
     ) {
+        return analyze(question, previousUserQuestion, previousAiAnswer, null);
+    }
+
+    @Override
+    public AiQuestionAnalysis analyze(
+            String question,
+            String previousUserQuestion,
+            String previousAiAnswer,
+            AiResolvedContext previousResolvedContext
+    ) {
         if (question == null || question.isBlank()) {
             return AiQuestionAnalysis.fallback();
         }
@@ -65,6 +76,11 @@ public class SpringAiQuestionIntentClassifier implements AiQuestionIntentClassif
                         .append(previousUserQuestion.trim())
                         .append("\n\n[직전 AI 답변]\n")
                         .append(previousAiAnswer.trim())
+                        .append("\n\n");
+            }
+            if (previousResolvedContext != null && !previousResolvedContext.isEmpty()) {
+                userPrompt.append("[직전 구조화 문맥]\n")
+                        .append(previousResolvedContext.toPromptText())
                         .append("\n\n");
             }
             userPrompt.append("[분류할 현재 사용자 질문]\n").append(question.trim());
@@ -94,7 +110,7 @@ public class SpringAiQuestionIntentClassifier implements AiQuestionIntentClassif
             ).withClarification(
                     result != null && result.needsClarification(),
                     result == null ? null : result.clarificationQuestion()
-            );
+            ).withResolvedContext(result == null ? null : result.resolvedContext());
             log.info(
                     "[AI] 질문 LLM 분석 결과: intent={}, searchScope={}, retrievalQueryCount={}",
                     analysis.intent(),
@@ -119,7 +135,8 @@ public class SpringAiQuestionIntentClassifier implements AiQuestionIntentClassif
             String searchGoal,
             List<AiRequiredConcept> requiredConcepts,
             boolean needsClarification,
-            String clarificationQuestion
+            String clarificationQuestion,
+            AiResolvedContext resolvedContext
     ) {
     }
 

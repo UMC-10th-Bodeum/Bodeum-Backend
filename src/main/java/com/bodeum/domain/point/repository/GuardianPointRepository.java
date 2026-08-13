@@ -10,25 +10,20 @@ import org.springframework.data.repository.query.Param;
 
 public interface GuardianPointRepository extends JpaRepository<GuardianPoint, Long> {
 
-    Optional<GuardianPoint> findByGuardianProfileId(Long guardianProfileId);
+    Optional<GuardianPoint> findByGuardianProfile_Id(Long guardianProfileId);
 
     @Query("""
             SELECT guardianPoint
             FROM GuardianPoint guardianPoint
-            WHERE guardianPoint.guardianProfileId = (
-                SELECT guardianProfile.id
-                FROM GuardianProfile guardianProfile
-                WHERE guardianProfile.user.id = :userId
-            )
+            WHERE guardianPoint.guardianProfile.user.id = :userId
             """)
     Optional<GuardianPoint> findByUserId(@Param("userId") Long userId);
 
     @Query("""
-            SELECT guardianProfile.user.id AS userId,
+            SELECT guardianPoint.guardianProfile.user.id AS userId,
                    guardianPoint.totalPoint AS totalPoint
-            FROM GuardianPoint guardianPoint, GuardianProfile guardianProfile
-            WHERE guardianPoint.guardianProfileId = guardianProfile.id
-              AND guardianProfile.user.id IN :userIds
+            FROM GuardianPoint guardianPoint
+            WHERE guardianPoint.guardianProfile.user.id IN :userIds
             """)
     List<UserTotalPoint> findTotalPointsByUserIdIn(
             @Param("userIds") Collection<Long> userIds

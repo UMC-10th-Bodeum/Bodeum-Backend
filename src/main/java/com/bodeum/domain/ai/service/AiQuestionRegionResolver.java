@@ -21,6 +21,8 @@ public class AiQuestionRegionResolver {
     private static final Pattern REGION_LEVEL_2_PATTERN =
             Pattern.compile("([가-힣]+(?:시|군|구))");
     private static final Pattern KOREAN_WORD_PATTERN = Pattern.compile("[가-힣]{2,}");
+    private static final Pattern REGION_ONLY_REMAINDER_PATTERN = Pattern.compile(
+            "^(?:은|는|도|은요|는요|요|에|에서|에선|에서는|쪽|지역)?$");
     private static final Map<String, String> REGION_FULL_NAME_ALIASES = Map.of(
             "경기광주", "경기도 광주시"
     );
@@ -94,6 +96,86 @@ public class AiQuestionRegionResolver {
         return regionLevel1 == null
                 ? RegionResolution.notFound()
                 : RegionResolution.resolvedRegionLevel1(regionLevel1);
+    }
+
+    public boolean isRegionOnlyQuestion(
+            String question,
+            RegionResolution resolution
+    ) {
+        if (resolution == null || !resolution.isResolved()) {
+            return false;
+        }
+        String remainder = normalize(question);
+        for (String mention : regionMentions(resolution)) {
+            remainder = remainder.replace(normalize(mention), "");
+        }
+        return REGION_ONLY_REMAINDER_PATTERN.matcher(remainder).matches();
+    }
+
+    public String replaceRegion(
+            String question,
+            RegionResolution previousResolution,
+            RegionResolution currentResolution
+    ) {
+        String replacement = displayName(currentResolution);
+        if (question == null || question.isBlank() || replacement == null) {
+            return question;
+        }
+        if (previousResolution != null && !previousResolution.isNotFound()) {
+            for (String mention : regionMentions(previousResolution)) {
+                Matcher matcher = Pattern.compile(Pattern.quote(mention))
+                        .matcher(question);
+                if (matcher.find()) {
+                    return matcher.replaceFirst(Matcher.quoteReplacement(replacement));
+                }
+            }
+        }
+        return replacement + " " + question.trim();
+    }
+
+    private List<String> regionMentions(RegionResolution resolution) {
+        Set<String> mentions = new HashSet<>();
+        if (resolution.region() != null) {
+            Region region = resolution.region();
+            mentions.add(region.getFullName());
+            mentions.add(region.getRegionLevel1());
+            mentions.add(region.getRegionLevel2());
+            mentions.add(removeAdministrativeSuffix(region.getRegionLevel2()));
+        } else if (resolution.regionLevel1() != null) {
+            mentions.add(resolution.regionLevel1());
+        }
+        resolution.candidates().forEach(candidate -> {
+            mentions.add(candidate);
+            String[] parts = candidate.split("\\s+");
+            String localName = parts[parts.length - 1];
+            mentions.add(localName);
+            mentions.add(removeAdministrativeSuffix(localName));
+        });
+        REGION_LEVEL_1_ALIASES.forEach((alias, fullName) -> {
+            if (fullName.equals(resolution.regionLevel1())) {
+                mentions.add(alias);
+            }
+        });
+        return mentions.stream()
+                .filter(mention -> mention != null && !mention.isBlank())
+                .sorted((left, right) -> Integer.compare(right.length(), left.length()))
+                .toList();
+    }
+
+    private String removeAdministrativeSuffix(String regionLevel2) {
+        return regionLevel2 == null
+                ? null
+                : regionLevel2.replaceFirst(
+                        "(특별자치시|특별시|광역시|특별자치도|도|시|군|구)$", "");
+    }
+
+    private String displayName(RegionResolution resolution) {
+        if (resolution == null || !resolution.isResolved()) {
+            return null;
+        }
+        return resolution.region() == null
+                ? resolution.regionLevel1()
+                : resolution.region().getFullName();
     }
 
     private Optional<String> resolveRegionLevel1(String normalizedQuestion) {

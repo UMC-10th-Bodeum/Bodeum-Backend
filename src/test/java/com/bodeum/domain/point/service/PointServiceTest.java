@@ -31,6 +31,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.beans.BeanUtils;
 import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
@@ -56,7 +57,7 @@ class PointServiceTest {
         GuardianPoint guardianPoint = guardianPoint(7L, 11L, 0);
 
         given(userRepository.findByIdForUpdate(1L)).willReturn(Optional.of(user));
-        given(guardianPointRepository.findByGuardianProfileId(11L))
+        given(guardianPointRepository.findByGuardianProfile_Id(11L))
                 .willReturn(Optional.of(guardianPoint));
         given(pointHistoryRepository
                 .existsByGuardianPoint_IdAndEventTypeAndReferenceIdAndActorUserId(
@@ -93,7 +94,7 @@ class PointServiceTest {
         GuardianPoint guardianPoint = guardianPoint(7L, 11L, 5);
 
         given(userRepository.findByIdForUpdate(1L)).willReturn(Optional.of(user));
-        given(guardianPointRepository.findByGuardianProfileId(11L))
+        given(guardianPointRepository.findByGuardianProfile_Id(11L))
                 .willReturn(Optional.of(guardianPoint));
         given(pointHistoryRepository
                 .existsByGuardianPoint_IdAndEventTypeAndReferenceIdAndActorUserId(
@@ -123,7 +124,7 @@ class PointServiceTest {
         GuardianPoint guardianPoint = guardianPoint(7L, 11L, 15);
 
         given(userRepository.findByIdForUpdate(1L)).willReturn(Optional.of(user));
-        given(guardianPointRepository.findByGuardianProfileId(11L))
+        given(guardianPointRepository.findByGuardianProfile_Id(11L))
                 .willReturn(Optional.of(guardianPoint));
         given(pointHistoryRepository
                 .existsByGuardianPoint_IdAndEventTypeAndReferenceIdAndActorUserId(
@@ -160,7 +161,7 @@ class PointServiceTest {
         GuardianPoint guardianPoint = guardianPoint(7L, 11L, 0);
 
         given(userRepository.findByIdForUpdate(1L)).willReturn(Optional.of(user));
-        given(guardianPointRepository.findByGuardianProfileId(11L))
+        given(guardianPointRepository.findByGuardianProfile_Id(11L))
                 .willReturn(Optional.of(guardianPoint));
 
         List<PointEventType> unlimitedEvents = List.of(
@@ -341,7 +342,9 @@ class PointServiceTest {
     }
 
     private GuardianPoint guardianPoint(Long pointId, Long guardianProfileId, int totalPoint) {
-        GuardianPoint guardianPoint = GuardianPoint.create(guardianProfileId);
+        GuardianProfile guardianProfile = BeanUtils.instantiateClass(GuardianProfile.class);
+        ReflectionTestUtils.setField(guardianProfile, "id", guardianProfileId);
+        GuardianPoint guardianPoint = GuardianPoint.create(guardianProfile);
         ReflectionTestUtils.setField(guardianPoint, "id", pointId);
         guardianPoint.increasePoint(totalPoint);
         return guardianPoint;
