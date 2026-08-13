@@ -147,7 +147,7 @@ class CommentServiceTest {
         Comment nestedReply = comment(3L, post, 22L, reply, "중첩 답글");
         given(postRepository.findByIdAndStatusAndDeletedAtIsNull(1L, PostStatus.ACTIVE))
                 .willReturn(Optional.of(post));
-        given(commentRepository.findAllActiveByPostIdWithParent(1L, CommentStatus.ACTIVE))
+        given(commentRepository.findAllByPostIdWithParent(1L))
                 .willReturn(List.of(root, reply, nestedReply));
         given(commentLikeRepository.findLikedCommentIds(22L, List.of(1L, 2L, 3L)))
                 .willReturn(List.of(3L));
@@ -168,7 +168,7 @@ class CommentServiceTest {
         Comment comment = comment(1L, post, 20L, null, "댓글");
         given(postRepository.findByIdAndStatusAndDeletedAtIsNull(1L, PostStatus.ACTIVE))
                 .willReturn(Optional.of(post));
-        given(commentRepository.findAllActiveByPostIdWithParent(1L, CommentStatus.ACTIVE))
+        given(commentRepository.findAllByPostIdWithParent(1L))
                 .willReturn(List.of(comment));
 
         CommentListResponse response = commentService.getComments(null, 1L);
@@ -196,7 +196,7 @@ class CommentServiceTest {
         User anonymousAuthor2 = user(22L, " ");
         given(postRepository.findByIdAndStatusAndDeletedAtIsNull(1L, PostStatus.ACTIVE))
                 .willReturn(Optional.of(post));
-        given(commentRepository.findAllActiveByPostIdWithParent(1L, CommentStatus.ACTIVE))
+        given(commentRepository.findAllByPostIdWithParent(1L))
                 .willReturn(List.of(firstAnonymous, named, secondAnonymous, sameAsFirst));
         given(userRepository.findAllById(any()))
                 .willReturn(List.of(anonymousAuthor1, namedAuthor, anonymousAuthor2));
@@ -209,6 +209,40 @@ class CommentServiceTest {
         assertThat(response.comments())
                 .extracting(comment -> comment.profileImageUrl())
                 .containsExactly(null, "https://example.com/profile.jpg", null, null);
+    }
+
+    @Test
+    void getCommentsKeepsDeletedParentAsPlaceholderWithActiveReply() {
+        Post post = post(1L, 10L);
+        Comment deletedRoot = comment(1L, post, 20L, null, "노출하면 안 되는 원문");
+        Comment activeReply = comment(2L, post, 21L, deletedRoot, "유지할 답글");
+        deletedRoot.delete();
+        given(postRepository.findByIdAndStatusAndDeletedAtIsNull(1L, PostStatus.ACTIVE))
+                .willReturn(Optional.of(post));
+        given(commentRepository.findAllByPostIdWithParent(1L))
+                .willReturn(List.of(deletedRoot, activeReply));
+
+        CommentListResponse response = commentService.getComments(null, 1L);
+
+        assertThat(response.totalCount()).isOne();
+        assertThat(response.comments()).singleElement().satisfies(deleted -> {
+            assertThat(deleted.commentId()).isEqualTo(1L);
+            assertThat(deleted.parentCommentId()).isNull();
+            assertThat(deleted.authorId()).isNull();
+            assertThat(deleted.authorNickname()).isNull();
+            assertThat(deleted.profileImageUrl()).isNull();
+            assertThat(deleted.isMine()).isFalse();
+            assertThat(deleted.content()).isEqualTo("삭제된 댓글입니다");
+            assertThat(deleted.isAccepted()).isFalse();
+            assertThat(deleted.likeCount()).isZero();
+            assertThat(deleted.isLiked()).isFalse();
+            assertThat(deleted.status()).isEqualTo(CommentStatus.DELETED);
+            assertThat(deleted.replies()).singleElement().satisfies(reply -> {
+                assertThat(reply.commentId()).isEqualTo(2L);
+                assertThat(reply.parentCommentId()).isEqualTo(1L);
+                assertThat(reply.content()).isEqualTo("유지할 답글");
+            });
+        });
     }
 
     @Test

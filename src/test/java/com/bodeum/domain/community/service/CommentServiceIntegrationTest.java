@@ -9,6 +9,7 @@ import com.bodeum.domain.community.dto.response.CommentListResponse;
 import com.bodeum.domain.community.dto.response.CommentResponse;
 import com.bodeum.domain.community.entity.Comment;
 import com.bodeum.domain.community.entity.Post;
+import com.bodeum.domain.community.enums.CommentStatus;
 import com.bodeum.domain.community.enums.PostAnonymityType;
 import com.bodeum.domain.community.enums.PostBoardType;
 import com.bodeum.domain.community.exception.CommunityErrorCode;
@@ -71,7 +72,7 @@ class CommentServiceIntegrationTest {
     }
 
     @Test
-    void updateReturnsModifiedAtAndDeleteExcludesCommentWhileKeepingActiveReply() {
+    void updateReturnsModifiedAtAndDeleteKeepsPlaceholderWithActiveReply() {
         Post post = savePost();
         CommentResponse root = commentService.createComment(
                 20L,
@@ -110,9 +111,19 @@ class CommentServiceIntegrationTest {
 
         assertThat(response.totalCount()).isOne();
         assertThat(response.comments()).hasSize(1);
-        assertThat(response.comments().getFirst().commentId()).isEqualTo(reply.commentId());
-        assertThat(response.comments().getFirst().parentCommentId()).isNull();
-        assertThat(response.comments().getFirst().content()).isEqualTo("유지할 답글");
+        CommentResponse deletedPlaceholder = response.comments().getFirst();
+        assertThat(deletedPlaceholder.commentId()).isEqualTo(root.commentId());
+        assertThat(deletedPlaceholder.parentCommentId()).isNull();
+        assertThat(deletedPlaceholder.authorId()).isNull();
+        assertThat(deletedPlaceholder.authorNickname()).isNull();
+        assertThat(deletedPlaceholder.profileImageUrl()).isNull();
+        assertThat(deletedPlaceholder.content()).isEqualTo("삭제된 댓글입니다");
+        assertThat(deletedPlaceholder.status()).isEqualTo(CommentStatus.DELETED);
+        assertThat(deletedPlaceholder.replies()).singleElement().satisfies(activeReply -> {
+            assertThat(activeReply.commentId()).isEqualTo(reply.commentId());
+            assertThat(activeReply.parentCommentId()).isEqualTo(root.commentId());
+            assertThat(activeReply.content()).isEqualTo("유지할 답글");
+        });
     }
 
     @Test

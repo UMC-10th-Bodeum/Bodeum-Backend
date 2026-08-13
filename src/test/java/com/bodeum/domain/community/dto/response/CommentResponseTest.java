@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.bodeum.domain.community.entity.Comment;
 import com.bodeum.domain.community.entity.Post;
+import com.bodeum.domain.community.enums.CommentStatus;
 import com.bodeum.domain.community.enums.PostAnonymityType;
 import com.bodeum.domain.community.enums.PostBoardType;
 import java.util.List;
@@ -40,5 +41,33 @@ class CommentResponseTest {
         assertThat(response.authorId()).isNull();
         assertThat(response.authorNickname()).isEqualTo("탈퇴한 사용자");
         assertThat(response.profileImageUrl()).isNull();
+    }
+
+    @Test
+    void masksDeletedCommentAtResponseBoundary() {
+        Comment deletedComment = comment();
+        deletedComment.increaseLikeCount();
+        deletedComment.delete();
+
+        CommentResponse response = CommentResponse.of(
+                deletedComment,
+                null,
+                10L,
+                true,
+                false,
+                "보듬맘",
+                "https://example.com/profile.jpg",
+                List.of()
+        );
+
+        assertThat(response.authorId()).isNull();
+        assertThat(response.authorNickname()).isNull();
+        assertThat(response.profileImageUrl()).isNull();
+        assertThat(response.isMine()).isFalse();
+        assertThat(response.content()).isEqualTo("삭제된 댓글입니다");
+        assertThat(response.isAccepted()).isFalse();
+        assertThat(response.likeCount()).isZero();
+        assertThat(response.isLiked()).isFalse();
+        assertThat(response.status()).isEqualTo(CommentStatus.DELETED);
     }
 }
