@@ -1,11 +1,14 @@
 package com.bodeum.domain.point.entity;
 
 import com.bodeum.domain.point.enums.BadgeLevel;
+import com.bodeum.domain.user.entity.GuardianProfile;
 import com.bodeum.global.common.entity.BaseCreatedUpdatedEntity;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+
+import java.util.Objects;
 
 @Getter
 @Entity
@@ -28,16 +31,14 @@ public class GuardianPoint extends BaseCreatedUpdatedEntity {
     @Column(name = "guardian_point_id")
     private Long id;
 
-    @Column(name = "guardian_profile_id", nullable = false)
-    private Long guardianProfileId;
-
-    /*
-     * TODO: GuardianProfile 엔터티 연동 시 아래 연관관계로 변경 예정
-     *
-     * @OneToOne(fetch = FetchType.LAZY)
-     * @JoinColumn(name = "guardian_profile_id", nullable = false)
-     * private GuardianProfile guardianProfile;
-     */
+    @OneToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(
+            name = "guardian_profile_id",
+            nullable = false,
+            unique = true,
+            foreignKey = @ForeignKey(name = "fk_guardian_point_guardian_profile")
+    )
+    private GuardianProfile guardianProfile;
 
     @Column(name = "total_point", nullable = false)
     private Integer totalPoint = MIN_POINT;
@@ -46,14 +47,18 @@ public class GuardianPoint extends BaseCreatedUpdatedEntity {
     @Column(name = "badge_level", nullable = false, length = 30)
     private BadgeLevel badgeLevel = BadgeLevel.SPROUT;
 
-    private GuardianPoint(Long guardianProfileId) {
-        this.guardianProfileId = guardianProfileId;
+    private GuardianPoint(GuardianProfile guardianProfile) {
+        this.guardianProfile = Objects.requireNonNull(guardianProfile);
         this.totalPoint = MIN_POINT;
         this.badgeLevel = BadgeLevel.SPROUT;
     }
 
-    public static GuardianPoint create(Long guardianProfileId) {
-        return new GuardianPoint(guardianProfileId);
+    public static GuardianPoint create(GuardianProfile guardianProfile) {
+        return new GuardianPoint(guardianProfile);
+    }
+
+    public Long getGuardianProfileId() {
+        return guardianProfile.getId();
     }
 
     public void increasePoint(int point) {

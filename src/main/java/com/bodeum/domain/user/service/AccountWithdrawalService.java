@@ -30,9 +30,9 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
  *   <li>AI 데이터: 회원에게 종속된 채팅방·메시지·응답 출처·피드백·피드백 사유를 삭제한다.
  *       공용 출처 데이터, 출처 검토 이력, Chroma의 INFO/NEWS 색인은 보존한다.</li>
  *   <li>포인트: 총점은 GuardianPoint.totalPoint, 적립 내역은 GuardianPointHistory에 있다.
- *       GuardianPoint는 guardianProfileId를 단순 컬럼으로 들고 있어 guardianProfile
- *       orphanRemoval로 지워지지 않으므로 명시적으로 삭제한다. 조회가 GuardianProfile을
- *       경유하므로 {@link UserService#withdraw(Long)}보다 먼저 삭제해야 한다.</li>
+ *       GuardianPoint는 GuardianProfile을 참조하지만 프로필의 cascade 대상이 아니므로
+ *       명시적으로 삭제한다. DB FK가 프로필 삭제를 제한하므로
+ *       {@link UserService#withdraw(Long)}보다 먼저 삭제해야 한다.</li>
  *   <li>프로필 이미지: 개인정보이므로 S3 실제 파일까지 삭제한다. 롤백 불가한 외부 부수효과라 커밋 이후 수행한다.
  *       게시글·리뷰 이미지는 본문을 보존하므로 함께 보존한다.</li>
  * </ul>

@@ -28,7 +28,7 @@ public interface NewsRepository extends JpaRepository<News, Long> {
               and (:newsType is null or news.newsType = :newsType)
               and (:category is null or lower(news.newsCategory.name) = lower(:category))
               and (:status is null or news.recruitmentStatus = :status)
-              and (:filterByRegion = false or news.regionId in :regionIds)
+              and (:filterByRegion = false or news.region.id in :regionIds)
             """)
     Page<News> findVisibleNews(
             @Param("newsType") NewsType newsType,
@@ -50,12 +50,12 @@ public interface NewsRepository extends JpaRepository<News, Long> {
                     or (news.summary is not null and lower(news.summary) like :keyword)
                     or (news.content is not null and lower(cast(news.content as String)) like :keyword)
                     or (news.sourceName is not null and lower(news.sourceName) like :keyword)
-                    or (:filterByKeywordRegion = true and news.regionId in :keywordRegionIds)
+                    or (:filterByKeywordRegion = true and news.region.id in :keywordRegionIds)
               )
               and (:newsType is null or news.newsType = :newsType)
               and (:category is null or lower(news.newsCategory.name) = lower(:category))
               and (:status is null or news.recruitmentStatus = :status)
-              and (:filterByRegion = false or news.regionId in :regionIds)
+              and (:filterByRegion = false or news.region.id in :regionIds)
             """)
     Page<News> searchVisibleNews(
             @Param("keyword") String keyword,
@@ -109,7 +109,7 @@ public interface NewsRepository extends JpaRepository<News, Long> {
             select news
             from News news
             where news.id <> :newsId
-              and news.regionId in :regionIds
+              and news.region.id in :regionIds
               and news.recruitmentStatus = :status
               and news.active = true
               and news.deletedAt is null

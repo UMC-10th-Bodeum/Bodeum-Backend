@@ -34,6 +34,7 @@ import com.bodeum.domain.point.service.PointService;
 import com.bodeum.domain.search.entity.SearchLog;
 import com.bodeum.domain.search.enums.SearchType;
 import com.bodeum.domain.search.repository.SearchLogRepository;
+import com.bodeum.domain.user.entity.GuardianProfile;
 import com.bodeum.domain.user.entity.User;
 import com.bodeum.domain.user.repository.UserRepository;
 import com.bodeum.global.config.JpaAuditingConfig;
@@ -265,9 +266,9 @@ class AccountWithdrawalPersistenceIntegrationTest {
         Long userId = user.getId();
         em.flush();
 
-        Long guardianProfileId = (Long) ReflectionTestUtils.getField(
-                ReflectionTestUtils.getField(user, "guardianProfile"), "id");
-        persistGuardianPointWithHistory(guardianProfileId);
+        GuardianProfile guardianProfile = (GuardianProfile) ReflectionTestUtils.getField(
+                user, "guardianProfile");
+        persistGuardianPointWithHistory(guardianProfile);
         em.flush();
         em.clear();
         assertThat(countGuardianPoints()).isEqualTo(1L);
@@ -337,11 +338,9 @@ class AccountWithdrawalPersistenceIntegrationTest {
                 .getSingleResult();
     }
 
-    // GuardianPoint·GuardianPointHistory는 공개 생성자·정적 팩토리가 없어 리플렉션으로 시드한다.
-    private void persistGuardianPointWithHistory(Long guardianProfileId) {
-        GuardianPoint guardianPoint = BeanUtils.instantiateClass(GuardianPoint.class);
-        ReflectionTestUtils.setField(guardianPoint, "guardianProfileId", guardianProfileId);
-        ReflectionTestUtils.setField(guardianPoint, "totalPoint", 100);
+    private void persistGuardianPointWithHistory(GuardianProfile guardianProfile) {
+        GuardianPoint guardianPoint = GuardianPoint.create(guardianProfile);
+        guardianPoint.increasePoint(100);
         em.persist(guardianPoint);
 
         GuardianPointHistory history = BeanUtils.instantiateClass(GuardianPointHistory.class);
