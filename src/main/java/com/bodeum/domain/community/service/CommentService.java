@@ -75,10 +75,7 @@ public class CommentService {
 
     public CommentListResponse getComments(Long userId, Long postId) {
         Post post = findPost(postId);
-        List<Comment> comments = commentRepository.findAllActiveByPostIdWithParent(
-                postId,
-                CommentStatus.ACTIVE
-        );
+        List<Comment> comments = commentRepository.findAllByPostIdWithParent(postId);
         Set<Long> likedCommentIds = findLikedCommentIds(userId, comments);
         Set<Long> withdrawnAuthorIds = findWithdrawnAuthorIds(comments);
         Map<Long, CommentAuthorProfile> authorProfiles = buildAuthorProfiles(comments, withdrawnAuthorIds);
@@ -295,10 +292,9 @@ public class CommentService {
             return new CommentAuthorProfile(WithdrawalConstants.WITHDRAWN_DISPLAY_NAME, null);
         }
 
-        List<Comment> postComments = new ArrayList<>(commentRepository.findAllActiveByPostIdWithParent(
-                comment.getPost().getId(),
-                CommentStatus.ACTIVE
-        ));
+        List<Comment> postComments = new ArrayList<>(
+                commentRepository.findAllByPostIdWithParent(comment.getPost().getId())
+        );
         boolean currentCommentIncluded = postComments.stream()
                 .anyMatch(postComment -> Objects.equals(postComment.getId(), comment.getId()));
         if (!currentCommentIncluded) {
@@ -315,7 +311,7 @@ public class CommentService {
         }
 
         List<Long> activeCommentIds = comments.stream()
-                .filter(comment -> comment.getStatus() == CommentStatus.ACTIVE && !comment.isDeleted())
+                .filter(comment -> !isDeletedComment(comment))
                 .map(Comment::getId)
                 .toList();
 
@@ -329,6 +325,7 @@ public class CommentService {
     // 보존된 댓글·답글의 작성자 익명화용. 페이지 내 distinct 작성자 id를 배치 조회해 탈퇴 회원 집합만 판정한다(N+1 방지).
     private Set<Long> findWithdrawnAuthorIds(List<Comment> comments) {
         Set<Long> authorIds = comments.stream()
+                .filter(comment -> !isDeletedComment(comment))
                 .map(Comment::getUserId)
                 .collect(Collectors.toSet());
         if (authorIds.isEmpty()) {
@@ -343,6 +340,7 @@ public class CommentService {
             Set<Long> withdrawnAuthorIds
     ) {
         List<Comment> orderedComments = comments.stream()
+                .filter(comment -> !isDeletedComment(comment))
                 .sorted(Comparator.comparing(Comment::getId))
                 .toList();
         Set<Long> activeAuthorIds = orderedComments.stream()
@@ -406,17 +404,22 @@ public class CommentService {
             List<CommentResponse> replies = reverseCopy(repliesByParentId.get(comment.getId()));
             Long parentId = comment.getParent() == null ? null : comment.getParent().getId();
             Long visibleParentId = parentId != null && commentsById.containsKey(parentId) ? parentId : null;
-            CommentAuthorProfile authorProfile = authorProfiles.get(comment.getUserId());
-            CommentResponse response = CommentResponse.of(
-                    comment,
-                    visibleParentId,
-                    viewerId,
-                    likedCommentIds.contains(comment.getId()),
-                    withdrawnAuthorIds.contains(comment.getUserId()),
-                    authorProfile.displayName(),
-                    authorProfile.profileImageUrl(),
-                    replies
-            );
+            CommentResponse response;
+            if (isDeletedComment(comment)) {
+                response = CommentResponse.deleted(comment, visibleParentId, replies);
+            } else {
+                CommentAuthorProfile authorProfile = authorProfiles.get(comment.getUserId());
+                response = CommentResponse.of(
+                        comment,
+                        visibleParentId,
+                        viewerId,
+                        likedCommentIds.contains(comment.getId()),
+                        withdrawnAuthorIds.contains(comment.getUserId()),
+                        authorProfile.displayName(),
+                        authorProfile.profileImageUrl(),
+                        replies
+                );
+            }
 
             if (visibleParentId == null) {
                 roots.add(response);
@@ -437,6 +440,10 @@ public class CommentService {
         List<CommentResponse> orderedResponses = new ArrayList<>(responses);
         Collections.reverse(orderedResponses);
         return List.copyOf(orderedResponses);
+    }
+
+    private boolean isDeletedComment(Comment comment) {
+        return comment.getStatus() == CommentStatus.DELETED || comment.isDeleted();
     }
 
     private record CommentAuthorProfile(

@@ -112,6 +112,27 @@ class CommentControllerTest {
     }
 
     @Test
+    void getCommentsReturnsDeletedPlaceholderWithNestedReply() throws Exception {
+        CommentResponse reply = commentResponse(2L, 1L, List.of());
+        CommentResponse deletedRoot = deletedCommentResponse(1L, null, List.of(reply));
+        given(commentService.getComments(10L, 1L))
+                .willReturn(new CommentListResponse(1, List.of(deletedRoot)));
+
+        mockMvc.perform(get("/api/v1/community/posts/1/comments"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.totalCount").value(1))
+                .andExpect(jsonPath("$.result.comments[0].commentId").value(1))
+                .andExpect(jsonPath("$.result.comments[0].content").value("삭제된 댓글입니다"))
+                .andExpect(jsonPath("$.result.comments[0].status").value("DELETED"))
+                .andExpect(jsonPath("$.result.comments[0].isMine").value(false))
+                .andExpect(jsonPath("$.result.comments[0].isAccepted").value(false))
+                .andExpect(jsonPath("$.result.comments[0].likeCount").value(0))
+                .andExpect(jsonPath("$.result.comments[0].isLiked").value(false))
+                .andExpect(jsonPath("$.result.comments[0].replies[0].commentId").value(2))
+                .andExpect(jsonPath("$.result.comments[0].replies[0].parentCommentId").value(1));
+    }
+
+    @Test
     void updateAndDeleteCommentUseCommentPath() throws Exception {
         given(commentService.updateComment(any(), any(), any(UpdateCommentRequest.class)))
                 .willReturn(commentResponse(1L, null, List.of()));
@@ -239,6 +260,29 @@ class CommentControllerTest {
                 1,
                 true,
                 CommentStatus.ACTIVE,
+                Instant.parse("2026-07-20T00:00:00Z"),
+                Instant.parse("2026-07-20T00:00:00Z"),
+                replies
+        );
+    }
+
+    private CommentResponse deletedCommentResponse(
+            Long commentId,
+            Long parentCommentId,
+            List<CommentResponse> replies
+    ) {
+        return new CommentResponse(
+                commentId,
+                parentCommentId,
+                null,
+                null,
+                null,
+                false,
+                "삭제된 댓글입니다",
+                false,
+                0,
+                false,
+                CommentStatus.DELETED,
                 Instant.parse("2026-07-20T00:00:00Z"),
                 Instant.parse("2026-07-20T00:00:00Z"),
                 replies

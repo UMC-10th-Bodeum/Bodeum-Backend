@@ -22,14 +22,9 @@ public interface CommentRepository extends JpaRepository<Comment, Long> {
             select c from Comment c
             left join fetch c.parent
             where c.post.id = :postId
-              and c.status = :status
-              and c.deletedAt is null
             order by c.id asc
             """)
-    List<Comment> findAllActiveByPostIdWithParent(
-            @Param("postId") Long postId,
-            @Param("status") CommentStatus status
-    );
+    List<Comment> findAllByPostIdWithParent(@Param("postId") Long postId);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
