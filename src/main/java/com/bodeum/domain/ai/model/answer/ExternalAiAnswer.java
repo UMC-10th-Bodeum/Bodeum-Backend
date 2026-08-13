@@ -24,6 +24,10 @@ public record ExternalAiAnswer(
         return new ExternalAiAnswer(null, List.of(), AiAnswerStatus.NO_EVIDENCE);
     }
 
+    public static ExternalAiAnswer noEvidence(String message) {
+        return new ExternalAiAnswer(message, List.of(), AiAnswerStatus.NO_EVIDENCE);
+    }
+
     public static ExternalAiAnswer linkGuidance(
             String answer,
             List<AiReferenceDocument> sources

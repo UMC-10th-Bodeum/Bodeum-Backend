@@ -31,6 +31,7 @@ import com.bodeum.domain.ai.model.rag.AiQuestionAnalysis;
 import com.bodeum.domain.ai.model.rag.AiScrapInterests;
 import com.bodeum.domain.ai.model.rag.AiSourceKey;
 import com.bodeum.domain.ai.model.answer.GeneratedAiAnswer;
+import com.bodeum.domain.ai.model.answer.GeneratedAiAnswerItem;
 import com.bodeum.domain.ai.model.answer.ExternalAiAnswer;
 import com.bodeum.domain.ai.model.answer.AiStarterQuestionAnswer;
 import com.bodeum.domain.ai.repository.AiChatRoomRepository;
@@ -95,7 +96,8 @@ class AiMessageServiceTest {
                 aiResponseSourceRepository, requestGuard,
                 referenceDocumentResolver, starterQuestionRouter,
                 questionIntentClassifier, scrapInterestService,
-                new AiQuestionRegionResolver(regionRepository));
+                new AiQuestionRegionResolver(regionRepository),
+                new AiSiteListAnswerValidator());
         user = User.createSocialUser(SocialProvider.KAKAO, "provider-id", "a@b.com", "보호자");
         chatRoom = AiChatRoom.create(user);
         lenient().when(aiChatRoomRepository.findByUserId(1L)).thenReturn(Optional.of(chatRoom));
@@ -160,6 +162,30 @@ class AiMessageServiceTest {
         assertThat(result.aiMessage().answerStatus()).isEqualTo(AiAnswerStatus.NO_EVIDENCE);
         assertThat(result.aiMessage().sources()).isEmpty();
         verify(answerGenerator, never()).generate(any(), any(), any());
+    }
+
+    @Test
+    void preservesSpecificExternalNoEvidenceMessage() {
+        String question = "공식 복지 사이트를 알려줘";
+        when(documentRetriever.retrieve(eq(question), any(), any()))
+                .thenReturn(List.of());
+        when(externalAnswerProvider.search(eq(question), any(), any(), any()))
+                .thenReturn(ExternalAiAnswer.noEvidence(
+                        "사이트별 출처를 정확히 확인하지 못했습니다."));
+        AiMessage saved = savedAiMessage(
+                "사이트별 출처를 정확히 확인하지 못했습니다.");
+        when(persistenceService.saveAiMessageAndComplete(
+                11L, chatRoom,
+                "사이트별 출처를 정확히 확인하지 못했습니다.",
+                false, AiAnswerStatus.NO_EVIDENCE, List.of()
+        )).thenReturn(saved);
+
+        var result = service.createMessage(1L, question);
+
+        assertThat(result.aiMessage().content())
+                .isEqualTo("사이트별 출처를 정확히 확인하지 못했습니다.");
+        assertThat(result.aiMessage().answerStatus())
+                .isEqualTo(AiAnswerStatus.NO_EVIDENCE);
     }
 
     @Test
@@ -670,7 +696,11 @@ class AiMessageServiceTest {
         when(documentRetriever.retrieve(eq("지원금 확인 사이트 알려줘"), any(), any()))
                 .thenReturn(List.of(source));
         when(answerGenerator.generate(eq("지원금 확인 사이트 알려줘"), any(), eq(List.of(source))))
-                .thenReturn(new GeneratedAiAnswer("복지로에서 확인할 수 있습니다.", List.of("DOC-1")));
+                .thenReturn(new GeneratedAiAnswer(
+                        "복지로에서 확인할 수 있습니다.",
+                        List.of("DOC-1"),
+                        List.of(new GeneratedAiAnswerItem("복지로", "DOC-1"))
+                ));
         when(aiSourceReviewRepository.existsWarningRequiredBySources(
                 java.util.Set.of(new AiSourceKey(AiResponseSourceType.SITE, 10L))
         )).thenReturn(true);
@@ -688,6 +718,51 @@ class AiMessageServiceTest {
         assertThat(result.aiMessage().answerStatus()).isEqualTo(AiAnswerStatus.ANSWERED);
         assertThat(result.aiMessage().warning().type()).isEqualTo(AiWarningType.INCORRECT_SOURCE);
         assertThat(result.aiMessage().warning().message()).contains("오류 피드백");
+    }
+
+    @Test
+    void fallsBackToExternalSearchWhenSiteItemsUseTheSameDomainTwice() {
+        String question = "공식 복지 사이트 3개 알려줘";
+        AiReferenceDocument firstPage = new AiReferenceDocument(
+                "SITE-1", "장애아보육료지원 안내", AiResponseSourceType.SITE,
+                1L, "장애아보육료지원", "https://www.bokjiro.go.kr/child-care", null);
+        AiReferenceDocument secondPage = new AiReferenceDocument(
+                "SITE-2", "지역아동센터 지원 안내", AiResponseSourceType.SITE,
+                2L, "지역아동센터 지원", "https://m.bokjiro.go.kr/local-child", null);
+        List<AiReferenceDocument> retrieved = List.of(firstPage, secondPage);
+        when(documentRetriever.retrieve(eq(question), any(), any())).thenReturn(retrieved);
+        when(answerGenerator.generate(eq(question), any(), eq(retrieved)))
+                .thenReturn(new GeneratedAiAnswer(
+                        "복지 사이트 2곳을 안내합니다.",
+                        List.of("SITE-1", "SITE-2"),
+                        List.of(
+                                new GeneratedAiAnswerItem("복지로", "SITE-1"),
+                                new GeneratedAiAnswerItem("지역아동센터 지원", "SITE-2")
+                        )
+                ));
+
+        AiReferenceDocument externalSource = new AiReferenceDocument(
+                "EXTERNAL-1", "복지로 공식 사이트", AiResponseSourceType.SITE,
+                3L, "복지로", "https://www.bokjiro.go.kr", null);
+        when(externalAnswerProvider.search(eq(question), any(), any(), any()))
+                .thenReturn(new ExternalAiAnswer(
+                        "확인 가능한 공식 복지 사이트는 복지로 1곳입니다.",
+                        List.of(externalSource)
+                ));
+        AiMessage saved = savedAiMessage(
+                "확인 가능한 공식 복지 사이트는 복지로 1곳입니다.");
+        when(persistenceService.saveAiMessageAndComplete(
+                11L, chatRoom,
+                "확인 가능한 공식 복지 사이트는 복지로 1곳입니다.",
+                false, AiAnswerStatus.ANSWERED, List.of(externalSource)
+        )).thenReturn(saved);
+
+        var result = service.createMessage(1L, question);
+
+        assertThat(result.aiMessage().content())
+                .isEqualTo("확인 가능한 공식 복지 사이트는 복지로 1곳입니다.");
+        assertThat(result.aiMessage().sources()).hasSize(1);
+        verify(externalAnswerProvider).search(eq(question), any(), any(), any());
     }
 
     @Test
@@ -1042,6 +1117,79 @@ class AiMessageServiceTest {
                 null,
                 11L
         );
+    }
+
+    @Test
+    void startsNewContextForSelfContainedNearbyResourceQuestionEvenWhenLlmMarksFollowUp() {
+        String question = "근처 장애인재활센터 5개 알려줘";
+        String previousQuestion = "부산 특수학교 알려줘";
+        String previousAnswer = "부산광역시 특수학교 5곳을 안내했습니다.";
+        user.updateInterestRegion(List.of(), Region.create("경기도", "수원시"));
+        AiMessage currentUserMessage = mock(AiMessage.class);
+        AiMessage previousUserMessage = mock(AiMessage.class);
+        AiMessage previousAiMessage = mock(AiMessage.class);
+        when(previousUserMessage.getContent()).thenReturn(previousQuestion);
+        when(previousUserMessage.getId()).thenReturn(100L);
+        when(previousUserMessage.getContextRootMessageId()).thenReturn(90L);
+        when(previousAiMessage.getContent()).thenReturn(previousAnswer);
+        when(aiMessageRepository.findByChatRoomIdAndSenderTypeOrderByCreatedAtDescIdDesc(
+                any(), eq(SenderType.USER), any()))
+                .thenReturn(List.of(currentUserMessage, previousUserMessage));
+        when(aiMessageRepository.findByChatRoomIdAndSenderTypeOrderByCreatedAtDescIdDesc(
+                any(), eq(SenderType.AI), any()))
+                .thenReturn(List.of(previousAiMessage));
+        when(questionIntentClassifier.analyze(question))
+                .thenReturn(AiQuestionAnalysis.forQuestion(
+                        question,
+                        AiQuestionIntent.NONE,
+                        AiSearchScope.LOCAL_RESOURCE,
+                        List.of(),
+                        5,
+                        question,
+                        true
+                ));
+        when(documentRetriever.retrieve(
+                any(), any(), eq(AiSearchScope.LOCAL_RESOURCE)))
+                .thenReturn(List.of());
+        AiMessage saved = savedAiMessage("관련 정보를 찾을 수 없습니다.");
+        when(persistenceService.saveAiMessageAndComplete(
+                eq(11L), eq(chatRoom), eq("관련 정보를 찾을 수 없습니다."),
+                eq(false), eq(AiAnswerStatus.NO_EVIDENCE), eq(List.of())))
+                .thenReturn(saved);
+
+        service.createMessage(1L, question);
+
+        verify(persistenceService).updateUserMessageContext(
+                11L,
+                question,
+                null,
+                11L
+        );
+        verify(questionIntentClassifier).analyze(question);
+        verify(questionIntentClassifier, never()).analyze(
+                question, previousQuestion, previousAnswer);
+    }
+
+    @Test
+    void keepsContextForQuestionThatReferencesPreviouslyMentionedResource() {
+        String question = "그 센터 신청 방법을 알려줘";
+        AiQuestionRegionResolver.RegionResolution regionResolution =
+                new AiQuestionRegionResolver.RegionResolution(
+                        AiQuestionRegionResolver.RegionResolution.Status.RESOLVED,
+                        Region.create("경기도", "수원시"),
+                        "경기도",
+                        List.of()
+                );
+
+        Boolean independent = ReflectionTestUtils.invokeMethod(
+                service,
+                "isSelfContainedLocalResourceQuestion",
+                question,
+                "수원시 그 센터 신청 방법을 알려줘",
+                regionResolution
+        );
+
+        assertThat(independent).isFalse();
     }
 
     @Test
