@@ -20,9 +20,7 @@ import com.bodeum.domain.ai.model.rag.AiUserProfile;
 import com.bodeum.domain.ai.model.answer.GeneratedAiAnswer;
 import com.bodeum.domain.ai.model.answer.ExternalAiAnswer;
 import com.bodeum.domain.ai.model.answer.AiStarterQuestionAnswer;
-import com.bodeum.domain.ai.infrastructure.retrieval.AiReferenceDocumentResolver;
 import com.bodeum.domain.ai.service.port.AiAnswerGenerator;
-import com.bodeum.domain.ai.service.port.AiDocumentRetriever;
 import com.bodeum.domain.ai.service.port.AiExternalAnswerProvider;
 import com.bodeum.domain.ai.service.port.AiQuestionIntentClassifier;
 import com.bodeum.domain.ai.repository.AiChatRoomRepository;
@@ -103,7 +101,6 @@ public class AiMessageService {
     private final AiMessageRepository aiMessageRepository;
     private final UserRepository userRepository;
     private final RegionRepository regionRepository;
-    private final AiDocumentRetriever documentRetriever;
     private final AiAnswerGenerator answerGenerator;
     private final AiExternalAnswerProvider externalAnswerProvider;
     private final AiMessagePersistenceService persistenceService;
@@ -111,21 +108,18 @@ public class AiMessageService {
     private final AiSourceReviewRepository aiSourceReviewRepository;
     private final AiResponseSourceRepository aiResponseSourceRepository;
     private final AiRequestGuard requestGuard;
-    private final AiReferenceDocumentResolver referenceDocumentResolver;
     private final AiStarterQuestionRouter starterQuestionRouter;
     private final AiQuestionIntentClassifier questionIntentClassifier;
     private final AiScrapInterestService scrapInterestService;
     private final AiQuestionRegionResolver questionRegionResolver;
     private final AiSiteListAnswerValidator siteListAnswerValidator;
+    private final AiDocumentSearchService documentSearchService;
 
     @Value("${bodeum.ai.conversation.recent-turn-count:3}")
     private int recentConversationTurnCount = 3;
 
     @Value("${bodeum.ai.result.max-count:10}")
     private int maxResultCount = 10;
-
-    @Value("${bodeum.ai.rag.max-supplemental-concept-searches:3}")
-    private int maxSupplementalConceptSearches = 3;
 
     public CreateAiMessageResponse createMessage(Long userId, String content) {
         AiChatRoom chatRoom = aiChatRoomRepository.findByUserId(userId)
@@ -1170,256 +1164,14 @@ public class AiMessageService {
             AiUserProfile profile,
             AiSearchScope searchScope
     ) {
-        List<String> queries = new ArrayList<>();
-        queries.add(originalQuestion);
-        if (expandedQueries != null) {
-            queries.addAll(expandedQueries);
-        }
-        List<String> distinctQueries = queries.stream()
-                .filter(query -> query != null && !query.isBlank())
-                .map(String::trim)
-                .distinct()
-                .limit(3)
-                .toList();
-
-        List<List<AiReferenceDocument>> documentsByQuery = new ArrayList<>();
-        for (int queryIndex = 0; queryIndex < distinctQueries.size(); queryIndex++) {
-            String query = distinctQueries.get(queryIndex);
-            List<AiReferenceDocument> queryDocuments =
-                    documentRetriever.retrieve(query, profile, searchScope);
-            documentsByQuery.add(queryDocuments);
-            log.debug(
-                    "[AI] 질의별 검색 결과: queryIndex={}, documentKeys={}",
-                    queryIndex,
-                    queryDocuments.stream()
-                            .map(AiReferenceDocument::documentKey)
-                            .toList()
-            );
-        }
-
-        LinkedHashMap<String, AiReferenceDocument> documentsByKey = new LinkedHashMap<>();
-        preserveRequiredConceptDocuments(
-                    requiredConcepts,
-                    searchGoal,
-                    documentsByQuery,
-                    documentsByKey,
-                    profile,
-                    searchScope
+        return documentSearchService.retrieve(
+                originalQuestion,
+                expandedQueries,
+                searchGoal,
+                requiredConcepts,
+                profile,
+                searchScope
         );
-        if (normalizeQuestion(originalQuestion).contains("장애아동")) {
-            // 원문·전국·지역 결과 균형 병합
-            mergeRoundRobin(documentsByQuery, documentsByKey);
-        } else {
-            // 기존 원문 우선 병합
-            mergeOriginalFirst(documentsByQuery, documentsByKey);
-        }
-
-        List<AiReferenceDocument> merged = documentsByKey.values().stream()
-                .limit(maxResultCount)
-                .toList();
-        log.info(
-                "[AI] 다중 검색 완료: queryCount={}, uniqueDocumentCount={}",
-                distinctQueries.size(),
-                merged.size()
-        );
-        return referenceDocumentResolver.resolve(merged);
-    }
-
-    private void preserveRequiredConceptDocuments(
-            List<AiRequiredConcept> requiredConcepts,
-            String searchGoal,
-            List<List<AiReferenceDocument>> documentsByQuery,
-            LinkedHashMap<String, AiReferenceDocument> documentsByKey,
-            AiUserProfile profile,
-            AiSearchScope searchScope
-    ) {
-        if (requiredConcepts == null || requiredConcepts.isEmpty()) {
-            return;
-        }
-
-        List<AiReferenceDocument> candidates = new ArrayList<>(documentsByQuery.stream()
-                .flatMap(List::stream)
-                .toList());
-        int supplementalSearchCount = 0;
-        for (int conceptIndex = 0; conceptIndex < requiredConcepts.size(); conceptIndex++) {
-            AiRequiredConcept concept = requiredConcepts.get(conceptIndex);
-            Optional<AiReferenceDocument> matched = findConceptDocument(
-                    candidates,
-                    concept,
-                    profile,
-                    documentsByKey.keySet()
-            );
-            if (matched.isEmpty()
-                    && supplementalSearchCount < maxSupplementalConceptSearches) {
-                supplementalSearchCount++;
-                List<AiReferenceDocument> supplemented = documentRetriever.retrieve(
-                        supplementalResultQuery(concept, searchGoal, profile),
-                        profile,
-                        searchScope
-                );
-                candidates.addAll(supplemented);
-                matched = findConceptDocument(
-                        supplemented,
-                        concept,
-                        profile,
-                        documentsByKey.keySet()
-                );
-            }
-            matched.ifPresent(document -> documentsByKey.putIfAbsent(
-                    document.documentKey(), document));
-            if (matched.isEmpty()) {
-                log.warn("[AI] 필수 검색 개념 근거 문서 누락: conceptIndex={}", conceptIndex);
-            }
-        }
-    }
-
-    private String supplementalResultQuery(
-            AiRequiredConcept concept,
-            String searchGoal,
-            AiUserProfile profile
-    ) {
-        StringBuilder query = new StringBuilder();
-        if (concept.requiresUserRegion()
-                && profile != null
-                && profile.region() != null
-                && !profile.region().isBlank()) {
-            query.append(profile.region()).append(' ');
-        }
-        query.append(concept.retrievalQuery());
-        if (searchGoal != null && !searchGoal.isBlank()) {
-            query.append(' ').append(searchGoal.trim());
-        }
-        return query.append("\n요청 결과 개수: ")
-                .append(maxResultCount)
-                .append("개")
-                .toString();
-    }
-
-    private Optional<AiReferenceDocument> findConceptDocument(
-            List<AiReferenceDocument> documents,
-            AiRequiredConcept concept,
-            AiUserProfile profile,
-            Set<String> excludedDocumentKeys
-    ) {
-        List<String> matchTerms = concept.matchTerms().stream()
-                .map(this::normalizeQuestion)
-                .toList();
-        List<String> excludeTerms = concept.excludeTerms().stream()
-                .map(this::normalizeQuestion)
-                .toList();
-        return documents.stream()
-                .filter(document -> !excludedDocumentKeys.contains(document.documentKey()))
-                .filter(document -> {
-                    String searchableText = normalizeQuestion(document.title())
-                            + normalizeQuestion(document.content());
-                    return matchTerms.stream().allMatch(searchableText::contains)
-                            && excludeTerms.stream().noneMatch(searchableText::contains)
-                            && matchesRequiredRegion(searchableText, concept, profile);
-                })
-                .findFirst();
-    }
-
-    private boolean matchesRequiredRegion(
-            String searchableText,
-            AiRequiredConcept concept,
-            AiUserProfile profile
-    ) {
-        if (!concept.requiresUserRegion()) {
-            return true;
-        }
-        if (profile == null) {
-            return false;
-        }
-        String region = normalizeQuestion(profile.region());
-        String regionLevel2 = normalizeQuestion(profile.regionLevel2());
-        return (!region.isBlank() && searchableText.contains(region))
-                || (!regionLevel2.isBlank() && searchableText.contains(regionLevel2));
-    }
-
-    private void mergeRoundRobin(
-            List<List<AiReferenceDocument>> documentsByQuery,
-            LinkedHashMap<String, AiReferenceDocument> documentsByKey
-    ) {
-        int maxRank = documentsByQuery.stream()
-                .mapToInt(List::size)
-                .max()
-                .orElse(0);
-        for (int rank = 0;
-             rank < maxRank && documentsByKey.size() < maxResultCount;
-             rank++) {
-            for (List<AiReferenceDocument> queryDocuments : documentsByQuery) {
-                if (rank < queryDocuments.size()) {
-                    AiReferenceDocument document = queryDocuments.get(rank);
-                    documentsByKey.putIfAbsent(document.documentKey(), document);
-                }
-                if (documentsByKey.size() >= maxResultCount) {
-                    break;
-                }
-            }
-        }
-    }
-
-    private void mergeOriginalFirst(
-            List<List<AiReferenceDocument>> documentsByQuery,
-            LinkedHashMap<String, AiReferenceDocument> documentsByKey
-    ) {
-        if (!documentsByQuery.isEmpty()) {
-            int reservedExpandedSlots = Math.min(
-                    documentsByQuery.size() - 1,
-                    maxResultCount
-            );
-            int originalLimit = maxResultCount - reservedExpandedSlots;
-            for (AiReferenceDocument document : documentsByQuery.getFirst()) {
-                documentsByKey.putIfAbsent(document.documentKey(), document);
-                if (documentsByKey.size() >= originalLimit) {
-                    break;
-                }
-            }
-        }
-
-        for (int queryIndex = 1;
-             queryIndex < documentsByQuery.size()
-                     && documentsByKey.size() < maxResultCount;
-             queryIndex++) {
-            List<AiReferenceDocument> queryDocuments = documentsByQuery.get(queryIndex);
-            if (!queryDocuments.isEmpty()) {
-                AiReferenceDocument document = queryDocuments.getFirst();
-                documentsByKey.putIfAbsent(document.documentKey(), document);
-            }
-        }
-
-        int maxExpandedRank = documentsByQuery.stream()
-                .skip(1)
-                .mapToInt(List::size)
-                .max()
-                .orElse(0);
-        for (int rank = 1;
-             rank < maxExpandedRank
-                     && documentsByKey.size() < maxResultCount;
-             rank++) {
-            for (int queryIndex = 1;
-                 queryIndex < documentsByQuery.size();
-                 queryIndex++) {
-                List<AiReferenceDocument> queryDocuments =
-                        documentsByQuery.get(queryIndex);
-                if (rank < queryDocuments.size()) {
-                    AiReferenceDocument document = queryDocuments.get(rank);
-                    documentsByKey.putIfAbsent(document.documentKey(), document);
-                }
-                if (documentsByKey.size() >= maxResultCount) {
-                    break;
-                }
-            }
-        }
-
-        if (!documentsByQuery.isEmpty()) {
-            for (AiReferenceDocument document : documentsByQuery.getFirst()) {
-                documentsByKey.putIfAbsent(document.documentKey(), document);
-                if (documentsByKey.size() >= maxResultCount) {
-                    break;
-                }
-            }
-        }
     }
 
     private List<String> contextualizeLocalRegions(

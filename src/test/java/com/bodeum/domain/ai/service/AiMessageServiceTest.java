@@ -94,13 +94,15 @@ class AiMessageServiceTest {
     void setUp() {
         service = new AiMessageService(
                 aiChatRoomRepository, aiMessageRepository, userRepository, regionRepository,
-                documentRetriever, answerGenerator, externalAnswerProvider,
+                answerGenerator, externalAnswerProvider,
                 persistenceService, failureService, aiSourceReviewRepository,
                 aiResponseSourceRepository, requestGuard,
-                referenceDocumentResolver, starterQuestionRouter,
+                starterQuestionRouter,
                 questionIntentClassifier, scrapInterestService,
                 new AiQuestionRegionResolver(regionRepository),
-                new AiSiteListAnswerValidator());
+                new AiSiteListAnswerValidator(),
+                new AiDocumentSearchService(
+                        documentRetriever, referenceDocumentResolver, 10, 3));
         user = User.createSocialUser(SocialProvider.KAKAO, "provider-id", "a@b.com", "보호자");
         chatRoom = AiChatRoom.create(user);
         lenient().when(aiChatRoomRepository.findByUserId(1L)).thenReturn(Optional.of(chatRoom));
@@ -1585,33 +1587,6 @@ class AiMessageServiceTest {
                 .startsWith(nationalDocument, localDocument)
                 .contains(unrelatedDocument);
         verify(documentRetriever).retrieve(eq(nationalSupplementQuery), any(), any());
-    }
-
-    @Test
-    void limitsSupplementalConceptSearches() {
-        List<AiRequiredConcept> concepts = IntStream.rangeClosed(1, 5)
-                .mapToObj(index -> new AiRequiredConcept(
-                        "필수 개념 " + index,
-                        "보충 검색어 " + index,
-                        List.of("일치어-" + index),
-                        List.of()
-                ))
-                .toList();
-        when(documentRetriever.retrieve(any(), any(), any())).thenReturn(List.of());
-
-        ReflectionTestUtils.invokeMethod(
-                service,
-                "preserveRequiredConceptDocuments",
-                concepts,
-                "검색 목표",
-                List.<List<AiReferenceDocument>>of(),
-                new LinkedHashMap<String, AiReferenceDocument>(),
-                null,
-                AiSearchScope.GENERAL
-        );
-
-        verify(documentRetriever, org.mockito.Mockito.times(3))
-                .retrieve(any(), any(), eq(AiSearchScope.GENERAL));
     }
 
     @Test
