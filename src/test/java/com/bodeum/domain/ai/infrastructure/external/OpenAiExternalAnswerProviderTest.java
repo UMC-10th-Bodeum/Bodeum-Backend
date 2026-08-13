@@ -6,7 +6,12 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.bodeum.domain.ai.infrastructure.generation.AiPromptFormatter;
+import com.bodeum.domain.ai.entity.AiExternalSource;
+import com.bodeum.domain.ai.enums.AiAnswerStatus;
+import com.bodeum.domain.ai.enums.AiResponseSourceType;
 import com.bodeum.domain.ai.enums.AiSearchScope;
+import com.bodeum.domain.ai.model.answer.ExternalAiAnswer;
+import com.bodeum.domain.ai.model.rag.AiReferenceDocument;
 import com.bodeum.domain.ai.model.rag.AiUserProfile;
 import com.bodeum.domain.ai.repository.AiExternalSourceRepository;
 import java.io.IOException;
@@ -16,6 +21,7 @@ import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.client.RestClient;
 
 class OpenAiExternalAnswerProviderTest {
@@ -38,6 +44,109 @@ class OpenAiExternalAnswerProviderTest {
         assertThat(OpenAiExternalAnswerProvider.isNoEvidenceAnswer(
                 "한국장애인부모회에서 장애인 가족 지원 사업 정보를 확인할 수 있습니다."))
                 .isFalse();
+    }
+
+    @Test
+    void rejectsSiteListThatCountsPagesFromTheSameDomainAsDifferentSites() {
+        ExternalAiAnswer answer = new ExternalAiAnswer(
+                """
+                        공식 복지 사이트 3곳을 안내합니다.
+                        1. 복지로
+                        2. 장애아보육료지원
+                        3. 지역아동센터 지원
+                        """,
+                List.of(
+                        reference(1L, "https://www.bokjiro.go.kr"),
+                        reference(2L, "https://m.bokjiro.go.kr/child-care"),
+                        reference(3L, "https://www.bokjiro.go.kr/local-child")
+                ),
+                AiAnswerStatus.ANSWERED
+        );
+
+        assertThat(OpenAiExternalAnswerProvider.isValidExternalSiteListAnswer(
+                "복지 사이트를 알려줘", answer)).isFalse();
+    }
+
+    @Test
+    void acceptsMultiplePagesGroupedUnderOneSite() {
+        ExternalAiAnswer answer = new ExternalAiAnswer(
+                """
+                        확인 가능한 공식 복지 사이트는 복지로 1곳입니다.
+                        1. 복지로
+                        - 장애아보육료지원 안내
+                        - 지역아동센터 지원 안내
+                        """,
+                List.of(
+                        reference(1L, "https://www.bokjiro.go.kr/child-care"),
+                        reference(2L, "https://www.bokjiro.go.kr/local-child")
+                ),
+                AiAnswerStatus.ANSWERED
+        );
+
+        assertThat(OpenAiExternalAnswerProvider.isValidExternalSiteListAnswer(
+                "복지 사이트를 알려줘", answer)).isTrue();
+    }
+
+    @Test
+    void rebuildsInvalidExternalSiteListWithoutCallingTheLlmAgain() {
+        ExternalAiAnswer invalid = new ExternalAiAnswer(
+                "공식 복지 사이트 3곳을 안내합니다.",
+                List.of(
+                        reference(1L, "https://www.bokjiro.go.kr"),
+                        new AiReferenceDocument(
+                                "SITE-2", "장애아보육료지원 안내",
+                                AiResponseSourceType.SITE, 2L,
+                                "장애아보육료지원 안내",
+                                "https://www.bokjiro.go.kr/child-care", null),
+                        new AiReferenceDocument(
+                                "SITE-3", "지역아동센터 지원 안내",
+                                AiResponseSourceType.SITE, 3L,
+                                "지역아동센터 지원 안내",
+                                "https://m.bokjiro.go.kr/local-child", null)
+                ),
+                AiAnswerStatus.ANSWERED
+        );
+        AiExternalSource bokjiro = mock(AiExternalSource.class);
+        when(bokjiro.getName()).thenReturn("복지로");
+        OpenAiExternalAnswerProvider provider = provider();
+
+        ExternalAiAnswer rebuilt = ReflectionTestUtils.invokeMethod(
+                provider,
+                "groupExternalSiteAnswer",
+                invalid,
+                Map.of("bokjiro.go.kr", bokjiro)
+        );
+
+        assertThat(rebuilt.answer())
+                .contains(
+                        "공식 사이트는 다음 1곳",
+                        "**복지로**",
+                        "장애아보육료지원 안내",
+                        "지역아동센터 지원 안내"
+                )
+                .doesNotContain("3곳");
+        assertThat(rebuilt.sources()).hasSize(3);
+    }
+
+    @Test
+    void returnsSpecificNoEvidenceMessageWhenSiteSourcesCannotBeGrouped() {
+        ExternalAiAnswer invalid = new ExternalAiAnswer(
+                "공식 사이트를 안내합니다.",
+                List.of(reference(1L, null)),
+                AiAnswerStatus.ANSWERED
+        );
+
+        ExternalAiAnswer result = ReflectionTestUtils.invokeMethod(
+                provider(),
+                "groupExternalSiteAnswer",
+                invalid,
+                Map.of()
+        );
+
+        assertThat(result.answer())
+                .isEqualTo("사이트별 출처를 정확히 확인하지 못했습니다.");
+        assertThat(result.answerStatus()).isEqualTo(AiAnswerStatus.NO_EVIDENCE);
+        assertThat(result.sources()).isEmpty();
     }
 
     @Test
@@ -108,5 +217,33 @@ class OpenAiExternalAnswerProviderTest {
 
         assertThat((String) localBody.get("input"))
                 .contains("부산광역시 재활센터 추천");
+    }
+
+    private AiReferenceDocument reference(long id, String url) {
+        return new AiReferenceDocument(
+                "SITE-" + id,
+                "공식 안내",
+                AiResponseSourceType.SITE,
+                id,
+                "공식 안내",
+                url,
+                null
+        );
+    }
+
+    private OpenAiExternalAnswerProvider provider() {
+        return new OpenAiExternalAnswerProvider(
+                mock(AiExternalSourceRepository.class),
+                mock(AiExternalDocumentPersistenceService.class),
+                RestClient.builder(),
+                "test-key",
+                "test-model",
+                1200,
+                Duration.ofSeconds(1),
+                Duration.ofSeconds(1),
+                10,
+                new ClassPathResource("prompts/ai-external-search-system-prompt.txt"),
+                mock(AiPromptFormatter.class)
+        );
     }
 }

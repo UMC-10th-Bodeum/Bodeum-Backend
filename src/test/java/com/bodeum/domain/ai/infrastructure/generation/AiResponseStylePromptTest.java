@@ -27,6 +27,10 @@ class AiResponseStylePromptTest {
                     "번호 목록의 각 항목 사이에는 빈 줄을 한 줄 넣어",
                     "각 학교·기관 이름을 Markdown 굵은 글씨(`**이름**`)로 표시하세요.",
                     "대상, 주소, 전화번호, 홈페이지 등 세부 정보는 글머리표 목록",
+                    "목록의 각 항목은 해당 항목을 직접 확인할 수 있는 개별 근거가 있을 때만",
+                    "같은 도메인의 대표 사이트와 하위 안내 페이지를 서로 다른 사이트로 중복 계산하지 마세요.",
+                    "하나의 사이트 아래 관련 안내 페이지로 구분하세요.",
+                    "직접 인용할 수 없는 사이트는 본문 항목 수에 포함하지 마세요.",
                     "개수를 지정했다면",
                     "한 번의 답변에서 최대 {{maxResultCount}}개까지",
                     "임의로 5개로 줄이지 마세요.",
@@ -52,6 +56,18 @@ class AiResponseStylePromptTest {
                     "질문과 관련 있을 때만 답변 마지막에 안내하세요."
             );
         }
+    }
+
+    @Test
+    void mapsRagListItemsToReferenceDocuments() throws IOException {
+        String prompt = readPrompt("prompts/ai-rag-system-prompt.txt");
+
+        assertThat(prompt).contains(
+                "answerItems에는 학교·기관·사이트처럼 본문에서 독립된 항목으로 나열한 대상만",
+                "본문에 표시한 name과 해당 항목을 직접 확인할 수 있는 documentKey 하나",
+                "URL은 만들거나 반환하지 마세요.",
+                "별도 answerItems로 반환하지 말고 하나의 사이트 항목으로 묶으세요."
+        );
     }
 
     private String readPrompt(String path) throws IOException {

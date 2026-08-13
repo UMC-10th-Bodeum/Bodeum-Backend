@@ -115,6 +115,7 @@ public class AiMessageService {
     private final AiQuestionIntentClassifier questionIntentClassifier;
     private final AiScrapInterestService scrapInterestService;
     private final AiQuestionRegionResolver questionRegionResolver;
+    private final AiSiteListAnswerValidator siteListAnswerValidator;
 
     @Value("${bodeum.ai.conversation.recent-turn-count:3}")
     private int recentConversationTurnCount = 3;
@@ -330,6 +331,19 @@ public class AiMessageService {
 
         log.debug("[AI] 답변 생성 완료");
         log.debug("[AI] citedDocumentKeys: {}", generated.citedDocumentKeys());
+
+        if (siteListAnswerValidator.requiresValidation(resolvedContent)
+                && !siteListAnswerValidator.isValid(generated, retrievedDocuments)) {
+            log.warn("[AI] 사이트 목록 항목과 인용 근거 검증 실패, 외부 검색 시작");
+            return createExternalOrNoResultResponse(
+                    chatRoom,
+                    userMessage,
+                    searchQuestion,
+                    searchQueries,
+                    profile,
+                    questionContext.searchScope()
+            );
+        }
 
         List<AiReferenceDocument> citedSources =
                 validateCitations(generated, retrievedDocuments);
@@ -1250,7 +1264,12 @@ public class AiMessageService {
                 searchScope
         );
         if (!externalAnswer.hasEvidence()) {
-            return createNoEvidenceResponse(chatRoom, userMessage);
+            String noEvidenceMessage = externalAnswer.answer() == null
+                    || externalAnswer.answer().isBlank()
+                    ? NO_RESULT_MESSAGE
+                    : externalAnswer.answer();
+            return createNoEvidenceResponse(
+                    chatRoom, userMessage, noEvidenceMessage);
         }
 
         boolean warning = hasIncorrectFeedback(externalAnswer.sources());

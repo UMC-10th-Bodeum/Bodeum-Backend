@@ -8,6 +8,7 @@ import com.bodeum.domain.ai.enums.AiSearchScope;
 import com.bodeum.domain.ai.exception.AiErrorCode;
 import com.bodeum.domain.ai.infrastructure.generation.AiPromptFormatter;
 import com.bodeum.domain.ai.infrastructure.support.AiPromptTemplate;
+import com.bodeum.domain.ai.infrastructure.support.AiSiteDomainNormalizer;
 import com.bodeum.domain.ai.infrastructure.support.AiTimeoutDetector;
 import com.bodeum.domain.ai.model.rag.AiReferenceDocument;
 import com.bodeum.domain.ai.model.rag.AiUserProfile;
@@ -24,12 +25,16 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Profile;
@@ -47,6 +52,16 @@ public class OpenAiExternalAnswerProvider implements AiExternalAnswerProvider {
 
     private static final int MAX_ALLOWED_DOMAINS = 100;
     private static final String NO_EVIDENCE_MARKER = "[[NO_EVIDENCE]]";
+    private static final String SITE_SOURCE_UNVERIFIED_MESSAGE =
+            "사이트별 출처를 정확히 확인하지 못했습니다.";
+    private static final Pattern SITE_LIST_QUESTION_PATTERN = Pattern.compile(
+            "(사이트|홈페이지).*(알려|추천|목록|모아|찾아)|"
+                    + "(알려|추천|목록|모아|찾아).*(사이트|홈페이지)");
+    private static final Pattern EXPLICIT_SITE_COUNT_PATTERN = Pattern.compile(
+            "(?:사이트|홈페이지).{0,40}?(\\d+)(?:곳|개)|"
+                    + "(\\d+)(?:곳|개).{0,40}?(?:사이트|홈페이지)");
+    private static final Pattern NUMBERED_LIST_ITEM_PATTERN = Pattern.compile(
+            "(?m)^\\s*\\d+[.)]\\s+");
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     private final AiExternalSourceRepository externalSourceRepository;
@@ -110,22 +125,20 @@ public class OpenAiExternalAnswerProvider implements AiExternalAnswerProvider {
         }
 
         try {
-            String responseBody = restClient.post()
-                    .uri("/v1/responses")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .body(requestBody(
-                            question,
-                            retrievalQueries,
-                            profile,
-                            searchScope,
-                            sourcesByDomain.keySet().stream().toList()
-                    ))
-                    .retrieve()
-                    .body(String.class);
-            JsonNode response = responseBody == null
-                    ? null
-                    : OBJECT_MAPPER.readTree(responseBody);
-            return mapResponse(response, sourcesByDomain);
+            Map<String, Object> body = requestBody(
+                    question,
+                    retrievalQueries,
+                    profile,
+                    searchScope,
+                    sourcesByDomain.keySet().stream().toList()
+            );
+            ExternalAiAnswer answer = executeSearch(body, sourcesByDomain);
+            if (isValidExternalSiteListAnswer(question, answer)) {
+                return answer;
+            }
+
+            log.warn("[AI] 외부 사이트 목록과 인용 도메인 불일치, 검증된 출처로 재구성합니다.");
+            return groupExternalSiteAnswer(answer, sourcesByDomain);
         } catch (ProjectException e) {
             throw e;
         } catch (Exception e) {
@@ -134,6 +147,142 @@ public class OpenAiExternalAnswerProvider implements AiExternalAnswerProvider {
             }
             throw new ProjectException(AiErrorCode.AI_RESPONSE_FAILED, e);
         }
+    }
+
+    private ExternalAiAnswer executeSearch(
+            Map<String, Object> body,
+            Map<String, AiExternalSource> sourcesByDomain
+    ) throws IOException {
+        String responseBody = restClient.post()
+                .uri("/v1/responses")
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(body)
+                .retrieve()
+                .body(String.class);
+        JsonNode response = responseBody == null
+                ? null
+                : OBJECT_MAPPER.readTree(responseBody);
+        return mapResponse(response, sourcesByDomain);
+    }
+
+    private ExternalAiAnswer groupExternalSiteAnswer(
+            ExternalAiAnswer answer,
+            Map<String, AiExternalSource> sourcesByDomain
+    ) {
+        if (answer == null || !answer.hasEvidence()) {
+            return ExternalAiAnswer.noEvidence(SITE_SOURCE_UNVERIFIED_MESSAGE);
+        }
+
+        Map<String, List<AiReferenceDocument>> referencesByHost = answer.sources().stream()
+                .filter(source -> normalizedHost(source.url()) != null)
+                .collect(java.util.stream.Collectors.groupingBy(
+                        source -> normalizedHost(source.url()),
+                        LinkedHashMap::new,
+                        java.util.stream.Collectors.toList()
+                ));
+        if (referencesByHost.isEmpty()) {
+            return ExternalAiAnswer.noEvidence(SITE_SOURCE_UNVERIFIED_MESSAGE);
+        }
+
+        StringBuilder content = new StringBuilder()
+                .append("확인 가능한 공식 사이트는 다음 ")
+                .append(referencesByHost.size())
+                .append("곳입니다.");
+        int index = 1;
+        for (List<AiReferenceDocument> references : referencesByHost.values()) {
+            AiReferenceDocument first = references.getFirst();
+            AiExternalSource registeredSource = findSource(
+                    first.url(), sourcesByDomain).orElse(null);
+            String siteName = registeredSource == null
+                    ? first.title()
+                    : registeredSource.getName();
+            if (siteName == null || siteName.isBlank()) {
+                return ExternalAiAnswer.noEvidence(SITE_SOURCE_UNVERIFIED_MESSAGE);
+            }
+
+            content.append("\n\n")
+                    .append(index++)
+                    .append(". **")
+                    .append(siteName.trim())
+                    .append("**");
+            List<String> pageTitles = references.stream()
+                    .map(AiReferenceDocument::title)
+                    .filter(title -> title != null && !title.isBlank())
+                    .map(String::trim)
+                    .filter(title -> !title.equalsIgnoreCase(siteName.trim()))
+                    .distinct()
+                    .toList();
+            if (!pageTitles.isEmpty()) {
+                content.append("\n\n- 관련 안내 페이지");
+                pageTitles.forEach(title -> content.append("\n  - ").append(title));
+            }
+        }
+        return new ExternalAiAnswer(
+                content.toString(),
+                answer.sources(),
+                answer.answerStatus()
+        );
+    }
+
+    static boolean isValidExternalSiteListAnswer(
+            String question,
+            ExternalAiAnswer answer
+    ) {
+        if (!isSiteListQuestion(question) || answer == null || !answer.hasEvidence()) {
+            return true;
+        }
+
+        Set<String> citedHosts = new HashSet<>();
+        for (AiReferenceDocument source : answer.sources()) {
+            String host = normalizedHost(source.url());
+            if (host != null) {
+                citedHosts.add(host);
+            }
+        }
+        if (citedHosts.isEmpty()) {
+            return false;
+        }
+
+        int claimedCount = Math.max(
+                explicitSiteCount(answer.answer()),
+                numberedListItemCount(answer.answer())
+        );
+        return claimedCount == 0 || claimedCount <= citedHosts.size();
+    }
+
+    private static boolean isSiteListQuestion(String question) {
+        if (question == null || question.isBlank()) {
+            return false;
+        }
+        String normalized = question.replaceAll("\\s+", "");
+        return SITE_LIST_QUESTION_PATTERN.matcher(normalized).find();
+    }
+
+    private static int explicitSiteCount(String answer) {
+        Matcher matcher = EXPLICIT_SITE_COUNT_PATTERN.matcher(answer);
+        int count = 0;
+        while (matcher.find()) {
+            String value = matcher.group(1) == null ? matcher.group(2) : matcher.group(1);
+            try {
+                count = Math.max(count, Integer.parseInt(value));
+            } catch (NumberFormatException ignored) {
+                return Integer.MAX_VALUE;
+            }
+        }
+        return count;
+    }
+
+    private static int numberedListItemCount(String answer) {
+        Matcher matcher = NUMBERED_LIST_ITEM_PATTERN.matcher(answer);
+        int count = 0;
+        while (matcher.find()) {
+            count++;
+        }
+        return count;
+    }
+
+    private static String normalizedHost(String url) {
+        return AiSiteDomainNormalizer.normalize(url);
     }
 
     Map<String, Object> requestBody(
