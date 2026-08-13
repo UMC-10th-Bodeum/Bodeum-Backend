@@ -16,6 +16,7 @@ import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 @Component
 @RequiredArgsConstructor
@@ -30,6 +31,7 @@ public class AiStarterQuestionContextResolver {
     private final AiMessageRepository aiMessageRepository;
     private final RegionRepository regionRepository;
 
+    @Transactional(readOnly = true)
     public Optional<AiQuestionContext> resolve(
             Long chatRoomId,
             String content,
@@ -59,7 +61,8 @@ public class AiStarterQuestionContextResolver {
     ) {
         return new AiQuestionContext(
                 profile, Optional.of(questionType), Optional.empty(), searchScope(questionType),
-                List.of(), null, null, false, null, List.of(), false, null, null);
+                List.of(), null, null, false, null, List.of(), false, null, null,
+                questionType == AiStarterQuestionType.WELFARE_SITES);
     }
 
     private AiSearchScope searchScope(AiStarterQuestionType questionType) {

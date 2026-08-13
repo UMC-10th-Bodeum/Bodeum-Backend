@@ -268,8 +268,7 @@ public class AiMessageService {
         log.debug("[AI] 답변 생성 완료");
         log.debug("[AI] citedDocumentKeys: {}", generated.citedDocumentKeys());
 
-        if ((siteListAnswerValidator.requiresValidation(content)
-                || siteListAnswerValidator.requiresValidation(resolvedContent))
+        if (questionContext.siteListRequest()
                 && !siteListAnswerValidator.isValid(generated, retrievedDocuments)) {
             log.warn("[AI] 사이트 목록 항목과 인용 근거 검증 실패, 외부 검색 시작");
             return fallbackService.externalOrNoResult(

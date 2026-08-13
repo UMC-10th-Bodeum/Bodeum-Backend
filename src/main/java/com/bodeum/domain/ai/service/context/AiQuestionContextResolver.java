@@ -1,7 +1,5 @@
 package com.bodeum.domain.ai.service.context;
 
-import com.bodeum.domain.ai.service.answer.AiSiteListAnswerValidator;
-
 import com.bodeum.domain.ai.enums.AiQuestionIntent;
 import com.bodeum.domain.ai.enums.AiSearchScope;
 import com.bodeum.domain.ai.model.context.AiConversationContext;
@@ -40,16 +38,13 @@ public class AiQuestionContextResolver {
 
     private final AiQuestionIntentClassifier questionIntentClassifier;
     private final AiQuestionRegionResolver questionRegionResolver;
-    private final AiSiteListAnswerValidator siteListAnswerValidator;
 
     public AiQuestionContextResolver(
             AiQuestionIntentClassifier questionIntentClassifier,
-            AiQuestionRegionResolver questionRegionResolver,
-            AiSiteListAnswerValidator siteListAnswerValidator
+            AiQuestionRegionResolver questionRegionResolver
     ) {
         this.questionIntentClassifier = questionIntentClassifier;
         this.questionRegionResolver = questionRegionResolver;
-        this.siteListAnswerValidator = siteListAnswerValidator;
     }
 
     public AiQuestionContext resolve(
@@ -78,16 +73,15 @@ public class AiQuestionContextResolver {
                     ? analyzeWithConversationContext(content, conversationContext)
                     : questionIntentClassifier.analyze(content);
         }
-        boolean explicitSiteListRequest = siteListAnswerValidator.requiresValidation(content);
-        if (explicitSiteListRequest && regionFollowUpQuestion.isEmpty()) {
+        boolean analyzedSiteListRequest = analysis.siteListRequest()
+                || analysis.intent() == AiQuestionIntent.WELFARE_SITES;
+        if (analyzedSiteListRequest && regionFollowUpQuestion.isEmpty()) {
             analysis = forceResolvedTarget(analysis, content, analysis.followUp());
         }
-
         AiQuestionIntent intent = analysis.intent();
         String resolvedQuestion = analysis.resolvedQuestion() == null
                 ? content : analysis.resolvedQuestion();
-        boolean siteListRequest = explicitSiteListRequest
-                || siteListAnswerValidator.requiresValidation(resolvedQuestion);
+        boolean siteListRequest = analyzedSiteListRequest;
         boolean followUp = analysis.followUp() && !selfContainedResourceQuestion;
         AiSearchScope searchScope = resolveSearchScope(intent, analysis.searchScope());
         if (nationwideResourceQuestion) {
@@ -104,17 +98,15 @@ public class AiQuestionContextResolver {
             resolvedQuestion = resolvedContext.toResolvedQuestion(resolvedQuestion);
             regionResolution = questionRegionResolver.resolve(resolvedQuestion, profile);
         }
-        boolean finalSiteListRequest = siteListRequest
-                || siteListAnswerValidator.requiresValidation(resolvedQuestion);
         if (intent == AiQuestionIntent.NONE
-                && !regionResolution.isNotFound()
+                && regionResolution.isResolved()
                 && isLocalResourceTarget(resolvedQuestion)) {
             searchScope = AiSearchScope.LOCAL_RESOURCE;
         }
-        if (finalSiteListRequest && regionResolution.isResolved()) {
+        if (siteListRequest && regionResolution.isResolved()) {
             searchScope = AiSearchScope.LOCAL_RESOURCE;
         }
-        InfoSubCategory category = finalSiteListRequest
+        InfoSubCategory category = siteListRequest
                 ? null : resolveInfoSubCategory(resolvedQuestion, analysis.infoSubCategory());
         AiQuestionRegionResolver.RegionResolution priorityRegion =
                 resolveNationwideSearchPriorityRegion(
@@ -131,12 +123,12 @@ public class AiQuestionContextResolver {
                         ? resolvedContext.requestedResultCount()
                         : analysis.requestedResultCount(),
                 resolvedQuestion, followUp, analysis.searchGoal(), analysis.requiredConcepts(),
-                analysis.needsClarification(), analysis.clarificationQuestion(), resolvedContext);
+                analysis.needsClarification(), analysis.clarificationQuestion(), resolvedContext,
+                siteListRequest);
     }
 
     public boolean isLocalResourceTarget(String question) {
-        return question != null && (LOCAL_RESOURCE_PATTERN.matcher(question).find()
-                || siteListAnswerValidator.requiresValidation(question));
+        return question != null && LOCAL_RESOURCE_PATTERN.matcher(question).find();
     }
 
     public boolean isSelfContainedResourceQuestion(
@@ -197,7 +189,7 @@ public class AiQuestionContextResolver {
                 analysis.intent(), analysis.searchScope(), retrievalQueries,
                 analysis.requestedResultCount(), resolvedQuestion, followUp,
                 analysis.infoSubCategory(), analysis.searchGoal(), analysis.requiredConcepts(),
-                false, null, analysis.resolvedContext());
+                false, null, analysis.resolvedContext(), analysis.siteListRequest());
     }
 
     private AiResolvedContext resolveStructuredContext(

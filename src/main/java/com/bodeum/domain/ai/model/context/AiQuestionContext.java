@@ -20,6 +20,7 @@ public record AiQuestionContext(
         List<AiRequiredConcept> requiredConcepts,
         boolean needsClarification,
         String clarificationQuestion,
-        AiResolvedContext resolvedContext
+        AiResolvedContext resolvedContext,
+        boolean siteListRequest
 ) {
 }

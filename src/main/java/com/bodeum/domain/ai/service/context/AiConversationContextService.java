@@ -18,6 +18,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
@@ -39,6 +40,7 @@ public class AiConversationContextService {
     @Value("${bodeum.ai.conversation.recent-turn-count:3}")
     private int recentConversationTurnCount = 3;
 
+    @Transactional(readOnly = true)
     public AiConversationContext resolve(Long chatRoomId) {
         int turnCount = Math.max(1, recentConversationTurnCount);
         List<AiMessage> recentUsers = aiMessageRepository
@@ -70,6 +72,7 @@ public class AiConversationContextService {
                 rootId == null || rootId <= 0 ? immediatePrevious.getId() : rootId);
     }
 
+    @Transactional(readOnly = true)
     public AiAdditionalResultsContext resolveAdditionalResults(Long chatRoomId, String content) {
         if (!isAdditionalResultsQuestion(content)) {
             return AiAdditionalResultsContext.empty();

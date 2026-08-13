@@ -124,8 +124,7 @@ class AiMessageServiceTest {
                         documentRetriever, referenceDocumentResolver, 10, 3),
                 new AiQuestionContextResolver(
                         questionIntentClassifier,
-                        new AiQuestionRegionResolver(regionRepository),
-                        new AiSiteListAnswerValidator()),
+                        new AiQuestionRegionResolver(regionRepository)),
                 conversationContextService,
                 new AiQuestionSearchQueryBuilder(),
                 evidenceService,
@@ -759,6 +758,10 @@ class AiMessageServiceTest {
     @Test
     void fallsBackToExternalSearchWhenSiteItemsUseTheSameDomainTwice() {
         String question = "공식 복지 사이트 3개 알려줘";
+        when(questionIntentClassifier.analyze(question)).thenReturn(
+                AiQuestionAnalysis.forQuestion(
+                        question, AiQuestionIntent.NONE, AiSearchScope.GENERAL, List.of())
+                        .withSiteListRequest(true));
         AiReferenceDocument firstPage = new AiReferenceDocument(
                 "SITE-1", "장애아보육료지원 안내", AiResponseSourceType.SITE,
                 1L, "장애아보육료지원", "https://www.bokjiro.go.kr/child-care", null);
@@ -1284,7 +1287,7 @@ class AiMessageServiceTest {
                         analyzedQuestion,
                         true,
                         InfoSubCategory.FAMILY_SUPPORT
-                ));
+                ).withSiteListRequest(true));
         AiReferenceDocument source = referenceDocument("SEONGNAM-SITE", 1L);
         when(documentRetriever.retrieve(eq(finalQuestion), any(),
                 eq(AiSearchScope.LOCAL_RESOURCE))).thenReturn(List.of(source));

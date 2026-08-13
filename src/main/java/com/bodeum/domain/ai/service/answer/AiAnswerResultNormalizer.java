@@ -19,13 +19,13 @@ public class AiAnswerResultNormalizer {
         }
         String answer = generated.answer()
                 .replaceAll(
-                        "(?m)\\s*현재 확인 가능한 관련 (?:항목|학교|기관|사이트)은? "
+                        "(?m)\\s*현재 확인 가능한 관련 (?:항목|학교|기관|사이트)(?:은|는) "
                                 + "\\d+개입니다\\.\\s*",
                         "\n"
                 )
                 .replaceAll(
                         "(?m)\\s*이전에 안내한 항목을 제외하면,? 추가로 확인 가능한 "
-                                + "관련 항목은 \\d+개입니다\\.\\s*",
+                                + "관련 (?:항목|학교|기관|사이트)(?:은|는) \\d+개입니다\\.\\s*",
                         "\n"
                 )
                 .trim();
