@@ -110,4 +110,17 @@ class AiQuestionAnalysisTest {
         assertThat(invalid.needsClarification()).isFalse();
         assertThat(invalid.clarificationQuestion()).isNull();
     }
+
+    @Test
+    void preservesStructuredSiteListRequestAcrossAnalysisUpdates() {
+        AiQuestionAnalysis analysis = AiQuestionAnalysis.forQuestion(
+                "가입 가능한 복지 사이트 추천해줘",
+                AiQuestionIntent.NONE,
+                List.of()
+        ).withSiteListRequest(true)
+                .withClarification(false, null)
+                .withResolvedContext(null);
+
+        assertThat(analysis.siteListRequest()).isTrue();
+    }
 }

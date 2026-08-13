@@ -4,15 +4,6 @@
 
 <br>
 
-## 🔗 링크
-
-| 구분 | 링크 |
-|---|---|
-| 서비스 URL | https://bodeum.site |
-| API 문서 (Swagger) | https://api.bodeum.site/swagger-ui/index.html |
-
-<br>
-
 ## 🛠 기술 스택
 
 ### Backend

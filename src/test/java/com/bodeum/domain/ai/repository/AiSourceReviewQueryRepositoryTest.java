@@ -53,7 +53,7 @@ class AiSourceReviewQueryRepositoryTest {
     }
 
     @Test
-    void returnsTrueWhenSourceReviewIsRequired() {
+    void doesNotWarnUsersWhileSourceReviewIsPending() {
         repository.save(AiSourceReview.create(
                 AiResponseSourceType.NEWS,
                 11L,
@@ -63,6 +63,6 @@ class AiSourceReviewQueryRepositoryTest {
 
         assertThat(repository.existsWarningRequiredBySources(Set.of(
                 new AiSourceKey(AiResponseSourceType.NEWS, 11L)
-        ))).isTrue();
+        ))).isFalse();
     }
 }

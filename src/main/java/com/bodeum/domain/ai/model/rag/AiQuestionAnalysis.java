@@ -20,12 +20,13 @@ public record AiQuestionAnalysis(
         List<AiRequiredConcept> requiredConcepts,
         boolean needsClarification,
         String clarificationQuestion,
-        AiResolvedContext resolvedContext
+        AiResolvedContext resolvedContext,
+        boolean siteListRequest
 ) {
 
     public AiQuestionAnalysis(AiQuestionIntent intent, List<String> retrievalQueries) {
         this(intent, AiSearchScope.GENERAL, retrievalQueries, null, null, false,
-                null, null, List.of(), false, null, null);
+                null, null, List.of(), false, null, null, false);
     }
 
     public AiQuestionAnalysis(
@@ -34,7 +35,7 @@ public record AiQuestionAnalysis(
             List<String> retrievalQueries
     ) {
         this(intent, searchScope, retrievalQueries, null, null, false,
-                null, null, List.of(), false, null, null);
+                null, null, List.of(), false, null, null, false);
     }
 
     public AiQuestionAnalysis(
@@ -44,7 +45,7 @@ public record AiQuestionAnalysis(
             Integer requestedResultCount
     ) {
         this(intent, searchScope, retrievalQueries, requestedResultCount, null, false,
-                null, null, List.of(), false, null, null);
+                null, null, List.of(), false, null, null, false);
     }
 
     public AiQuestionAnalysis {
@@ -84,7 +85,7 @@ public record AiQuestionAnalysis(
     public static AiQuestionAnalysis fallback() {
         return new AiQuestionAnalysis(
                 AiQuestionIntent.NONE, AiSearchScope.GENERAL, List.of(), null, null, false,
-                null, null, List.of(), false, null, null);
+                null, null, List.of(), false, null, null, false);
     }
 
     public static AiQuestionAnalysis fallback(String question) {
@@ -185,7 +186,8 @@ public record AiQuestionAnalysis(
                     List.of(),
                     false,
                     null,
-                    null
+                    null,
+                    false
             );
         }
 
@@ -213,7 +215,8 @@ public record AiQuestionAnalysis(
                 List.of(),
                 false,
                 null,
-                null
+                null,
+                false
         );
     }
 
@@ -233,7 +236,8 @@ public record AiQuestionAnalysis(
                 resolvedRequiredConcepts,
                 needsClarification,
                 clarificationQuestion,
-                resolvedContext
+                resolvedContext,
+                siteListRequest
         );
     }
 
@@ -253,7 +257,8 @@ public record AiQuestionAnalysis(
                 requiredConcepts,
                 clarificationRequired,
                 question,
-                resolvedContext
+                resolvedContext,
+                siteListRequest
         );
     }
 
@@ -270,7 +275,26 @@ public record AiQuestionAnalysis(
                 requiredConcepts,
                 needsClarification,
                 clarificationQuestion,
-                context
+                context,
+                siteListRequest
+        );
+    }
+
+    public AiQuestionAnalysis withSiteListRequest(boolean requested) {
+        return new AiQuestionAnalysis(
+                intent,
+                searchScope,
+                retrievalQueries,
+                requestedResultCount,
+                resolvedQuestion,
+                followUp,
+                infoSubCategory,
+                searchGoal,
+                requiredConcepts,
+                needsClarification,
+                clarificationQuestion,
+                resolvedContext,
+                requested
         );
     }
 }

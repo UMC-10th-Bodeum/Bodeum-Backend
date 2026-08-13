@@ -33,10 +33,8 @@ public class AiSourceReviewQueryRepositoryImpl implements AiSourceReviewQueryRep
                 .selectOne()
                 .from(aiSourceReview)
                 .where(
-                        aiSourceReview.reviewStatus.in(
-                                AiSourceReviewStatus.REVIEW_REQUIRED,
-                                AiSourceReviewStatus.CONFIRMED_INCORRECT
-                        ),
+                        aiSourceReview.reviewStatus.eq(
+                                AiSourceReviewStatus.CONFIRMED_INCORRECT),
                         sourceCondition
                 )
                 .fetchFirst() != null;

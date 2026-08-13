@@ -3,7 +3,7 @@ package com.bodeum.domain.ai.controller;
 import com.bodeum.domain.ai.dto.response.AiMessageHistoryResponse;
 import com.bodeum.domain.ai.dto.response.AiTodayMessageResponse;
 import com.bodeum.domain.ai.exception.AiErrorCode;
-import com.bodeum.domain.ai.service.AiMessageQueryService;
+import com.bodeum.domain.ai.service.chat.AiMessageQueryService;
 import com.bodeum.global.apiPayload.ApiResponse;
 import com.bodeum.global.apiPayload.code.GeneralSuccessCode;
 import com.bodeum.global.apiPayload.exception.ProjectException;

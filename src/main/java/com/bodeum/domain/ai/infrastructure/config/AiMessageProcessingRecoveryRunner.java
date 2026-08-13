@@ -1,6 +1,6 @@
 package com.bodeum.domain.ai.infrastructure.config;
 
-import com.bodeum.domain.ai.service.AiMessageFailureService;
+import com.bodeum.domain.ai.service.chat.AiMessageFailureService;
 import java.time.Duration;
 import java.time.Instant;
 import lombok.RequiredArgsConstructor;
