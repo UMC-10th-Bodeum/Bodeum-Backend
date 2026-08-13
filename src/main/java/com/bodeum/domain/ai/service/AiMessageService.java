@@ -12,6 +12,8 @@ import com.bodeum.domain.ai.model.rag.AiReferenceDocument;
 import com.bodeum.domain.ai.model.context.AiResolvedContext;
 import com.bodeum.domain.ai.model.context.AiConversationContext;
 import com.bodeum.domain.ai.model.context.AiQuestionContext;
+import com.bodeum.domain.ai.model.context.AiAdditionalResultsContext;
+import com.bodeum.domain.ai.model.context.AiSearchQueryContext;
 import com.bodeum.domain.ai.model.rag.AiRequiredConcept;
 import com.bodeum.domain.ai.model.rag.AiScrapInterests;
 import com.bodeum.domain.ai.model.rag.AiSourceKey;
@@ -92,6 +94,10 @@ public class AiMessageService {
     private final AiSiteListAnswerValidator siteListAnswerValidator;
     private final AiDocumentSearchService documentSearchService;
     private final AiQuestionContextResolver questionContextResolver;
+    private final AiConversationContextService conversationContextService;
+    private final AiQuestionSearchQueryBuilder searchQueryBuilder;
+    private final AiAnswerEvidenceService evidenceService;
+    private final AiAnswerFallbackService fallbackService;
 
     @Value("${bodeum.ai.conversation.recent-turn-count:3}")
     private int recentConversationTurnCount = 3;
@@ -151,17 +157,17 @@ public class AiMessageService {
             AiScrapInterests scrapInterests
     ) {
 
-        AdditionalResultsContext additionalResultsContext =
-                resolveAdditionalResultsContext(chatRoom.getId(), content);
+        AiAdditionalResultsContext additionalResultsContext =
+                conversationContextService.resolveAdditionalResults(chatRoom.getId(), content);
         AiConversationContext conversationContext =
-                resolveConversationContext(chatRoom.getId());
+                conversationContextService.resolve(chatRoom.getId());
         AiUserProfile baseProfile = toProfile(
                 user, userWithDisabilities, scrapInterests);
         if (RELATIVE_LOCAL_REGION_PATTERN.matcher(content).find()
                 && (baseProfile.region() == null || baseProfile.region().isBlank())) {
             persistenceService.updateUserMessageContext(
                     userMessage.getId(), content, null, null, userMessage.getId());
-            return createRegionRequiredResponse(
+            return fallbackService.regionRequired(
                     chatRoom,
                     userMessage,
                     "어느 지역을 기준으로 찾을까요? 시·도와 시·군·구를 알려주세요."
@@ -173,7 +179,7 @@ public class AiMessageService {
                 && regionResolution.isAmbiguous()) {
             persistenceService.updateUserMessageContext(
                     userMessage.getId(), content, null, null, userMessage.getId());
-            return createRegionRequiredResponse(
+            return fallbackService.regionRequired(
                     chatRoom, userMessage, regionResolution.ambiguityMessage());
         }
 
@@ -205,7 +211,7 @@ public class AiMessageService {
         );
         if (questionContext.safetyGuidance().isPresent()) {
             log.info("[AI] 안전 응답 안내로 전환");
-            return createNoEvidenceResponse(
+            return fallbackService.noEvidence(
                     chatRoom,
                     userMessage,
                     questionContext.safetyGuidance().get()
@@ -213,7 +219,7 @@ public class AiMessageService {
         }
         if (questionContext.needsClarification()) {
             log.info("[AI] 사용자 확인 질문으로 전환");
-            return createClarificationRequiredResponse(
+            return fallbackService.clarificationRequired(
                     chatRoom,
                     userMessage,
                     questionContext.clarificationQuestion()
@@ -230,37 +236,17 @@ public class AiMessageService {
         if (starterAnswer.isPresent()) {
             AiStarterQuestionAnswer answer = starterAnswer.get();
             if (answer.isRegionRequired() || answer.hasEvidence()) {
-                return saveStarterAnswer(chatRoom, userMessage, answer);
+                return fallbackService.saveStarterAnswer(chatRoom, userMessage, answer);
             }
             log.info("[AI] 추천 질문 출처 없음, 일반 질문 흐름으로 전환");
         }
 
-        String searchQuestion = appendRequestedResultCount(contextualizeLocalRegion(
-                resolvedContent,
-                profile,
-                questionContext.searchScope()
-        ), questionContext.requestedResultCount());
-        searchQuestion = appendAdditionalResultsSearchContext(
-                searchQuestion, additionalResultsContext);
-        List<String> searchQueries = ensureBroaderDisabilityTargetQuery(
-                searchQuestion,
-                contextualizeLocalRegions(
-                        questionContext.retrievalQueries(),
-                        profile,
-                        questionContext.searchScope()
-                ).stream()
-                        .map(query -> appendRequestedResultCount(
-                                query,
-                                questionContext.requestedResultCount()
-                        ))
-                        .map(query -> appendAdditionalResultsSearchContext(
-                                query,
-                                additionalResultsContext
-                        ))
-                        .toList(),
-                profile,
-                questionContext.searchScope()
-        );
+        AiSearchQueryContext searchContext = searchQueryBuilder.build(
+                resolvedContent, questionContext.retrievalQueries(), profile,
+                questionContext.searchScope(), questionContext.requestedResultCount(),
+                additionalResultsContext);
+        String searchQuestion = searchContext.question();
+        List<String> searchQueries = searchContext.queries();
 
         log.debug("[AI] 문서 검색 시작");
         List<AiReferenceDocument> retrievedDocuments = retrieveDocuments(
@@ -273,11 +259,11 @@ public class AiMessageService {
         ).stream()
                 .filter(document -> !additionalResultsContext.excludedSources().contains(
                         new AiSourceKey(document.sourceType(), document.sourceId())))
-                .filter(document -> documentIdentityKeys(document).stream()
+                .filter(document -> evidenceService.documentIdentityKeys(document).stream()
                         .noneMatch(additionalResultsContext.excludedIdentityKeys()::contains))
                 .toList();
         if (additionalResultsContext.isFollowUp()) {
-            retrievedDocuments = deduplicateInstitutions(retrievedDocuments);
+            retrievedDocuments = evidenceService.deduplicateInstitutions(retrievedDocuments);
         }
 
         log.info("[AI] 검색 문서 수: {}", retrievedDocuments.size());
@@ -288,7 +274,7 @@ public class AiMessageService {
 
         if (retrievedDocuments.isEmpty()) {
             log.info("[AI] 내부 문서 없음, 외부 검색 시작");
-            return createExternalOrNoResultResponse(
+            return fallbackService.externalOrNoResult(
                     chatRoom,
                     userMessage,
                     searchQuestion,
@@ -316,7 +302,7 @@ public class AiMessageService {
                 || siteListAnswerValidator.requiresValidation(resolvedContent))
                 && !siteListAnswerValidator.isValid(generated, retrievedDocuments)) {
             log.warn("[AI] 사이트 목록 항목과 인용 근거 검증 실패, 외부 검색 시작");
-            return createExternalOrNoResultResponse(
+            return fallbackService.externalOrNoResult(
                     chatRoom,
                     userMessage,
                     searchQuestion,
@@ -327,13 +313,13 @@ public class AiMessageService {
         }
 
         List<AiReferenceDocument> citedSources =
-                validateCitations(generated, retrievedDocuments);
+                evidenceService.validateCitations(generated, retrievedDocuments);
 
         // 검색 결과가 있더라도 LLM이 그 문서를 실제 근거로 인용하지 않았다면,
         // 내부 답변을 폐기하고 등록된 외부 사이트 범위에서 근거를 다시 찾는다.
         if (citedSources.isEmpty()) {
             log.info("[AI] 내부 문서 인용 근거 없음, 외부 검색 시작");
-            return createExternalOrNoResultResponse(
+            return fallbackService.externalOrNoResult(
                     chatRoom,
                     userMessage,
                     searchQuestion,
@@ -343,13 +329,12 @@ public class AiMessageService {
             );
         }
 
-        boolean warning = hasIncorrectFeedback(citedSources);
+        boolean warning = evidenceService.hasIncorrectFeedback(citedSources);
         AiMessage message = persistenceService.saveAiMessageAndComplete(
                 userMessage.getId(), chatRoom, generated.answer(), warning,
                 AiAnswerStatus.ANSWERED, citedSources);
 
-        return sourceBackedResponse(
-                message, citedSources, warningResponse(warning), AiAnswerStatus.ANSWERED);
+        return fallbackService.sourceBacked(message, citedSources, AiAnswerStatus.ANSWERED);
     }
 
     private AiQuestionContext resolveQuestionContext(

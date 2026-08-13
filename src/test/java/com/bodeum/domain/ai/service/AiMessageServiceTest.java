@@ -92,6 +92,8 @@ class AiMessageServiceTest {
 
     @BeforeEach
     void setUp() {
+        AiAnswerEvidenceService evidenceService =
+                new AiAnswerEvidenceService(aiSourceReviewRepository);
         service = new AiMessageService(
                 aiChatRoomRepository, aiMessageRepository, userRepository, regionRepository,
                 answerGenerator, externalAnswerProvider,
@@ -106,7 +108,13 @@ class AiMessageServiceTest {
                 new AiQuestionContextResolver(
                         questionIntentClassifier,
                         new AiQuestionRegionResolver(regionRepository),
-                        new AiSiteListAnswerValidator()));
+                        new AiSiteListAnswerValidator()),
+                new AiConversationContextService(
+                        aiMessageRepository, aiResponseSourceRepository, evidenceService),
+                new AiQuestionSearchQueryBuilder(),
+                evidenceService,
+                new AiAnswerFallbackService(
+                        externalAnswerProvider, persistenceService, evidenceService));
         user = User.createSocialUser(SocialProvider.KAKAO, "provider-id", "a@b.com", "보호자");
         chatRoom = AiChatRoom.create(user);
         lenient().when(aiChatRoomRepository.findByUserId(1L)).thenReturn(Optional.of(chatRoom));
