@@ -19,10 +19,21 @@ public class AiSiteListAnswerValidator {
     private static final Pattern SITE_LIST_QUESTION_PATTERN = Pattern.compile(
             "(사이트|홈페이지).*(알려|추천|목록|모아|찾아)|"
                     + "(알려|추천|목록|모아|찾아).*(사이트|홈페이지)");
+    private static final Pattern IMPLICIT_SITE_LIST_QUESTION_PATTERN = Pattern.compile(
+            "(알아두면좋은|참고할|참고하면좋은|유용한|공식|복지).*(사이트|홈페이지)$");
+    private static final Pattern SITE_USAGE_QUESTION_PATTERN = Pattern.compile(
+            "(회원가입|가입|로그인|비밀번호|탈퇴|접속|오류|이용방법|사용방법|신청방법)");
 
     public boolean requiresValidation(String question) {
-        return question != null
-                && SITE_LIST_QUESTION_PATTERN.matcher(normalizeQuestion(question)).find();
+        if (question == null) {
+            return false;
+        }
+        String normalizedQuestion = normalizeQuestion(question);
+        if (SITE_USAGE_QUESTION_PATTERN.matcher(normalizedQuestion).find()) {
+            return false;
+        }
+        return SITE_LIST_QUESTION_PATTERN.matcher(normalizedQuestion).find()
+                || IMPLICIT_SITE_LIST_QUESTION_PATTERN.matcher(normalizedQuestion).find();
     }
 
     public boolean isValid(

@@ -1154,7 +1154,7 @@ class AiMessageServiceTest {
 
     @Test
     void preservesExplicitSiteTargetWhenClassifierParaphrasesItAsWelfareServices() {
-        String question = "경기도 성남시에서 알아두면 좋은 복지사이트를 알려줘";
+        String question = "성남에서 알아두면 좋은 복지사이트";
         String changedQuestion = "경기도 성남시 복지 서비스와 기관을 알려줘";
         Region seongnam = Region.create("경기도", "성남시");
         when(regionRepository.findMentionedInQuestion(any(), any()))

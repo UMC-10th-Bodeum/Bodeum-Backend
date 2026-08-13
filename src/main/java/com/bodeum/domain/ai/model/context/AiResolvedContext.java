@@ -1,9 +1,12 @@
 package com.bodeum.domain.ai.model.context;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import java.util.LinkedHashMap;
 import java.util.Collections;
 import java.util.Map;
 
+@JsonIgnoreProperties(ignoreUnknown = true)
 public record AiResolvedContext(
         String topic,
         RegionContext region,
@@ -22,6 +25,7 @@ public record AiResolvedContext(
                 : null;
     }
 
+    @JsonIgnore
     public boolean isEmpty() {
         return topic == null
                 && region == null
@@ -133,6 +137,7 @@ public record AiResolvedContext(
         return value == null ? "null" : value;
     }
 
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public record RegionContext(String sido, String sigungu) {
 
         public RegionContext {
@@ -140,6 +145,7 @@ public record AiResolvedContext(
             sigungu = normalize(sigungu);
         }
 
+        @JsonIgnore
         public boolean isEmpty() {
             return sido == null && sigungu == null;
         }
