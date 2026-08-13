@@ -1197,8 +1197,17 @@ class AiMessageServiceTest {
         verify(starterQuestionRouter, never()).route(
                 eq(AiStarterQuestionType.WELFARE_SITES), any());
         verify(answerGenerator).generate(eq(question), any(), eq(List.of(source)));
+        ArgumentCaptor<AiResolvedContext> contextCaptor =
+                ArgumentCaptor.forClass(AiResolvedContext.class);
         verify(persistenceService).updateUserMessageContext(
-                11L, question, null, null, 11L);
+                eq(11L),
+                eq(question),
+                contextCaptor.capture(),
+                eq(null),
+                eq(11L)
+        );
+        assertThat(contextCaptor.getValue().region())
+                .isEqualTo(new AiResolvedContext.RegionContext("경기도", "성남시"));
     }
 
     @Test
