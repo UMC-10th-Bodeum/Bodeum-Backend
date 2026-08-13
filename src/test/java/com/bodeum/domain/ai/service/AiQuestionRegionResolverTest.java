@@ -50,6 +50,63 @@ class AiQuestionRegionResolverTest {
                 .containsExactly("광주광역시", "경기도 광주시");
     }
 
+    @Test
+    void detectsRegionOnlyFollowUpAndReplacesPreviousRegion() {
+        Region seongnam = Region.create("경기도", "성남시");
+        Region anyang = Region.create("경기도", "안양시");
+        when(regionRepository.findAllByRegionLevel2OrderByIdAsc("안양시"))
+                .thenReturn(List.of(anyang));
+
+        var currentResolution = resolver.resolve(
+                "안양시는?", profile("경기도", "수원시"));
+
+        assertThat(resolver.isRegionOnlyQuestion("안양시는?", currentResolution))
+                .isTrue();
+        assertThat(resolver.replaceRegion(
+                "경기도 성남시에서 알아두면 좋은 복지 사이트",
+                AiQuestionRegionResolver.RegionResolution.resolved(seongnam),
+                currentResolution
+        )).isEqualTo("경기도 안양시에서 알아두면 좋은 복지 사이트");
+    }
+
+    @Test
+    void replacesAmbiguousBareRegionWithCurrentResolvedRegion() {
+        Region anyang = Region.create("경기도", "안양시");
+        var previousResolution = new AiQuestionRegionResolver.RegionResolution(
+                AiQuestionRegionResolver.RegionResolution.Status.AMBIGUOUS,
+                null,
+                null,
+                List.of("광주광역시", "경기도 광주시")
+        );
+
+        String replaced = resolver.replaceRegion(
+                "광주 특수학교를 알려줘",
+                previousResolution,
+                AiQuestionRegionResolver.RegionResolution.resolved(anyang)
+        );
+
+        assertThat(replaced).isEqualTo("경기도 안양시 특수학교를 알려줘");
+    }
+
+    @Test
+    void replacesAmbiguousBareCountyNameWithCurrentResolvedRegion() {
+        Region anyang = Region.create("경기도", "안양시");
+        var previousResolution = new AiQuestionRegionResolver.RegionResolution(
+                AiQuestionRegionResolver.RegionResolution.Status.AMBIGUOUS,
+                null,
+                null,
+                List.of("강원특별자치도 고성군", "경상남도 고성군")
+        );
+
+        String replaced = resolver.replaceRegion(
+                "고성 재활센터를 알려줘",
+                previousResolution,
+                AiQuestionRegionResolver.RegionResolution.resolved(anyang)
+        );
+
+        assertThat(replaced).isEqualTo("경기도 안양시 재활센터를 알려줘");
+    }
+
     private AiUserProfile profile(String regionLevel1, String regionLevel2) {
         return new AiUserProfile(
                 regionLevel1 + " " + regionLevel2,

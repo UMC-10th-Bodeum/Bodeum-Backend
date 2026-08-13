@@ -3,12 +3,15 @@ package com.bodeum.domain.ai.entity;
 import com.bodeum.domain.ai.enums.AiResponseProcessingStatus;
 import com.bodeum.domain.ai.enums.AiAnswerStatus;
 import com.bodeum.domain.ai.enums.SenderType;
+import com.bodeum.domain.ai.model.context.AiResolvedContext;
 import com.bodeum.global.common.entity.BaseCreatedEntity;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Entity
 @Getter
@@ -34,6 +37,10 @@ public class AiMessage extends BaseCreatedEntity {
 
     @Column(name = "resolved_question", columnDefinition = "TEXT")
     private String resolvedQuestion;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "resolved_context", columnDefinition = "JSON")
+    private AiResolvedContext resolvedContext;
 
     @Column(name = "context_parent_message_id")
     private Long contextParentMessageId;
@@ -106,6 +113,7 @@ public class AiMessage extends BaseCreatedEntity {
 
     public void updateConversationContext(
             String resolvedQuestion,
+            AiResolvedContext resolvedContext,
             Long contextParentMessageId,
             Long contextRootMessageId
     ) {
@@ -113,6 +121,9 @@ public class AiMessage extends BaseCreatedEntity {
         this.resolvedQuestion = resolvedQuestion == null || resolvedQuestion.isBlank()
                 ? content
                 : resolvedQuestion.trim();
+        this.resolvedContext = resolvedContext == null || resolvedContext.isEmpty()
+                ? null
+                : resolvedContext;
         this.contextParentMessageId = contextParentMessageId;
         this.contextRootMessageId = contextRootMessageId;
     }
@@ -123,6 +134,7 @@ public class AiMessage extends BaseCreatedEntity {
                     "AI message can inherit context only from a USER message");
         }
         this.resolvedQuestion = userMessage.resolvedQuestion;
+        this.resolvedContext = userMessage.resolvedContext;
         this.contextParentMessageId = userMessage.id;
         this.contextRootMessageId = userMessage.contextRootMessageId;
     }
