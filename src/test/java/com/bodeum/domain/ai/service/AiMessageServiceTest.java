@@ -89,6 +89,7 @@ class AiMessageServiceTest {
     private AiMessageService service;
     private AiAnswerEvidenceService evidenceService;
     private AiConversationContextService conversationContextService;
+    private AiAnswerResultNormalizer answerResultNormalizer;
     private AiChatRoom chatRoom;
     private User user;
 
@@ -97,8 +98,9 @@ class AiMessageServiceTest {
         evidenceService = new AiAnswerEvidenceService(aiSourceReviewRepository);
         conversationContextService = new AiConversationContextService(
                 aiMessageRepository, aiResponseSourceRepository, evidenceService);
+        answerResultNormalizer = new AiAnswerResultNormalizer();
         service = new AiMessageService(
-                aiChatRoomRepository, aiMessageRepository, userRepository, regionRepository,
+                aiChatRoomRepository, userRepository,
                 answerGenerator, persistenceService, failureService, requestGuard,
                 starterQuestionRouter,
                 scrapInterestService,
@@ -114,7 +116,10 @@ class AiMessageServiceTest {
                 new AiQuestionSearchQueryBuilder(),
                 evidenceService,
                 new AiAnswerFallbackService(
-                        externalAnswerProvider, persistenceService, evidenceService));
+                        externalAnswerProvider, persistenceService, evidenceService),
+                new AiUserProfileFactory(),
+                new AiStarterQuestionContextResolver(aiMessageRepository, regionRepository),
+                answerResultNormalizer);
         user = User.createSocialUser(SocialProvider.KAKAO, "provider-id", "a@b.com", "보호자");
         chatRoom = AiChatRoom.create(user);
         lenient().when(aiChatRoomRepository.findByUserId(1L)).thenReturn(Optional.of(chatRoom));
@@ -2279,8 +2284,8 @@ class AiMessageServiceTest {
                 )
         );
 
-        GeneratedAiAnswer normalized = ReflectionTestUtils.invokeMethod(
-                service, "normalizeListedResultCount", generated, 6, true);
+        GeneratedAiAnswer normalized =
+                answerResultNormalizer.normalizeListedResultCount(generated, 6, true);
 
         assertThat(normalized).isNotNull();
         assertThat(normalized.answer())
@@ -2302,8 +2307,8 @@ class AiMessageServiceTest {
                 )
         );
 
-        GeneratedAiAnswer normalized = ReflectionTestUtils.invokeMethod(
-                service, "normalizeListedResultCount", generated, 5, false);
+        GeneratedAiAnswer normalized =
+                answerResultNormalizer.normalizeListedResultCount(generated, 5, false);
 
         assertThat(normalized).isSameAs(generated);
         assertThat(normalized.answer()).contains("관련 학교는 5개입니다.");
