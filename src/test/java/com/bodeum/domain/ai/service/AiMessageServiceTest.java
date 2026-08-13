@@ -1395,7 +1395,7 @@ class AiMessageServiceTest {
 
         Boolean independent = ReflectionTestUtils.invokeMethod(
                 service,
-                "isSelfContainedLocalResourceQuestion",
+                "isSelfContainedResourceQuestion",
                 question,
                 "수원시 그 센터 신청 방법을 알려줘",
                 regionResolution
@@ -2084,6 +2084,61 @@ class AiMessageServiceTest {
                         "경기도 수원시".equals(profile.region())
                                 && "경기도".equals(profile.regionLevel1())
                                 && "수원시".equals(profile.regionLevel2())),
+                eq(AiSearchScope.GENERAL)
+        );
+    }
+
+    @Test
+    void inheritsPreviousRegionAsPriorityWithoutRestrictingNationwideSearch() {
+        String question = "특수학교를 알려줘";
+        String previousQuestion = "수원 특수학교를 알려줘";
+        String previousAnswer = "수원시 특수학교 3곳을 안내했습니다.";
+        user.updateInterestRegion(List.of(), Region.create("서울특별시", "강남구"));
+        Region suwon = Region.create("경기도", "수원시");
+
+        AiMessage currentUserMessage = mock(AiMessage.class);
+        AiMessage previousUserMessage = mock(AiMessage.class);
+        AiMessage previousAiMessage = mock(AiMessage.class);
+        when(previousUserMessage.getContent()).thenReturn(previousQuestion);
+        when(previousUserMessage.getId()).thenReturn(100L);
+        when(previousAiMessage.getContent()).thenReturn(previousAnswer);
+        when(aiMessageRepository.findByChatRoomIdAndSenderTypeOrderByCreatedAtDescIdDesc(
+                any(), eq(SenderType.USER), any()))
+                .thenReturn(List.of(currentUserMessage, previousUserMessage));
+        when(aiMessageRepository.findByChatRoomIdAndSenderTypeOrderByCreatedAtDescIdDesc(
+                any(), eq(SenderType.AI), any()))
+                .thenReturn(List.of(previousAiMessage));
+        when(regionRepository.findMentionedInQuestion(any(), any()))
+                .thenAnswer(invocation -> invocation.<String>getArgument(0).contains("수원")
+                        ? List.of(suwon)
+                        : List.of());
+        when(questionIntentClassifier.analyze(question)).thenReturn(
+                AiQuestionAnalysis.forQuestion(
+                        question,
+                        AiQuestionIntent.NONE,
+                        AiSearchScope.GENERAL,
+                        List.of()
+                )
+        );
+        when(documentRetriever.retrieve(eq(question), any(), eq(AiSearchScope.GENERAL)))
+                .thenReturn(List.of());
+        AiMessage saved = savedAiMessage("관련 정보를 찾을 수 없습니다.");
+        when(persistenceService.saveAiMessageAndComplete(
+                11L, chatRoom, "관련 정보를 찾을 수 없습니다.", false,
+                AiAnswerStatus.NO_EVIDENCE, List.of()
+        )).thenReturn(saved);
+
+        service.createMessage(1L, question);
+
+        verify(questionIntentClassifier).analyze(question);
+        verify(questionIntentClassifier, never()).analyze(
+                question, previousQuestion, previousAnswer);
+        verify(documentRetriever).retrieve(
+                eq(question),
+                org.mockito.ArgumentMatchers.argThat(profile ->
+                        "경기도 수원시".equals(profile.region())
+                                && profile.infoSubCategory()
+                                == InfoSubCategory.SPECIAL_SCHOOL),
                 eq(AiSearchScope.GENERAL)
         );
     }

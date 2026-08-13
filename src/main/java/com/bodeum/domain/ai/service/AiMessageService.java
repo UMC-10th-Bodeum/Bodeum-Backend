@@ -404,7 +404,9 @@ public class AiMessageService {
 
         AiQuestionRegionResolver.RegionResolution originalRegionResolution =
                 questionRegionResolver.resolve(content, profile);
-        boolean selfContainedLocalResource = isSelfContainedLocalResourceQuestion(
+        boolean nationwideResourceQuestion = isNationwideResourceQuestion(
+                content, originalRegionResolution);
+        boolean selfContainedResourceQuestion = isSelfContainedResourceQuestion(
                 content, content, originalRegionResolution);
         Optional<String> regionFollowUpQuestion = resolveRegionOnlyFollowUpQuestion(
                 content,
@@ -421,7 +423,7 @@ public class AiMessageService {
             );
         } else {
             analysis = conversationContext.hasContext()
-                    && !selfContainedLocalResource
+                    && !selfContainedResourceQuestion
                     ? analyzeWithConversationContext(content, conversationContext)
                     : questionIntentClassifier.analyze(content);
         }
@@ -436,8 +438,11 @@ public class AiMessageService {
                 : analysis.resolvedQuestion();
         boolean siteListRequest = explicitSiteListRequest
                 || siteListAnswerValidator.requiresValidation(resolvedQuestion);
-        boolean followUp = analysis.followUp() && !selfContainedLocalResource;
+        boolean followUp = analysis.followUp() && !selfContainedResourceQuestion;
         AiSearchScope searchScope = resolveSearchScope(intent, analysis.searchScope());
+        if (nationwideResourceQuestion) {
+            searchScope = AiSearchScope.GENERAL;
+        }
         AiQuestionRegionResolver.RegionResolution regionResolution =
                 questionRegionResolver.resolve(resolvedQuestion, profile);
         AiResolvedContext resolvedContext = resolveStructuredContext(
@@ -465,8 +470,16 @@ public class AiMessageService {
         InfoSubCategory infoSubCategory = finalSiteListRequest
                 ? null
                 : resolveInfoSubCategory(resolvedQuestion, analysis.infoSubCategory());
-        AiUserProfile searchProfile = (regionResolution.isResolved()
-                        ? regionResolution.applyTo(profile)
+        AiQuestionRegionResolver.RegionResolution searchPriorityRegion =
+                resolveNationwideSearchPriorityRegion(
+                        infoSubCategory,
+                        profile,
+                        conversationContext,
+                        regionResolution,
+                        nationwideResourceQuestion
+                );
+        AiUserProfile searchProfile = (searchPriorityRegion.isResolved()
+                        ? searchPriorityRegion.applyTo(profile)
                         : profile)
                 .withInfoSubCategory(infoSubCategory);
         return new QuestionContext(
@@ -639,7 +652,7 @@ public class AiMessageService {
         );
     }
 
-    private boolean isSelfContainedLocalResourceQuestion(
+    private boolean isSelfContainedResourceQuestion(
             String originalQuestion,
             String resolvedQuestion,
             AiQuestionRegionResolver.RegionResolution regionResolution
@@ -652,7 +665,42 @@ public class AiMessageService {
             return false;
         }
         return RELATIVE_LOCAL_REGION_PATTERN.matcher(originalQuestion).find()
-                || regionResolution.isResolved();
+                || regionResolution.isResolved()
+                || isNationwideResourceQuestion(originalQuestion, regionResolution);
+    }
+
+    private boolean isNationwideResourceQuestion(
+            String question,
+            AiQuestionRegionResolver.RegionResolution regionResolution
+    ) {
+        return isLocalResourceTarget(question)
+                && !CONTEXT_REFERENCE_PATTERN.matcher(question).find()
+                && !RELATIVE_LOCAL_REGION_PATTERN.matcher(question).find()
+                && !regionResolution.isResolved()
+                && resolveInfoSubCategory(question, null) != null;
+    }
+
+    private AiQuestionRegionResolver.RegionResolution resolveNationwideSearchPriorityRegion(
+            InfoSubCategory infoSubCategory,
+            AiUserProfile profile,
+            ConversationContext conversationContext,
+            AiQuestionRegionResolver.RegionResolution currentResolution,
+            boolean nationwideResourceQuestion
+    ) {
+        if (!nationwideResourceQuestion
+                || currentResolution.isResolved()
+                || infoSubCategory == null
+                || !conversationContext.hasContext()) {
+            return currentResolution;
+        }
+        String previousQuestion = conversationContext.immediatePreviousUserQuestion();
+        if (previousQuestion == null
+                || infoSubCategory != resolveInfoSubCategory(previousQuestion, null)) {
+            return currentResolution;
+        }
+        AiQuestionRegionResolver.RegionResolution previousResolution =
+                questionRegionResolver.resolve(previousQuestion, profile);
+        return previousResolution.isResolved() ? previousResolution : currentResolution;
     }
 
     private boolean isLocalResourceTarget(String question) {
