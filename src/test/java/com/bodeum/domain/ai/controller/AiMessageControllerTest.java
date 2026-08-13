@@ -10,7 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.bodeum.domain.ai.dto.response.AiMessageHistoryResponse;
 import com.bodeum.domain.ai.dto.response.AiTodayMessageResponse;
-import com.bodeum.domain.ai.service.AiMessageQueryService;
+import com.bodeum.domain.ai.service.chat.AiMessageQueryService;
 import com.bodeum.global.apiPayload.handler.GeneralExceptionAdvice;
 import com.bodeum.global.auth.LoginUser;
 import java.time.Instant;
