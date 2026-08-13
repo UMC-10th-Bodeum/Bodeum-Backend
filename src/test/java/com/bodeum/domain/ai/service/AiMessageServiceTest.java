@@ -31,6 +31,8 @@ import com.bodeum.domain.ai.model.rag.AiRequiredConcept;
 import com.bodeum.domain.ai.model.rag.AiQuestionAnalysis;
 import com.bodeum.domain.ai.model.rag.AiScrapInterests;
 import com.bodeum.domain.ai.model.rag.AiSourceKey;
+import com.bodeum.domain.ai.model.rag.AiUserProfile;
+import com.bodeum.domain.info.entity.enums.InfoSubCategory;
 import com.bodeum.domain.ai.model.answer.GeneratedAiAnswer;
 import com.bodeum.domain.ai.model.answer.GeneratedAiAnswerItem;
 import com.bodeum.domain.ai.model.answer.ExternalAiAnswer;
@@ -1154,7 +1156,7 @@ class AiMessageServiceTest {
 
     @Test
     void preservesExplicitSiteTargetWhenClassifierParaphrasesItAsWelfareServices() {
-        String question = "경기도 성남시에서 알아두면 좋은 복지사이트를 알려줘";
+        String question = "성남에서 알아두면 좋은 복지사이트";
         String changedQuestion = "경기도 성남시 복지 서비스와 기관을 알려줘";
         Region seongnam = Region.create("경기도", "성남시");
         when(regionRepository.findMentionedInQuestion(any(), any()))
@@ -1208,6 +1210,73 @@ class AiMessageServiceTest {
         );
         assertThat(contextCaptor.getValue().region())
                 .isEqualTo(new AiResolvedContext.RegionContext("경기도", "성남시"));
+    }
+
+    @Test
+    void clearsCategoryWhenFollowUpContextRestoresSiteListTarget() {
+        String question = "그중 추천은?";
+        String analyzedQuestion = "경기도 성남시 복지 서비스 추천";
+        String finalQuestion = "경기도 성남시 복지사이트 알려줘";
+        AiResolvedContext previousContext = new AiResolvedContext(
+                "복지사이트",
+                new AiResolvedContext.RegionContext("경기도", "성남시"),
+                java.util.Map.of(),
+                "목록",
+                null
+        );
+        Region seongnam = Region.create("경기도", "성남시");
+        AiMessage currentUserMessage = mock(AiMessage.class);
+        AiMessage previousUserMessage = mock(AiMessage.class);
+        AiMessage previousAiMessage = mock(AiMessage.class);
+        when(previousUserMessage.getResolvedQuestion()).thenReturn(finalQuestion);
+        when(previousUserMessage.getResolvedContext()).thenReturn(previousContext);
+        when(previousUserMessage.getId()).thenReturn(100L);
+        when(previousAiMessage.getContent()).thenReturn("성남시 복지 사이트 안내");
+        when(aiMessageRepository.findByChatRoomIdAndSenderTypeOrderByCreatedAtDescIdDesc(
+                any(), eq(SenderType.USER), any()))
+                .thenReturn(List.of(currentUserMessage, previousUserMessage));
+        when(aiMessageRepository.findByChatRoomIdAndSenderTypeOrderByCreatedAtDescIdDesc(
+                any(), eq(SenderType.AI), any()))
+                .thenReturn(List.of(previousAiMessage));
+        when(regionRepository.findMentionedInQuestion(any(), any()))
+                .thenAnswer(invocation -> invocation.<String>getArgument(0).contains("성남시")
+                        ? List.of(seongnam)
+                        : List.of());
+        when(questionIntentClassifier.analyze(
+                eq(question), any(), any(), eq(previousContext)))
+                .thenReturn(AiQuestionAnalysis.forQuestion(
+                        question,
+                        AiQuestionIntent.NONE,
+                        AiSearchScope.GENERAL,
+                        List.of(),
+                        null,
+                        analyzedQuestion,
+                        true,
+                        InfoSubCategory.FAMILY_SUPPORT
+                ));
+        AiReferenceDocument source = referenceDocument("SEONGNAM-SITE", 1L);
+        when(documentRetriever.retrieve(eq(finalQuestion), any(),
+                eq(AiSearchScope.LOCAL_RESOURCE))).thenReturn(List.of(source));
+        when(answerGenerator.generate(eq(finalQuestion), any(), eq(List.of(source))))
+                .thenReturn(new GeneratedAiAnswer(
+                        "성남시 복지 사이트 안내",
+                        List.of("SEONGNAM-SITE"),
+                        List.of(new GeneratedAiAnswerItem(
+                                "성남시 복지 사이트", "SEONGNAM-SITE"))));
+        AiMessage saved = savedAiMessage("성남시 복지 사이트 안내");
+        when(persistenceService.saveAiMessageAndComplete(
+                eq(11L), eq(chatRoom), any(), eq(false),
+                eq(AiAnswerStatus.ANSWERED), eq(List.of(source))))
+                .thenReturn(saved);
+
+        service.createMessage(1L, question);
+
+        ArgumentCaptor<AiUserProfile> profileCaptor =
+                ArgumentCaptor.forClass(AiUserProfile.class);
+        verify(documentRetriever).retrieve(
+                eq(finalQuestion), profileCaptor.capture(),
+                eq(AiSearchScope.LOCAL_RESOURCE));
+        assertThat(profileCaptor.getValue().infoSubCategory()).isNull();
     }
 
     @Test

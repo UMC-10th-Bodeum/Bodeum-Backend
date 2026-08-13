@@ -434,6 +434,8 @@ public class AiMessageService {
         String resolvedQuestion = analysis.resolvedQuestion() == null
                 ? content
                 : analysis.resolvedQuestion();
+        boolean siteListRequest = explicitSiteListRequest
+                || siteListAnswerValidator.requiresValidation(resolvedQuestion);
         boolean followUp = analysis.followUp() && !selfContainedLocalResource;
         AiSearchScope searchScope = resolveSearchScope(intent, analysis.searchScope());
         AiQuestionRegionResolver.RegionResolution regionResolution =
@@ -450,18 +452,19 @@ public class AiMessageService {
             resolvedQuestion = resolvedContext.toResolvedQuestion(resolvedQuestion);
             regionResolution = questionRegionResolver.resolve(resolvedQuestion, profile);
         }
+        boolean finalSiteListRequest = siteListRequest
+                || siteListAnswerValidator.requiresValidation(resolvedQuestion);
         if (intent == AiQuestionIntent.NONE
                 && !regionResolution.isNotFound()
                 && isLocalResourceTarget(resolvedQuestion)) {
             searchScope = AiSearchScope.LOCAL_RESOURCE;
         }
-        if (explicitSiteListRequest && !regionResolution.isNotFound()) {
+        if (finalSiteListRequest && regionResolution.isResolved()) {
             searchScope = AiSearchScope.LOCAL_RESOURCE;
         }
-        InfoSubCategory infoSubCategory = resolveInfoSubCategory(
-                resolvedQuestion,
-                analysis.infoSubCategory()
-        );
+        InfoSubCategory infoSubCategory = finalSiteListRequest
+                ? null
+                : resolveInfoSubCategory(resolvedQuestion, analysis.infoSubCategory());
         AiUserProfile searchProfile = (regionResolution.isResolved()
                         ? regionResolution.applyTo(profile)
                         : profile)
