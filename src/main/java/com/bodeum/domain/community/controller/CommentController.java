@@ -60,7 +60,8 @@ public class CommentController {
 
     @Operation(
             summary = "게시글 댓글 트리 조회",
-            description = "인증 여부와 관계없이 활성 댓글과 답글을 조회하며, 삭제된 댓글은 응답에서 제외한다."
+            description = "인증 여부와 관계없이 댓글과 답글을 조회한다. 삭제된 댓글은 작성자 정보와 원문을 "
+                    + "숨긴 '삭제된 댓글입니다' 자리표시자로 반환하여 기존 답글 계층을 유지한다."
     )
     @GetMapping("/posts/{postId}/comments")
     public ApiResponse<CommentListResponse> getComments(
