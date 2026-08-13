@@ -98,11 +98,15 @@ class AiMessageServiceTest {
                 persistenceService, failureService, aiSourceReviewRepository,
                 aiResponseSourceRepository, requestGuard,
                 starterQuestionRouter,
-                questionIntentClassifier, scrapInterestService,
+                scrapInterestService,
                 new AiQuestionRegionResolver(regionRepository),
                 new AiSiteListAnswerValidator(),
                 new AiDocumentSearchService(
-                        documentRetriever, referenceDocumentResolver, 10, 3));
+                        documentRetriever, referenceDocumentResolver, 10, 3),
+                new AiQuestionContextResolver(
+                        questionIntentClassifier,
+                        new AiQuestionRegionResolver(regionRepository),
+                        new AiSiteListAnswerValidator()));
         user = User.createSocialUser(SocialProvider.KAKAO, "provider-id", "a@b.com", "보호자");
         chatRoom = AiChatRoom.create(user);
         lenient().when(aiChatRoomRepository.findByUserId(1L)).thenReturn(Optional.of(chatRoom));

@@ -4,16 +4,15 @@ import com.bodeum.domain.ai.dto.response.*;
 import com.bodeum.domain.ai.entity.AiChatRoom;
 import com.bodeum.domain.ai.entity.AiMessage;
 import com.bodeum.domain.ai.enums.AiAnswerStatus;
-import com.bodeum.domain.ai.enums.AiQuestionIntent;
 import com.bodeum.domain.ai.enums.AiSearchScope;
 import com.bodeum.domain.ai.enums.AiStarterQuestionType;
 import com.bodeum.domain.ai.enums.SenderType;
 import com.bodeum.domain.ai.exception.AiErrorCode;
 import com.bodeum.domain.ai.model.rag.AiReferenceDocument;
 import com.bodeum.domain.ai.model.context.AiResolvedContext;
+import com.bodeum.domain.ai.model.context.AiConversationContext;
+import com.bodeum.domain.ai.model.context.AiQuestionContext;
 import com.bodeum.domain.ai.model.rag.AiRequiredConcept;
-import com.bodeum.domain.info.entity.enums.InfoSubCategory;
-import com.bodeum.domain.ai.model.rag.AiQuestionAnalysis;
 import com.bodeum.domain.ai.model.rag.AiScrapInterests;
 import com.bodeum.domain.ai.model.rag.AiSourceKey;
 import com.bodeum.domain.ai.model.rag.AiUserProfile;
@@ -22,7 +21,6 @@ import com.bodeum.domain.ai.model.answer.ExternalAiAnswer;
 import com.bodeum.domain.ai.model.answer.AiStarterQuestionAnswer;
 import com.bodeum.domain.ai.service.port.AiAnswerGenerator;
 import com.bodeum.domain.ai.service.port.AiExternalAnswerProvider;
-import com.bodeum.domain.ai.service.port.AiQuestionIntentClassifier;
 import com.bodeum.domain.ai.repository.AiChatRoomRepository;
 import com.bodeum.domain.ai.repository.AiMessageRepository;
 import com.bodeum.domain.ai.repository.AiResponseSourceRepository;
@@ -59,13 +57,8 @@ public class AiMessageService {
 
     private static final Pattern PHONE_NUMBER_PATTERN = Pattern.compile(
             "(?<!\\d)(?:0\\d{1,2})[- .]?\\d{3,4}[- .]?\\d{4}(?!\\d)");
-    private static final Pattern LOCAL_RESOURCE_PATTERN = Pattern.compile(
-            "(학교|센터|기관|병원|의원|약국|복지관|시설|교육원|상담소|지원사업|지원서비스)");
     private static final Pattern RELATIVE_LOCAL_REGION_PATTERN = Pattern.compile(
             "(우리\\s*(지역|동네)|근처|주변)");
-    private static final Pattern CONTEXT_REFERENCE_PATTERN = Pattern.compile(
-            "(그중|그\\s*(학교|센터|기관|곳|서비스|제도)|위\\s*(학교|센터|기관|곳|서비스|제도)"
-                    + "|앞서|이전|방금|해당)");
     private static final Pattern ADDITIONAL_RESULTS_PATTERN = Pattern.compile(
             "(?:"
                     + "(?:\\d+(?:개|곳))?더(?:\\d+(?:개|곳))?"
@@ -82,21 +75,6 @@ public class AiMessageService {
             "재활센터알려줘",
             "재활센터를알려줘"
     );
-    private static final Set<InfoSubCategory> AI_SEARCHABLE_INFO_SUB_CATEGORIES = Set.of(
-            InfoSubCategory.PRIMARY_CARE,
-            InfoSubCategory.EMERGENCY_CLINIC,
-            InfoSubCategory.THERAPY_REHAB,
-            InfoSubCategory.WELFARE_CENTER,
-            InfoSubCategory.FAMILY_SUPPORT,
-            InfoSubCategory.PRIVATE_WELFARE,
-            InfoSubCategory.NATIONAL_WELFARE,
-            InfoSubCategory.LOCAL_WELFARE,
-            InfoSubCategory.SPECIAL_SCHOOL,
-            InfoSubCategory.SPECIAL_EDU_SUPPORT,
-            InfoSubCategory.LIFELONG_EDU,
-            InfoSubCategory.REALTIME_JOB,
-            InfoSubCategory.STANDARD_WORKPLACE
-    );
     private final AiChatRoomRepository aiChatRoomRepository;
     private final AiMessageRepository aiMessageRepository;
     private final UserRepository userRepository;
@@ -109,11 +87,11 @@ public class AiMessageService {
     private final AiResponseSourceRepository aiResponseSourceRepository;
     private final AiRequestGuard requestGuard;
     private final AiStarterQuestionRouter starterQuestionRouter;
-    private final AiQuestionIntentClassifier questionIntentClassifier;
     private final AiScrapInterestService scrapInterestService;
     private final AiQuestionRegionResolver questionRegionResolver;
     private final AiSiteListAnswerValidator siteListAnswerValidator;
     private final AiDocumentSearchService documentSearchService;
+    private final AiQuestionContextResolver questionContextResolver;
 
     @Value("${bodeum.ai.conversation.recent-turn-count:3}")
     private int recentConversationTurnCount = 3;
@@ -175,7 +153,7 @@ public class AiMessageService {
 
         AdditionalResultsContext additionalResultsContext =
                 resolveAdditionalResultsContext(chatRoom.getId(), content);
-        ConversationContext conversationContext =
+        AiConversationContext conversationContext =
                 resolveConversationContext(chatRoom.getId());
         AiUserProfile baseProfile = toProfile(
                 user, userWithDisabilities, scrapInterests);
@@ -199,7 +177,7 @@ public class AiMessageService {
                     chatRoom, userMessage, regionResolution.ambiguityMessage());
         }
 
-        QuestionContext questionContext = resolveQuestionContext(
+        AiQuestionContext questionContext = resolveQuestionContext(
                 chatRoom.getId(),
                 content,
                 baseProfile,
@@ -374,11 +352,11 @@ public class AiMessageService {
                 message, citedSources, warningResponse(warning), AiAnswerStatus.ANSWERED);
     }
 
-    private QuestionContext resolveQuestionContext(
+    private AiQuestionContext resolveQuestionContext(
             Long chatRoomId,
             String content,
             AiUserProfile profile,
-            ConversationContext conversationContext
+            AiConversationContext conversationContext
     ) {
         Optional<Region> explicitRegion = resolveExplicitRehabRegion(content);
         if (explicitRegion.isPresent()) {
@@ -396,166 +374,7 @@ public class AiMessageService {
             return localRehabContext(profile, followUpRegion.get());
         }
 
-        AiQuestionRegionResolver.RegionResolution originalRegionResolution =
-                questionRegionResolver.resolve(content, profile);
-        boolean nationwideResourceQuestion = isNationwideResourceQuestion(
-                content, originalRegionResolution);
-        boolean selfContainedResourceQuestion = isSelfContainedResourceQuestion(
-                content, content, originalRegionResolution);
-        Optional<String> regionFollowUpQuestion = resolveRegionOnlyFollowUpQuestion(
-                content,
-                profile,
-                conversationContext,
-                originalRegionResolution
-        );
-        AiQuestionAnalysis analysis;
-        if (regionFollowUpQuestion.isPresent()) {
-            String resolvedRegionQuestion = regionFollowUpQuestion.get();
-            analysis = forceResolvedFollowUp(
-                    questionIntentClassifier.analyze(resolvedRegionQuestion),
-                    resolvedRegionQuestion
-            );
-        } else {
-            analysis = conversationContext.hasContext()
-                    && !selfContainedResourceQuestion
-                    ? analyzeWithConversationContext(content, conversationContext)
-                    : questionIntentClassifier.analyze(content);
-        }
-        boolean explicitSiteListRequest =
-                siteListAnswerValidator.requiresValidation(content);
-        if (explicitSiteListRequest && regionFollowUpQuestion.isEmpty()) {
-            analysis = forceResolvedTarget(analysis, content, analysis.followUp());
-        }
-        AiQuestionIntent intent = analysis.intent();
-        String resolvedQuestion = analysis.resolvedQuestion() == null
-                ? content
-                : analysis.resolvedQuestion();
-        boolean siteListRequest = explicitSiteListRequest
-                || siteListAnswerValidator.requiresValidation(resolvedQuestion);
-        boolean followUp = analysis.followUp() && !selfContainedResourceQuestion;
-        AiSearchScope searchScope = resolveSearchScope(intent, analysis.searchScope());
-        if (nationwideResourceQuestion) {
-            searchScope = AiSearchScope.GENERAL;
-        }
-        AiQuestionRegionResolver.RegionResolution regionResolution =
-                questionRegionResolver.resolve(resolvedQuestion, profile);
-        AiResolvedContext resolvedContext = resolveStructuredContext(
-                content,
-                analysis.resolvedContext(),
-                conversationContext.immediatePreviousResolvedContext(),
-                regionResolution,
-                followUp || regionFollowUpQuestion.isPresent(),
-                analysis.requestedResultCount()
-        );
-        if (followUp && resolvedContext != null) {
-            resolvedQuestion = resolvedContext.toResolvedQuestion(resolvedQuestion);
-            regionResolution = questionRegionResolver.resolve(resolvedQuestion, profile);
-        }
-        boolean finalSiteListRequest = siteListRequest
-                || siteListAnswerValidator.requiresValidation(resolvedQuestion);
-        if (intent == AiQuestionIntent.NONE
-                && !regionResolution.isNotFound()
-                && isLocalResourceTarget(resolvedQuestion)) {
-            searchScope = AiSearchScope.LOCAL_RESOURCE;
-        }
-        if (finalSiteListRequest && regionResolution.isResolved()) {
-            searchScope = AiSearchScope.LOCAL_RESOURCE;
-        }
-        InfoSubCategory infoSubCategory = finalSiteListRequest
-                ? null
-                : resolveInfoSubCategory(resolvedQuestion, analysis.infoSubCategory());
-        AiQuestionRegionResolver.RegionResolution searchPriorityRegion =
-                resolveNationwideSearchPriorityRegion(
-                        infoSubCategory,
-                        profile,
-                        conversationContext,
-                        regionResolution,
-                        nationwideResourceQuestion
-                );
-        AiUserProfile searchProfile = (searchPriorityRegion.isResolved()
-                        ? searchPriorityRegion.applyTo(profile)
-                        : profile)
-                .withInfoSubCategory(infoSubCategory);
-        return new QuestionContext(
-                searchProfile,
-                intent.starterQuestionType(),
-                intent.safetyGuidance(),
-                searchScope,
-                intent == AiQuestionIntent.NONE
-                        ? analysis.retrievalQueries()
-                        : List.of(),
-                analysis.requestedResultCount() == null && resolvedContext != null
-                        ? resolvedContext.requestedResultCount()
-                        : analysis.requestedResultCount(),
-                resolvedQuestion,
-                followUp,
-                analysis.searchGoal(),
-                analysis.requiredConcepts(),
-                analysis.needsClarification(),
-                analysis.clarificationQuestion(),
-                resolvedContext
-        );
-    }
-
-    private AiQuestionAnalysis analyzeWithConversationContext(
-            String content,
-            ConversationContext conversationContext
-    ) {
-        AiResolvedContext previousContext =
-                conversationContext.immediatePreviousResolvedContext();
-        if (previousContext == null) {
-            return questionIntentClassifier.analyze(
-                    content,
-                    conversationContext.previousUserQuestion(),
-                    conversationContext.previousAiAnswer()
-            );
-        }
-        return questionIntentClassifier.analyze(
-                content,
-                conversationContext.previousUserQuestion(),
-                conversationContext.previousAiAnswer(),
-                previousContext
-        );
-    }
-
-    private AiResolvedContext resolveStructuredContext(
-            String content,
-            AiResolvedContext analyzedContext,
-            AiResolvedContext previousContext,
-            AiQuestionRegionResolver.RegionResolution regionResolution,
-            boolean followUp,
-            Integer requestedResultCount
-    ) {
-        AiResolvedContext resolved = followUp && previousContext != null
-                ? previousContext.merge(analyzedContext)
-                : analyzedContext;
-        if (resolved == null) {
-            if (requestedResultCount == null && !regionResolution.isResolved()) {
-                return null;
-            }
-            resolved = new AiResolvedContext(
-                    null, null, java.util.Map.of(), null, requestedResultCount);
-        }
-        if (requestedResultCount != null) {
-            resolved = resolved.withRequestedResultCount(requestedResultCount);
-        }
-        if (regionResolution.isResolved()) {
-            Region region = regionResolution.region();
-            resolved = resolved.withRegion(
-                    region == null ? regionResolution.regionLevel1()
-                            : region.getRegionLevel1(),
-                    region == null ? null : region.getRegionLevel2()
-            );
-        }
-        String normalized = normalizeQuestion(content);
-        if (followUp) {
-            if (normalized.contains("공립")) {
-                resolved = resolved.withFilter("설립구분", "공립");
-            } else if (normalized.contains("사립")) {
-                resolved = resolved.withFilter("설립구분", "사립");
-            }
-        }
-        return resolved.isEmpty() ? null : resolved;
+        return questionContextResolver.resolve(content, profile, conversationContext);
     }
 
     private GeneratedAiAnswer normalizeListedResultCount(
@@ -593,126 +412,29 @@ public class AiMessageService {
         );
     }
 
-    private Optional<String> resolveRegionOnlyFollowUpQuestion(
-            String content,
-            AiUserProfile profile,
-            ConversationContext conversationContext,
-            AiQuestionRegionResolver.RegionResolution currentResolution
-    ) {
-        if (!conversationContext.hasContext()
-                || conversationContext.immediatePreviousUserQuestion() == null
-                || !questionRegionResolver.isRegionOnlyQuestion(
-                        content, currentResolution)) {
-            return Optional.empty();
-        }
-        String previousQuestion = conversationContext.immediatePreviousUserQuestion();
-        AiQuestionRegionResolver.RegionResolution previousResolution =
-                questionRegionResolver.resolve(previousQuestion, profile);
-        return Optional.of(questionRegionResolver.replaceRegion(
-                previousQuestion,
-                previousResolution,
-                currentResolution
-        ));
-    }
-
-    private AiQuestionAnalysis forceResolvedFollowUp(
-            AiQuestionAnalysis analysis,
-            String resolvedQuestion
-    ) {
-        return forceResolvedTarget(analysis, resolvedQuestion, true);
-    }
-
-    private AiQuestionAnalysis forceResolvedTarget(
-            AiQuestionAnalysis analysis,
-            String resolvedQuestion,
-            boolean followUp
-    ) {
-        List<String> retrievalQueries = new ArrayList<>();
-        retrievalQueries.add(resolvedQuestion);
-        retrievalQueries.addAll(analysis.retrievalQueries());
-        return new AiQuestionAnalysis(
-                analysis.intent(),
-                analysis.searchScope(),
-                retrievalQueries,
-                analysis.requestedResultCount(),
-                resolvedQuestion,
-                followUp,
-                analysis.infoSubCategory(),
-                analysis.searchGoal(),
-                analysis.requiredConcepts(),
-                false,
-                null,
-                analysis.resolvedContext()
-        );
-    }
-
     private boolean isSelfContainedResourceQuestion(
             String originalQuestion,
             String resolvedQuestion,
             AiQuestionRegionResolver.RegionResolution regionResolution
     ) {
-        String question = resolvedQuestion == null || resolvedQuestion.isBlank()
-                ? originalQuestion
-                : resolvedQuestion;
-        if (!isLocalResourceTarget(question)
-                || CONTEXT_REFERENCE_PATTERN.matcher(originalQuestion).find()) {
-            return false;
-        }
-        return RELATIVE_LOCAL_REGION_PATTERN.matcher(originalQuestion).find()
-                || regionResolution.isResolved()
-                || isNationwideResourceQuestion(originalQuestion, regionResolution);
-    }
-
-    private boolean isNationwideResourceQuestion(
-            String question,
-            AiQuestionRegionResolver.RegionResolution regionResolution
-    ) {
-        return isLocalResourceTarget(question)
-                && !CONTEXT_REFERENCE_PATTERN.matcher(question).find()
-                && !RELATIVE_LOCAL_REGION_PATTERN.matcher(question).find()
-                && !regionResolution.isResolved()
-                && resolveInfoSubCategory(question, null) != null;
-    }
-
-    private AiQuestionRegionResolver.RegionResolution resolveNationwideSearchPriorityRegion(
-            InfoSubCategory infoSubCategory,
-            AiUserProfile profile,
-            ConversationContext conversationContext,
-            AiQuestionRegionResolver.RegionResolution currentResolution,
-            boolean nationwideResourceQuestion
-    ) {
-        if (!nationwideResourceQuestion
-                || currentResolution.isResolved()
-                || infoSubCategory == null
-                || !conversationContext.hasContext()) {
-            return currentResolution;
-        }
-        String previousQuestion = conversationContext.immediatePreviousUserQuestion();
-        if (previousQuestion == null
-                || infoSubCategory != resolveInfoSubCategory(previousQuestion, null)) {
-            return currentResolution;
-        }
-        AiQuestionRegionResolver.RegionResolution previousResolution =
-                questionRegionResolver.resolve(previousQuestion, profile);
-        return previousResolution.isResolved() ? previousResolution : currentResolution;
+        return questionContextResolver.isSelfContainedResourceQuestion(
+                originalQuestion, resolvedQuestion, regionResolution);
     }
 
     private boolean isLocalResourceTarget(String question) {
-        return question != null
-                && (LOCAL_RESOURCE_PATTERN.matcher(question).find()
-                || siteListAnswerValidator.requiresValidation(question));
+        return questionContextResolver.isLocalResourceTarget(question);
     }
 
-    private boolean shouldRouteStarterQuestion(QuestionContext context) {
+    private boolean shouldRouteStarterQuestion(AiQuestionContext context) {
         return context.questionType().orElse(null) != AiStarterQuestionType.WELFARE_SITES
                 || context.searchScope() != AiSearchScope.LOCAL_RESOURCE;
     }
 
-    private QuestionContext starterQuestionContext(
+    private AiQuestionContext starterQuestionContext(
             AiUserProfile profile,
             AiStarterQuestionType questionType
     ) {
-        return new QuestionContext(
+        return new AiQuestionContext(
                 profile,
                 Optional.of(questionType),
                 Optional.empty(),
@@ -729,56 +451,6 @@ public class AiMessageService {
         );
     }
 
-    private AiSearchScope resolveSearchScope(
-            AiQuestionIntent intent,
-            AiSearchScope analyzedSearchScope
-    ) {
-        return switch (intent) {
-            case LOCAL_REHAB_CENTERS -> AiSearchScope.LOCAL_RESOURCE;
-            case CHILD_MEDICAL_SUPPORT, VOUCHER_APPLICATION ->
-                    AiSearchScope.NATIONAL_POLICY;
-            default -> analyzedSearchScope == null
-                    ? AiSearchScope.GENERAL
-                    : analyzedSearchScope;
-        };
-    }
-
-    private InfoSubCategory resolveInfoSubCategory(
-            String question,
-            InfoSubCategory analyzedCategory
-    ) {
-        String normalizedQuestion = normalizeQuestion(question);
-        if (normalizedQuestion.contains("특수교육지원센터")) {
-            return InfoSubCategory.SPECIAL_EDU_SUPPORT;
-        }
-        if (normalizedQuestion.contains("특수학교")) {
-            return InfoSubCategory.SPECIAL_SCHOOL;
-        }
-        if (normalizedQuestion.contains("장애인평생교육")) {
-            return InfoSubCategory.LIFELONG_EDU;
-        }
-        if (normalizedQuestion.contains("응급의료기관")) {
-            return InfoSubCategory.EMERGENCY_CLINIC;
-        }
-        if (normalizedQuestion.contains("치료재활기관")
-                || normalizedQuestion.contains("재활센터")) {
-            return InfoSubCategory.THERAPY_REHAB;
-        }
-        if (normalizedQuestion.contains("장애인복지관")) {
-            return InfoSubCategory.WELFARE_CENTER;
-        }
-        if (normalizedQuestion.contains("장애인가족지원센터")) {
-            return InfoSubCategory.FAMILY_SUPPORT;
-        }
-        if (normalizedQuestion.contains("장애인표준사업장")) {
-            return InfoSubCategory.STANDARD_WORKPLACE;
-        }
-        return analyzedCategory != null
-                && AI_SEARCHABLE_INFO_SUB_CATEGORIES.contains(analyzedCategory)
-                ? analyzedCategory
-                : null;
-    }
-
     private AiSearchScope searchScope(AiStarterQuestionType questionType) {
         return switch (questionType) {
             case LOCAL_REHAB_CENTERS -> AiSearchScope.LOCAL_RESOURCE;
@@ -788,7 +460,7 @@ public class AiMessageService {
         };
     }
 
-    private QuestionContext localRehabContext(
+    private AiQuestionContext localRehabContext(
             AiUserProfile profile,
             Region region
     ) {
@@ -1028,7 +700,7 @@ public class AiMessageService {
         }
     }
 
-    private ConversationContext resolveConversationContext(Long chatRoomId) {
+    private AiConversationContext resolveConversationContext(Long chatRoomId) {
         int resolvedTurnCount = Math.max(1, recentConversationTurnCount);
         List<AiMessage> recentUserMessages = aiMessageRepository
                 .findByChatRoomIdAndSenderTypeOrderByCreatedAtDescIdDesc(
@@ -1037,7 +709,7 @@ public class AiMessageService {
                         PageRequest.of(0, resolvedTurnCount + 1)
                 );
         if (recentUserMessages.size() < 2) {
-            return ConversationContext.empty();
+            return AiConversationContext.empty();
         }
         List<AiMessage> previousAiMessages = aiMessageRepository
                 .findByChatRoomIdAndSenderTypeOrderByCreatedAtDescIdDesc(
@@ -1055,7 +727,7 @@ public class AiMessageService {
                     .orElseGet(List::of);
         }
         if (previousAiMessages.isEmpty()) {
-            return ConversationContext.empty();
+            return AiConversationContext.empty();
         }
         List<AiMessage> previousUserMessages = recentUserMessages.subList(
                 1,
@@ -1064,7 +736,7 @@ public class AiMessageService {
                         resolvedTurnCount + 1
                 )
         );
-        return new ConversationContext(
+        return new AiConversationContext(
                 formatPreviousUserQuestions(previousUserMessages),
                 formatPreviousAiAnswers(previousAiMessages),
                 resolvedQuestion(previousUserMessages.getFirst()),
@@ -1510,43 +1182,6 @@ public class AiMessageService {
             rootCause = rootCause.getCause();
         }
         return rootCause;
-    }
-
-    private record QuestionContext(
-            AiUserProfile profile,
-            Optional<AiStarterQuestionType> questionType,
-            Optional<String> safetyGuidance,
-            AiSearchScope searchScope,
-            List<String> retrievalQueries,
-            Integer requestedResultCount,
-            String resolvedQuestion,
-            boolean followUp,
-            String searchGoal,
-            List<AiRequiredConcept> requiredConcepts,
-            boolean needsClarification,
-            String clarificationQuestion,
-            AiResolvedContext resolvedContext
-    ) {
-    }
-
-    private record ConversationContext(
-            String previousUserQuestion,
-            String previousAiAnswer,
-            String immediatePreviousUserQuestion,
-            AiResolvedContext immediatePreviousResolvedContext,
-            Long parentUserMessageId,
-            Long rootUserMessageId
-    ) {
-        private static ConversationContext empty() {
-            return new ConversationContext(null, null, null, null, null, null);
-        }
-
-        private boolean hasContext() {
-            return previousUserQuestion != null
-                    && !previousUserQuestion.isBlank()
-                    && previousAiAnswer != null
-                    && !previousAiAnswer.isBlank();
-        }
     }
 
     private record AdditionalResultsContext(
