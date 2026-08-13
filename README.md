@@ -22,6 +22,7 @@
 ![JPA](https://img.shields.io/badge/Spring_Data_JPA-6DB33F?style=flat&logo=spring&logoColor=white)
 ![QueryDSL](https://img.shields.io/badge/QueryDSL-0769AD?style=flat&logoColor=white)
 ![Spring Security](https://img.shields.io/badge/Spring_Security-6DB33F?style=flat&logo=springsecurity&logoColor=white)
+<br>
 ![OAuth 2.0](https://img.shields.io/badge/OAuth_2.0-EB5424?style=flat&logo=auth0&logoColor=white)
 ![JWT](https://img.shields.io/badge/JWT-000000?style=flat&logo=jsonwebtokens&logoColor=white)
 ![Spring AI](https://img.shields.io/badge/Spring_AI_2.0.0-6DB33F?style=flat&logo=spring&logoColor=white)
@@ -44,7 +45,7 @@
 
 ## 🏗 시스템 아키텍처
 
-<img width="4848" height="3381" alt="인프라 최종본" src="https://github.com/user-attachments/assets/69e0e934-f8dc-46e2-a58c-3a8b842a0264" />
+<img src="https://github.com/user-attachments/assets/69e0e934-f8dc-46e2-a58c-3a8b842a0264" style="width: 1000px; height: auto;" alt="인프라 최종본"  />
 
 <br>
 
