@@ -2,7 +2,7 @@ package com.bodeum.domain.ai.controller;
 
 import com.bodeum.domain.ai.dto.request.CreateAiFeedbackRequest;
 import com.bodeum.domain.ai.dto.response.CreateAiFeedbackResponse;
-import com.bodeum.domain.ai.service.AiFeedbackService;
+import com.bodeum.domain.ai.service.support.AiFeedbackService;
 import com.bodeum.global.apiPayload.ApiResponse;
 import com.bodeum.global.apiPayload.code.GeneralSuccessCode;
 import com.bodeum.global.auth.LoginUser;

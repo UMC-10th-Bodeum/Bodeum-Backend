@@ -12,7 +12,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.bodeum.domain.ai.dto.response.CreateAiFeedbackResponse;
 import com.bodeum.domain.ai.enums.AiFeedbackReasonType;
 import com.bodeum.domain.ai.enums.AiFeedbackType;
-import com.bodeum.domain.ai.service.AiFeedbackService;
+import com.bodeum.domain.ai.service.support.AiFeedbackService;
 import com.bodeum.global.apiPayload.handler.GeneralExceptionAdvice;
 import com.bodeum.global.auth.LoginUser;
 import java.util.List;

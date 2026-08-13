@@ -6,7 +6,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.bodeum.domain.ai.dto.response.AiChatStarterResponse;
-import com.bodeum.domain.ai.service.AiChatStarterService;
+import com.bodeum.domain.ai.service.chat.AiChatStarterService;
 import com.bodeum.global.apiPayload.handler.GeneralExceptionAdvice;
 import com.bodeum.global.auth.LoginUser;
 import java.util.List;

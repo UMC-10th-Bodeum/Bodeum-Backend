@@ -8,8 +8,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.bodeum.domain.ai.dto.response.AiChatRoomResponse;
 import com.bodeum.domain.ai.exception.AiErrorCode;
-import com.bodeum.domain.ai.service.AiChatRoomService;
-import com.bodeum.domain.ai.service.AiMessageService;
+import com.bodeum.domain.ai.service.chat.AiChatRoomService;
+import com.bodeum.domain.ai.service.chat.AiMessageService;
 import com.bodeum.global.apiPayload.exception.ProjectException;
 import com.bodeum.global.apiPayload.handler.GeneralExceptionAdvice;
 import com.bodeum.global.auth.LoginUser;

@@ -1,6 +1,6 @@
 package com.bodeum.domain.user.service;
 
-import com.bodeum.domain.ai.service.AiWithdrawalService;
+import com.bodeum.domain.ai.service.support.AiWithdrawalService;
 import com.bodeum.domain.auth.exception.AuthErrorCode;
 import com.bodeum.domain.community.service.CommentService;
 import com.bodeum.domain.community.service.PostService;

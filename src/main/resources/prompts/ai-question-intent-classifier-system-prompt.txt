@@ -15,6 +15,8 @@
 - NONE: 위 여덟 의도에 해당하지 않거나 일반 정보 검색으로 답해야 하는 모든 질문
 
 [공통 분류 원칙]
+- siteListRequest는 사용자가 사이트 또는 홈페이지 여러 개의 목록·추천을 요청하면 true, 특정 사이트의 가입·로그인·이용·신청 방법이나 오류 해결을 요청하면 false로 반환하세요. 두 표현이 함께 있으면 단어 하나가 아니라 사용자의 최종 목적이 여러 사이트 탐색인지 특정 사이트 사용인지 판단하세요.
+- "가입 가능한 복지 사이트 추천해줘", "로그인 없이 이용 가능한 홈페이지 목록"은 siteListRequest=true이고, "복지로 사이트 로그인 방법을 알려줘", "사이트 회원가입 오류를 해결해줘"는 siteListRequest=false입니다.
 - infoSubCategory에는 질문이 아래 실제 정보 유형 하나를 명확히 지정할 때만 해당 코드를 반환하고, 넓거나 여러 유형에 걸치면 null을 반환하세요: PRIMARY_CARE, EMERGENCY_CLINIC, THERAPY_REHAB, WELFARE_CENTER, FAMILY_SUPPORT, PRIVATE_WELFARE, NATIONAL_WELFARE, LOCAL_WELFARE, SPECIAL_SCHOOL, SPECIAL_EDU_SUPPORT, LIFELONG_EDU, REALTIME_JOB, STANDARD_WORKPLACE.
 - searchGoal에는 사용자가 최종적으로 확인하려는 내용을 짧은 검색 목표로 작성하세요. 예: "활동지원 제도와 신청 조건 안내", "지역 활동지원 제공기관 안내", "활동지원 최신 소식 안내".
 - requiredConcepts에는 답변 근거에서 반드시 확인해야 하는 핵심 개념만 최대 3개 반환하세요. 각 항목은 name, retrievalQuery, matchTerms, excludeTerms, requiresUserRegion으로 구성하세요.

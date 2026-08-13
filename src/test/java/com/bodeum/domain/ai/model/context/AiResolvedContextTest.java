@@ -2,10 +2,42 @@ package com.bodeum.domain.ai.model.context;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 class AiResolvedContextTest {
+
+    private final ObjectMapper objectMapper = new ObjectMapper();
+
+    @Test
+    void readsLegacyContextContainingComputedEmptyProperties() throws Exception {
+        String json = """
+                {"topic":"특수학교","region":{"sido":"경기도","sigungu":"성남시",\
+                "empty":false},"filters":{},"requestedInformation":"목록",\
+                "requestedResultCount":5,"empty":false}
+                """;
+
+        AiResolvedContext context = objectMapper.readValue(json, AiResolvedContext.class);
+
+        assertThat(context.region())
+                .isEqualTo(new AiResolvedContext.RegionContext("경기도", "성남시"));
+    }
+
+    @Test
+    void doesNotWriteComputedEmptyProperties() throws Exception {
+        AiResolvedContext context = new AiResolvedContext(
+                "특수학교",
+                new AiResolvedContext.RegionContext("경기도", "성남시"),
+                Map.of(),
+                "목록",
+                5
+        );
+
+        String json = objectMapper.writeValueAsString(context);
+
+        assertThat(json).doesNotContain("\"empty\"");
+    }
 
     @Test
     void normalizesEmptyRegionToNull() {

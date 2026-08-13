@@ -31,6 +31,10 @@ class AiQuestionIntentPromptTest {
                 "후속 안내 항목을 하나만 제안했거나 사용자가 원하는 항목을 명시했다면",
                 "사이트 또는 홈페이지 목록을 명시적으로 요청했다면",
                 "복지사업, 서비스 또는 기관 목록 요청으로 바꾸지 마세요.",
+                "가입 가능한 복지 사이트 추천해줘",
+                "siteListRequest=true",
+                "복지로 사이트 로그인 방법을 알려줘",
+                "siteListRequest=false",
                 "resolvedContext에는 현재 질문을 독립적으로 검색하는 데 필요한 구조화 문맥",
                 "변경하지 않은 topic·region·filters·requestedInformation은 유지"
         );

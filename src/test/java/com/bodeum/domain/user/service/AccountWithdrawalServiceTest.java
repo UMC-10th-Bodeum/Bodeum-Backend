@@ -5,7 +5,7 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 import static org.mockito.Mockito.never;
 
-import com.bodeum.domain.ai.service.AiWithdrawalService;
+import com.bodeum.domain.ai.service.support.AiWithdrawalService;
 import com.bodeum.domain.auth.enums.SocialProvider;
 import com.bodeum.domain.auth.exception.AuthErrorCode;
 import com.bodeum.domain.community.service.CommentService;
