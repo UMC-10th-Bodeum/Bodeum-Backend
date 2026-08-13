@@ -19,15 +19,10 @@ import com.bodeum.domain.ai.model.rag.AiScrapInterests;
 import com.bodeum.domain.ai.model.rag.AiSourceKey;
 import com.bodeum.domain.ai.model.rag.AiUserProfile;
 import com.bodeum.domain.ai.model.answer.GeneratedAiAnswer;
-import com.bodeum.domain.ai.model.answer.ExternalAiAnswer;
 import com.bodeum.domain.ai.model.answer.AiStarterQuestionAnswer;
 import com.bodeum.domain.ai.service.port.AiAnswerGenerator;
-import com.bodeum.domain.ai.service.port.AiExternalAnswerProvider;
 import com.bodeum.domain.ai.repository.AiChatRoomRepository;
 import com.bodeum.domain.ai.repository.AiMessageRepository;
-import com.bodeum.domain.ai.repository.AiResponseSourceRepository;
-import com.bodeum.domain.ai.repository.AiSourceReviewRepository;
-import com.bodeum.domain.ai.repository.projection.AiResponseSourceProjection;
 import com.bodeum.domain.region.entity.Region;
 import com.bodeum.domain.region.repository.RegionRepository;
 import com.bodeum.domain.user.entity.User;
@@ -35,21 +30,14 @@ import com.bodeum.domain.user.exception.UserErrorCode;
 import com.bodeum.domain.user.repository.UserRepository;
 import com.bodeum.global.apiPayload.exception.ProjectException;
 
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Set;
 import java.util.Optional;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.net.URI;
-import java.util.Locale;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -57,20 +45,10 @@ import org.springframework.stereotype.Service;
 @Slf4j
 public class AiMessageService {
 
-    private static final Pattern PHONE_NUMBER_PATTERN = Pattern.compile(
-            "(?<!\\d)(?:0\\d{1,2})[- .]?\\d{3,4}[- .]?\\d{4}(?!\\d)");
     private static final Pattern RELATIVE_LOCAL_REGION_PATTERN = Pattern.compile(
             "(우리\\s*(지역|동네)|근처|주변)");
-    private static final Pattern ADDITIONAL_RESULTS_PATTERN = Pattern.compile(
-            "(?:"
-                    + "(?:\\d+(?:개|곳))?더(?:\\d+(?:개|곳))?"
-                    + "|더많은(?:곳|기관|학교|센터|서비스|제도|항목)?"
-                    + "|추가로?(?:\\d+(?:개|곳))?"
-                    + "|다른(?:곳|기관|학교|센터|서비스|제도|항목)"
-                    + ")(?:알려줘|알려주세요|추천해줘|추천해주세요)$");
     private static final String AMBIGUOUS_REGION_MESSAGE_PREFIX =
             "확인할 지역이 여러 곳입니다. ";
-    private static final String NO_RESULT_MESSAGE = "관련 정보를 찾을 수 없습니다.";
     private static final Set<String> EXPLICIT_REGION_REHAB_QUESTIONS = Set.of(
             "재활센터추천해줘",
             "재활센터를추천해줘",
@@ -82,11 +60,8 @@ public class AiMessageService {
     private final UserRepository userRepository;
     private final RegionRepository regionRepository;
     private final AiAnswerGenerator answerGenerator;
-    private final AiExternalAnswerProvider externalAnswerProvider;
     private final AiMessagePersistenceService persistenceService;
     private final AiMessageFailureService failureService;
-    private final AiSourceReviewRepository aiSourceReviewRepository;
-    private final AiResponseSourceRepository aiResponseSourceRepository;
     private final AiRequestGuard requestGuard;
     private final AiStarterQuestionRouter starterQuestionRouter;
     private final AiScrapInterestService scrapInterestService;
@@ -98,12 +73,6 @@ public class AiMessageService {
     private final AiQuestionSearchQueryBuilder searchQueryBuilder;
     private final AiAnswerEvidenceService evidenceService;
     private final AiAnswerFallbackService fallbackService;
-
-    @Value("${bodeum.ai.conversation.recent-turn-count:3}")
-    private int recentConversationTurnCount = 3;
-
-    @Value("${bodeum.ai.result.max-count:10}")
-    private int maxResultCount = 10;
 
     public CreateAiMessageResponse createMessage(Long userId, String content) {
         AiChatRoom chatRoom = aiChatRoomRepository.findByUserId(userId)
@@ -528,282 +497,6 @@ public class AiMessageService {
         return normalizeSpacing(content).replaceAll("\\s+", "");
     }
 
-    private String appendRequestedResultCount(
-            String question,
-            Integer requestedResultCount
-    ) {
-        if (requestedResultCount == null || requestedResultCount <= 0) {
-            return question;
-        }
-        int searchResultCount = Math.min(requestedResultCount, maxResultCount);
-        return question + "\n요청 결과 개수: " + searchResultCount + "개";
-    }
-
-    private AdditionalResultsContext resolveAdditionalResultsContext(
-            Long chatRoomId,
-            String content
-    ) {
-        if (!isAdditionalResultsQuestion(content)) {
-            return AdditionalResultsContext.empty();
-        }
-
-        List<AiMessage> nearestUserMessages = aiMessageRepository
-                .findByChatRoomIdAndSenderTypeOrderByCreatedAtDescIdDesc(
-                        chatRoomId,
-                        SenderType.USER,
-                        PageRequest.of(0, 2)
-                );
-        if (nearestUserMessages.size() >= 2) {
-            AiMessage previousUserMessage = nearestUserMessages.get(1);
-            Long rootMessageId = previousUserMessage.getContextRootMessageId();
-            if (rootMessageId != null && rootMessageId > 0) {
-                Optional<AiMessage> rootMessage = aiMessageRepository.findById(rootMessageId);
-                List<AiMessage> previousAiMessages = aiMessageRepository
-                        .findByChatRoomIdAndContextRootMessageIdAndSenderTypeOrderByCreatedAtDescIdDesc(
-                                chatRoomId,
-                                rootMessageId,
-                                SenderType.AI
-                        );
-                if (rootMessage.isPresent() && !previousAiMessages.isEmpty()) {
-                    return additionalResultsContext(
-                            rootMessage.get(),
-                            previousAiMessages
-                    );
-                }
-            }
-        }
-
-        return AdditionalResultsContext.empty();
-    }
-
-    private AdditionalResultsContext additionalResultsContext(
-            AiMessage baseQuestion,
-            List<AiMessage> previousAiMessages
-    ) {
-        List<AiResponseSourceProjection> previousSources = aiResponseSourceRepository
-                .findAllByMessageIds(previousAiMessages.stream()
-                        .map(AiMessage::getId)
-                        .toList());
-        if (previousSources.isEmpty()) {
-            return AdditionalResultsContext.empty();
-        }
-
-        Set<AiSourceKey> excludedSources = previousSources.stream()
-                .map(source -> new AiSourceKey(source.getSourceType(), source.getSourceId()))
-                .collect(java.util.stream.Collectors.toSet());
-        List<String> excludedTitles = previousSources.stream()
-                .map(AiResponseSourceProjection::getSourceTitle)
-                .filter(title -> title != null && !title.isBlank())
-                .distinct()
-                .toList();
-        Set<String> excludedIdentityKeys = previousSources.stream()
-                .flatMap(source -> sourceIdentityKeys(
-                        source.getSourceTitle(),
-                        source.getSourceUrl()
-                ).stream())
-                .collect(java.util.stream.Collectors.toSet());
-        return new AdditionalResultsContext(
-                baseQuestion.getResolvedQuestion() == null
-                        || baseQuestion.getResolvedQuestion().isBlank()
-                        ? baseQuestion.getContent()
-                        : baseQuestion.getResolvedQuestion(),
-                excludedSources,
-                excludedTitles,
-                excludedIdentityKeys
-        );
-    }
-
-    private List<AiReferenceDocument> deduplicateInstitutions(
-            List<AiReferenceDocument> documents
-    ) {
-        Set<String> seenIdentityKeys = new HashSet<>();
-        List<AiReferenceDocument> distinctDocuments = new ArrayList<>();
-        for (AiReferenceDocument document : documents) {
-            Set<String> identityKeys = documentIdentityKeys(document);
-            if (!identityKeys.isEmpty()
-                    && identityKeys.stream().anyMatch(seenIdentityKeys::contains)) {
-                continue;
-            }
-            distinctDocuments.add(document);
-            seenIdentityKeys.addAll(identityKeys);
-        }
-        return List.copyOf(distinctDocuments);
-    }
-
-    private Set<String> documentIdentityKeys(AiReferenceDocument document) {
-        Set<String> identityKeys = new HashSet<>(
-                sourceIdentityKeys(document.title(), document.url()));
-        if (!identityKeys.isEmpty()) {
-            return identityKeys;
-        }
-        Matcher phoneMatcher = PHONE_NUMBER_PATTERN.matcher(
-                document.content() == null ? "" : document.content());
-        while (phoneMatcher.find()) {
-            identityKeys.add("phone:" + phoneMatcher.group().replaceAll("\\D", ""));
-        }
-        return identityKeys;
-    }
-
-    private Set<String> sourceIdentityKeys(String title, String url) {
-        Set<String> identityKeys = new HashSet<>();
-        String normalizedTitle = normalizeInstitutionTitle(title);
-        if (!normalizedTitle.isBlank()) {
-            identityKeys.add("title:" + normalizedTitle);
-        }
-        String normalizedUrl = normalizeInstitutionUrl(url);
-        if (!normalizedUrl.isBlank()) {
-            identityKeys.add("url:" + normalizedUrl);
-        }
-        return identityKeys;
-    }
-
-    private String normalizeInstitutionTitle(String title) {
-        if (title == null) {
-            return "";
-        }
-        return title.toLowerCase(Locale.ROOT)
-                .replaceAll("^\\s*\\[[^]]+]\\s*", "")
-                .replaceAll("[^\\p{L}\\p{N}]", "");
-    }
-
-    private String normalizeInstitutionUrl(String url) {
-        if (url == null || url.isBlank()) {
-            return "";
-        }
-        try {
-            String absoluteUrl = url.contains("://") ? url : "https://" + url;
-            URI uri = URI.create(absoluteUrl.trim()).normalize();
-            String host = uri.getHost();
-            if (host == null || host.isBlank()) {
-                return "";
-            }
-            String path = uri.getPath() == null ? "" : uri.getPath();
-            path = path.replaceAll("/+$", "");
-            return host.toLowerCase(Locale.ROOT).replaceFirst("^www\\.", "") + path;
-        } catch (IllegalArgumentException ignored) {
-            return url.trim().toLowerCase(Locale.ROOT).replaceAll("/+$", "");
-        }
-    }
-
-    private AiConversationContext resolveConversationContext(Long chatRoomId) {
-        int resolvedTurnCount = Math.max(1, recentConversationTurnCount);
-        List<AiMessage> recentUserMessages = aiMessageRepository
-                .findByChatRoomIdAndSenderTypeOrderByCreatedAtDescIdDesc(
-                        chatRoomId,
-                        SenderType.USER,
-                        PageRequest.of(0, resolvedTurnCount + 1)
-                );
-        if (recentUserMessages.size() < 2) {
-            return AiConversationContext.empty();
-        }
-        List<AiMessage> previousAiMessages = aiMessageRepository
-                .findByChatRoomIdAndSenderTypeOrderByCreatedAtDescIdDesc(
-                        chatRoomId,
-                        SenderType.AI,
-                        PageRequest.of(0, resolvedTurnCount)
-                );
-        if (previousAiMessages.isEmpty()) {
-            previousAiMessages = aiMessageRepository
-                    .findTopByChatRoomIdAndSenderTypeOrderByCreatedAtDescIdDesc(
-                            chatRoomId,
-                            SenderType.AI
-                    )
-                    .map(List::of)
-                    .orElseGet(List::of);
-        }
-        if (previousAiMessages.isEmpty()) {
-            return AiConversationContext.empty();
-        }
-        List<AiMessage> previousUserMessages = recentUserMessages.subList(
-                1,
-                Math.min(
-                        recentUserMessages.size(),
-                        resolvedTurnCount + 1
-                )
-        );
-        return new AiConversationContext(
-                formatPreviousUserQuestions(previousUserMessages),
-                formatPreviousAiAnswers(previousAiMessages),
-                resolvedQuestion(previousUserMessages.getFirst()),
-                previousUserMessages.getFirst().getResolvedContext(),
-                previousUserMessages.getFirst().getId(),
-                previousUserMessages.getFirst().getContextRootMessageId() == null
-                        || previousUserMessages.getFirst().getContextRootMessageId() <= 0
-                        ? previousUserMessages.getFirst().getId()
-                        : previousUserMessages.getFirst().getContextRootMessageId()
-        );
-    }
-
-    private String resolvedQuestion(AiMessage message) {
-        return message.getResolvedQuestion() == null
-                || message.getResolvedQuestion().isBlank()
-                ? message.getContent()
-                : message.getResolvedQuestion();
-    }
-
-    private String formatPreviousUserQuestions(List<AiMessage> messages) {
-        if (messages.size() == 1) {
-            AiMessage message = messages.getFirst();
-            return message.getResolvedQuestion() == null
-                    || message.getResolvedQuestion().isBlank()
-                    ? message.getContent()
-                    : message.getResolvedQuestion();
-        }
-        StringBuilder context = new StringBuilder();
-        for (int index = messages.size() - 1; index >= 0; index--) {
-            AiMessage message = messages.get(index);
-            String question = message.getResolvedQuestion() == null
-                    || message.getResolvedQuestion().isBlank()
-                    ? message.getContent()
-                    : message.getResolvedQuestion();
-            if (question != null && !question.isBlank()) {
-                context.append("- ").append(question).append('\n');
-            }
-        }
-        return context.toString().trim();
-    }
-
-    private String formatPreviousAiAnswers(List<AiMessage> messages) {
-        if (messages.size() == 1) {
-            return messages.getFirst().getContent();
-        }
-        StringBuilder context = new StringBuilder();
-        for (int index = messages.size() - 1; index >= 0; index--) {
-            String answer = messages.get(index).getContent();
-            if (answer != null && !answer.isBlank()) {
-                context.append("- ").append(answer).append('\n');
-            }
-        }
-        return context.toString().trim();
-    }
-
-    private boolean isAdditionalResultsQuestion(String content) {
-        String normalized = normalizeQuestion(content);
-        if (normalized.contains("자세히")
-                || normalized.contains("상세히")
-                || normalized.contains("내용")
-                || normalized.contains("방법")) {
-            return false;
-        }
-        return ADDITIONAL_RESULTS_PATTERN.matcher(normalized).find();
-    }
-
-    private String appendAdditionalResultsSearchContext(
-            String question,
-            AdditionalResultsContext context
-    ) {
-        if (!context.isFollowUp()) {
-            return question;
-        }
-        StringBuilder contextualized = new StringBuilder(question)
-                .append("\n검색 후보 개수: ").append(maxResultCount).append("개");
-        if (!context.excludedTitles().isEmpty()) {
-            contextualized.append("\n이전에 안내하여 제외할 기관: ")
-                    .append(String.join(", ", context.excludedTitles()));
-        }
-        return contextualized.toString();
-    }
-
     private String normalizeSpacing(String content) {
         return content == null
                 ? ""
@@ -829,241 +522,6 @@ public class AiMessageService {
                 profile,
                 searchScope
         );
-    }
-
-    private List<String> contextualizeLocalRegions(
-            List<String> queries,
-            AiUserProfile profile,
-            AiSearchScope searchScope
-    ) {
-        if (queries == null) {
-            return List.of();
-        }
-        return queries.stream()
-                .map(query -> contextualizeLocalRegion(query, profile, searchScope))
-                .toList();
-    }
-
-    private List<String> ensureBroaderDisabilityTargetQuery(
-            String question,
-            List<String> queries,
-            AiUserProfile profile,
-            AiSearchScope searchScope
-    ) {
-        List<String> expanded = new ArrayList<>();
-        if (question != null) {
-            String broaderTargetQuery = question.replaceAll("장애\\s*아동", "장애인");
-            if (!broaderTargetQuery.equals(question)) {
-                expanded.add(broaderTargetQuery);
-                if (searchScope == AiSearchScope.NATIONAL_POLICY
-                        && question.replaceAll("\\s+", "").contains("활동지원")
-                        && profile != null
-                        && profile.region() != null
-                        && !profile.region().isBlank()) {
-                    expanded.add(profile.region() + " " + broaderTargetQuery);
-                }
-            }
-        }
-        if (queries != null) {
-            expanded.addAll(queries);
-        }
-        return expanded.stream()
-                .filter(query -> query != null && !query.isBlank())
-                .map(String::trim)
-                .distinct()
-                .limit(3)
-                .toList();
-    }
-
-    private String contextualizeLocalRegion(
-            String query,
-            AiUserProfile profile,
-            AiSearchScope searchScope
-    ) {
-        if (searchScope != AiSearchScope.LOCAL_RESOURCE
-                || profile == null
-                || profile.region() == null
-                || profile.region().isBlank()) {
-            return query;
-        }
-        return query
-                .replace("우리 지역", profile.region())
-                .replace("우리 동네", profile.region())
-                .replace("근처", profile.region())
-                .replace("주변", profile.region());
-    }
-
-    private CreateAiMessageResponse saveStarterAnswer(
-            AiChatRoom chatRoom,
-            AiMessage userMessage,
-            AiStarterQuestionAnswer answer
-    ) {
-        if (answer.isRegionRequired()) {
-            return createRegionRequiredResponse(chatRoom, userMessage, answer.content());
-        }
-        if (!answer.hasEvidence()) {
-            return createNoEvidenceResponse(chatRoom, userMessage);
-        }
-
-        boolean warning = hasIncorrectFeedback(answer.sources());
-        AiMessage message = persistenceService.saveAiMessageAndComplete(
-                userMessage.getId(),
-                chatRoom,
-                answer.content(),
-                warning,
-                AiAnswerStatus.ANSWERED,
-                answer.sources()
-        );
-        return sourceBackedResponse(
-                message,
-                answer.sources(),
-                warningResponse(warning),
-                AiAnswerStatus.ANSWERED
-        );
-    }
-
-    private CreateAiMessageResponse createExternalOrNoResultResponse(
-            AiChatRoom chatRoom,
-            AiMessage userMessage,
-            String question,
-            List<String> retrievalQueries,
-            AiUserProfile profile,
-            AiSearchScope searchScope
-    ) {
-        ExternalAiAnswer externalAnswer = externalAnswerProvider.search(
-                question,
-                retrievalQueries,
-                profile,
-                searchScope
-        );
-        if (!externalAnswer.hasEvidence()) {
-            String noEvidenceMessage = externalAnswer.answer() == null
-                    || externalAnswer.answer().isBlank()
-                    ? NO_RESULT_MESSAGE
-                    : externalAnswer.answer();
-            return createNoEvidenceResponse(
-                    chatRoom, userMessage, noEvidenceMessage);
-        }
-
-        boolean warning = hasIncorrectFeedback(externalAnswer.sources());
-        AiMessage message = persistenceService.saveAiMessageAndComplete(
-                userMessage.getId(), chatRoom, externalAnswer.answer(), warning,
-                externalAnswer.answerStatus(), externalAnswer.sources());
-        return sourceBackedResponse(
-                message,
-                externalAnswer.sources(),
-                warningResponse(warning),
-                externalAnswer.answerStatus()
-        );
-    }
-
-    private CreateAiMessageResponse createRegionRequiredResponse(
-            AiChatRoom chatRoom,
-            AiMessage userMessage,
-            String content
-    ) {
-        AiMessage message = persistenceService.saveAiMessageAndComplete(
-                userMessage.getId(),
-                chatRoom,
-                content,
-                false,
-                AiAnswerStatus.REGION_REQUIRED,
-                List.of()
-        );
-        return new CreateAiMessageResponse(AiMessageResponse.regionRequired(
-                message.getId(),
-                message.getSenderType(),
-                message.getContent(),
-                message.getCreatedAt()
-        ));
-    }
-
-    private CreateAiMessageResponse createNoEvidenceResponse(
-            AiChatRoom chatRoom,
-            AiMessage userMessage
-    ) {
-        return createNoEvidenceResponse(chatRoom, userMessage, NO_RESULT_MESSAGE);
-    }
-
-    private CreateAiMessageResponse createClarificationRequiredResponse(
-            AiChatRoom chatRoom,
-            AiMessage userMessage,
-            String content
-    ) {
-        AiMessage message = persistenceService.saveAiMessageAndComplete(
-                userMessage.getId(),
-                chatRoom,
-                content,
-                false,
-                AiAnswerStatus.CLARIFICATION_REQUIRED,
-                List.of()
-        );
-        return new CreateAiMessageResponse(AiMessageResponse.clarificationRequired(
-                message.getId(),
-                message.getSenderType(),
-                message.getContent(),
-                message.getCreatedAt()
-        ));
-    }
-
-    private CreateAiMessageResponse createNoEvidenceResponse(
-            AiChatRoom chatRoom,
-            AiMessage userMessage,
-            String content
-    ) {
-        AiMessage message = persistenceService.saveAiMessageAndComplete(
-                userMessage.getId(), chatRoom, content, false,
-                AiAnswerStatus.NO_EVIDENCE, List.of());
-        return new CreateAiMessageResponse(AiMessageResponse.noEvidence(
-                message.getId(),
-                message.getSenderType(),
-                message.getContent(),
-                message.getCreatedAt()
-        ));
-    }
-
-    private List<AiReferenceDocument> validateCitations(
-            GeneratedAiAnswer generated,
-            List<AiReferenceDocument> retrievedDocuments
-    ) {
-        log.debug("[AI] citation 검증 시작");
-
-        Set<String> citedKeys = new HashSet<>(
-                generated.citedDocumentKeys() == null
-                        ? List.of()
-                        : generated.citedDocumentKeys()
-        );
-
-        // LLM이 임의의 출처를 만들어도 응답에 포함되지 않도록,
-        // 실제 검색 결과에 존재하는 documentKey만 인용으로 인정한다.
-        List<AiReferenceDocument> cited = retrievedDocuments.stream()
-                .filter(document -> citedKeys.contains(document.documentKey()))
-                .toList();
-
-        log.info("[AI] 유효 citation 수: {}", cited.size());
-
-        if (cited.isEmpty()) {
-            log.warn(
-                    "[AI] citation 검증 실패. citedKeys={}, retrievedKeys={}",
-                    citedKeys,
-                    retrievedDocuments.stream()
-                            .map(AiReferenceDocument::documentKey)
-                            .toList()
-            );
-
-        }
-
-        return cited;
-    }
-
-    private boolean hasIncorrectFeedback(List<AiReferenceDocument> sources) {
-        if (sources.isEmpty()) {
-            return false;
-        }
-        Set<AiSourceKey> sourceKeys = sources.stream()
-                .map(source -> new AiSourceKey(source.sourceType(), source.sourceId()))
-                .collect(java.util.stream.Collectors.toSet());
-        return aiSourceReviewRepository.existsWarningRequiredBySources(sourceKeys);
     }
 
     private AiUserProfile toProfile(
@@ -1097,34 +555,6 @@ public class AiMessageService {
             log.warn("[AI] 최근 스크랩 관심 정보 조회 실패, 기본 프로필로 처리합니다.", e);
             return AiScrapInterests.empty();
         }
-    }
-
-    private CreateAiMessageResponse sourceBackedResponse(
-            AiMessage message,
-            List<AiReferenceDocument> sources,
-            AiMessageWarningResponse warning,
-            AiAnswerStatus answerStatus
-    ) {
-        List<AiMessageSourceResponse> sourceResponses = sources.stream()
-                .map(source -> new AiMessageSourceResponse(
-                        source.sourceType(), source.sourceId(), source.title(),
-                        source.url(), source.updatedAt()))
-                .toList();
-        AiMessageResponse response = AiMessageResponse.sourceBacked(
-                message.getId(),
-                message.getSenderType(),
-                answerStatus,
-                message.getContent(),
-                message.getCreatedAt(),
-                sourceResponses,
-                warning);
-        return new CreateAiMessageResponse(response);
-    }
-
-    private AiMessageWarningResponse warningResponse(boolean warning) {
-        return warning
-                ? AiMessageWarningResponse.incorrectSource()
-                : null;
     }
 
     private void markFailedSafely(Long userMessageId, Exception originalException) {
@@ -1167,22 +597,6 @@ public class AiMessageService {
             rootCause = rootCause.getCause();
         }
         return rootCause;
-    }
-
-    private record AdditionalResultsContext(
-            String previousQuestion,
-            Set<AiSourceKey> excludedSources,
-            List<String> excludedTitles,
-            Set<String> excludedIdentityKeys
-    ) {
-        private static AdditionalResultsContext empty() {
-            return new AdditionalResultsContext(
-                    null, Set.of(), List.of(), Set.of());
-        }
-
-        private boolean isFollowUp() {
-            return previousQuestion != null && !previousQuestion.isBlank();
-        }
     }
 
 }

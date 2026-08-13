@@ -87,18 +87,19 @@ class AiMessageServiceTest {
     @Mock AiScrapInterestService scrapInterestService;
 
     private AiMessageService service;
+    private AiAnswerEvidenceService evidenceService;
+    private AiConversationContextService conversationContextService;
     private AiChatRoom chatRoom;
     private User user;
 
     @BeforeEach
     void setUp() {
-        AiAnswerEvidenceService evidenceService =
-                new AiAnswerEvidenceService(aiSourceReviewRepository);
+        evidenceService = new AiAnswerEvidenceService(aiSourceReviewRepository);
+        conversationContextService = new AiConversationContextService(
+                aiMessageRepository, aiResponseSourceRepository, evidenceService);
         service = new AiMessageService(
                 aiChatRoomRepository, aiMessageRepository, userRepository, regionRepository,
-                answerGenerator, externalAnswerProvider,
-                persistenceService, failureService, aiSourceReviewRepository,
-                aiResponseSourceRepository, requestGuard,
+                answerGenerator, persistenceService, failureService, requestGuard,
                 starterQuestionRouter,
                 scrapInterestService,
                 new AiQuestionRegionResolver(regionRepository),
@@ -109,8 +110,7 @@ class AiMessageServiceTest {
                         questionIntentClassifier,
                         new AiQuestionRegionResolver(regionRepository),
                         new AiSiteListAnswerValidator()),
-                new AiConversationContextService(
-                        aiMessageRepository, aiResponseSourceRepository, evidenceService),
+                conversationContextService,
                 new AiQuestionSearchQueryBuilder(),
                 evidenceService,
                 new AiAnswerFallbackService(
@@ -861,8 +861,8 @@ class AiMessageServiceTest {
         AiReferenceDocument second = identityDocument(
                 "CENTER-2", "두 번째 센터", "https://second.example.com", "031-123-4567");
 
-        List<AiReferenceDocument> result = ReflectionTestUtils.invokeMethod(
-                service, "deduplicateInstitutions", List.of(first, second));
+        List<AiReferenceDocument> result =
+                evidenceService.deduplicateInstitutions(List.of(first, second));
 
         assertThat(result).containsExactly(first, second);
     }
@@ -875,8 +875,8 @@ class AiMessageServiceTest {
         AiReferenceDocument duplicate = identityDocument(
                 "CENTER-2", null, null, "031-123-4567");
 
-        List<AiReferenceDocument> result = ReflectionTestUtils.invokeMethod(
-                service, "deduplicateInstitutions", List.of(first, duplicate));
+        List<AiReferenceDocument> result =
+                evidenceService.deduplicateInstitutions(List.of(first, duplicate));
 
         assertThat(result).containsExactly(first);
     }
@@ -893,8 +893,7 @@ class AiMessageServiceTest {
             "더 많은 기관 알려줘"
     })
     void recognizesAdditionalResultsQuestions(String question) {
-        assertThat((Boolean) ReflectionTestUtils.invokeMethod(
-                service, "isAdditionalResultsQuestion", question)).isTrue();
+        assertThat(conversationContextService.isAdditionalResultsQuestion(question)).isTrue();
     }
 
     @ParameterizedTest
@@ -907,8 +906,7 @@ class AiMessageServiceTest {
             "재활센터 알려줘"
     })
     void doesNotTreatNamesOrDetailQuestionsAsAdditionalResults(String question) {
-        assertThat((Boolean) ReflectionTestUtils.invokeMethod(
-                service, "isAdditionalResultsQuestion", question)).isFalse();
+        assertThat(conversationContextService.isAdditionalResultsQuestion(question)).isFalse();
     }
 
     @Test

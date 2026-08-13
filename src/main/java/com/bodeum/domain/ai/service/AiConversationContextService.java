@@ -109,7 +109,7 @@ public class AiConversationContextService {
                 excludedIdentityKeys);
     }
 
-    private boolean isAdditionalResultsQuestion(String content) {
+    public boolean isAdditionalResultsQuestion(String content) {
         String normalized = normalize(content);
         if (normalized.contains("자세히") || normalized.contains("상세히")
                 || normalized.contains("내용") || normalized.contains("방법")) {
