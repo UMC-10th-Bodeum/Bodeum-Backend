@@ -26,6 +26,7 @@ import com.bodeum.domain.ai.service.port.AiDocumentRetriever;
 import com.bodeum.domain.ai.service.port.AiExternalAnswerProvider;
 import com.bodeum.domain.ai.service.port.AiQuestionIntentClassifier;
 import com.bodeum.domain.ai.model.rag.AiReferenceDocument;
+import com.bodeum.domain.ai.model.context.AiResolvedContext;
 import com.bodeum.domain.ai.model.rag.AiRequiredConcept;
 import com.bodeum.domain.ai.model.rag.AiQuestionAnalysis;
 import com.bodeum.domain.ai.model.rag.AiScrapInterests;
@@ -1062,11 +1063,133 @@ class AiMessageServiceTest {
         verify(persistenceService).updateUserMessageContext(
                 11L,
                 resolvedQuestion,
+                null,
                 100L,
                 100L
         );
         verify(answerGenerator).generate(
                 eq(resolvedQuestion), any(), eq(List.of(source)));
+    }
+
+    @Test
+    void keepsPreviousTopicWhenFollowUpChangesOnlyRegion() {
+        String question = "안양시는?";
+        String previousQuestion = "경기도 성남시에서 알아두면 좋은 복지 사이트";
+        String previousAnswer = "성남시 거주자가 참고할 복지 사이트 안내";
+        String resolvedQuestion = "경기도 안양시에서 알아두면 좋은 복지 사이트";
+        Region seongnam = Region.create("경기도", "성남시");
+        Region anyang = Region.create("경기도", "안양시");
+        AiMessage currentUserMessage = mock(AiMessage.class);
+        AiMessage previousUserMessage = mock(AiMessage.class);
+        AiMessage previousAiMessage = mock(AiMessage.class);
+        when(previousUserMessage.getResolvedQuestion()).thenReturn(previousQuestion);
+        when(previousUserMessage.getId()).thenReturn(100L);
+        when(previousAiMessage.getContent()).thenReturn(previousAnswer);
+        when(aiMessageRepository.findByChatRoomIdAndSenderTypeOrderByCreatedAtDescIdDesc(
+                any(), eq(SenderType.USER), any()))
+                .thenReturn(List.of(currentUserMessage, previousUserMessage));
+        when(aiMessageRepository.findByChatRoomIdAndSenderTypeOrderByCreatedAtDescIdDesc(
+                any(), eq(SenderType.AI), any()))
+                .thenReturn(List.of(previousAiMessage));
+        when(regionRepository.findMentionedInQuestion(any(), any()))
+                .thenAnswer(invocation -> {
+                    String value = invocation.getArgument(0);
+                    if (value.contains("성남시")) {
+                        return List.of(seongnam);
+                    }
+                    if (value.contains("안양시")) {
+                        return List.of(anyang);
+                    }
+                    return List.of();
+                });
+        when(questionIntentClassifier.analyze(resolvedQuestion)).thenReturn(
+                AiQuestionAnalysis.forQuestion(
+                        resolvedQuestion,
+                        AiQuestionIntent.NONE,
+                        AiSearchScope.LOCAL_RESOURCE,
+                        List.of(),
+                        null,
+                        resolvedQuestion,
+                        false
+                ));
+        AiReferenceDocument source = referenceDocument("ANYANG-SITE", 1L);
+        when(documentRetriever.retrieve(
+                eq(resolvedQuestion), any(), eq(AiSearchScope.LOCAL_RESOURCE)))
+                .thenReturn(List.of(source));
+        when(answerGenerator.generate(
+                eq(resolvedQuestion), any(), eq(List.of(source))))
+                .thenReturn(new GeneratedAiAnswer("안양시 복지 사이트 안내",
+                        List.of("ANYANG-SITE"),
+                        List.of(new GeneratedAiAnswerItem(
+                                "안양시 복지 사이트", "ANYANG-SITE"))));
+        AiMessage saved = savedAiMessage("안양시 복지 사이트 안내");
+        when(persistenceService.saveAiMessageAndComplete(
+                11L,
+                chatRoom,
+                "안양시 복지 사이트 안내",
+                false,
+                AiAnswerStatus.ANSWERED,
+                List.of(source)
+        )).thenReturn(saved);
+
+        service.createMessage(1L, question);
+
+        verify(questionIntentClassifier).analyze(resolvedQuestion);
+        verify(questionIntentClassifier, never()).analyze(
+                question, previousQuestion, previousAnswer);
+        verify(persistenceService).updateUserMessageContext(
+                11L, resolvedQuestion, null, 100L, 100L);
+        verify(answerGenerator).generate(
+                eq(resolvedQuestion), any(), eq(List.of(source)));
+    }
+
+    @Test
+    void preservesExplicitSiteTargetWhenClassifierParaphrasesItAsWelfareServices() {
+        String question = "경기도 성남시에서 알아두면 좋은 복지사이트를 알려줘";
+        String changedQuestion = "경기도 성남시 복지 서비스와 기관을 알려줘";
+        Region seongnam = Region.create("경기도", "성남시");
+        when(regionRepository.findMentionedInQuestion(any(), any()))
+                .thenReturn(List.of(seongnam));
+        when(questionIntentClassifier.analyze(question)).thenReturn(
+                AiQuestionAnalysis.forQuestion(
+                        changedQuestion,
+                        AiQuestionIntent.WELFARE_SITES,
+                        AiSearchScope.GENERAL,
+                        List.of(),
+                        null,
+                        changedQuestion,
+                        false
+                ));
+        AiReferenceDocument source = referenceDocument("SEONGNAM-SITE", 1L);
+        when(documentRetriever.retrieve(
+                eq(question), any(), eq(AiSearchScope.LOCAL_RESOURCE)))
+                .thenReturn(List.of(source));
+        when(answerGenerator.generate(eq(question), any(), eq(List.of(source))))
+                .thenReturn(new GeneratedAiAnswer(
+                        "성남시 복지 사이트 안내",
+                        List.of("SEONGNAM-SITE"),
+                        List.of(new GeneratedAiAnswerItem(
+                                "성남시 복지 사이트", "SEONGNAM-SITE"))
+                ));
+        AiMessage saved = savedAiMessage("성남시 복지 사이트 안내");
+        when(persistenceService.saveAiMessageAndComplete(
+                11L,
+                chatRoom,
+                "성남시 복지 사이트 안내",
+                false,
+                AiAnswerStatus.ANSWERED,
+                List.of(source)
+        )).thenReturn(saved);
+
+        service.createMessage(1L, question);
+
+        verify(documentRetriever, org.mockito.Mockito.atLeastOnce()).retrieve(
+                eq(question), any(), eq(AiSearchScope.LOCAL_RESOURCE));
+        verify(starterQuestionRouter, never()).route(
+                eq(AiStarterQuestionType.WELFARE_SITES), any());
+        verify(answerGenerator).generate(eq(question), any(), eq(List.of(source)));
+        verify(persistenceService).updateUserMessageContext(
+                11L, question, null, null, 11L);
     }
 
     @Test
@@ -1115,6 +1238,7 @@ class AiMessageServiceTest {
                 11L,
                 question,
                 null,
+                null,
                 11L
         );
     }
@@ -1160,10 +1284,11 @@ class AiMessageServiceTest {
         service.createMessage(1L, question);
 
         verify(persistenceService).updateUserMessageContext(
-                11L,
-                question,
-                null,
-                11L
+                eq(11L),
+                eq(question),
+                any(AiResolvedContext.class),
+                eq(null),
+                eq(11L)
         );
         verify(questionIntentClassifier).analyze(question);
         verify(questionIntentClassifier, never()).analyze(
@@ -2009,6 +2134,31 @@ class AiMessageServiceTest {
         when(message.getContent()).thenReturn(content);
         when(message.getCreatedAt()).thenReturn(Instant.parse("2026-07-03T06:30:03Z"));
         return message;
+    }
+
+    @Test
+    void correctsContradictoryAdditionalResultCountUsingActualAnswerItems() {
+        GeneratedAiAnswer generated = new GeneratedAiAnswer(
+                "학교 5곳을 안내합니다.\n\n"
+                        + "이전에 안내한 항목을 제외하면, 추가로 확인 가능한 관련 항목은 "
+                        + "0개입니다.",
+                List.of("1", "2", "3", "4", "5"),
+                List.of(
+                        new GeneratedAiAnswerItem("학교1", "1"),
+                        new GeneratedAiAnswerItem("학교2", "2"),
+                        new GeneratedAiAnswerItem("학교3", "3"),
+                        new GeneratedAiAnswerItem("학교4", "4"),
+                        new GeneratedAiAnswerItem("학교5", "5")
+                )
+        );
+
+        GeneratedAiAnswer normalized = ReflectionTestUtils.invokeMethod(
+                service, "normalizeListedResultCount", generated, 6, true);
+
+        assertThat(normalized).isNotNull();
+        assertThat(normalized.answer())
+                .contains("추가로 확인 가능한 관련 항목은 5개입니다.")
+                .doesNotContain("관련 항목은 0개입니다.");
     }
 
     private AiReferenceDocument referenceDocument(String documentKey, long sourceId) {
