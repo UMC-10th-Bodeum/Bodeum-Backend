@@ -51,17 +51,17 @@ public class NewsPublicDataSyncService {
                         candidate.categoryCode(),
                         this::findOrCreateCategory
                 );
-                Long regionId = resolveRegion(candidate.regionName(), regions);
+                Region region = resolveRegion(candidate.regionName(), regions);
                 News news = newsByExternalItemId.get(candidate.externalItemId());
 
                 if (news == null) {
                     News createdNews = newsRepository.save(
-                            News.create(category, source, regionId, candidate)
+                            News.create(category, source, region, candidate)
                     );
                     newsByExternalItemId.put(candidate.externalItemId(), createdNews);
                     created++;
                 } else {
-                    news.updateCollectedData(category, source, regionId, candidate);
+                    news.updateCollectedData(category, source, region, candidate);
                     updated++;
                 }
             }
@@ -114,14 +114,14 @@ public class NewsPublicDataSyncService {
         return regions;
     }
 
-    private Long resolveRegion(String regionName, Map<String, Region> regions) {
+    private Region resolveRegion(String regionName, Map<String, Region> regions) {
         if (!StringUtils.hasText(regionName)) {
             return null;
         }
 
         Region region = regions.get(regionName);
         if (region != null) {
-            return region.getId();
+            return region;
         }
 
         throw new ProjectException(RegionErrorCode.REGION_NOT_FOUND);

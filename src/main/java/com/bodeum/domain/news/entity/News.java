@@ -1,6 +1,7 @@
 package com.bodeum.domain.news.entity;
 
 import com.bodeum.domain.news.collector.NewsCandidate;
+import com.bodeum.domain.region.entity.Region;
 import com.bodeum.global.common.entity.BaseCreatedUpdatedDeletedEntity;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
@@ -41,16 +42,12 @@ public class News extends BaseCreatedUpdatedDeletedEntity {
     @Column(name = "external_item_id", length = 100)
     private String externalItemId;
 
-    @Column(name = "region_id")
-    private Long regionId;
-
-    /*
-     * TODO: Region 엔터티 연동 시 아래 연관관계로 변경 예정
-     *
-     * @ManyToOne(fetch = FetchType.LAZY)
-     * @JoinColumn(name = "region_id")
-     * private Region region;
-     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(
+            name = "region_id",
+            foreignKey = @ForeignKey(name = "fk_news_region")
+    )
+    private Region region;
 
     @Column(name = "organization_id", length = 100)
     private String organizationId;
@@ -119,12 +116,12 @@ public class News extends BaseCreatedUpdatedDeletedEntity {
     private News(
             NewsCategory newsCategory,
             NewsSource newsSource,
-            Long regionId,
+            Region region,
             NewsCandidate candidate
     ) {
         this.newsCategory = newsCategory;
         this.newsSource = newsSource;
-        this.regionId = regionId;
+        this.region = region;
         this.viewCount = 0L;
         this.scrapCount = 0L;
         this.active = true;
@@ -134,13 +131,13 @@ public class News extends BaseCreatedUpdatedDeletedEntity {
     public static News create(
             NewsCategory newsCategory,
             NewsSource newsSource,
-            Long regionId,
+            Region region,
             NewsCandidate candidate
     ) {
         return News.builder()
                 .newsCategory(newsCategory)
                 .newsSource(newsSource)
-                .regionId(regionId)
+                .region(region)
                 .candidate(candidate)
                 .build();
     }
@@ -148,12 +145,12 @@ public class News extends BaseCreatedUpdatedDeletedEntity {
     public void updateCollectedData(
             NewsCategory newsCategory,
             NewsSource newsSource,
-            Long regionId,
+            Region region,
             NewsCandidate candidate
     ) {
         this.newsCategory = newsCategory;
         this.newsSource = newsSource;
-        this.regionId = regionId;
+        this.region = region;
         this.active = true;
         restore();
         apply(candidate);
@@ -171,6 +168,10 @@ public class News extends BaseCreatedUpdatedDeletedEntity {
         if (this.scrapCount > 0) {
             this.scrapCount--;
         }
+    }
+
+    public Long getRegionId() {
+        return region == null ? null : region.getId();
     }
 
     public boolean isVisible() {

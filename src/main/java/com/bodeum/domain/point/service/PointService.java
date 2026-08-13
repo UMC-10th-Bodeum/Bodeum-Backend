@@ -54,9 +54,9 @@ public class PointService {
         userRepository.flush();
 
         GuardianPoint guardianPoint = guardianPointRepository
-                .findByGuardianProfileId(guardianProfile.getId())
+                .findByGuardianProfile_Id(guardianProfile.getId())
                 .orElseGet(() -> guardianPointRepository.save(
-                        GuardianPoint.create(guardianProfile.getId())
+                        GuardianPoint.create(guardianProfile)
                 ));
 
         if (pointHistoryRepository
@@ -188,9 +188,9 @@ public class PointService {
     /**
      * 회원 탈퇴 시 해당 회원의 포인트 데이터를 삭제한다.
      *
-     * <p>GuardianPoint는 guardianProfileId를 단순 컬럼으로만 들고 있어 GuardianProfile의
-     * orphanRemoval로 함께 지워지지 않는다. 또 조회가 GuardianProfile을 경유하는 서브쿼리이므로,
-     * 호출자는 profile이 제거되기 전에(= User.withdraw() 전에) 이 메서드를 호출해야 한다.
+     * <p>GuardianPoint는 GuardianProfile을 참조하지만 프로필의 cascade 대상은 아니다.
+     * DB FK가 프로필 삭제를 제한하므로 호출자는 profile이 제거되기 전에
+     * (= User.withdraw() 전에) 이 메서드를 호출해야 한다.
      *
      * <p>GuardianPointHistory는 guardian_point_id가 NOT NULL FK라 히스토리를 먼저 삭제한다.
      */
