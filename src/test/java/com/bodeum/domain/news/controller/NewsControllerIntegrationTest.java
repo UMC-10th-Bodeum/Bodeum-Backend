@@ -955,6 +955,9 @@ class NewsControllerIntegrationTest {
                 category.getNewsType(),
                 status
         );
-        return News.create(category, source, regionId, candidate);
+        Region region = regionId == null
+                ? null
+                : regionRepository.findById(regionId).orElseThrow();
+        return News.create(category, source, region, candidate);
     }
 }
