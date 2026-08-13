@@ -520,7 +520,7 @@ public class AiMessageService {
                 ? previousContext.merge(analyzedContext)
                 : analyzedContext;
         if (resolved == null) {
-            if (requestedResultCount == null) {
+            if (requestedResultCount == null && !regionResolution.isResolved()) {
                 return null;
             }
             resolved = new AiResolvedContext(
@@ -544,13 +544,6 @@ public class AiMessageService {
             } else if (normalized.contains("사립")) {
                 resolved = resolved.withFilter("설립구분", "사립");
             }
-            if (normalized.contains("신청방법") || normalized.contains("신청절차")) {
-                resolved = resolved.withRequestedInformation("신청 방법");
-            } else if (normalized.contains("필요서류") || normalized.contains("준비서류")) {
-                resolved = resolved.withRequestedInformation("필요 서류");
-            } else if (normalized.contains("지원대상") || normalized.equals("대상은?")) {
-                resolved = resolved.withRequestedInformation("지원 대상");
-            }
         }
         return resolved.isEmpty() ? null : resolved;
     }
@@ -561,7 +554,9 @@ public class AiMessageService {
             boolean additionalResults
     ) {
         int actualCount = generated.answerItems().size();
-        if (actualCount == 0 || requestedResultCount == null) {
+        if (actualCount == 0
+                || requestedResultCount == null
+                || actualCount >= requestedResultCount) {
             return generated;
         }
         String answer = generated.answer()
@@ -576,13 +571,11 @@ public class AiMessageService {
                         "\n"
                 )
                 .trim();
-        if (actualCount < requestedResultCount) {
-            String countMessage = additionalResults
-                    ? "이전에 안내한 항목을 제외하면, 추가로 확인 가능한 관련 항목은 "
-                            + actualCount + "개입니다."
-                    : "현재 확인 가능한 관련 항목은 " + actualCount + "개입니다.";
-            answer = answer + "\n\n" + countMessage;
-        }
+        String countMessage = additionalResults
+                ? "이전에 안내한 항목을 제외하면, 추가로 확인 가능한 관련 항목은 "
+                        + actualCount + "개입니다."
+                : "현재 확인 가능한 관련 항목은 " + actualCount + "개입니다.";
+        answer = answer + "\n\n" + countMessage;
         return new GeneratedAiAnswer(
                 answer,
                 generated.citedDocumentKeys(),

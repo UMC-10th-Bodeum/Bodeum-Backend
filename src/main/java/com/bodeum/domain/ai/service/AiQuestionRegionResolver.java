@@ -121,7 +121,7 @@ public class AiQuestionRegionResolver {
         if (question == null || question.isBlank() || replacement == null) {
             return question;
         }
-        if (previousResolution != null && previousResolution.isResolved()) {
+        if (previousResolution != null && !previousResolution.isNotFound()) {
             for (String mention : regionMentions(previousResolution)) {
                 Matcher matcher = Pattern.compile(Pattern.quote(mention))
                         .matcher(question);
@@ -144,6 +144,13 @@ public class AiQuestionRegionResolver {
         } else if (resolution.regionLevel1() != null) {
             mentions.add(resolution.regionLevel1());
         }
+        resolution.candidates().forEach(candidate -> {
+            mentions.add(candidate);
+            String[] parts = candidate.split("\\s+");
+            String localName = parts[parts.length - 1];
+            mentions.add(localName);
+            mentions.add(removeAdministrativeSuffix(localName));
+        });
         REGION_LEVEL_1_ALIASES.forEach((alias, fullName) -> {
             if (fullName.equals(resolution.regionLevel1())) {
                 mentions.add(alias);
@@ -158,7 +165,8 @@ public class AiQuestionRegionResolver {
     private String removeAdministrativeSuffix(String regionLevel2) {
         return regionLevel2 == null
                 ? null
-                : regionLevel2.replaceFirst("(시|군|구)$", "");
+                : regionLevel2.replaceFirst(
+                        "(특별자치시|특별시|광역시|특별자치도|도|시|군|구)$", "");
     }
 
     private String displayName(RegionResolution resolution) {

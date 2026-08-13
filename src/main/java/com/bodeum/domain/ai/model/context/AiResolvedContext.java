@@ -14,6 +14,7 @@ public record AiResolvedContext(
 
     public AiResolvedContext {
         topic = normalize(topic);
+        region = region != null && region.isEmpty() ? null : region;
         filters = normalizeFilters(filters);
         requestedInformation = normalize(requestedInformation);
         requestedResultCount = requestedResultCount != null && requestedResultCount > 0
@@ -137,6 +138,10 @@ public record AiResolvedContext(
         public RegionContext {
             sido = normalize(sido);
             sigungu = normalize(sigungu);
+        }
+
+        public boolean isEmpty() {
+            return sido == null && sigungu == null;
         }
 
         public String displayName() {

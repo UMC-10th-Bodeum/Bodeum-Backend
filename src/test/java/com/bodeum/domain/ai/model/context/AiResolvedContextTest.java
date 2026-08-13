@@ -8,6 +8,43 @@ import org.junit.jupiter.api.Test;
 class AiResolvedContextTest {
 
     @Test
+    void normalizesEmptyRegionToNull() {
+        AiResolvedContext context = new AiResolvedContext(
+                null,
+                new AiResolvedContext.RegionContext(" ", null),
+                Map.of(),
+                null,
+                null
+        );
+
+        assertThat(context.region()).isNull();
+        assertThat(context.isEmpty()).isTrue();
+    }
+
+    @Test
+    void ignoresEmptyRegionWhenMergingFollowUpContext() {
+        AiResolvedContext original = new AiResolvedContext(
+                "특수학교",
+                new AiResolvedContext.RegionContext("경기도", "수원시"),
+                Map.of(),
+                "목록",
+                5
+        );
+        AiResolvedContext update = new AiResolvedContext(
+                null,
+                new AiResolvedContext.RegionContext(null, null),
+                Map.of("설립구분", "공립"),
+                null,
+                null
+        );
+
+        AiResolvedContext merged = original.merge(update);
+
+        assertThat(merged.region()).isEqualTo(original.region());
+        assertThat(merged.filters()).containsEntry("설립구분", "공립");
+    }
+
+    @Test
     void preservesTopicAcrossRegionAndFilterFollowUps() {
         AiResolvedContext original = new AiResolvedContext(
                 "특수학교",

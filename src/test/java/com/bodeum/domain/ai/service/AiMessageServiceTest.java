@@ -1137,8 +1137,17 @@ class AiMessageServiceTest {
         verify(questionIntentClassifier).analyze(resolvedQuestion);
         verify(questionIntentClassifier, never()).analyze(
                 question, previousQuestion, previousAnswer);
+        ArgumentCaptor<AiResolvedContext> contextCaptor =
+                ArgumentCaptor.forClass(AiResolvedContext.class);
         verify(persistenceService).updateUserMessageContext(
-                11L, resolvedQuestion, null, 100L, 100L);
+                eq(11L),
+                eq(resolvedQuestion),
+                contextCaptor.capture(),
+                eq(100L),
+                eq(100L)
+        );
+        assertThat(contextCaptor.getValue().region())
+                .isEqualTo(new AiResolvedContext.RegionContext("경기도", "안양시"));
         verify(answerGenerator).generate(
                 eq(resolvedQuestion), any(), eq(List.of(source)));
     }
@@ -2159,6 +2168,27 @@ class AiMessageServiceTest {
         assertThat(normalized.answer())
                 .contains("추가로 확인 가능한 관련 항목은 5개입니다.")
                 .doesNotContain("관련 항목은 0개입니다.");
+    }
+
+    @Test
+    void preservesCountMessageWhenRequestedCountIsSatisfied() {
+        GeneratedAiAnswer generated = new GeneratedAiAnswer(
+                "현재 확인 가능한 관련 학교는 5개입니다.",
+                List.of("1", "2", "3", "4", "5"),
+                List.of(
+                        new GeneratedAiAnswerItem("학교1", "1"),
+                        new GeneratedAiAnswerItem("학교2", "2"),
+                        new GeneratedAiAnswerItem("학교3", "3"),
+                        new GeneratedAiAnswerItem("학교4", "4"),
+                        new GeneratedAiAnswerItem("학교5", "5")
+                )
+        );
+
+        GeneratedAiAnswer normalized = ReflectionTestUtils.invokeMethod(
+                service, "normalizeListedResultCount", generated, 5, false);
+
+        assertThat(normalized).isSameAs(generated);
+        assertThat(normalized.answer()).contains("관련 학교는 5개입니다.");
     }
 
     private AiReferenceDocument referenceDocument(String documentKey, long sourceId) {
