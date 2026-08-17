@@ -35,6 +35,7 @@ import com.bodeum.domain.ai.model.answer.GeneratedAiAnswer;
 import com.bodeum.domain.ai.model.answer.AiStarterQuestionAnswer;
 import com.bodeum.domain.ai.service.port.AiAnswerGenerator;
 import com.bodeum.domain.ai.repository.AiChatRoomRepository;
+import com.bodeum.domain.info.entity.enums.InfoSubCategory;
 import com.bodeum.domain.user.entity.User;
 import com.bodeum.domain.user.exception.UserErrorCode;
 import com.bodeum.domain.user.repository.UserRepository;
@@ -197,11 +198,19 @@ public class AiMessageService {
         }
 
         AiUserProfile profile = questionContext.profile();
+        if (additionalResultsContext.isFollowUp()) {
+            InfoSubCategory previousCategory = questionContextResolver.resolveInfoSubCategory(
+                    additionalResultsContext.previousQuestion());
+            if (previousCategory != null) {
+                profile = profile.withInfoSubCategory(previousCategory);
+            }
+        }
         Optional<AiStarterQuestionAnswer> starterAnswer =
                 questionContext.requestedResultCount() == null
                         && starterQuestionContextResolver.shouldRoute(questionContext)
                         ? questionContext.questionType()
-                                .flatMap(type -> starterQuestionRouter.route(type, profile))
+                                .flatMap(type -> starterQuestionRouter.route(
+                                        type, questionContext.profile()))
                         : Optional.empty();
         if (starterAnswer.isPresent()) {
             AiStarterQuestionAnswer answer = starterAnswer.get();

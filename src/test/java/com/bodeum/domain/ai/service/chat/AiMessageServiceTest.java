@@ -1040,6 +1040,66 @@ class AiMessageServiceTest {
     }
 
     @Test
+    void keepsRootResourceCategoryForAdditionalNationwideResults() {
+        String question = "더 알려줘";
+        String previousQuestion = "우리 지역 특수학교 알려줘";
+        String llmResolvedQuestion = "수원시에서 더 알려줘";
+        user.updateInterestRegion(List.of(), Region.create("경기도", "수원시"));
+
+        AiMessage currentUserMessage = mock(AiMessage.class);
+        AiMessage previousUserMessage = mock(AiMessage.class);
+        AiMessage previousAiMessage = mock(AiMessage.class);
+        when(previousUserMessage.getResolvedQuestion()).thenReturn(previousQuestion);
+        when(previousUserMessage.getContextRootMessageId()).thenReturn(100L);
+        when(previousUserMessage.getId()).thenReturn(100L);
+        when(previousAiMessage.getId()).thenReturn(20L);
+        when(previousAiMessage.getContent()).thenReturn("자혜학교를 안내했습니다.");
+        when(aiMessageRepository.findByChatRoomIdAndSenderTypeOrderByCreatedAtDescIdDesc(
+                any(), eq(SenderType.USER), any()))
+                .thenReturn(List.of(currentUserMessage, previousUserMessage));
+        when(aiMessageRepository.findByChatRoomIdAndSenderTypeOrderByCreatedAtDescIdDesc(
+                any(), eq(SenderType.AI), any()))
+                .thenReturn(List.of(previousAiMessage));
+        when(aiMessageRepository.findById(100L)).thenReturn(Optional.of(previousUserMessage));
+        when(aiMessageRepository
+                .findByChatRoomIdAndContextRootMessageIdAndSenderTypeOrderByCreatedAtDescIdDesc(
+                        any(), eq(100L), eq(SenderType.AI)))
+                .thenReturn(List.of(previousAiMessage));
+        AiResponseSourceProjection previousSource = mock(AiResponseSourceProjection.class);
+        when(previousSource.getSourceType()).thenReturn(AiResponseSourceType.INFO);
+        when(previousSource.getSourceId()).thenReturn(1L);
+        when(previousSource.getSourceTitle()).thenReturn("자혜학교");
+        when(aiResponseSourceRepository.findAllByMessageIds(List.of(20L)))
+                .thenReturn(List.of(previousSource));
+        when(questionIntentClassifier.analyze(
+                question, previousQuestion, "자혜학교를 안내했습니다."))
+                .thenReturn(AiQuestionAnalysis.forQuestion(
+                        llmResolvedQuestion,
+                        AiQuestionIntent.NONE,
+                        AiSearchScope.GENERAL,
+                        List.of(),
+                        null,
+                        llmResolvedQuestion,
+                        true
+                ));
+        when(documentRetriever.retrieve(any(), any(), eq(AiSearchScope.GENERAL)))
+                .thenReturn(List.of());
+        AiMessage saved = savedAiMessage("관련 정보를 찾을 수 없습니다.");
+        when(persistenceService.saveAiMessageAndComplete(
+                11L, chatRoom, "관련 정보를 찾을 수 없습니다.", false,
+                AiAnswerStatus.NO_EVIDENCE, List.of()
+        )).thenReturn(saved);
+
+        service.createMessage(1L, question);
+
+        verify(documentRetriever, org.mockito.Mockito.atLeastOnce()).retrieve(
+                any(),
+                org.mockito.ArgumentMatchers.argThat(profile ->
+                        profile.infoSubCategory() == InfoSubCategory.SPECIAL_SCHOOL),
+                eq(AiSearchScope.GENERAL));
+    }
+
+    @Test
     void resolvesAmbiguousFollowUpQuestionFromPreviousConversation() {
         String question = "그중에서 공립만 알려줘";
         String previousQuestion = "수원시 특수학교를 알려줘";

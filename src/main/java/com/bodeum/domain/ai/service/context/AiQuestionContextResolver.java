@@ -131,6 +131,10 @@ public class AiQuestionContextResolver {
         return question != null && LOCAL_RESOURCE_PATTERN.matcher(question).find();
     }
 
+    public InfoSubCategory resolveInfoSubCategory(String question) {
+        return resolveInfoSubCategory(question, null);
+    }
+
     public boolean isSelfContainedResourceQuestion(
             String originalQuestion,
             String resolvedQuestion,
