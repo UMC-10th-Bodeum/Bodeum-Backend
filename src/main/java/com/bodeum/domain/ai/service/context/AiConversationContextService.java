@@ -32,6 +32,10 @@ public class AiConversationContextService {
                     + "|추가로(?:\\d+(?:개|곳)?)?"
                     + "|다른(?:곳|기관|학교|센터|서비스|제도|항목))"
                     + "(?:알려줘|알려주세요|추천해줘|추천해주세요)$");
+    private static final Pattern SHORT_ADDITIONAL_RESULTS_PATTERN = Pattern.compile(
+            "^(?:(?:좀|조금)?더|추가로)$|"
+                    + ".*(?:곳|기관|학교|센터|서비스|제도|항목|사이트|홈페이지)"
+                    + "(?:을|를)?더$");
 
     private final AiMessageRepository aiMessageRepository;
     private final AiResponseSourceRepository aiResponseSourceRepository;
@@ -120,7 +124,8 @@ public class AiConversationContextService {
                 || normalized.contains("내용") || normalized.contains("방법")) {
             return false;
         }
-        return ADDITIONAL_RESULTS_PATTERN.matcher(normalized).find();
+        return SHORT_ADDITIONAL_RESULTS_PATTERN.matcher(normalized).find()
+                || ADDITIONAL_RESULTS_PATTERN.matcher(normalized).find();
     }
 
     private String resolvedQuestion(AiMessage message) {

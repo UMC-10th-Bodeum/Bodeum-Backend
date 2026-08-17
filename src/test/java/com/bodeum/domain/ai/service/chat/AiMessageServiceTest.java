@@ -905,6 +905,10 @@ class AiMessageServiceTest {
 
     @ParameterizedTest
     @ValueSource(strings = {
+            "더",
+            "좀 더",
+            "추가로",
+            "부산 특수학교를 더",
             "5개 더 알려줘",
             "더 알려줘",
             "좀 더 추천해줘",
@@ -1041,7 +1045,7 @@ class AiMessageServiceTest {
 
     @Test
     void keepsRootResourceCategoryForAdditionalNationwideResults() {
-        String question = "더 알려줘";
+        String question = "더";
         String previousQuestion = "우리 지역 특수학교 알려줘";
         String llmResolvedQuestion = "수원시에서 더 알려줘";
         user.updateInterestRegion(List.of(), Region.create("경기도", "수원시"));
