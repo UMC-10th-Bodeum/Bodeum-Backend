@@ -123,4 +123,17 @@ class AiQuestionAnalysisTest {
 
         assertThat(analysis.siteListRequest()).isTrue();
     }
+
+    @Test
+    void preservesStructuredResourceListRequestAcrossAnalysisUpdates() {
+        AiQuestionAnalysis analysis = AiQuestionAnalysis.forQuestion(
+                "수원 특수학교 5개 알려줘",
+                AiQuestionIntent.NONE,
+                List.of()
+        ).withResourceListRequest(true)
+                .withClarification(false, null)
+                .withResolvedContext(null);
+
+        assertThat(analysis.resourceListRequest()).isTrue();
+    }
 }

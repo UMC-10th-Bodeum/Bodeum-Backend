@@ -26,6 +26,7 @@ import com.bodeum.domain.ai.service.answer.AiAnswerFallbackService;
 import com.bodeum.domain.ai.service.answer.AiAnswerResultNormalizer;
 import com.bodeum.domain.ai.service.answer.AiDocumentSearchService;
 import com.bodeum.domain.ai.service.answer.AiSiteListAnswerValidator;
+import com.bodeum.domain.ai.service.answer.AiResourceListSearchService;
 import com.bodeum.domain.ai.service.answer.AiStarterQuestionRouter;
 import com.bodeum.domain.ai.service.context.AiConversationContextService;
 import com.bodeum.domain.ai.service.context.AiQuestionContextResolver;
@@ -99,6 +100,7 @@ class AiMessageServiceTest {
     @Mock AiStarterQuestionRouter starterQuestionRouter;
     @Mock AiQuestionIntentClassifier questionIntentClassifier;
     @Mock AiScrapInterestService scrapInterestService;
+    @Mock AiResourceListSearchService resourceListSearchService;
 
     private AiMessageService service;
     private AiAnswerEvidenceService evidenceService;
@@ -132,7 +134,8 @@ class AiMessageServiceTest {
                         externalAnswerProvider, persistenceService, evidenceService),
                 new AiUserProfileFactory(),
                 new AiStarterQuestionContextResolver(aiMessageRepository, regionRepository),
-                answerResultNormalizer);
+                answerResultNormalizer,
+                resourceListSearchService);
         user = User.createSocialUser(SocialProvider.KAKAO, "provider-id", "a@b.com", "보호자");
         chatRoom = AiChatRoom.create(user);
         lenient().when(aiChatRoomRepository.findByUserId(1L)).thenReturn(Optional.of(chatRoom));

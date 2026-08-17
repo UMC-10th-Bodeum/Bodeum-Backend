@@ -111,7 +111,9 @@ public class SpringAiQuestionIntentClassifier implements AiQuestionIntentClassif
                     result != null && result.needsClarification(),
                     result == null ? null : result.clarificationQuestion()
             ).withResolvedContext(result == null ? null : result.resolvedContext())
-                    .withSiteListRequest(result != null && result.siteListRequest());
+                    .withSiteListRequest(result != null && result.siteListRequest())
+                    .withResourceListRequest(
+                            result != null && result.resourceListRequest());
             log.info(
                     "[AI] 질문 LLM 분석 결과: intent={}, searchScope={}, retrievalQueryCount={}",
                     analysis.intent(),
@@ -138,7 +140,8 @@ public class SpringAiQuestionIntentClassifier implements AiQuestionIntentClassif
             boolean needsClarification,
             String clarificationQuestion,
             AiResolvedContext resolvedContext,
-            boolean siteListRequest
+            boolean siteListRequest,
+            boolean resourceListRequest
     ) {
     }
 

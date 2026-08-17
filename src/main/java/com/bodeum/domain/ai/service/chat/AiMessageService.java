@@ -5,6 +5,7 @@ import com.bodeum.domain.ai.service.answer.AiAnswerFallbackService;
 import com.bodeum.domain.ai.service.answer.AiAnswerResultNormalizer;
 import com.bodeum.domain.ai.service.answer.AiDocumentSearchService;
 import com.bodeum.domain.ai.service.answer.AiSiteListAnswerValidator;
+import com.bodeum.domain.ai.service.answer.AiResourceListSearchService;
 import com.bodeum.domain.ai.service.answer.AiStarterQuestionRouter;
 import com.bodeum.domain.ai.service.context.AiConversationContextService;
 import com.bodeum.domain.ai.service.context.AiQuestionContextResolver;
@@ -75,6 +76,7 @@ public class AiMessageService {
     private final AiUserProfileFactory userProfileFactory;
     private final AiStarterQuestionContextResolver starterQuestionContextResolver;
     private final AiAnswerResultNormalizer answerResultNormalizer;
+    private final AiResourceListSearchService resourceListSearchService;
 
     public CreateAiMessageResponse createMessage(Long userId, String content) {
         AiChatRoom chatRoom = aiChatRoomRepository.findByUserId(userId)
@@ -228,14 +230,27 @@ public class AiMessageService {
         List<String> searchQueries = searchContext.queries();
 
         log.debug("[AI] 문서 검색 시작");
-        List<AiReferenceDocument> retrievedDocuments = retrieveDocuments(
-                searchQuestion,
-                searchQueries,
-                questionContext.searchGoal(),
-                questionContext.requiredConcepts(),
-                profile,
-                questionContext.searchScope()
-        ).stream()
+        boolean structuredResourceList = questionContext.resourceListRequest()
+                || (additionalResultsContext.isFollowUp()
+                && profile.infoSubCategory() != null);
+        List<AiReferenceDocument> retrievedDocuments = structuredResourceList
+                ? resourceListSearchService.retrieve(
+                        profile,
+                        questionContext.searchScope(),
+                        questionContext.requestedResultCount(),
+                        additionalResultsContext.excludedSources(),
+                        additionalResultsContext.excludedIdentityKeys())
+                : List.of();
+        if (retrievedDocuments.isEmpty()) {
+            retrievedDocuments = retrieveDocuments(
+                        searchQuestion,
+                        searchQueries,
+                        questionContext.searchGoal(),
+                        questionContext.requiredConcepts(),
+                        profile,
+                        questionContext.searchScope());
+        }
+        retrievedDocuments = retrievedDocuments.stream()
                 .filter(document -> !additionalResultsContext.excludedSources().contains(
                         new AiSourceKey(document.sourceType(), document.sourceId())))
                 .filter(document -> evidenceService.documentIdentityKeys(document).stream()

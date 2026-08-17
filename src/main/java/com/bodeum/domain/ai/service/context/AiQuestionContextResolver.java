@@ -82,6 +82,8 @@ public class AiQuestionContextResolver {
         String resolvedQuestion = analysis.resolvedQuestion() == null
                 ? content : analysis.resolvedQuestion();
         boolean siteListRequest = analyzedSiteListRequest;
+        boolean resourceListRequest = analysis.resourceListRequest()
+                || intent == AiQuestionIntent.LOCAL_REHAB_CENTERS;
         boolean followUp = analysis.followUp() && !selfContainedResourceQuestion;
         AiSearchScope searchScope = resolveSearchScope(intent, analysis.searchScope());
         if (nationwideResourceQuestion) {
@@ -124,7 +126,7 @@ public class AiQuestionContextResolver {
                         : analysis.requestedResultCount(),
                 resolvedQuestion, followUp, analysis.searchGoal(), analysis.requiredConcepts(),
                 analysis.needsClarification(), analysis.clarificationQuestion(), resolvedContext,
-                siteListRequest);
+                siteListRequest, resourceListRequest);
     }
 
     public boolean isLocalResourceTarget(String question) {
@@ -193,7 +195,8 @@ public class AiQuestionContextResolver {
                 analysis.intent(), analysis.searchScope(), retrievalQueries,
                 analysis.requestedResultCount(), resolvedQuestion, followUp,
                 analysis.infoSubCategory(), analysis.searchGoal(), analysis.requiredConcepts(),
-                false, null, analysis.resolvedContext(), analysis.siteListRequest());
+                false, null, analysis.resolvedContext(), analysis.siteListRequest(),
+                analysis.resourceListRequest());
     }
 
     private AiResolvedContext resolveStructuredContext(

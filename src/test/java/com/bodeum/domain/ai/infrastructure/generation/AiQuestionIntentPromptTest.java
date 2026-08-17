@@ -39,4 +39,19 @@ class AiQuestionIntentPromptTest {
                 "변경하지 않은 topic·region·filters·requestedInformation은 유지"
         );
     }
+
+    @Test
+    void distinguishesStructuredResourceListsFromInstitutionExplanations()
+            throws IOException {
+        String prompt = new ClassPathResource(
+                "prompts/ai-question-intent-classifier-system-prompt.txt"
+        ).getContentAsString(StandardCharsets.UTF_8);
+
+        assertThat(prompt).contains(
+                "resourceListRequest=true",
+                "resourceListRequest=false",
+                "수원 특수학교 5개",
+                "특정 기관의 이용 방법"
+        );
+    }
 }

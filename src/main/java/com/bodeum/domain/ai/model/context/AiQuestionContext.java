@@ -21,6 +21,7 @@ public record AiQuestionContext(
         boolean needsClarification,
         String clarificationQuestion,
         AiResolvedContext resolvedContext,
-        boolean siteListRequest
+        boolean siteListRequest,
+        boolean resourceListRequest
 ) {
 }

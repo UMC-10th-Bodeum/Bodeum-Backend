@@ -62,7 +62,8 @@ public class AiStarterQuestionContextResolver {
         return new AiQuestionContext(
                 profile, Optional.of(questionType), Optional.empty(), searchScope(questionType),
                 List.of(), null, null, false, null, List.of(), false, null, null,
-                questionType == AiStarterQuestionType.WELFARE_SITES);
+                questionType == AiStarterQuestionType.WELFARE_SITES,
+                questionType == AiStarterQuestionType.LOCAL_REHAB_CENTERS);
     }
 
     private AiSearchScope searchScope(AiStarterQuestionType questionType) {
