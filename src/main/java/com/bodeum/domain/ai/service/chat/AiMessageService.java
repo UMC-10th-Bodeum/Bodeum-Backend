@@ -286,7 +286,8 @@ public class AiMessageService {
         generated = answerResultNormalizer.normalizeListedResultCount(
                 generated,
                 questionContext.requestedResultCount(),
-                additionalResultsContext.isFollowUp()
+                additionalResultsContext.isFollowUp(),
+                profile.infoSubCategory()
         );
 
         log.debug("[AI] 답변 생성 완료");

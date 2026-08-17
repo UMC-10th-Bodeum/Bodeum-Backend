@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.bodeum.domain.ai.model.answer.GeneratedAiAnswer;
 import com.bodeum.domain.ai.model.answer.GeneratedAiAnswerItem;
+import com.bodeum.domain.info.entity.enums.InfoSubCategory;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
@@ -29,5 +30,29 @@ class AiAnswerResultNormalizerTest {
         assertThat(normalized.answer())
                 .doesNotContain("관련 학교는 0개입니다.")
                 .containsOnlyOnce("추가로 확인 가능한 관련 항목은 2개입니다.");
+    }
+
+    @Test
+    void explainsWhenBodeumHasFewerRehabCentersThanRequested() {
+        GeneratedAiAnswer generated = new GeneratedAiAnswer(
+                "수원시에서 확인 가능한 치료·재활기관은 6개입니다.\n\n기관 목록",
+                List.of("1", "2", "3", "4", "5", "6"),
+                List.of(
+                        new GeneratedAiAnswerItem("기관1", "1"),
+                        new GeneratedAiAnswerItem("기관2", "2"),
+                        new GeneratedAiAnswerItem("기관3", "3"),
+                        new GeneratedAiAnswerItem("기관4", "4"),
+                        new GeneratedAiAnswerItem("기관5", "5"),
+                        new GeneratedAiAnswerItem("기관6", "6")
+                )
+        );
+
+        GeneratedAiAnswer normalized = normalizer.normalizeListedResultCount(
+                generated, 10, false, InfoSubCategory.THERAPY_REHAB);
+
+        assertThat(normalized.answer())
+                .containsOnlyOnce(
+                        "요청하신 10곳 중 현재 보듬에서 확인 가능한 치료·재활기관은 6곳입니다.")
+                .doesNotContain("수원시에서 확인 가능한 치료·재활기관은 6개입니다.");
     }
 }
