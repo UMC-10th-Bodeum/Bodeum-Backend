@@ -1,31 +1,17 @@
-package com.bodeum.domain.ai.enums;
+package com.bodeum.domain.ai.model.question;
 
 import java.util.Optional;
 
-public enum AiQuestionIntent {
-    WELFARE_SITES,
-    LOCAL_REHAB_CENTERS,
-    CHILD_MEDICAL_SUPPORT,
-    DIAGNOSIS_FIRST_STEPS,
-    VOUCHER_APPLICATION,
-    MEDICAL_DIAGNOSIS,
-    LEGAL_ADVICE,
-    INSTITUTION_EVALUATION,
-    NONE;
+/**
+ * 안전 제한 의도를 사용자 안내 문구로 변환한다.
+ */
+public final class AiSafetyGuidanceResolver {
 
-    public Optional<AiStarterQuestionType> starterQuestionType() {
-        return switch (this) {
-            case WELFARE_SITES -> Optional.of(AiStarterQuestionType.WELFARE_SITES);
-            case LOCAL_REHAB_CENTERS -> Optional.of(AiStarterQuestionType.LOCAL_REHAB_CENTERS);
-            case CHILD_MEDICAL_SUPPORT -> Optional.of(AiStarterQuestionType.CHILD_MEDICAL_SUPPORT);
-            case DIAGNOSIS_FIRST_STEPS -> Optional.of(AiStarterQuestionType.DIAGNOSIS_FIRST_STEPS);
-            case VOUCHER_APPLICATION -> Optional.of(AiStarterQuestionType.VOUCHER_APPLICATION);
-            default -> Optional.empty();
-        };
+    private AiSafetyGuidanceResolver() {
     }
 
-    public Optional<String> safetyGuidance() {
-        return switch (this) {
+    public static Optional<String> resolve(AiQuestionIntent intent) {
+        return switch (intent) {
             case MEDICAL_DIAGNOSIS -> Optional.of("""
                     입력해 주신 증상만으로 특정 질환이나 장애 여부를 진단해드릴 수 없습니다. 정확한 진단은 증상과 연령에 맞는 관련 전문의의 종합적인 평가가 필요합니다.
 

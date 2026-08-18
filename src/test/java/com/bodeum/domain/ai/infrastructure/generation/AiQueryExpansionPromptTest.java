@@ -22,7 +22,7 @@ class AiQueryExpansionPromptTest {
                 "최대 3개",
                 "우리 동네",
                 "서비스, 지원사업, 프로그램",
-                "LOCAL_RESOURCE",
+                "LOCAL_ONLY",
                 "지역 표현이 없는 서비스·지원사업 질문",
                 "장애아동을 대상으로 하는 제도, 서비스 또는 지원사업 질문",
                 "대상 표현만 \"장애아동\"에서 \"장애인\"으로 확장",
@@ -57,7 +57,7 @@ class AiQueryExpansionPromptTest {
 
         assertThat(prompt).contains(
                 "지역 표현이 없는 기관·시설·학교·병원·센터 질문",
-                "GENERAL",
+                "REGION_PRIORITY",
                 "전국을 검색 범위로 유지",
                 "검색 범위를 제한하지 않고 결과 우선순위에만 사용"
         );
@@ -71,7 +71,7 @@ class AiQueryExpansionPromptTest {
 
         assertThat(prompt).contains(
                 "resolvedQuestion",
-                "isFollowUp",
+                "referencesPreviousContext",
                 "독립적인 새 주제이면 false",
                 "같은 대화방에 이전 메시지가 있다는 이유로",
                 "직전 대화 없이는 의미가 불완전한 후속 질문",

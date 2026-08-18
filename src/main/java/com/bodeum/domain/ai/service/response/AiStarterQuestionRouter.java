@@ -1,10 +1,10 @@
-package com.bodeum.domain.ai.service.answer;
+package com.bodeum.domain.ai.service.response;
 
 import com.bodeum.domain.ai.entity.AiExternalDocument;
 import com.bodeum.domain.ai.entity.AiExternalSource;
 import com.bodeum.domain.ai.enums.AiExternalSourceType;
 import com.bodeum.domain.ai.enums.AiResponseSourceType;
-import com.bodeum.domain.ai.enums.AiStarterQuestionType;
+import com.bodeum.domain.ai.model.question.AiCuratedAnswerType;
 import com.bodeum.domain.ai.exception.AiErrorCode;
 import com.bodeum.domain.ai.infrastructure.external.AiExternalDocumentCandidate;
 import com.bodeum.domain.ai.infrastructure.external.AiExternalDocumentPersistenceService;
@@ -37,12 +37,17 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * 선별된 추천 질문 유형에 맞는 고정 답변과 근거를 구성하고,
+ * 지역 기관 질문은 내부 기관 데이터로 응답한다.
+ */
 @Service
 public class AiStarterQuestionRouter {
 
     private static final List<String> CIRCLED_NUMBERS =
             List.of("①", "②", "③", "④", "⑤");
-    private static final int LOCAL_CENTER_LIMIT = 5;
+    private static final int DEFAULT_LOCAL_CENTER_LIMIT = 5;
+    private static final int MAX_LOCAL_CENTER_LIMIT = 10;
     private static final String REGION_REQUIRED_MESSAGE =
             "활동 지역이 설정되어 있지 않습니다. "
                     + "확인할 시·도와 시·군·구를 알려주세요.";
@@ -206,36 +211,64 @@ public class AiStarterQuestionRouter {
 
     @Transactional
     public Optional<AiStarterQuestionAnswer> route(
-            AiStarterQuestionType type,
+            AiCuratedAnswerType type,
             AiUserProfile profile
     ) {
+        return route(type, profile, null);
+    }
+
+    @Transactional
+    public Optional<AiStarterQuestionAnswer> route(
+            AiCuratedAnswerType type,
+            AiUserProfile profile,
+            Integer requestedResultCount
+    ) {
         return switch (type) {
-            case WELFARE_SITES -> Optional.of(welfareSites());
-            case LOCAL_REHAB_CENTERS -> Optional.of(localRehabCenters(profile));
+            case WELFARE_SITES -> fixedSiteAnswer(
+                    WELFARE_SITES, requestedResultCount, this::welfareSites);
+            case LOCAL_REHAB_CENTERS -> Optional.of(localRehabCenters(
+                    profile, requestedResultCount));
             case CHILD_MEDICAL_SUPPORT -> Optional.of(childMedicalSupport());
             case DIAGNOSIS_FIRST_STEPS -> Optional.of(diagnosisFirstSteps());
             case VOUCHER_APPLICATION -> Optional.of(voucherApplication(profile));
-            case AUTISM_INFO_SITES -> Optional.of(autismInfoSites());
+            case AUTISM_INFO_SITES -> fixedSiteAnswer(
+                    AUTISM_INFO_SITES, requestedResultCount, this::autismInfoSites);
         };
+    }
+
+    private Optional<AiStarterQuestionAnswer> fixedSiteAnswer(
+            List<WelfareSiteSpec> sites,
+            Integer requestedResultCount,
+            java.util.function.IntFunction<AiStarterQuestionAnswer> answerFactory
+    ) {
+        int resultCount = requestedResultCount == null
+                ? sites.size() : Math.max(1, requestedResultCount);
+        if (resultCount > sites.size()) {
+            return Optional.empty();
+        }
+        return Optional.of(answerFactory.apply(resultCount));
     }
 
     // -------------------------------------------------------------------------
     // 질문별 답변 생성
     // -------------------------------------------------------------------------
 
-    private AiStarterQuestionAnswer welfareSites() {
+    private AiStarterQuestionAnswer welfareSites(int resultCount) {
+        List<WelfareSiteSpec> selectedSites = WELFARE_SITES.stream()
+                .limit(resultCount)
+                .toList();
         List<AiExternalSource> sources = findRegisteredSources(
-                WELFARE_SITES.stream().map(WelfareSiteSpec::host).toList()
+                selectedSites.stream().map(WelfareSiteSpec::host).toList()
         );
-        if (sources.size() != WELFARE_SITES.size()) {
+        if (sources.size() != selectedSites.size()) {
             return AiStarterQuestionAnswer.noEvidence();
         }
 
         List<AiReferenceDocument> references = persistSourceEntryPagesAsReferences(sources);
 
-        String content = IntStream.range(0, WELFARE_SITES.size())
+        String content = IntStream.range(0, selectedSites.size())
                 .mapToObj(index -> {
-                    WelfareSiteSpec spec = WELFARE_SITES.get(index);
+                    WelfareSiteSpec spec = selectedSites.get(index);
                     return String.format(
                             "- **%s** — %s",
                             spec.displayName(),
@@ -244,7 +277,8 @@ public class AiStarterQuestionRouter {
                 })
                 .collect(Collectors.joining(
                         "\n",
-                        "네, 참고하면 좋을 공식 복지 사이트 5개를 추천드리겠습니다!\n\n"
+                        "네, 참고하면 좋을 공식 복지 사이트 " + resultCount
+                                + "개를 추천드리겠습니다!\n\n"
                                 + "**자주 확인하면 좋은 공식 복지 사이트**\n\n",
                         "\n\n이 사이트들은 모두 정부·공공기관 및 공식 지원기관이 직접 운영해서 정보 신뢰도가 높아요. "
                                 + "보듬에서도 이 출처들을 기반으로 최신 정보를 정리해드리고 있습니다."
@@ -252,17 +286,23 @@ public class AiStarterQuestionRouter {
         return AiStarterQuestionAnswer.answered(content, references);
     }
 
-    private AiStarterQuestionAnswer localRehabCenters(AiUserProfile profile) {
+    private AiStarterQuestionAnswer localRehabCenters(
+            AiUserProfile profile,
+            Integer requestedResultCount
+    ) {
         if (profile.regionLevel1() == null || profile.regionLevel1().isBlank()
                 || profile.regionLevel2() == null || profile.regionLevel2().isBlank()) {
             return AiStarterQuestionAnswer.regionRequired(REGION_REQUIRED_MESSAGE);
         }
 
+        int resultCount = requestedResultCount == null
+                ? DEFAULT_LOCAL_CENTER_LIMIT
+                : Math.min(Math.max(1, requestedResultCount), MAX_LOCAL_CENTER_LIMIT);
         List<InfoItem> centers = infoItemRepository.findRehabCentersByRegion(
                 profile.regionLevel1(),
                 profile.regionLevel2(),
                 InfoSubCategory.THERAPY_REHAB,
-                PageRequest.of(0, LOCAL_CENTER_LIMIT)
+                PageRequest.of(0, resultCount)
         );
         if (centers.isEmpty()) {
             return AiStarterQuestionAnswer.noEvidence();
@@ -275,8 +315,8 @@ public class AiStarterQuestionRouter {
                 .mapToObj(index -> centerCard(centers.get(index), index))
                 .collect(Collectors.joining(
                         "\n\n",
-                        displayRegion(profile)
-                                + "에서 확인 가능한 재활센터를 정리해드렸어요!\n"
+                        localRehabAnswerPrefix(
+                                profile, requestedResultCount, centers.size())
                                 + "조회, 저장, 후기를 기준으로 정렬된 것이며, 기관의 우수성을 "
                                 + "판단한 결과는 아닙니다.\n"
                                 + "방문 전 꼭 직접 확인하시는 것을 권장합니다.\n\n",
@@ -286,8 +326,34 @@ public class AiStarterQuestionRouter {
         return AiStarterQuestionAnswer.answered(content, references);
     }
 
-    private AiStarterQuestionAnswer autismInfoSites() {
-        List<String> requiredHosts = AUTISM_INFO_SITES.stream()
+    private String localRehabAnswerPrefix(
+            AiUserProfile profile,
+            Integer requestedResultCount,
+            int actualCount
+    ) {
+        String region = displayRegion(profile);
+        if (requestedResultCount != null) {
+            if (requestedResultCount > MAX_LOCAL_CENTER_LIMIT) {
+                return "한 번에 최대 " + MAX_LOCAL_CENTER_LIMIT
+                        + "곳까지 안내할 수 있으며, 현재 보듬에서 확인한 "
+                        + region + " 재활센터 " + actualCount + "곳을 안내드립니다.\n";
+            }
+            if (actualCount < requestedResultCount) {
+                return "요청하신 " + requestedResultCount
+                        + "곳 중 현재 보듬에서 확인한 " + region
+                        + " 재활센터는 " + actualCount + "곳입니다.\n";
+            }
+            return "요청하신 " + requestedResultCount + "곳에 맞춰 "
+                    + region + " 재활센터 " + actualCount + "곳을 안내드립니다.\n";
+        }
+        return region + "에서 확인 가능한 재활센터를 정리해드렸어요!\n";
+    }
+
+    private AiStarterQuestionAnswer autismInfoSites(int resultCount) {
+        List<WelfareSiteSpec> selectedSites = AUTISM_INFO_SITES.stream()
+                .limit(resultCount)
+                .toList();
+        List<String> requiredHosts = selectedSites.stream()
                 .map(WelfareSiteSpec::host)
                 .distinct()
                 .toList();
@@ -297,7 +363,7 @@ public class AiStarterQuestionRouter {
         }
 
         List<AiReferenceDocument> references = persistSourceEntryPagesAsReferences(sources);
-        String content = AUTISM_INFO_SITES.stream()
+        String content = selectedSites.stream()
                 .map(spec -> String.format(
                         "- **%s** — %s",
                         spec.displayName(),

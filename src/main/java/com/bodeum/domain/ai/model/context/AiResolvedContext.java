@@ -1,5 +1,6 @@
 package com.bodeum.domain.ai.model.context;
 
+import com.bodeum.domain.ai.util.AiTextNormalizer;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import java.util.LinkedHashMap;
@@ -16,10 +17,10 @@ public record AiResolvedContext(
 ) {
 
     public AiResolvedContext {
-        topic = normalize(topic);
+        topic = AiTextNormalizer.trimToNull(topic);
         region = region != null && region.isEmpty() ? null : region;
         filters = normalizeFilters(filters);
-        requestedInformation = normalize(requestedInformation);
+        requestedInformation = AiTextNormalizer.trimToNull(requestedInformation);
         requestedResultCount = requestedResultCount != null && requestedResultCount > 0
                 ? requestedResultCount
                 : null;
@@ -68,8 +69,8 @@ public record AiResolvedContext(
 
     public AiResolvedContext withFilter(String key, String value) {
         Map<String, String> updatedFilters = new LinkedHashMap<>(filters);
-        String normalizedKey = normalize(key);
-        String normalizedValue = normalize(value);
+        String normalizedKey = AiTextNormalizer.trimToNull(key);
+        String normalizedValue = AiTextNormalizer.trimToNull(value);
         if (normalizedKey != null && normalizedValue != null) {
             updatedFilters.put(normalizedKey, normalizedValue);
         }
@@ -120,17 +121,13 @@ public record AiResolvedContext(
         }
         Map<String, String> normalized = new LinkedHashMap<>();
         filters.forEach((key, value) -> {
-            String normalizedKey = normalize(key);
-            String normalizedValue = normalize(value);
+            String normalizedKey = AiTextNormalizer.trimToNull(key);
+            String normalizedValue = AiTextNormalizer.trimToNull(value);
             if (normalizedKey != null && normalizedValue != null) {
                 normalized.put(normalizedKey, normalizedValue);
             }
         });
         return Collections.unmodifiableMap(normalized);
-    }
-
-    private static String normalize(String value) {
-        return value == null || value.isBlank() ? null : value.trim();
     }
 
     private static String value(String value) {
@@ -141,8 +138,8 @@ public record AiResolvedContext(
     public record RegionContext(String sido, String sigungu) {
 
         public RegionContext {
-            sido = normalize(sido);
-            sigungu = normalize(sigungu);
+            sido = AiTextNormalizer.trimToNull(sido);
+            sigungu = AiTextNormalizer.trimToNull(sigungu);
         }
 
         @JsonIgnore

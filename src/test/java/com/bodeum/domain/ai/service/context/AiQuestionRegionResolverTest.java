@@ -60,9 +60,9 @@ class AiQuestionRegionResolverTest {
         var currentResolution = resolver.resolve(
                 "안양시는?", profile("경기도", "수원시"));
 
-        assertThat(resolver.isRegionOnlyQuestion("안양시는?", currentResolution))
+        assertThat(resolver.isRegionOnlyFollowUp("안양시는?", currentResolution))
                 .isTrue();
-        assertThat(resolver.replaceRegion(
+        assertThat(resolver.replaceRegionInQuestion(
                 "경기도 성남시에서 알아두면 좋은 복지 사이트",
                 AiQuestionRegionResolver.RegionResolution.resolved(seongnam),
                 currentResolution
@@ -79,7 +79,7 @@ class AiQuestionRegionResolverTest {
                 List.of("광주광역시", "경기도 광주시")
         );
 
-        String replaced = resolver.replaceRegion(
+        String replaced = resolver.replaceRegionInQuestion(
                 "광주 특수학교를 알려줘",
                 previousResolution,
                 AiQuestionRegionResolver.RegionResolution.resolved(anyang)
@@ -98,7 +98,7 @@ class AiQuestionRegionResolverTest {
                 List.of("강원특별자치도 고성군", "경상남도 고성군")
         );
 
-        String replaced = resolver.replaceRegion(
+        String replaced = resolver.replaceRegionInQuestion(
                 "고성 재활센터를 알려줘",
                 previousResolution,
                 AiQuestionRegionResolver.RegionResolution.resolved(anyang)

@@ -6,7 +6,7 @@ import com.bodeum.domain.ai.dto.response.AiChatStarterResponse;
 import com.bodeum.domain.ai.entity.AiChatRoom;
 import com.bodeum.domain.ai.entity.AiMessage;
 import com.bodeum.domain.ai.enums.AiAnswerStatus;
-import com.bodeum.domain.ai.enums.AiStarterQuestionType;
+import com.bodeum.domain.ai.model.question.AiStarterQuestionCatalog;
 import com.bodeum.domain.ai.exception.AiErrorCode;
 import com.bodeum.domain.ai.repository.AiChatRoomRepository;
 import com.bodeum.domain.ai.repository.AiMessageRepository;
@@ -25,6 +25,10 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * 사용자 정보에 맞는 AI 채팅 시작 인사와 추천 질문을 구성하고,
+ * 당일 대화 여부에 따라 시작 화면을 제공한다.
+ */
 @Service
 @RequiredArgsConstructor
 public class AiChatStarterService {
@@ -43,10 +47,7 @@ public class AiChatStarterService {
 
             무엇이 궁금하신가요?""";
     private static final List<String> SUGGESTED_QUESTIONS =
-            Arrays.stream(AiStarterQuestionType.values())
-                    .filter(AiStarterQuestionType::isSuggestedQuestion)
-                    .map(AiStarterQuestionType::getContent)
-                    .toList();
+            AiStarterQuestionCatalog.visibleQuestionContents();
 
     private final UserService userService;
     private final AiChatRoomRepository aiChatRoomRepository;

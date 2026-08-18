@@ -17,6 +17,10 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * AI 대화 메시지와 출처를 저장하고,
+ * 사용자 메시지의 처리 상태 및 대화 문맥을 함께 갱신한다.
+ */
 @Service
 @RequiredArgsConstructor
 public class AiMessagePersistenceService {
@@ -25,6 +29,9 @@ public class AiMessagePersistenceService {
     private final AiResponseSourceRepository aiResponseSourceRepository;
     private final AiChatRoomRepository aiChatRoomRepository;
 
+    /**
+     * 사용자 질문을 처리 중 상태의 메시지로 저장하고, 채팅방의 마지막 메시지 시각을 갱신한다.
+     */
     @Transactional
     public AiMessage saveProcessingUserMessage(AiChatRoom chatRoom, String content) {
         AiMessage message = aiMessageRepository.save(AiMessage.createUserMessage(chatRoom, content));
@@ -33,6 +40,9 @@ public class AiMessagePersistenceService {
         return message;
     }
 
+    /**
+     * AI가 해석한 질문과 대화 연결 정보를 사용자 메시지에 저장한다.
+     */
     @Transactional
     public void updateUserMessageContext(
             Long userMessageId,
@@ -51,6 +61,10 @@ public class AiMessagePersistenceService {
         );
     }
 
+    /**
+     * AI 답변과 출처를 저장하고,
+     * 사용자 메시지의 응답 처리를 완료 상태로 변경한다.
+     */
     @Transactional
     public AiMessage saveAiMessageAndComplete(
             Long userMessageId,
@@ -64,15 +78,23 @@ public class AiMessagePersistenceService {
                 .orElseThrow(() -> new ProjectException(AiErrorCode.AI_RESPONSE_FAILED));
         AiMessage message = aiMessageRepository.save(
                 AiMessage.createAiMessage(chatRoom, content, warning, answerStatus));
+
+        // 사용자 질문의 대화 연결 정보를 AI 답변에도 동일하게 적용
         message.inheritConversationContext(userMessage);
+
+        // AI 답변에 사용된 근거 출처를 함께 저장
         aiResponseSourceRepository.saveAll(sources.stream()
                 .map(source -> AiResponseSource.create(
                         message, source.sourceType(), source.sourceId(), source.title(),
                         source.url(), source.updatedAt()))
                 .toList());
+
+        // AI 답변 생성이 정상적으로 완료되었음을 사용자 메시지에 반영
         userMessage.completeAiResponse();
+
         chatRoom.updateLastMessageAt(Instant.now());
         aiChatRoomRepository.save(chatRoom);
+
         return message;
     }
 }

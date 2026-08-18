@@ -39,4 +39,39 @@ class AiQuestionIntentPromptTest {
                 "변경하지 않은 topic·region·filters·requestedInformation은 유지"
         );
     }
+
+    @Test
+    void distinguishesStructuredResourceListsFromInstitutionExplanations()
+            throws IOException {
+        String prompt = new ClassPathResource(
+                "prompts/ai-question-intent-classifier-system-prompt.txt"
+        ).getContentAsString(StandardCharsets.UTF_8);
+
+        assertThat(prompt).contains(
+                "resourceListRequest=true",
+                "resourceListRequest=false",
+                "수원 특수학교 5개",
+                "특정 기관의 이용 방법",
+                "resolvedContext.requestedInformation이 자원 목록인 경우에만",
+                "같은 설명을 확장하는 후속 요청으로 판단하고 resourceListRequest=false"
+        );
+    }
+
+    @Test
+    void distinguishesAdditionalFilterAndDetailFollowUps() throws IOException {
+        String prompt = new ClassPathResource(
+                "prompts/ai-question-intent-classifier-system-prompt.txt"
+        ).getContentAsString(StandardCharsets.UTF_8);
+
+        assertThat(prompt).contains(
+                "referencesPreviousContext",
+                "excludePreviousResults",
+                "더 알려줘",
+                "직전 답변이 목록",
+                "직전 답변이 제도나 방법 설명",
+                "사용자 프로필 지역",
+                "현재 질문에 지역을 명시",
+                "현재 대화의 검색 문맥만 변경"
+        );
+    }
 }

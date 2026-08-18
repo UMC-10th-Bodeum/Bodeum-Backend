@@ -1,5 +1,6 @@
 package com.bodeum.domain.ai.model.rag;
 
+import com.bodeum.domain.ai.util.AiTextNormalizer;
 import java.util.List;
 
 public record AiRequiredConcept(
@@ -19,18 +20,14 @@ public record AiRequiredConcept(
     }
 
     public AiRequiredConcept {
-        name = normalize(name);
-        retrievalQuery = normalize(retrievalQuery);
+        name = AiTextNormalizer.trimToNull(name);
+        retrievalQuery = AiTextNormalizer.trimToNull(retrievalQuery);
         matchTerms = normalizeTerms(matchTerms);
         excludeTerms = normalizeTerms(excludeTerms);
     }
 
     public boolean isValid() {
         return name != null && retrievalQuery != null && !matchTerms.isEmpty();
-    }
-
-    private static String normalize(String value) {
-        return value == null || value.isBlank() ? null : value.trim();
     }
 
     private static List<String> normalizeTerms(List<String> terms) {

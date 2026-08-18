@@ -1,4 +1,4 @@
-package com.bodeum.domain.ai.service.answer;
+package com.bodeum.domain.ai.service.validation;
 
 import com.bodeum.domain.ai.infrastructure.support.AiSiteDomainNormalizer;
 import com.bodeum.domain.ai.model.answer.GeneratedAiAnswer;
@@ -12,6 +12,10 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Component;
 
+/**
+ * 사이트 목록 답변의 각 항목이 인용 근거와 대응하고
+ * 동일 기관이 중복되지 않는지 검증한다.
+ */
 @Component
 public class AiSiteListAnswerValidator {
 

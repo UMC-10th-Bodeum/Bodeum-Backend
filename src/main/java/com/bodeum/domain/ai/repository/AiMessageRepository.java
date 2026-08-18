@@ -3,6 +3,7 @@ package com.bodeum.domain.ai.repository;
 import com.bodeum.domain.ai.entity.AiMessage;
 import com.bodeum.domain.ai.enums.AiResponseProcessingStatus;
 import com.bodeum.domain.ai.enums.SenderType;
+import com.bodeum.domain.ai.repository.projection.AiConversationMessageProjection;
 import jakarta.persistence.LockModeType;
 import jakarta.persistence.QueryHint;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -18,6 +19,22 @@ import java.util.List;
 import java.util.Optional;
 
 public interface AiMessageRepository extends JpaRepository<AiMessage, Long> {
+
+    @Query("""
+            select message.id as id,
+                   message.senderType as senderType,
+                   message.content as content,
+                   message.resolvedQuestion as resolvedQuestion,
+                   message.resolvedContext as resolvedContext,
+                   message.contextRootMessageId as contextRootMessageId
+              from AiMessage message
+             where message.chatRoom.id = :chatRoomId
+             order by message.createdAt desc, message.id desc
+            """)
+    List<AiConversationMessageProjection> findRecentConversationContext(
+            @Param("chatRoomId") Long chatRoomId,
+            Pageable pageable
+    );
 
     Optional<AiMessage> findTopByChatRoomIdAndSenderTypeOrderByCreatedAtDescIdDesc(
             Long chatRoomId,

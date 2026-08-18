@@ -1,4 +1,4 @@
-package com.bodeum.domain.ai.service.answer;
+package com.bodeum.domain.ai.service.response;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -11,7 +11,8 @@ import com.bodeum.domain.ai.entity.AiExternalDocument;
 import com.bodeum.domain.ai.entity.AiExternalSource;
 import com.bodeum.domain.ai.enums.AiExternalSourceType;
 import com.bodeum.domain.ai.enums.AiResponseSourceType;
-import com.bodeum.domain.ai.enums.AiStarterQuestionType;
+import com.bodeum.domain.ai.model.question.AiCuratedAnswerType;
+import com.bodeum.domain.ai.model.question.AiStarterQuestionCatalog;
 import com.bodeum.domain.ai.infrastructure.external.AiExternalDocumentPersistenceService;
 import com.bodeum.domain.ai.model.rag.AiUserProfile;
 import com.bodeum.domain.ai.repository.AiExternalSourceRepository;
@@ -22,9 +23,11 @@ import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Pageable;
+import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
 class AiStarterQuestionRouterTest {
@@ -67,7 +70,7 @@ class AiStarterQuestionRouterTest {
         when(externalDocumentPersistenceService.saveAll(any())).thenReturn(documents);
 
         var result = router.route(
-                AiStarterQuestionType.DIAGNOSIS_FIRST_STEPS,
+                AiCuratedAnswerType.DIAGNOSIS_FIRST_STEPS,
                 profile("경기도 수원시")
         ).orElseThrow();
 
@@ -103,7 +106,7 @@ class AiStarterQuestionRouterTest {
         when(externalDocumentPersistenceService.saveAll(any())).thenReturn(documents);
 
         var result = router.route(
-                AiStarterQuestionType.WELFARE_SITES,
+                AiCuratedAnswerType.WELFARE_SITES,
                 profile("경기도 수원시")
         ).orElseThrow();
 
@@ -117,6 +120,44 @@ class AiStarterQuestionRouterTest {
                 "정부24",
                 "보듬에서도 이 출처들을 기반으로 최신 정보를 정리"
         );
+    }
+
+    @Test
+    void limitsFixedWelfareSitesToRequestedCount() {
+        List<AiExternalSource> sources = List.of(
+                source("복지로", "https://www.bokjiro.go.kr"),
+                source("발달장애인지원포털", "https://www.broso.or.kr/mainPage.do"),
+                source("사회서비스 전자바우처", "https://www.socialservice.or.kr")
+        );
+        when(externalSourceRepository.findAllBySourceTypeAndActiveTrue(
+                AiExternalSourceType.WEBSITE
+        )).thenReturn(sources);
+        List<AiExternalDocument> documents = List.of(
+                document(1L, sources.get(0).getBaseUrl()),
+                document(2L, sources.get(1).getBaseUrl()),
+                document(3L, sources.get(2).getBaseUrl())
+        );
+        when(externalDocumentPersistenceService.saveAll(any())).thenReturn(documents);
+
+        var result = router.route(
+                AiCuratedAnswerType.WELFARE_SITES,
+                profile("경기도 성남시"),
+                3
+        ).orElseThrow();
+
+        assertThat(result.sources()).hasSize(3);
+        assertThat(result.content())
+                .contains("공식 복지 사이트 3개를 추천드리겠습니다")
+                .doesNotContain("정부24");
+    }
+
+    @Test
+    void fallsThroughWhenRequestedSiteCountExceedsCuratedList() {
+        assertThat(router.route(
+                AiCuratedAnswerType.AUTISM_INFO_SITES,
+                profile("경기도 성남시"),
+                10
+        )).isEmpty();
     }
 
     @Test
@@ -140,7 +181,7 @@ class AiStarterQuestionRouterTest {
                 .toList();
         when(externalDocumentPersistenceService.saveAll(any())).thenReturn(documents);
 
-        AiStarterQuestionType type = AiStarterQuestionType.fromQuestion(
+        AiCuratedAnswerType type = AiStarterQuestionCatalog.findAnswerType(
                 "참고하면 좋을 복지사이트 알려주세요"
         ).orElseThrow();
         var result = router.route(type, profile(null));
@@ -157,7 +198,7 @@ class AiStarterQuestionRouterTest {
         )).thenReturn(List.of(bokjiro));
 
         var result = router.route(
-                AiStarterQuestionType.WELFARE_SITES,
+                AiCuratedAnswerType.WELFARE_SITES,
                 profile("경기도 수원시")
         ).orElseThrow();
 
@@ -182,13 +223,13 @@ class AiStarterQuestionRouterTest {
         );
         when(externalDocumentPersistenceService.saveAll(any())).thenReturn(documents);
 
-        AiStarterQuestionType type = AiStarterQuestionType.fromQuestion(
+        AiCuratedAnswerType type = AiStarterQuestionCatalog.findAnswerType(
                 "자폐스펙트럼 정보 사이트 알려주세요"
         ).orElseThrow();
         var result = router.route(type, profile(null)).orElseThrow();
 
-        assertThat(type).isEqualTo(AiStarterQuestionType.AUTISM_INFO_SITES);
-        assertThat(type.isSuggestedQuestion()).isFalse();
+        assertThat(type).isEqualTo(AiCuratedAnswerType.AUTISM_INFO_SITES);
+        assertThat(AiStarterQuestionCatalog.isVisible(type)).isFalse();
         assertThat(result.hasEvidence()).isTrue();
         assertThat(result.sources()).hasSize(3);
         assertThat(result.content()).contains(
@@ -218,7 +259,7 @@ class AiStarterQuestionRouterTest {
         when(externalDocumentPersistenceService.saveAll(any())).thenReturn(documents);
 
         var result = router.route(
-                AiStarterQuestionType.CHILD_MEDICAL_SUPPORT,
+                AiCuratedAnswerType.CHILD_MEDICAL_SUPPORT,
                 profile("경기도 수원시")
         ).orElseThrow();
 
@@ -243,7 +284,7 @@ class AiStarterQuestionRouterTest {
         )).thenReturn(List.of(mohw));
 
         var result = router.route(
-                AiStarterQuestionType.CHILD_MEDICAL_SUPPORT,
+                AiCuratedAnswerType.CHILD_MEDICAL_SUPPORT,
                 profile(null)
         ).orElseThrow();
 
@@ -267,7 +308,7 @@ class AiStarterQuestionRouterTest {
         when(externalDocumentPersistenceService.saveAll(any())).thenReturn(documents);
 
         var result = router.route(
-                AiStarterQuestionType.VOUCHER_APPLICATION,
+                AiCuratedAnswerType.VOUCHER_APPLICATION,
                 profile("경기도 수원시")
         ).orElseThrow();
 
@@ -306,7 +347,7 @@ class AiStarterQuestionRouterTest {
         )).thenReturn(List.of(center));
 
         var result = router.route(
-                AiStarterQuestionType.LOCAL_REHAB_CENTERS,
+                AiCuratedAnswerType.LOCAL_REHAB_CENTERS,
                 profile("경기도 수원시")
         ).orElseThrow();
 
@@ -324,9 +365,55 @@ class AiStarterQuestionRouterTest {
     }
 
     @Test
+    void usesRequestedCountForLocalRehabCenterLookup() {
+        when(infoItemRepository.findRehabCentersByRegion(
+                eq("경기도"),
+                eq("수원시"),
+                eq(com.bodeum.domain.info.entity.enums.InfoSubCategory.THERAPY_REHAB),
+                any(Pageable.class)
+        )).thenReturn(List.of());
+
+        router.route(
+                AiCuratedAnswerType.LOCAL_REHAB_CENTERS,
+                profile("경기도 수원시"),
+                10
+        ).orElseThrow();
+
+        ArgumentCaptor<Pageable> pageCaptor = ArgumentCaptor.forClass(Pageable.class);
+        verify(infoItemRepository).findRehabCentersByRegion(
+                eq("경기도"),
+                eq("수원시"),
+                eq(com.bodeum.domain.info.entity.enums.InfoSubCategory.THERAPY_REHAB),
+                pageCaptor.capture()
+        );
+        assertThat(pageCaptor.getValue().getPageSize()).isEqualTo(10);
+    }
+
+    @Test
+    void doesNotDescribePageSizeAsTotalRehabCenterCount() {
+        String exactRequestedCount = ReflectionTestUtils.invokeMethod(
+                router, "localRehabAnswerPrefix", profile("경기도 수원시"), 5, 5);
+        String fewerThanRequested = ReflectionTestUtils.invokeMethod(
+                router, "localRehabAnswerPrefix", profile("경기도 수원시"), 5, 3);
+        String overMaximum = ReflectionTestUtils.invokeMethod(
+                router, "localRehabAnswerPrefix", profile("경기도 수원시"), 100, 10);
+
+        assertThat(exactRequestedCount)
+                .isEqualTo("요청하신 5곳에 맞춰 경기도 수원시 재활센터 5곳을 안내드립니다.\n")
+                .doesNotContain("확인 가능한 재활센터는");
+        assertThat(fewerThanRequested)
+                .isEqualTo("요청하신 5곳 중 현재 보듬에서 확인한 경기도 수원시 "
+                        + "재활센터는 3곳입니다.\n");
+        assertThat(overMaximum)
+                .isEqualTo("한 번에 최대 10곳까지 안내할 수 있으며, 현재 보듬에서 확인한 "
+                        + "경기도 수원시 재활센터 10곳을 안내드립니다.\n")
+                .doesNotContain("요청하신 100곳 중");
+    }
+
+    @Test
     void asksForRegionWhenActivityRegionIsMissing() {
         var result = router.route(
-                AiStarterQuestionType.LOCAL_REHAB_CENTERS,
+                AiCuratedAnswerType.LOCAL_REHAB_CENTERS,
                 profile(null)
         ).orElseThrow();
 
