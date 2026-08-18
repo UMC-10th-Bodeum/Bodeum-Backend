@@ -1,6 +1,7 @@
 package com.bodeum.domain.ai.service.context;
 
 import com.bodeum.domain.ai.model.rag.AiUserProfile;
+import com.bodeum.domain.ai.util.AiTextNormalizer;
 import com.bodeum.domain.region.entity.Region;
 import com.bodeum.domain.region.repository.RegionRepository;
 import java.util.HashSet;
@@ -14,6 +15,10 @@ import java.util.stream.Collectors;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
 
+/**
+ * 사용자 질문에서 지역 정보를 추출하고,
+ * 사용자 프로필과 지역 DB를 기반으로 지역을 확정하거나 모호성을 판단한다.
+ */
 @Component
 public class AiQuestionRegionResolver {
 
@@ -50,6 +55,8 @@ public class AiQuestionRegionResolver {
 
     public RegionResolution resolve(String question, AiUserProfile profile) {
         String normalizedQuestion = normalize(question);
+
+        // "광주"는 광주광역시와 경기도 광주시가 모두 존재하므로 별도로 처리
         if (isBareGwangju(normalizedQuestion)) {
             Optional<Region> gwangjuSubregion = resolveGwangjuSubregion(question);
             if (gwangjuSubregion.isPresent()) {
@@ -59,6 +66,7 @@ public class AiQuestionRegionResolver {
                     GWANGJU_METROPOLITAN_CITY, "경기도 광주시"));
         }
 
+        // "경기광주"처럼 전체 지역명을 의미하는 별칭을 우선 확인
         for (Map.Entry<String, String> alias : REGION_FULL_NAME_ALIASES.entrySet()) {
             if (normalizedQuestion.contains(alias.getKey())) {
                 Optional<Region> region = regionRepository.findByFullName(alias.getValue());
@@ -68,6 +76,7 @@ public class AiQuestionRegionResolver {
             }
         }
 
+        // 질문에 전체 지역명이 포함된 경우 DB에서 직접 매칭
         Optional<Region> fullNameRegion = regionRepository.findMentionedInQuestion(
                         normalizeSpacing(question), PageRequest.of(0, 1))
                 .stream().findFirst();
@@ -75,6 +84,7 @@ public class AiQuestionRegionResolver {
             return RegionResolution.resolved(fullNameRegion.get());
         }
 
+        // 시·군·구 단위 표현을 찾고 광역 지역 또는 사용자 프로필을 이용해 후보를 좁힘
         String regionLevel1 = resolveRegionLevel1(normalizedQuestion).orElse(null);
         Matcher matcher = REGION_LEVEL_2_PATTERN.matcher(normalizeSpacing(question));
         while (matcher.find()) {
@@ -88,6 +98,7 @@ public class AiQuestionRegionResolver {
             }
         }
 
+        // "강남", "수원"처럼 행정구역 접미사가 생략된 표현도 후보로 검색
         RegionResolution bareResolution = selectCandidate(
                 findBareRegionCandidates(question), regionLevel1, profile.regionLevel1());
         if (!bareResolution.isNotFound()) {
@@ -98,7 +109,7 @@ public class AiQuestionRegionResolver {
                 : RegionResolution.resolvedRegionLevel1(regionLevel1);
     }
 
-    public boolean isRegionOnlyQuestion(
+    public boolean isRegionOnlyFollowUp(
             String question,
             RegionResolution resolution
     ) {
@@ -112,7 +123,7 @@ public class AiQuestionRegionResolver {
         return REGION_ONLY_REMAINDER_PATTERN.matcher(remainder).matches();
     }
 
-    public String replaceRegion(
+    public String replaceRegionInQuestion(
             String question,
             RegionResolution previousResolution,
             RegionResolution currentResolution
@@ -121,6 +132,8 @@ public class AiQuestionRegionResolver {
         if (question == null || question.isBlank() || replacement == null) {
             return question;
         }
+
+        // 이전 질문의 지역 표현을 찾으면 새 지역으로 교체
         if (previousResolution != null && !previousResolution.isNotFound()) {
             for (String mention : regionMentions(previousResolution)) {
                 Matcher matcher = Pattern.compile(Pattern.quote(mention))
@@ -130,11 +143,15 @@ public class AiQuestionRegionResolver {
                 }
             }
         }
+
+        // 기존 지역 표현을 찾지 못하면 새 지역명을 질문 앞에 추가
         return replacement + " " + question.trim();
     }
 
     private List<String> regionMentions(RegionResolution resolution) {
         Set<String> mentions = new HashSet<>();
+
+        // 전체명, 광역명, 시군구명, 접미사를 제거한 축약명까지 모두 후보로 수집
         if (resolution.region() != null) {
             Region region = resolution.region();
             mentions.add(region.getFullName());
@@ -156,6 +173,8 @@ public class AiQuestionRegionResolver {
                 mentions.add(alias);
             }
         });
+
+        // 긴 표현부터 치환해야 "서울특별시 강남구"가 "서울"보다 먼저 처리됨
         return mentions.stream()
                 .filter(mention -> mention != null && !mention.isBlank())
                 .sorted((left, right) -> Integer.compare(right.length(), left.length()))
@@ -193,17 +212,22 @@ public class AiQuestionRegionResolver {
             String explicitRegionLevel1,
             String profileRegionLevel1
     ) {
+        // 사용자가 광역 지역을 명시했다면 해당 지역 후보만 남김
         if (explicitRegionLevel1 != null) {
             candidates = candidates.stream()
                     .filter(region -> explicitRegionLevel1.equals(region.getRegionLevel1()))
                     .toList();
         }
+
+        // 동일 시군구가 여러 곳에 존재하면 사용자 프로필 지역을 우선 사용
         Optional<Region> profileCandidate = candidates.stream()
                 .filter(region -> region.getRegionLevel1().equals(profileRegionLevel1))
                 .findFirst();
         if (profileCandidate.isPresent()) {
             return RegionResolution.resolved(profileCandidate.get());
         }
+
+        // 후보가 하나면 확정하고, 여러 개면 사용자에게 재질문이 필요함
         if (candidates.size() == 1) {
             return RegionResolution.resolved(candidates.getFirst());
         }
@@ -219,9 +243,13 @@ public class AiQuestionRegionResolver {
         Set<String> names = new HashSet<>();
         while (matcher.find()) {
             String word = matcher.group().replaceFirst("(에서|으로|에|의)$", "");
+
+            // 이미 시·군·구가 붙은 표현은 앞 단계에서 처리하므로 제외
             if (word.endsWith("시") || word.endsWith("군") || word.endsWith("구")) {
                 continue;
             }
+
+            // 접미사가 생략된 지역명을 시·군·구 후보로 확장
             names.add(word + "시");
             names.add(word + "군");
             names.add(word + "구");
@@ -232,6 +260,9 @@ public class AiQuestionRegionResolver {
                         names.stream().sorted().toList());
     }
 
+    /**
+     * 광주광역시와 경기도 광주시 중 하나로 특정되지 않은 "광주" 표현인지 확인
+     */
     private boolean isBareGwangju(String normalizedQuestion) {
         return normalizedQuestion.contains("광주")
                 && !normalizedQuestion.contains("광주광역시")
@@ -240,6 +271,9 @@ public class AiQuestionRegionResolver {
                 && !normalizedQuestion.contains("광주시");
     }
 
+    /**
+     * "광주 북구"처럼 하위 행정구역으로 광주광역시를 특정할 수 있는지 확인
+     */
     private Optional<Region> resolveGwangjuSubregion(String question) {
         Matcher matcher = REGION_LEVEL_2_PATTERN.matcher(normalizeSpacing(question));
         while (matcher.find()) {
@@ -257,7 +291,7 @@ public class AiQuestionRegionResolver {
     }
 
     private String normalize(String value) {
-        return normalizeSpacing(value).replaceAll("\\s+", "");
+        return AiTextNormalizer.removeWhitespace(normalizeSpacing(value));
     }
 
     private String normalizeSpacing(String value) {
@@ -305,7 +339,8 @@ public class AiQuestionRegionResolver {
             return status == Status.NOT_FOUND;
         }
 
-        public AiUserProfile applyTo(AiUserProfile profile) {
+        public AiUserProfile toSearchProfile(AiUserProfile profile) {
+            // 원본 사용자 프로필은 유지하고 현재 요청의 검색 지역만 반영한 복사본을 생성
             if (region != null) {
                 return profile.withRegion(region.getFullName(),
                         region.getRegionLevel1(), region.getRegionLevel2());
@@ -314,6 +349,7 @@ public class AiQuestionRegionResolver {
         }
 
         public String ambiguityMessage() {
+            // 후보가 여러 개인 경우 사용자에게 지역을 다시 확인하기 위한 메시지 생성
             return "확인할 지역이 여러 곳입니다. "
                     + candidates.stream().collect(Collectors.joining(", "))
                     + " 중 어느 지역을 말씀하시나요?";

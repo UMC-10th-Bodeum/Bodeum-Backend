@@ -1,6 +1,7 @@
 package com.bodeum.domain.ai.model.context;
 
 public record AiConversationContext(
+        String recentConversation,
         String previousUserQuestion,
         String previousAiAnswer,
         String immediatePreviousUserQuestion,
@@ -9,13 +10,10 @@ public record AiConversationContext(
         Long rootUserMessageId
 ) {
     public static AiConversationContext empty() {
-        return new AiConversationContext(null, null, null, null, null, null);
+        return new AiConversationContext(null, null, null, null, null, null, null);
     }
 
     public boolean hasContext() {
-        return previousUserQuestion != null
-                && !previousUserQuestion.isBlank()
-                && previousAiAnswer != null
-                && !previousAiAnswer.isBlank();
+        return recentConversation != null && !recentConversation.isBlank();
     }
 }

@@ -1,4 +1,4 @@
-package com.bodeum.domain.ai.service.answer;
+package com.bodeum.domain.ai.service.validation;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

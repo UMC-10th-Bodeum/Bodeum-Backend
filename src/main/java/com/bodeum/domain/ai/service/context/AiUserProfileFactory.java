@@ -6,6 +6,9 @@ import com.bodeum.domain.region.entity.Region;
 import com.bodeum.domain.user.entity.User;
 import org.springframework.stereotype.Component;
 
+/**
+ * 사용자 프로필과 최근 스크랩 정보를 기반으로 AI 개인화용 사용자 프로필을 생성한다.
+ */
 @Component
 public class AiUserProfileFactory {
 

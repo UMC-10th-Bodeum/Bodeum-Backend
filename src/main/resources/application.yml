@@ -133,6 +133,7 @@ bodeum:
       max-count: ${AI_RESULT_MAX_COUNT:10}
     rag:
       top-k: ${AI_RAG_TOP_K:5}
+      max-candidate-count: ${AI_RAG_MAX_CANDIDATE_COUNT:30}
       similarity-threshold: ${AI_RAG_SIMILARITY_THRESHOLD:0.4}
       max-supplemental-concept-searches: ${AI_RAG_MAX_SUPPLEMENTAL_CONCEPT_SEARCHES:3}
     web-search:

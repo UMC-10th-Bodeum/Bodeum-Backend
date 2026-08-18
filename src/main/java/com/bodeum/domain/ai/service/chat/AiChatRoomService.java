@@ -20,6 +20,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import static com.bodeum.global.common.constant.TimeConstants.SERVICE_ZONE_ID;
 
+/**
+ * 사용자의 AI 채팅방을 생성하거나 조회하고,
+ * 최초 이용 안내 확인 상태를 관리한다.
+ */
 @Service
 @RequiredArgsConstructor
 public class AiChatRoomService {

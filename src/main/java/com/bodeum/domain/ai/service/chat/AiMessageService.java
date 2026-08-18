@@ -1,11 +1,13 @@
 package com.bodeum.domain.ai.service.chat;
 
-import com.bodeum.domain.ai.service.answer.AiAnswerEvidenceService;
-import com.bodeum.domain.ai.service.answer.AiAnswerFallbackService;
-import com.bodeum.domain.ai.service.answer.AiAnswerResultNormalizer;
-import com.bodeum.domain.ai.service.answer.AiDocumentSearchService;
-import com.bodeum.domain.ai.service.answer.AiSiteListAnswerValidator;
-import com.bodeum.domain.ai.service.answer.AiStarterQuestionRouter;
+import com.bodeum.domain.ai.service.response.AiAnswerFallbackService;
+import com.bodeum.domain.ai.service.response.AiAnswerResultNormalizer;
+import com.bodeum.domain.ai.service.response.AiResourceListAnswerBuilder;
+import com.bodeum.domain.ai.service.response.AiStarterQuestionRouter;
+import com.bodeum.domain.ai.service.retrieval.AiDocumentSearchService;
+import com.bodeum.domain.ai.service.retrieval.AiResourceListSearchService;
+import com.bodeum.domain.ai.service.validation.AiAnswerEvidenceService;
+import com.bodeum.domain.ai.service.validation.AiSiteListAnswerValidator;
 import com.bodeum.domain.ai.service.context.AiConversationContextService;
 import com.bodeum.domain.ai.service.context.AiQuestionContextResolver;
 import com.bodeum.domain.ai.service.context.AiQuestionRegionResolver;
@@ -14,12 +16,13 @@ import com.bodeum.domain.ai.service.context.AiStarterQuestionContextResolver;
 import com.bodeum.domain.ai.service.context.AiUserProfileFactory;
 import com.bodeum.domain.ai.service.support.AiRequestGuard;
 import com.bodeum.domain.ai.service.support.AiScrapInterestService;
+import com.bodeum.domain.ai.util.AiTextNormalizer;
 
 import com.bodeum.domain.ai.dto.response.*;
 import com.bodeum.domain.ai.entity.AiChatRoom;
 import com.bodeum.domain.ai.entity.AiMessage;
 import com.bodeum.domain.ai.enums.AiAnswerStatus;
-import com.bodeum.domain.ai.enums.AiSearchScope;
+import com.bodeum.domain.ai.model.question.AiSearchScope;
 import com.bodeum.domain.ai.exception.AiErrorCode;
 import com.bodeum.domain.ai.model.rag.AiReferenceDocument;
 import com.bodeum.domain.ai.model.context.AiResolvedContext;
@@ -35,6 +38,7 @@ import com.bodeum.domain.ai.model.answer.GeneratedAiAnswer;
 import com.bodeum.domain.ai.model.answer.AiStarterQuestionAnswer;
 import com.bodeum.domain.ai.service.port.AiAnswerGenerator;
 import com.bodeum.domain.ai.repository.AiChatRoomRepository;
+import com.bodeum.domain.info.entity.enums.InfoSubCategory;
 import com.bodeum.domain.user.entity.User;
 import com.bodeum.domain.user.exception.UserErrorCode;
 import com.bodeum.domain.user.repository.UserRepository;
@@ -48,6 +52,10 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+/**
+ * 사용자 질문을 분석하고 내부·외부 근거를 검색하여 AI 답변을 생성하며,
+ * 응답 검증과 메시지 저장까지 전체 처리 흐름을 조율한다.
+ */
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -74,7 +82,12 @@ public class AiMessageService {
     private final AiUserProfileFactory userProfileFactory;
     private final AiStarterQuestionContextResolver starterQuestionContextResolver;
     private final AiAnswerResultNormalizer answerResultNormalizer;
+    private final AiResourceListSearchService resourceListSearchService;
+    private final AiResourceListAnswerBuilder resourceListAnswerBuilder;
 
+    /**
+     * AI 질문 요청 제한을 검증한 뒤 응답 생성 흐름을 시작한다.
+     */
     public CreateAiMessageResponse createMessage(Long userId, String content) {
         AiChatRoom chatRoom = aiChatRoomRepository.findByUserId(userId)
                 .orElseThrow(() -> new ProjectException(AiErrorCode.AI_CHAT_ROOM_NOT_FOUND));
@@ -90,6 +103,7 @@ public class AiMessageService {
     ) {
         log.debug("[AI] 사용자 프로필 조회 시작");
 
+        // AI 개인화에 사용할 사용자 프로필과 최근 관심 정보 조회
         User user = userRepository.findAiProfileById(userId)
                 .orElseThrow(() -> new ProjectException(UserErrorCode.USER_NOT_FOUND));
 
@@ -100,8 +114,10 @@ public class AiMessageService {
 
         log.debug("[AI] 사용자 프로필 조회 완료");
 
+        // AI 응답 생성 전 사용자 질문을 PROCESSING 상태로 저장
         AiMessage userMessage = persistenceService.saveProcessingUserMessage(chatRoom, content);
 
+        // 응답 생성 실패 시 사용자 메시지를 FAILED 상태로 변경
         try {
             return generateAndSaveResponse(
                     chatRoom,
@@ -126,13 +142,13 @@ public class AiMessageService {
             User userWithDisabilities,
             AiScrapInterests scrapInterests
     ) {
-
-        AiAdditionalResultsContext additionalResultsContext =
-                conversationContextService.resolveAdditionalResults(chatRoom.getId(), content);
+        // 최근 대화 문맥과 사용자 개인화 프로필 구성
         AiConversationContext conversationContext =
                 conversationContextService.resolve(chatRoom.getId());
         AiUserProfile baseProfile = userProfileFactory.create(
                 user, userWithDisabilities, scrapInterests);
+
+        // 상대적 지역 표현을 사용했지만 프로필 지역이 없으면 지역 입력 요청
         if (RELATIVE_LOCAL_REGION_PATTERN.matcher(content).find()
                 && (baseProfile.region() == null || baseProfile.region().isBlank())) {
             persistenceService.updateUserMessageContext(
@@ -143,6 +159,8 @@ public class AiMessageService {
                     "어느 지역을 기준으로 찾을까요? 시·도와 시·군·구를 알려주세요."
             );
         }
+
+        // 지역 시설 질문의 지역이 여러 곳으로 해석되면, 사용자에게 지역 확인 요청
         AiQuestionRegionResolver.RegionResolution regionResolution =
                 questionRegionResolver.resolve(content, baseProfile);
         if (isLocalResourceTarget(content)
@@ -153,12 +171,19 @@ public class AiMessageService {
                     chatRoom, userMessage, regionResolution.ambiguityMessage());
         }
 
-        AiQuestionContext questionContext = resolveQuestionContext(
+        // 질문 의도와 이전 대화를 분석해 검색에 사용할 질문 문맥 구성
+        AiQuestionContext questionContext = resolveStarterOrAnalyzedQuestionContext(
                 chatRoom.getId(),
                 content,
                 baseProfile,
                 conversationContext
         );
+
+        // 추가 결과 요청이면, 이전 답변의 출처를 제외하기 위한 문맥 구성
+        AiAdditionalResultsContext additionalResultsContext =
+                conversationContextService.resolveAdditionalResults(
+                        chatRoom.getId(), conversationContext,
+                        questionContext.excludePreviousResults());
         String resolvedContent = questionContext.resolvedQuestion() == null
                 ? content
                 : questionContext.resolvedQuestion();
@@ -170,6 +195,8 @@ public class AiMessageService {
         }
         boolean followUp = questionContext.followUp()
                 || additionalResultsContext.isFollowUp();
+
+        // 해석된 질문과 부모·루트 메시지 정보를 저장해 후속 질문 연결 관계 유지
         persistenceService.updateUserMessageContext(
                 userMessage.getId(),
                 resolvedContent,
@@ -179,6 +206,8 @@ public class AiMessageService {
                         ? userMessage.getId()
                         : conversationContext.rootUserMessageId()
         );
+
+        // 안전 안내가 필요한 질문은 일반 검색 없이 안내 응답 반환
         if (questionContext.safetyGuidance().isPresent()) {
             log.info("[AI] 안전 응답 안내로 전환");
             return fallbackService.noEvidence(
@@ -187,6 +216,8 @@ public class AiMessageService {
                     questionContext.safetyGuidance().get()
             );
         }
+
+        // 질문 의도가 불명확하면 검색 전에 사용자에게 추가 정보 요청
         if (questionContext.needsClarification()) {
             log.info("[AI] 사용자 확인 질문으로 전환");
             return fallbackService.clarificationRequired(
@@ -196,13 +227,27 @@ public class AiMessageService {
             );
         }
 
-        AiUserProfile profile = questionContext.profile();
+        // 추가 결과 요청 시 이전 검색 카테고리를 유지
+        AiUserProfile searchProfile = questionContext.searchProfile();
+        if (additionalResultsContext.isFollowUp()) {
+            InfoSubCategory previousCategory = questionContextResolver.resolveInfoSubCategory(
+                    additionalResultsContext.previousQuestion());
+            if (previousCategory != null) {
+                searchProfile = searchProfile.withInfoSubCategory(previousCategory);
+            }
+        }
+        AiUserProfile effectiveSearchProfile = searchProfile;
+
+        // 초기 추천 질문은 사전 정의된 답변을 우선 조회하고, 근거가 없으면 일반 검색으로 전환
         Optional<AiStarterQuestionAnswer> starterAnswer =
-                questionContext.requestedResultCount() == null
-                        && starterQuestionContextResolver.shouldRoute(questionContext)
-                        ? questionContext.questionType()
-                                .flatMap(type -> starterQuestionRouter.route(type, profile))
-                        : Optional.empty();
+                questionContext.curatedAnswerType()
+                        .flatMap(type -> questionContext.requestedResultCount() == null
+                                ? starterQuestionRouter.route(
+                                        type, effectiveSearchProfile)
+                                : starterQuestionRouter.route(
+                                        type,
+                                        effectiveSearchProfile,
+                                        questionContext.requestedResultCount()));
         if (starterAnswer.isPresent()) {
             AiStarterQuestionAnswer answer = starterAnswer.get();
             if (answer.isRegionRequired() || answer.hasEvidence()) {
@@ -211,22 +256,44 @@ public class AiMessageService {
             log.info("[AI] 추천 질문 출처 없음, 일반 질문 흐름으로 전환");
         }
 
+        // 지역·결과 개수·후속 질문 문맥을 반영한 최종 검색 쿼리 구성
         AiSearchQueryContext searchContext = searchQueryBuilder.build(
-                resolvedContent, questionContext.retrievalQueries(), profile,
+                resolvedContent, questionContext.retrievalQueries(), searchProfile,
                 questionContext.searchScope(), questionContext.requestedResultCount(),
                 additionalResultsContext);
         String searchQuestion = searchContext.question();
         List<String> searchQueries = searchContext.queries();
 
         log.debug("[AI] 문서 검색 시작");
-        List<AiReferenceDocument> retrievedDocuments = retrieveDocuments(
-                searchQuestion,
-                searchQueries,
-                questionContext.searchGoal(),
-                questionContext.requiredConcepts(),
-                profile,
-                questionContext.searchScope()
-        ).stream()
+        // 구조화된 시설 목록 요청은 전용 검색을 우선 수행
+        boolean structuredResourceList = questionContext.isResourceListRequest()
+                || (additionalResultsContext.isFollowUp()
+                && searchProfile.infoSubCategory() != null);
+        List<AiReferenceDocument> retrievedDocuments = structuredResourceList
+                ? resourceListSearchService.retrieve(
+                        searchProfile,
+                        questionContext.searchScope(),
+                        questionContext.requestedResultCount(),
+                        additionalResultsContext.excludedSources(),
+                        additionalResultsContext.excludedIdentityKeys())
+                : List.of();
+        boolean hasStructuredResourceList = !retrievedDocuments.isEmpty();
+
+        // 전용 검색 결과가 없으면, 일반 문서 검색 수행
+        if (retrievedDocuments.isEmpty()) {
+            retrievedDocuments = retrieveDocuments(
+                        searchQuestion,
+                        searchQueries,
+                        questionContext.searchGoal(),
+                        questionContext.requiredConcepts(),
+                        searchProfile,
+                        questionContext.searchScope(),
+                        questionContext.requestedResultCount(),
+                        additionalResultsContext);
+        }
+
+        // 추가 결과 요청에서는 이전 답변에 사용된 출처와 동일 기관을 제외
+        retrievedDocuments = retrievedDocuments.stream()
                 .filter(document -> !additionalResultsContext.excludedSources().contains(
                         new AiSourceKey(document.sourceType(), document.sourceId())))
                 .filter(document -> evidenceService.documentIdentityKeys(document).stream()
@@ -236,12 +303,28 @@ public class AiMessageService {
             retrievedDocuments = evidenceService.deduplicateInstitutions(retrievedDocuments);
         }
 
+        // MySQL의 구조화된 기관 목록은 LLM을 거치지 않고 정확한 항목과 출처로 응답
+        if (hasStructuredResourceList && !retrievedDocuments.isEmpty()) {
+            String answer = resourceListAnswerBuilder.build(
+                    retrievedDocuments,
+                    questionContext.requestedResultCount(),
+                    additionalResultsContext.isFollowUp(),
+                    searchProfile.infoSubCategory());
+            boolean warning = evidenceService.hasIncorrectFeedback(retrievedDocuments);
+            AiMessage message = persistenceService.saveAiMessageAndComplete(
+                    userMessage.getId(), chatRoom, answer, warning,
+                    AiAnswerStatus.ANSWERED, retrievedDocuments);
+            return fallbackService.sourceBacked(
+                    message, retrievedDocuments, AiAnswerStatus.ANSWERED);
+        }
+
         log.info("[AI] 검색 문서 수: {}", retrievedDocuments.size());
         log.debug("[AI] 검색 documentKeys: {}",
                 retrievedDocuments.stream()
                         .map(AiReferenceDocument::documentKey)
                         .toList());
 
+        // 내부 근거를 찾지 못하면 허용된 외부 출처 검색으로 전환
         if (retrievedDocuments.isEmpty()) {
             log.info("[AI] 내부 문서 없음, 외부 검색 시작");
             return fallbackService.externalOrNoResult(
@@ -249,26 +332,30 @@ public class AiMessageService {
                     userMessage,
                     searchQuestion,
                     searchQueries,
-                    profile,
+                    searchProfile,
                     questionContext.searchScope()
             );
         }
 
         log.debug("[AI] 답변 생성 시작");
 
+        // 검색된 근거 문서를 기반으로 AI 답변 생성 및 요청 개수에 맞게 결과 보정
         GeneratedAiAnswer generated = answerGenerator.generate(
-                resolvedContent, profile, retrievedDocuments
+                content, resolvedContent, questionContext.resolvedContext(),
+                searchProfile.region(), questionContext.userProfile(), retrievedDocuments
         );
         generated = answerResultNormalizer.normalizeListedResultCount(
                 generated,
                 questionContext.requestedResultCount(),
-                additionalResultsContext.isFollowUp()
+                additionalResultsContext.isFollowUp(),
+                searchProfile.infoSubCategory()
         );
 
         log.debug("[AI] 답변 생성 완료");
         log.debug("[AI] citedDocumentKeys: {}", generated.citedDocumentKeys());
 
-        if (questionContext.siteListRequest()
+        // 사이트 목록 답변이 검색 근거와 일치하지 않으면 외부 검색으로 전환
+        if (questionContext.isSiteListRequest()
                 && !siteListAnswerValidator.isValid(generated, retrievedDocuments)) {
             log.warn("[AI] 사이트 목록 항목과 인용 근거 검증 실패, 외부 검색 시작");
             return fallbackService.externalOrNoResult(
@@ -276,7 +363,7 @@ public class AiMessageService {
                     userMessage,
                     searchQuestion,
                     searchQueries,
-                    profile,
+                    searchProfile,
                     questionContext.searchScope()
             );
         }
@@ -293,7 +380,7 @@ public class AiMessageService {
                     userMessage,
                     searchQuestion,
                     searchQueries,
-                    profile,
+                    searchProfile,
                     questionContext.searchScope()
             );
         }
@@ -306,7 +393,11 @@ public class AiMessageService {
         return fallbackService.sourceBacked(message, citedSources, AiAnswerStatus.ANSWERED);
     }
 
-    private AiQuestionContext resolveQuestionContext(
+    /**
+     * 초기 추천 질문 전용 문맥을 우선 적용하고,
+     * 해당하지 않으면 일반 질문 분석 문맥을 생성한다.
+     */
+    private AiQuestionContext resolveStarterOrAnalyzedQuestionContext(
             Long chatRoomId,
             String content,
             AiUserProfile profile,
@@ -317,30 +408,13 @@ public class AiMessageService {
                         content, profile, conversationContext));
     }
 
-    private boolean isSelfContainedResourceQuestion(
-            String originalQuestion,
-            String resolvedQuestion,
-            AiQuestionRegionResolver.RegionResolution regionResolution
-    ) {
-        return questionContextResolver.isSelfContainedResourceQuestion(
-                originalQuestion, resolvedQuestion, regionResolution);
-    }
-
     private boolean isLocalResourceTarget(String question) {
         return questionContextResolver.isLocalResourceTarget(question);
     }
 
     private String normalizeQuestion(String content) {
-        return normalizeSpacing(content).replaceAll("\\s+", "");
-    }
-
-    private String normalizeSpacing(String content) {
-        return content == null
-                ? ""
-                : content.trim()
-                        .replaceFirst("[.!?~]+$", "")
-                        .trim()
-                        .replaceAll("\\s+", " ");
+        return AiTextNormalizer.removeWhitespace(
+                AiTextNormalizer.normalizeQuestionSpacing(content));
     }
 
     private List<AiReferenceDocument> retrieveDocuments(
@@ -349,7 +423,9 @@ public class AiMessageService {
             String searchGoal,
             List<AiRequiredConcept> requiredConcepts,
             AiUserProfile profile,
-            AiSearchScope searchScope
+            AiSearchScope searchScope,
+            Integer requestedResultCount,
+            AiAdditionalResultsContext additionalResultsContext
     ) {
         return documentSearchService.retrieve(
                 originalQuestion,
@@ -357,10 +433,13 @@ public class AiMessageService {
                 searchGoal,
                 requiredConcepts,
                 profile,
-                searchScope
+                searchScope,
+                requestedResultCount,
+                additionalResultsContext
         );
     }
 
+    // 스크랩 조회 실패가 AI 질문 전체 실패로 이어지지 않도록 빈 관심 정보로 대체
     private AiScrapInterests loadScrapInterestsSafely(Long userId) {
         try {
             return scrapInterestService.findRecentInterests(userId);
@@ -370,6 +449,7 @@ public class AiMessageService {
         }
     }
 
+    // 실패 상태 기록 중 추가 예외가 발생해도 원래 응답 생성 예외를 유지
     private void markFailedSafely(Long userMessageId, Exception originalException) {
         try {
             failureService.markFailed(userMessageId);

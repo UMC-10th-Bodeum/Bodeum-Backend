@@ -1,7 +1,7 @@
 package com.bodeum.domain.ai.infrastructure.retrieval;
 
 import com.bodeum.domain.ai.enums.AiResponseSourceType;
-import com.bodeum.domain.ai.enums.AiSearchScope;
+import com.bodeum.domain.ai.model.question.AiSearchScope;
 import com.bodeum.domain.ai.exception.AiErrorCode;
 import com.bodeum.domain.ai.model.rag.AiReferenceDocument;
 import com.bodeum.domain.ai.model.rag.AiUserProfile;
@@ -34,6 +34,8 @@ public class SpringAiDocumentRetriever implements AiDocumentRetriever {
     private final VectorStoreRetriever vectorStoreRetriever;
     private final int topK;
     private final int maxResultCount;
+    @Value("${bodeum.ai.rag.max-candidate-count:30}")
+    private int maxCandidateCount = 30;
     private final double similarityThreshold;
 
     public SpringAiDocumentRetriever(
@@ -54,19 +56,36 @@ public class SpringAiDocumentRetriever implements AiDocumentRetriever {
             AiUserProfile profile,
             AiSearchScope searchScope
     ) {
+        return retrieve(
+                question, profile, searchScope,
+                resolveSearchCandidateCount(question));
+    }
+
+    @Override
+    public List<AiReferenceDocument> retrieve(
+            String question,
+            AiUserProfile profile,
+            AiSearchScope searchScope,
+            int candidateCount
+    ) {
         try {
+            int candidateLimit = Math.max(maxResultCount, maxCandidateCount);
+            int resolvedCandidateCount = Math.max(
+                    topK, Math.min(candidateCount, candidateLimit));
             AiSearchScope resolvedScope = searchScope == null
-                    ? AiSearchScope.GENERAL
+                    ? AiSearchScope.REGION_PRIORITY
                     : searchScope;
-            if (resolvedScope == AiSearchScope.LOCAL_RESOURCE) {
-                return retrieveLocalInstitution(question, profile);
+            if (resolvedScope == AiSearchScope.LOCAL_ONLY) {
+                return retrieveLocalInstitution(
+                        question, profile, resolvedCandidateCount);
             }
             return retrieveAtScope(
                     question,
                     profile,
                     categoryFilter(profile),
-                    resolvedScope == AiSearchScope.GENERAL
-                            && hasText(profile.region())
+                    resolvedScope == AiSearchScope.REGION_PRIORITY
+                            && hasText(profile.region()),
+                    resolvedCandidateCount
             );
         } catch (ProjectException e) {
             throw e;
@@ -77,7 +96,8 @@ public class SpringAiDocumentRetriever implements AiDocumentRetriever {
 
     private List<AiReferenceDocument> retrieveLocalInstitution(
             String question,
-            AiUserProfile profile
+            AiUserProfile profile,
+            int candidateCount
     ) {
         if (hasText(profile.regionLevel1()) && hasText(profile.regionLevel2())) {
             String cityFilter = combineFilters(
@@ -86,7 +106,7 @@ public class SpringAiDocumentRetriever implements AiDocumentRetriever {
                     categoryFilter(profile)
             );
             List<AiReferenceDocument> cityDocuments = retrieveAtScope(
-                    question, profile, cityFilter, false);
+                    question, profile, cityFilter, false, candidateCount);
             if (!cityDocuments.isEmpty()) {
                 log.info("[AI] 지역 기관 검색 완료: scope=SIGUNGU, count={}",
                         cityDocuments.size());
@@ -102,7 +122,8 @@ public class SpringAiDocumentRetriever implements AiDocumentRetriever {
                             equalsFilter("sido", profile.regionLevel1()),
                             categoryFilter(profile)
                     ),
-                    false
+                    false,
+                    candidateCount
             );
             if (!provinceDocuments.isEmpty()) {
                 log.info("[AI] 지역 기관 검색 범위 확대: scope=SIDO, count={}",
@@ -112,7 +133,7 @@ public class SpringAiDocumentRetriever implements AiDocumentRetriever {
         }
 
         List<AiReferenceDocument> allDocuments = retrieveAtScope(
-                question, profile, categoryFilter(profile), false);
+                question, profile, categoryFilter(profile), false, candidateCount);
         log.info("[AI] 지역 기관 검색 범위 확대: scope=ALL, count={}", allDocuments.size());
         return allDocuments;
     }
@@ -121,9 +142,9 @@ public class SpringAiDocumentRetriever implements AiDocumentRetriever {
             String question,
             AiUserProfile profile,
             String filterExpression,
-            boolean includeRegion
+            boolean includeRegion,
+            int searchCandidateCount
     ) {
-        int searchCandidateCount = resolveSearchCandidateCount(question);
         String searchQuery = buildSearchQuery(question, profile, includeRegion);
         List<Document> personalizedDocuments = search(
                 searchQuery, filterExpression, searchCandidateCount);

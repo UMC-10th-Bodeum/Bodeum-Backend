@@ -1,4 +1,4 @@
-package com.bodeum.domain.ai.service.answer;
+package com.bodeum.domain.ai.service.validation;
 
 import com.bodeum.domain.ai.model.answer.GeneratedAiAnswer;
 import com.bodeum.domain.ai.model.rag.AiReferenceDocument;
@@ -17,6 +17,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * AI 답변의 인용 출처를 검증하고,
+ * 동일 기관 중복 및 오류 피드백이 있는 근거를 판별한다.
+ */
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -24,6 +28,9 @@ public class AiAnswerEvidenceService {
 
     private static final Pattern PHONE_NUMBER_PATTERN = Pattern.compile(
             "(?<!\\d)(?:0\\d{1,2})[- .]?\\d{3,4}[- .]?\\d{4}(?!\\d)");
+    private static final Pattern INSTITUTION_NAME_PATTERN = Pattern.compile(
+            "^(.+?(?:지원센터|발달센터|심리상담센터|심리언어발달센터|센터|학교|복지관|"
+                    + "병원|의원|상담소|교육원|기관))(?:\\s*(\\([^)]*\\)))?(?=\\s|$)");
 
     private final AiSourceReviewRepository aiSourceReviewRepository;
 
@@ -91,6 +98,10 @@ public class AiAnswerEvidenceService {
         if (!normalizedTitle.isBlank()) {
             identityKeys.add("title:" + normalizedTitle);
         }
+        String institutionName = extractInstitutionName(title);
+        if (!institutionName.isBlank()) {
+            identityKeys.add("institution:" + institutionName);
+        }
         String normalizedUrl = normalizeInstitutionUrl(url);
         if (!normalizedUrl.isBlank()) {
             identityKeys.add("url:" + normalizedUrl);
@@ -102,6 +113,21 @@ public class AiAnswerEvidenceService {
         return title == null ? "" : title.toLowerCase(Locale.ROOT)
                 .replaceAll("^\\s*\\[[^]]+]\\s*", "")
                 .replaceAll("[^\\p{L}\\p{N}]", "");
+    }
+
+    private String extractInstitutionName(String title) {
+        if (title == null || title.isBlank()) {
+            return "";
+        }
+        String cleanedTitle = title.replaceAll("^\\s*\\[[^]]+]\\s*", "")
+                .replace("**", "")
+                .trim();
+        Matcher matcher = INSTITUTION_NAME_PATTERN.matcher(cleanedTitle);
+        if (!matcher.find()) {
+            return "";
+        }
+        String branch = matcher.group(2) == null ? "" : matcher.group(2);
+        return normalizeInstitutionTitle(matcher.group(1) + branch);
     }
 
     private String normalizeInstitutionUrl(String url) {

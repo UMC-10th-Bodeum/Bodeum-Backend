@@ -12,6 +12,9 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * 사용자의 최근 스크랩 정보를 AI 개인화를 위한 관심사 데이터로 변환한다.
+ */
 @Service
 @RequiredArgsConstructor
 public class AiScrapInterestService {

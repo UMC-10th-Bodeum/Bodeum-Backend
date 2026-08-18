@@ -4,7 +4,7 @@ import com.bodeum.domain.ai.entity.AiExternalDocument;
 import com.bodeum.domain.ai.entity.AiExternalSource;
 import com.bodeum.domain.ai.enums.AiExternalSourceType;
 import com.bodeum.domain.ai.enums.AiResponseSourceType;
-import com.bodeum.domain.ai.enums.AiSearchScope;
+import com.bodeum.domain.ai.model.question.AiSearchScope;
 import com.bodeum.domain.ai.exception.AiErrorCode;
 import com.bodeum.domain.ai.infrastructure.generation.AiPromptFormatter;
 import com.bodeum.domain.ai.infrastructure.support.AiPromptTemplate;
@@ -62,6 +62,9 @@ public class OpenAiExternalAnswerProvider implements AiExternalAnswerProvider {
                     + "(\\d+)(?:곳|개).{0,40}?(?:사이트|홈페이지)");
     private static final Pattern NUMBERED_LIST_ITEM_PATTERN = Pattern.compile(
             "(?m)^\\s*\\d+[.)]\\s+");
+    private static final Pattern REQUESTED_RESULT_COUNT_PATTERN = Pattern.compile(
+            "요청 결과 개수:\\s*(\\d+)개");
+    private static final String EXCLUDED_RESULTS_MARKER = "이전에 안내하여 제외할 기관:";
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     private final AiExternalSourceRepository externalSourceRepository;
@@ -69,6 +72,7 @@ public class OpenAiExternalAnswerProvider implements AiExternalAnswerProvider {
     private final RestClient restClient;
     private final String model;
     private final int maxOutputTokens;
+    private final int maxResultCount;
     private final String externalSearchSystemPrompt;
     private final AiPromptFormatter promptFormatter;
 
@@ -97,6 +101,7 @@ public class OpenAiExternalAnswerProvider implements AiExternalAnswerProvider {
                 .build();
         this.model = model;
         this.maxOutputTokens = maxOutputTokens;
+        this.maxResultCount = maxResultCount;
         this.externalSearchSystemPrompt = AiPromptTemplate.replaceRequiredPlaceholder(
                 readPrompt(promptResource),
                 "{{maxResultCount}}",
@@ -133,12 +138,13 @@ public class OpenAiExternalAnswerProvider implements AiExternalAnswerProvider {
                     sourcesByDomain.keySet().stream().toList()
             );
             ExternalAiAnswer answer = executeSearch(body, sourcesByDomain);
-            if (isValidExternalSiteListAnswer(question, answer)) {
+            if (!isSiteListQuestion(question)) {
                 return answer;
             }
-
-            log.warn("[AI] 외부 사이트 목록과 인용 도메인 불일치, 검증된 출처로 재구성합니다.");
-            return groupExternalSiteAnswer(answer, sourcesByDomain);
+            if (!isValidExternalSiteListAnswer(question, answer)) {
+                log.warn("[AI] 외부 사이트 목록과 인용 도메인 불일치, 검증된 출처로 재구성합니다.");
+            }
+            return groupExternalSiteAnswer(question, answer, sourcesByDomain);
         } catch (ProjectException e) {
             throw e;
         } catch (Exception e) {
@@ -166,6 +172,7 @@ public class OpenAiExternalAnswerProvider implements AiExternalAnswerProvider {
     }
 
     private ExternalAiAnswer groupExternalSiteAnswer(
+            String question,
             ExternalAiAnswer answer,
             Map<String, AiExternalSource> sourcesByDomain
     ) {
@@ -184,12 +191,18 @@ public class OpenAiExternalAnswerProvider implements AiExternalAnswerProvider {
             return ExternalAiAnswer.noEvidence(SITE_SOURCE_UNVERIFIED_MESSAGE);
         }
 
-        StringBuilder content = new StringBuilder()
-                .append("확인 가능한 공식 사이트는 다음 ")
-                .append(referencesByHost.size())
-                .append("곳입니다.");
+        int requestedCount = requestedResultCount(question);
+        int resultLimit = requestedCount > 0
+                ? Math.min(requestedCount, maxResultCount)
+                : maxResultCount;
+        List<List<AiReferenceDocument>> selectedReferences = referencesByHost.values().stream()
+                .limit(resultLimit)
+                .toList();
+        int actualCount = selectedReferences.size();
+        StringBuilder content = new StringBuilder(countMessage(
+                question, requestedCount, actualCount));
         int index = 1;
-        for (List<AiReferenceDocument> references : referencesByHost.values()) {
+        for (List<AiReferenceDocument> references : selectedReferences) {
             AiReferenceDocument first = references.getFirst();
             AiExternalSource registeredSource = findSource(
                     first.url(), sourcesByDomain).orElse(null);
@@ -219,9 +232,48 @@ public class OpenAiExternalAnswerProvider implements AiExternalAnswerProvider {
         }
         return new ExternalAiAnswer(
                 content.toString(),
-                answer.sources(),
+                selectedReferences.stream().flatMap(List::stream).toList(),
                 answer.answerStatus()
         );
+    }
+
+    private static String countMessage(
+            String question,
+            int requestedCount,
+            int actualCount
+    ) {
+        boolean additionalResults = question != null
+                && question.contains(EXCLUDED_RESULTS_MARKER);
+        if (requestedCount > actualCount) {
+            if (additionalResults) {
+                return "요청하신 " + requestedCount
+                        + "곳 중 이전에 안내한 항목을 제외하고 현재 추가로 확인 가능한 "
+                        + "공식 사이트는 " + actualCount + "곳입니다.";
+            }
+            return "요청하신 " + requestedCount
+                    + "곳 중 현재 확인 가능한 공식 사이트는 "
+                    + actualCount + "곳입니다.";
+        }
+        if (additionalResults) {
+            return "이전에 안내한 항목을 제외하면, 추가로 확인 가능한 공식 사이트는 "
+                    + actualCount + "곳입니다.";
+        }
+        return "현재 확인 가능한 공식 사이트는 " + actualCount + "곳입니다.";
+    }
+
+    private static int requestedResultCount(String question) {
+        if (question == null || question.isBlank()) {
+            return 0;
+        }
+        Matcher matcher = REQUESTED_RESULT_COUNT_PATTERN.matcher(question);
+        if (!matcher.find()) {
+            return 0;
+        }
+        try {
+            return Integer.parseInt(matcher.group(1));
+        } catch (NumberFormatException ignored) {
+            return 0;
+        }
     }
 
     static boolean isValidExternalSiteListAnswer(
@@ -317,7 +369,7 @@ public class OpenAiExternalAnswerProvider implements AiExternalAnswerProvider {
             AiUserProfile profile,
             AiSearchScope searchScope
     ) {
-        AiUserProfile searchProfile = searchScope == AiSearchScope.GENERAL
+        AiUserProfile searchProfile = searchScope == AiSearchScope.REGION_PRIORITY
                 ? profile.withRegion("", "", "")
                 : profile;
         String searchHints = retrievalQueries == null
@@ -356,7 +408,7 @@ public class OpenAiExternalAnswerProvider implements AiExternalAnswerProvider {
             AiUserProfile profile,
             AiSearchScope searchScope
     ) {
-        if (searchScope != AiSearchScope.LOCAL_RESOURCE
+        if (searchScope != AiSearchScope.LOCAL_ONLY
                 || profile == null
                 || profile.region() == null
                 || profile.region().isBlank()) {

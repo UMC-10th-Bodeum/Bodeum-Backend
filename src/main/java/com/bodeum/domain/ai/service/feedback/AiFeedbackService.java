@@ -1,4 +1,4 @@
-package com.bodeum.domain.ai.service.support;
+package com.bodeum.domain.ai.service.feedback;
 
 import com.bodeum.domain.ai.dto.request.CreateAiFeedbackRequest;
 import com.bodeum.domain.ai.dto.response.CreateAiFeedbackResponse;
@@ -22,6 +22,10 @@ import org.springframework.dao.QueryTimeoutException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * AI 답변에 대한 사용자 피드백을 저장하고,
+ * 반복된 오류 신고를 출처 검토 상태에 반영한다.
+ */
 @Service
 @RequiredArgsConstructor
 public class AiFeedbackService {
@@ -90,6 +94,7 @@ public class AiFeedbackService {
         }
     }
 
+    // 현재 답변의 출처별 오답 피드백 누적 횟수를 확인해 기준 이상이면 검토 필요 상태로 변경
     private void updateSourceReviewStatus(Long aiMessageId) {
         try {
             aiSourceReviewRepository.markReviewRequiredByIncorrectFeedbackCount(

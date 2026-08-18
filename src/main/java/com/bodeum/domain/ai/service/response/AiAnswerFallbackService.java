@@ -1,4 +1,4 @@
-package com.bodeum.domain.ai.service.answer;
+package com.bodeum.domain.ai.service.response;
 
 import com.bodeum.domain.ai.service.chat.AiMessagePersistenceService;
 
@@ -9,16 +9,21 @@ import com.bodeum.domain.ai.dto.response.CreateAiMessageResponse;
 import com.bodeum.domain.ai.entity.AiChatRoom;
 import com.bodeum.domain.ai.entity.AiMessage;
 import com.bodeum.domain.ai.enums.AiAnswerStatus;
-import com.bodeum.domain.ai.enums.AiSearchScope;
+import com.bodeum.domain.ai.model.question.AiSearchScope;
 import com.bodeum.domain.ai.model.answer.AiStarterQuestionAnswer;
 import com.bodeum.domain.ai.model.answer.ExternalAiAnswer;
 import com.bodeum.domain.ai.model.rag.AiReferenceDocument;
 import com.bodeum.domain.ai.model.rag.AiUserProfile;
 import com.bodeum.domain.ai.service.port.AiExternalAnswerProvider;
+import com.bodeum.domain.ai.service.validation.AiAnswerEvidenceService;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+/**
+ * 내부 근거가 부족하거나 추가 확인이 필요한 경우
+ * 외부 검색 또는 상태별 대체 응답을 생성하고 저장한다.
+ */
 @Service
 @RequiredArgsConstructor
 public class AiAnswerFallbackService {

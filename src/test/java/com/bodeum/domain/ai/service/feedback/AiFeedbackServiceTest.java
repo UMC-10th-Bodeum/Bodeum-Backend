@@ -1,4 +1,4 @@
-package com.bodeum.domain.ai.service.support;
+package com.bodeum.domain.ai.service.feedback;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;

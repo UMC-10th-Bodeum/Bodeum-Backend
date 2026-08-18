@@ -1,10 +1,9 @@
 package com.bodeum.domain.ai.model.rag;
 
-import com.bodeum.domain.info.entity.enums.InfoSubCategory;
-
-import com.bodeum.domain.ai.enums.AiQuestionIntent;
-import com.bodeum.domain.ai.enums.AiSearchScope;
+import com.bodeum.domain.ai.model.question.AiQuestionIntent;
+import com.bodeum.domain.ai.model.question.AiSearchScope;
 import com.bodeum.domain.ai.model.context.AiResolvedContext;
+import com.bodeum.domain.info.entity.enums.InfoSubCategory;
 import java.util.List;
 import java.util.stream.Stream;
 
@@ -14,19 +13,22 @@ public record AiQuestionAnalysis(
         List<String> retrievalQueries,
         Integer requestedResultCount,
         String resolvedQuestion,
-        boolean followUp,
         InfoSubCategory infoSubCategory,
         String searchGoal,
         List<AiRequiredConcept> requiredConcepts,
         boolean needsClarification,
         String clarificationQuestion,
         AiResolvedContext resolvedContext,
-        boolean siteListRequest
+        boolean siteListRequest,
+        boolean resourceListRequest,
+        boolean referencesPreviousContext,
+        boolean excludePreviousResults
 ) {
 
     public AiQuestionAnalysis(AiQuestionIntent intent, List<String> retrievalQueries) {
-        this(intent, AiSearchScope.GENERAL, retrievalQueries, null, null, false,
-                null, null, List.of(), false, null, null, false);
+        this(intent, AiSearchScope.REGION_PRIORITY, retrievalQueries, null, null,
+                null, null, List.of(), false, null, null, false, false,
+                false, false);
     }
 
     public AiQuestionAnalysis(
@@ -34,8 +36,9 @@ public record AiQuestionAnalysis(
             AiSearchScope searchScope,
             List<String> retrievalQueries
     ) {
-        this(intent, searchScope, retrievalQueries, null, null, false,
-                null, null, List.of(), false, null, null, false);
+        this(intent, searchScope, retrievalQueries, null, null,
+                null, null, List.of(), false, null, null, false, false,
+                false, false);
     }
 
     public AiQuestionAnalysis(
@@ -44,13 +47,14 @@ public record AiQuestionAnalysis(
             List<String> retrievalQueries,
             Integer requestedResultCount
     ) {
-        this(intent, searchScope, retrievalQueries, requestedResultCount, null, false,
-                null, null, List.of(), false, null, null, false);
+        this(intent, searchScope, retrievalQueries, requestedResultCount, null,
+                null, null, List.of(), false, null, null, false, false,
+                false, false);
     }
 
     public AiQuestionAnalysis {
         intent = intent == null ? AiQuestionIntent.NONE : intent;
-        searchScope = searchScope == null ? AiSearchScope.GENERAL : searchScope;
+        searchScope = searchScope == null ? AiSearchScope.REGION_PRIORITY : searchScope;
         retrievalQueries = retrievalQueries == null
                 ? List.of()
                 : retrievalQueries.stream()
@@ -80,16 +84,18 @@ public record AiQuestionAnalysis(
                 ? null
                 : clarificationQuestion.trim();
         needsClarification = needsClarification && clarificationQuestion != null;
+        excludePreviousResults = referencesPreviousContext && excludePreviousResults;
     }
 
     public static AiQuestionAnalysis fallback() {
         return new AiQuestionAnalysis(
-                AiQuestionIntent.NONE, AiSearchScope.GENERAL, List.of(), null, null, false,
-                null, null, List.of(), false, null, null, false);
+                AiQuestionIntent.NONE, AiSearchScope.REGION_PRIORITY, List.of(), null, null,
+                null, null, List.of(), false, null, null, false, false,
+                false, false);
     }
 
     public static AiQuestionAnalysis fallback(String question) {
-        return forQuestion(question, AiQuestionIntent.NONE, AiSearchScope.GENERAL, List.of());
+        return forQuestion(question, AiQuestionIntent.NONE, AiSearchScope.REGION_PRIORITY, List.of());
     }
 
     public static AiQuestionAnalysis forQuestion(
@@ -97,7 +103,7 @@ public record AiQuestionAnalysis(
             AiQuestionIntent intent,
             List<String> expandedQueries
     ) {
-        return forQuestion(question, intent, AiSearchScope.GENERAL, expandedQueries);
+        return forQuestion(question, intent, AiSearchScope.REGION_PRIORITY, expandedQueries);
     }
 
     public static AiQuestionAnalysis forQuestion(
@@ -176,17 +182,19 @@ public record AiQuestionAnalysis(
         if (resolvedIntent != AiQuestionIntent.NONE) {
             return new AiQuestionAnalysis(
                     resolvedIntent,
-                    AiSearchScope.GENERAL,
+                    searchScope,
                     List.of(),
                     requestedResultCount,
                     resolvedQuestion,
-                    followUp,
                     infoSubCategory,
                     null,
                     List.of(),
                     false,
                     null,
                     null,
+                    false,
+                    false,
+                    followUp,
                     false
             );
         }
@@ -209,13 +217,15 @@ public record AiQuestionAnalysis(
                 retrievalQueries,
                 requestedResultCount,
                 resolvedQuestion,
-                followUp,
                 infoSubCategory,
                 null,
                 List.of(),
                 false,
                 null,
                 null,
+                false,
+                false,
+                followUp,
                 false
         );
     }
@@ -230,14 +240,16 @@ public record AiQuestionAnalysis(
                 retrievalQueries,
                 requestedResultCount,
                 resolvedQuestion,
-                followUp,
                 infoSubCategory,
                 resolvedSearchGoal,
                 resolvedRequiredConcepts,
                 needsClarification,
                 clarificationQuestion,
                 resolvedContext,
-                siteListRequest
+                siteListRequest,
+                resourceListRequest,
+                referencesPreviousContext,
+                excludePreviousResults
         );
     }
 
@@ -251,14 +263,16 @@ public record AiQuestionAnalysis(
                 retrievalQueries,
                 requestedResultCount,
                 resolvedQuestion,
-                followUp,
                 infoSubCategory,
                 searchGoal,
                 requiredConcepts,
                 clarificationRequired,
                 question,
                 resolvedContext,
-                siteListRequest
+                siteListRequest,
+                resourceListRequest,
+                referencesPreviousContext,
+                excludePreviousResults
         );
     }
 
@@ -269,14 +283,16 @@ public record AiQuestionAnalysis(
                 retrievalQueries,
                 requestedResultCount,
                 resolvedQuestion,
-                followUp,
                 infoSubCategory,
                 searchGoal,
                 requiredConcepts,
                 needsClarification,
                 clarificationQuestion,
                 context,
-                siteListRequest
+                siteListRequest,
+                resourceListRequest,
+                referencesPreviousContext,
+                excludePreviousResults
         );
     }
 
@@ -287,14 +303,41 @@ public record AiQuestionAnalysis(
                 retrievalQueries,
                 requestedResultCount,
                 resolvedQuestion,
-                followUp,
                 infoSubCategory,
                 searchGoal,
                 requiredConcepts,
                 needsClarification,
                 clarificationQuestion,
                 resolvedContext,
-                requested
+                requested,
+                resourceListRequest,
+                referencesPreviousContext,
+                excludePreviousResults
         );
+    }
+
+    public AiQuestionAnalysis withResourceListRequest(boolean requested) {
+        return new AiQuestionAnalysis(
+                intent, searchScope, retrievalQueries, requestedResultCount,
+                resolvedQuestion, infoSubCategory, searchGoal,
+                requiredConcepts, needsClarification, clarificationQuestion,
+                resolvedContext, siteListRequest, requested,
+                referencesPreviousContext, excludePreviousResults);
+    }
+
+    public AiQuestionAnalysis withConversationContext(
+            boolean referencesContext,
+            boolean excludesPreviousResults
+    ) {
+        return new AiQuestionAnalysis(
+                intent, searchScope, retrievalQueries, requestedResultCount,
+                resolvedQuestion, infoSubCategory,
+                searchGoal, requiredConcepts, needsClarification, clarificationQuestion,
+                resolvedContext, siteListRequest, resourceListRequest,
+                referencesContext, excludesPreviousResults);
+    }
+
+    public boolean followUp() {
+        return referencesPreviousContext;
     }
 }

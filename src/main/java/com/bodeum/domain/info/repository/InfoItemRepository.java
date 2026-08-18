@@ -42,11 +42,29 @@ public interface InfoItemRepository extends JpaRepository<InfoItem, Long>, InfoI
 
     @Query("select i from InfoItem i join i.infoCategory c " +
             "where i.sido = :regionLevel1 and i.sigungu = :regionLevel2 " +
-            "and c.subCategory = :subCategory")
+            "and c.subCategory = :subCategory " +
+            "order by (i.scrapCount * 5 + i.reviewCount * 3 + i.viewCount) desc, i.id desc")
     List<InfoItem> findRehabCentersByRegion(@Param("regionLevel1") String regionLevel1,
                                             @Param("regionLevel2") String regionLevel2,
                                             @Param("subCategory") InfoSubCategory subCategory,
                                             Pageable pageable);
+
+    @EntityGraph(attributePaths = "infoCategory")
+    @Query("select i from InfoItem i join i.infoCategory c " +
+            "where i.sido = :regionLevel1 and c.subCategory = :subCategory " +
+            "order by (i.scrapCount * 5 + i.reviewCount * 3 + i.viewCount) desc, i.id desc")
+    List<InfoItem> findByRegionLevel1AndSubCategory(
+            @Param("regionLevel1") String regionLevel1,
+            @Param("subCategory") InfoSubCategory subCategory,
+            Pageable pageable);
+
+    @EntityGraph(attributePaths = "infoCategory")
+    @Query("select i from InfoItem i join i.infoCategory c " +
+            "where c.subCategory = :subCategory " +
+            "order by (i.scrapCount * 5 + i.reviewCount * 3 + i.viewCount) desc, i.id desc")
+    List<InfoItem> findBySubCategory(
+            @Param("subCategory") InfoSubCategory subCategory,
+            Pageable pageable);
 
     /**
      * 온보딩 유저 맞춤 추천 데이터 조회
