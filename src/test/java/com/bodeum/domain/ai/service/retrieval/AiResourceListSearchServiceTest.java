@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.bodeum.domain.ai.enums.AiResponseSourceType;
@@ -97,6 +98,26 @@ class AiResourceListSearchServiceTest {
                 .containsExactly(1L);
         assertThat(negativeResult).extracting(document -> document.sourceId())
                 .containsExactly(1L);
+    }
+
+    @Test
+    void expandsCandidateWindowByPreviouslyExcludedResourceCount() {
+        when(repository.findRehabCentersByRegion(
+                eq("경기도"), eq("수원시"), eq(InfoSubCategory.THERAPY_REHAB),
+                any(Pageable.class))).thenReturn(List.of());
+        Set<AiSourceKey> excludedSources = IntStream.rangeClosed(1, 25)
+                .mapToObj(id -> new AiSourceKey(AiResponseSourceType.INFO, (long) id))
+                .collect(java.util.stream.Collectors.toSet());
+
+        service.retrieve(profile(), AiSearchScope.LOCAL_ONLY, 5,
+                excludedSources, Set.of());
+
+        org.mockito.ArgumentCaptor<Pageable> pageCaptor =
+                org.mockito.ArgumentCaptor.forClass(Pageable.class);
+        verify(repository).findRehabCentersByRegion(
+                eq("경기도"), eq("수원시"), eq(InfoSubCategory.THERAPY_REHAB),
+                pageCaptor.capture());
+        assertThat(pageCaptor.getValue().getPageSize()).isEqualTo(30);
     }
 
     private AiUserProfile profile() {

@@ -129,10 +129,13 @@ bodeum:
   ai:
     conversation:
       recent-turn-count: ${AI_RECENT_CONVERSATION_TURN_COUNT:3}
+    response:
+      timeout: ${AI_RESPONSE_TIMEOUT:90s}
     result:
       max-count: ${AI_RESULT_MAX_COUNT:10}
     rag:
       top-k: ${AI_RAG_TOP_K:5}
+      max-query-count: ${AI_RAG_MAX_QUERY_COUNT:3}
       max-candidate-count: ${AI_RAG_MAX_CANDIDATE_COUNT:30}
       similarity-threshold: ${AI_RAG_SIMILARITY_THRESHOLD:0.4}
       max-supplemental-concept-searches: ${AI_RAG_MAX_SUPPLEMENTAL_CONCEPT_SEARCHES:3}
@@ -141,6 +144,8 @@ bodeum:
       max-output-tokens: ${OPENAI_WEB_SEARCH_MAX_OUTPUT_TOKENS:1200}
       connect-timeout: ${OPENAI_WEB_SEARCH_CONNECT_TIMEOUT:3s}
       read-timeout: ${OPENAI_WEB_SEARCH_READ_TIMEOUT:30s}
+    classifier:
+      model: ${OPENAI_CLASSIFIER_MODEL:${OPENAI_CHAT_MODEL:gpt-5.4-mini}}
     request-limit:
       per-minute: ${AI_REQUEST_LIMIT_PER_MINUTE:5}
       per-day: ${AI_REQUEST_LIMIT_PER_DAY:50}

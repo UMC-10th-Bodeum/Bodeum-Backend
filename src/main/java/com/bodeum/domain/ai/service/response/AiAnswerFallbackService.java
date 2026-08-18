@@ -16,8 +16,14 @@ import com.bodeum.domain.ai.model.rag.AiReferenceDocument;
 import com.bodeum.domain.ai.model.rag.AiUserProfile;
 import com.bodeum.domain.ai.service.port.AiExternalAnswerProvider;
 import com.bodeum.domain.ai.service.validation.AiAnswerEvidenceService;
+import com.bodeum.domain.ai.infrastructure.support.AiSiteDomainNormalizer;
+import com.bodeum.domain.ai.infrastructure.support.AiSourceDeduplicator;
+import com.bodeum.domain.info.entity.enums.InfoSubCategory;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 /**
@@ -33,6 +39,10 @@ public class AiAnswerFallbackService {
     private final AiExternalAnswerProvider externalAnswerProvider;
     private final AiMessagePersistenceService persistenceService;
     private final AiAnswerEvidenceService evidenceService;
+    private final AiAnswerResultNormalizer answerResultNormalizer;
+
+    @Value("${bodeum.ai.result.max-count:10}")
+    private int maxResultCount = 10;
 
     public CreateAiMessageResponse saveStarterAnswer(
             AiChatRoom chatRoom,
@@ -57,6 +67,131 @@ public class AiAnswerFallbackService {
             AiUserProfile profile,
             AiSearchScope searchScope
     ) {
+        return externalOrNoResult(
+                chatRoom, userMessage, question, retrievalQueries, profile, searchScope,
+                null, false, null, null, false, false);
+    }
+
+    public CreateAiMessageResponse saveStarterSiteAnswer(
+            AiChatRoom chatRoom,
+            AiMessage userMessage,
+            String question,
+            List<String> retrievalQueries,
+            AiUserProfile profile,
+            AiSearchScope searchScope,
+            AiStarterQuestionAnswer starterAnswer,
+            Integer requestedResultCount
+    ) {
+        List<AiReferenceDocument> fixedSources = uniqueSites(starterAnswer.sources());
+        int targetCount = requestedResultCount == null
+                ? fixedSources.size()
+                : Math.min(Math.max(1, requestedResultCount), maxResultCount);
+        List<AiReferenceDocument> supplementalSources = List.of();
+        if (targetCount > fixedSources.size()) {
+            ExternalAiAnswer externalAnswer = externalAnswerProvider.search(
+                    question, retrievalQueries, profile, searchScope);
+            if (externalAnswer.hasEvidence()) {
+                Map<String, AiReferenceDocument> fixedByHost = indexSites(fixedSources);
+                supplementalSources = uniqueSites(externalAnswer.sources()).stream()
+                        .filter(source -> !fixedByHost.containsKey(siteHost(source)))
+                        .limit(targetCount - fixedSources.size())
+                        .toList();
+            }
+        }
+
+        List<AiReferenceDocument> mergedSources = java.util.stream.Stream
+                .concat(fixedSources.stream(), supplementalSources.stream())
+                .toList();
+        String content = removeCuratedSiteCountHeader(starterAnswer.content());
+        if (!supplementalSources.isEmpty()) {
+            content += "\n\n**추가로 확인한 공식 사이트**\n"
+                    + supplementalSources.stream()
+                    .map(source -> "- **" + source.title() + "** — " + source.url())
+                    .collect(java.util.stream.Collectors.joining("\n"));
+        }
+        content = answerResultNormalizer.normalizeExternalListAnswer(
+                content, mergedSources.size(), requestedResultCount,
+                false, null, null, true, true);
+        return saveSourceBacked(
+                chatRoom, userMessage, content, AiAnswerStatus.ANSWERED, mergedSources);
+    }
+
+    /**
+     * 내부 사이트 근거를 유지하면서 요청 개수에 부족한 고유 도메인만
+     * 외부 검색 결과로 보충한다.
+     */
+    public List<AiReferenceDocument> supplementSiteSources(
+            String question,
+            List<String> retrievalQueries,
+            AiUserProfile profile,
+            AiSearchScope searchScope,
+            List<AiReferenceDocument> internalSources,
+            int requestedResultCount
+    ) {
+        int targetCount = Math.min(Math.max(1, requestedResultCount), maxResultCount);
+        List<AiReferenceDocument> uniqueInternalSources = uniqueSites(internalSources);
+        if (uniqueInternalSources.size() >= targetCount) {
+            return uniqueInternalSources.stream().limit(targetCount).toList();
+        }
+
+        ExternalAiAnswer externalAnswer = externalAnswerProvider.search(
+                question, retrievalQueries, profile, searchScope);
+        if (!externalAnswer.hasEvidence()) {
+            return uniqueInternalSources;
+        }
+
+        Map<String, AiReferenceDocument> mergedByHost = indexSites(uniqueInternalSources);
+        uniqueSites(externalAnswer.sources()).forEach(source ->
+                mergedByHost.putIfAbsent(siteHost(source), source));
+        return mergedByHost.values().stream().limit(targetCount).toList();
+    }
+
+    private List<AiReferenceDocument> uniqueSites(List<AiReferenceDocument> sources) {
+        return List.copyOf(indexSites(sources).values());
+    }
+
+    private Map<String, AiReferenceDocument> indexSites(List<AiReferenceDocument> sources) {
+        Map<String, AiReferenceDocument> sitesByHost = new LinkedHashMap<>();
+        if (sources == null) {
+            return sitesByHost;
+        }
+        sources.forEach(source -> {
+            String host = siteHost(source);
+            if (host != null) {
+                sitesByHost.putIfAbsent(host, source);
+            }
+        });
+        return sitesByHost;
+    }
+
+    private String siteHost(AiReferenceDocument source) {
+        return source == null ? null : AiSiteDomainNormalizer.normalize(source.url());
+    }
+
+    private String removeCuratedSiteCountHeader(String content) {
+        if (content == null) {
+            return "";
+        }
+        return content.replaceFirst(
+                "^네, 참고하면 좋을 공식 (?:복지 )?사이트 \\d+개를 추천드리겠습니다!\\s*",
+                ""
+        ).trim();
+    }
+
+    public CreateAiMessageResponse externalOrNoResult(
+            AiChatRoom chatRoom,
+            AiMessage userMessage,
+            String question,
+            List<String> retrievalQueries,
+            AiUserProfile profile,
+            AiSearchScope searchScope,
+            Integer requestedResultCount,
+            boolean additionalResults,
+            InfoSubCategory infoSubCategory,
+            String region,
+            boolean listRequest,
+            boolean siteListRequest
+    ) {
         ExternalAiAnswer answer = externalAnswerProvider.search(
                 question, retrievalQueries, profile, searchScope);
         if (!answer.hasEvidence()) {
@@ -64,7 +199,10 @@ public class AiAnswerFallbackService {
                     ? NO_RESULT_MESSAGE : answer.answer();
             return noEvidence(chatRoom, userMessage, content);
         }
-        return saveSourceBacked(chatRoom, userMessage, answer.answer(),
+        String content = answerResultNormalizer.normalizeExternalListAnswer(
+                answer.answer(), answer.sources().size(), requestedResultCount,
+                additionalResults, infoSubCategory, region, listRequest, siteListRequest);
+        return saveSourceBacked(chatRoom, userMessage, content,
                 answer.answerStatus(), answer.sources());
     }
 
@@ -116,8 +254,9 @@ public class AiAnswerFallbackService {
             List<AiReferenceDocument> sources,
             AiAnswerStatus answerStatus
     ) {
-        boolean warning = evidenceService.hasIncorrectFeedback(sources);
-        List<AiMessageSourceResponse> sourceResponses = sources.stream()
+        List<AiReferenceDocument> distinctSources = AiSourceDeduplicator.deduplicate(sources);
+        boolean warning = evidenceService.hasIncorrectFeedback(distinctSources);
+        List<AiMessageSourceResponse> sourceResponses = distinctSources.stream()
                 .map(source -> new AiMessageSourceResponse(
                         source.sourceType(), source.sourceId(), source.title(),
                         source.url(), source.updatedAt()))
@@ -136,9 +275,10 @@ public class AiAnswerFallbackService {
             AiAnswerStatus answerStatus,
             List<AiReferenceDocument> sources
     ) {
-        boolean warning = evidenceService.hasIncorrectFeedback(sources);
+        List<AiReferenceDocument> distinctSources = AiSourceDeduplicator.deduplicate(sources);
+        boolean warning = evidenceService.hasIncorrectFeedback(distinctSources);
         AiMessage message = persistenceService.saveAiMessageAndComplete(
-                userMessage.getId(), chatRoom, content, warning, answerStatus, sources);
-        return sourceBacked(message, sources, answerStatus);
+                userMessage.getId(), chatRoom, content, warning, answerStatus, distinctSources);
+        return sourceBacked(message, distinctSources, answerStatus);
     }
 }

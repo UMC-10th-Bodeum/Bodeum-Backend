@@ -27,7 +27,7 @@ public class AiMessageFailureService {
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void markFailed(Long userMessageId) {
-        AiMessage userMessage = aiMessageRepository.findById(userMessageId)
+        AiMessage userMessage = aiMessageRepository.findByIdForAiResponse(userMessageId)
                 .orElseThrow(() -> new ProjectException(AiErrorCode.AI_RESPONSE_FAILED));
         userMessage.failAiResponse();
     }

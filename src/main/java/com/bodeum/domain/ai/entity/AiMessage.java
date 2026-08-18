@@ -111,6 +111,11 @@ public class AiMessage extends BaseCreatedEntity {
         }
     }
 
+    public boolean isAiResponseProcessing() {
+        return senderType == SenderType.USER
+                && aiProcessingStatus == AiResponseProcessingStatus.PROCESSING;
+    }
+
     public void updateConversationContext(
             String resolvedQuestion,
             AiResolvedContext resolvedContext,

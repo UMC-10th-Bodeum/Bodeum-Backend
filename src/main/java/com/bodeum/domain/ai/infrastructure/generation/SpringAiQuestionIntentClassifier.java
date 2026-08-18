@@ -13,6 +13,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Profile;
 import org.springframework.core.io.Resource;
@@ -28,19 +29,31 @@ public class SpringAiQuestionIntentClassifier implements AiQuestionIntentClassif
     public SpringAiQuestionIntentClassifier(
             ChatClient.Builder builder,
             @Value("${bodeum.ai.result.max-count:10}") int maxResultCount,
+            @Value("${bodeum.ai.rag.max-query-count:3}") int maxQueryCount,
+            @Value("${bodeum.ai.classifier.model:${spring.ai.openai.chat.options.model}}")
+            String classifierModel,
             @Value("classpath:prompts/ai-question-intent-classifier-system-prompt.txt")
             Resource systemPromptResource,
             @Value("classpath:prompts/ai-query-expansion-system-prompt.txt")
             Resource queryExpansionPromptResource
     ) {
+        validateMaxQueryCount(maxQueryCount);
+        String queryExpansionPrompt = AiPromptTemplate.replaceRequiredPlaceholder(
+                readPrompt(queryExpansionPromptResource),
+                "{{maxQueryCount}}",
+                Integer.toString(maxQueryCount)
+        );
         String systemPrompt = AiPromptTemplate.replaceRequiredPlaceholder(
                 readPrompt(systemPromptResource),
                 "{{maxResultCount}}",
                 Integer.toString(maxResultCount)
         )
                 + "\n\n"
-                + readPrompt(queryExpansionPromptResource);
-        this.chatClient = builder.defaultSystem(systemPrompt).build();
+                + queryExpansionPrompt;
+        this.chatClient = builder
+                .defaultSystem(systemPrompt)
+                .defaultOptions(OpenAiChatOptions.builder().model(classifierModel))
+                .build();
     }
 
     @Override
@@ -194,6 +207,13 @@ public class SpringAiQuestionIntentClassifier implements AiQuestionIntentClassif
                     "질문 의도 분류 시스템 프롬프트를 읽을 수 없습니다.",
                     e
             );
+        }
+    }
+
+    private void validateMaxQueryCount(int maxQueryCount) {
+        if (maxQueryCount < 1 || maxQueryCount > 3) {
+            throw new IllegalArgumentException(
+                    "bodeum.ai.rag.max-query-count는 1 이상 3 이하여야 합니다.");
         }
     }
 }

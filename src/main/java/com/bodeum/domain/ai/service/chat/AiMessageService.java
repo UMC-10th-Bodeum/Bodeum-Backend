@@ -8,6 +8,7 @@ import com.bodeum.domain.ai.service.retrieval.AiDocumentSearchService;
 import com.bodeum.domain.ai.service.retrieval.AiResourceListSearchService;
 import com.bodeum.domain.ai.service.validation.AiAnswerEvidenceService;
 import com.bodeum.domain.ai.service.validation.AiSiteListAnswerValidator;
+import com.bodeum.domain.ai.service.validation.AiRequestedResultCountValidator;
 import com.bodeum.domain.ai.service.context.AiConversationContextService;
 import com.bodeum.domain.ai.service.context.AiQuestionContextResolver;
 import com.bodeum.domain.ai.service.context.AiQuestionRegionResolver;
@@ -84,6 +85,8 @@ public class AiMessageService {
     private final AiAnswerResultNormalizer answerResultNormalizer;
     private final AiResourceListSearchService resourceListSearchService;
     private final AiResourceListAnswerBuilder resourceListAnswerBuilder;
+    private final AiRequestedResultCountValidator requestedResultCountValidator;
+    private final AiResponseTimeoutExecutor responseTimeoutExecutor;
 
     /**
      * AI 질문 요청 제한을 검증한 뒤 응답 생성 흐름을 시작한다.
@@ -119,14 +122,9 @@ public class AiMessageService {
 
         // 응답 생성 실패 시 사용자 메시지를 FAILED 상태로 변경
         try {
-            return generateAndSaveResponse(
-                    chatRoom,
-                    userMessage,
-                    content,
-                    user,
-                    userWithDisabilities,
-                    scrapInterests
-            );
+            return responseTimeoutExecutor.execute(() -> generateAndSaveResponse(
+                    chatRoom, userMessage, content, user,
+                    userWithDisabilities, scrapInterests));
         } catch (Exception e) {
             logResponseGenerationFailure(userId, chatRoom.getId(), userMessage.getId(), e);
             markFailedSafely(userMessage.getId(), e);
@@ -142,6 +140,16 @@ public class AiMessageService {
             User userWithDisabilities,
             AiScrapInterests scrapInterests
     ) {
+        if (requestedResultCountValidator.hasNonPositiveCount(content)) {
+            persistenceService.updateUserMessageContext(
+                    userMessage.getId(), content, null, null, userMessage.getId());
+            return fallbackService.clarificationRequired(
+                    chatRoom,
+                    userMessage,
+                    "요청 개수는 1개 이상으로 입력해 주세요."
+            );
+        }
+
         // 최근 대화 문맥과 사용자 개인화 프로필 구성
         AiConversationContext conversationContext =
                 conversationContextService.resolve(chatRoom.getId());
@@ -251,6 +259,18 @@ public class AiMessageService {
         if (starterAnswer.isPresent()) {
             AiStarterQuestionAnswer answer = starterAnswer.get();
             if (answer.isRegionRequired() || answer.hasEvidence()) {
+                if (answer.hasEvidence() && questionContext.isSiteListRequest()) {
+                    return fallbackService.saveStarterSiteAnswer(
+                            chatRoom,
+                            userMessage,
+                            resolvedContent,
+                            questionContext.retrievalQueries(),
+                            effectiveSearchProfile,
+                            questionContext.searchScope(),
+                            answer,
+                            questionContext.requestedResultCount()
+                    );
+                }
                 return fallbackService.saveStarterAnswer(chatRoom, userMessage, answer);
             }
             log.info("[AI] 추천 질문 출처 없음, 일반 질문 흐름으로 전환");
@@ -309,13 +329,51 @@ public class AiMessageService {
                     retrievedDocuments,
                     questionContext.requestedResultCount(),
                     additionalResultsContext.isFollowUp(),
-                    searchProfile.infoSubCategory());
+                    searchProfile.infoSubCategory(),
+                    questionContext.searchScope(),
+                    searchProfile.region());
             boolean warning = evidenceService.hasIncorrectFeedback(retrievedDocuments);
             AiMessage message = persistenceService.saveAiMessageAndComplete(
                     userMessage.getId(), chatRoom, answer, warning,
                     AiAnswerStatus.ANSWERED, retrievedDocuments);
             return fallbackService.sourceBacked(
                     message, retrievedDocuments, AiAnswerStatus.ANSWERED);
+        }
+
+        // 사이트 목록은 답변 생성 전에 URL과 고유 도메인을 검증한다.
+        // 내부 근거가 일부 부족하면 기존 근거를 유지하고 부족분만 외부 검색으로 보충한다.
+        if (questionContext.isSiteListRequest()) {
+            retrievedDocuments = siteListAnswerValidator.uniqueValidSources(
+                    retrievedDocuments);
+            if (retrievedDocuments.isEmpty()) {
+                log.info("[AI] 유효한 내부 사이트 근거 없음, 외부 검색 시작");
+                return fallbackService.externalOrNoResult(
+                        chatRoom,
+                        userMessage,
+                        searchQuestion,
+                        searchQueries,
+                        searchProfile,
+                        questionContext.searchScope(),
+                        questionContext.requestedResultCount(),
+                        additionalResultsContext.isFollowUp(),
+                        searchProfile.infoSubCategory(),
+                        searchProfile.region(),
+                        true,
+                        true
+                );
+            }
+            Integer requestedResultCount = questionContext.requestedResultCount();
+            if (requestedResultCount != null
+                    && retrievedDocuments.size() < requestedResultCount) {
+                retrievedDocuments = fallbackService.supplementSiteSources(
+                        searchQuestion,
+                        searchQueries,
+                        searchProfile,
+                        questionContext.searchScope(),
+                        retrievedDocuments,
+                        requestedResultCount
+                );
+            }
         }
 
         log.info("[AI] 검색 문서 수: {}", retrievedDocuments.size());
@@ -333,7 +391,14 @@ public class AiMessageService {
                     searchQuestion,
                     searchQueries,
                     searchProfile,
-                    questionContext.searchScope()
+                    questionContext.searchScope(),
+                    questionContext.requestedResultCount(),
+                    additionalResultsContext.isFollowUp(),
+                    searchProfile.infoSubCategory(),
+                    searchProfile.region(),
+                    questionContext.isResourceListRequest()
+                            || questionContext.isSiteListRequest(),
+                    questionContext.isSiteListRequest()
             );
         }
 
@@ -348,7 +413,12 @@ public class AiMessageService {
                 generated,
                 questionContext.requestedResultCount(),
                 additionalResultsContext.isFollowUp(),
-                searchProfile.infoSubCategory()
+                searchProfile.infoSubCategory(),
+                searchProfile.region(),
+                questionContext.isResourceListRequest()
+                        || questionContext.isSiteListRequest(),
+                retrievedDocuments,
+                questionContext.searchScope()
         );
 
         log.debug("[AI] 답변 생성 완료");
@@ -364,7 +434,14 @@ public class AiMessageService {
                     searchQuestion,
                     searchQueries,
                     searchProfile,
-                    questionContext.searchScope()
+                    questionContext.searchScope(),
+                    questionContext.requestedResultCount(),
+                    additionalResultsContext.isFollowUp(),
+                    searchProfile.infoSubCategory(),
+                    searchProfile.region(),
+                    questionContext.isResourceListRequest()
+                            || questionContext.isSiteListRequest(),
+                    questionContext.isSiteListRequest()
             );
         }
 
@@ -381,7 +458,14 @@ public class AiMessageService {
                     searchQuestion,
                     searchQueries,
                     searchProfile,
-                    questionContext.searchScope()
+                    questionContext.searchScope(),
+                    questionContext.requestedResultCount(),
+                    additionalResultsContext.isFollowUp(),
+                    searchProfile.infoSubCategory(),
+                    searchProfile.region(),
+                    questionContext.isResourceListRequest()
+                            || questionContext.isSiteListRequest(),
+                    questionContext.isSiteListRequest()
             );
         }
 

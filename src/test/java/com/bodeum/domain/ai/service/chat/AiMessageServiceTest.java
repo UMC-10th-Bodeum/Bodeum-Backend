@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.Mockito.atLeastOnce;
@@ -34,6 +35,7 @@ import com.bodeum.domain.ai.service.retrieval.AiDocumentSearchService;
 import com.bodeum.domain.ai.service.retrieval.AiResourceListSearchService;
 import com.bodeum.domain.ai.service.validation.AiAnswerEvidenceService;
 import com.bodeum.domain.ai.service.validation.AiSiteListAnswerValidator;
+import com.bodeum.domain.ai.service.validation.AiRequestedResultCountValidator;
 import com.bodeum.domain.ai.service.context.AiConversationContextService;
 import com.bodeum.domain.ai.service.context.AiQuestionContextResolver;
 import com.bodeum.domain.ai.service.context.AiQuestionRegionResolver;
@@ -106,6 +108,7 @@ class AiMessageServiceTest {
     @Mock AiQuestionIntentClassifier questionIntentClassifier;
     @Mock AiScrapInterestService scrapInterestService;
     @Mock AiResourceListSearchService resourceListSearchService;
+    @Mock AiResponseTimeoutExecutor responseTimeoutExecutor;
 
     private AiMessageService service;
     private AiAnswerEvidenceService evidenceService;
@@ -137,12 +140,19 @@ class AiMessageServiceTest {
                 new AiQuestionSearchQueryBuilder(),
                 evidenceService,
                 new AiAnswerFallbackService(
-                        externalAnswerProvider, persistenceService, evidenceService),
+                        externalAnswerProvider, persistenceService, evidenceService,
+                        answerResultNormalizer),
                 new AiUserProfileFactory(),
                 new AiStarterQuestionContextResolver(aiMessageRepository, regionRepository),
                 answerResultNormalizer,
                 resourceListSearchService,
-                new AiResourceListAnswerBuilder());
+                new AiResourceListAnswerBuilder(),
+                new AiRequestedResultCountValidator(),
+                responseTimeoutExecutor);
+        lenient().when(responseTimeoutExecutor.execute(any()))
+                .thenAnswer(invocation -> invocation.<java.util.concurrent.Callable<
+                        com.bodeum.domain.ai.dto.response.CreateAiMessageResponse>>
+                        getArgument(0).call());
         user = User.createSocialUser(SocialProvider.KAKAO, "provider-id", "a@b.com", "보호자");
         chatRoom = AiChatRoom.create(user);
         lenient().when(aiChatRoomRepository.findByUserId(1L)).thenReturn(Optional.of(chatRoom));
@@ -300,6 +310,36 @@ class AiMessageServiceTest {
         assertThat(result.aiMessage().answerStatus())
                 .isEqualTo(AiAnswerStatus.CLARIFICATION_REQUIRED);
         assertThat(result.aiMessage().sources()).isEmpty();
+        verify(documentRetriever, never()).retrieve(any(), any(), any());
+        verify(answerGenerator, never()).generate(any(), any(), any());
+        verify(externalAnswerProvider, never()).search(any(), any(), any(), any());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "특수학교 -1개를 알려줘",
+            "부산 특수학교 - 6개를 알려줘",
+            "복지사이트 0개를 알려줘",
+            "재활센터 −2곳 알려줘"
+    })
+    void asksForValidCountWhenExplicitCountIsNotPositive(String question) {
+        String message = "요청 개수는 1개 이상으로 입력해 주세요.";
+        AiMessage saved = savedAiMessage(message);
+        when(persistenceService.saveAiMessageAndComplete(
+                11L,
+                chatRoom,
+                message,
+                false,
+                AiAnswerStatus.CLARIFICATION_REQUIRED,
+                List.of()
+        )).thenReturn(saved);
+
+        var result = service.createMessage(1L, question);
+
+        assertThat(result.aiMessage().content()).isEqualTo(message);
+        assertThat(result.aiMessage().answerStatus())
+                .isEqualTo(AiAnswerStatus.CLARIFICATION_REQUIRED);
+        verify(questionIntentClassifier, never()).analyze(any());
         verify(documentRetriever, never()).retrieve(any(), any(), any());
         verify(answerGenerator, never()).generate(any(), any(), any());
         verify(externalAnswerProvider, never()).search(any(), any(), any(), any());
@@ -806,11 +846,12 @@ class AiMessageServiceTest {
     }
 
     @Test
-    void fallsBackToExternalSearchWhenSiteItemsUseTheSameDomainTwice() {
+    void supplementsInsufficientUniqueSiteDomainsBeforeGeneratingAnswer() {
         String question = "공식 복지 사이트 3개 알려줘";
         when(questionIntentClassifier.analyze(question)).thenReturn(
                 AiQuestionAnalysis.forQuestion(
-                        question, AiQuestionIntent.NONE, AiSearchScope.REGION_PRIORITY, List.of())
+                        question, AiQuestionIntent.NONE, AiSearchScope.REGION_PRIORITY,
+                        List.of(), 3)
                         .withSiteListRequest(true));
         AiReferenceDocument firstPage = new AiReferenceDocument(
                 "SITE-1", "장애아보육료지원 안내", AiResponseSourceType.SITE,
@@ -819,39 +860,48 @@ class AiMessageServiceTest {
                 "SITE-2", "지역아동센터 지원 안내", AiResponseSourceType.SITE,
                 2L, "지역아동센터 지원", "https://m.bokjiro.go.kr/local-child", null);
         List<AiReferenceDocument> retrieved = List.of(firstPage, secondPage);
-        when(documentRetriever.retrieve(eq(question), any(), any())).thenReturn(retrieved);
-        when(answerGenerator.generate(eq(question), any(), eq(retrieved)))
-                .thenReturn(new GeneratedAiAnswer(
-                        "복지 사이트 2곳을 안내합니다.",
-                        List.of("SITE-1", "SITE-2"),
-                        List.of(
-                                new GeneratedAiAnswerItem("복지로", "SITE-1"),
-                                new GeneratedAiAnswerItem("지역아동센터 지원", "SITE-2")
-                        )
-                ));
-
+        when(documentRetriever.retrieve(
+                contains(question), any(), any())).thenReturn(retrieved);
         AiReferenceDocument externalSource = new AiReferenceDocument(
-                "EXTERNAL-1", "복지로 공식 사이트", AiResponseSourceType.SITE,
-                3L, "복지로", "https://www.bokjiro.go.kr", null);
-        when(externalAnswerProvider.search(eq(question), any(), any(), any()))
+                "EXTERNAL-1", "정부24", AiResponseSourceType.SITE,
+                3L, "정부24", "https://www.gov.kr", null);
+        AiReferenceDocument secondExternalSource = new AiReferenceDocument(
+                "EXTERNAL-2", "보건복지부", AiResponseSourceType.SITE,
+                4L, "보건복지부", "https://www.mohw.go.kr", null);
+        when(externalAnswerProvider.search(any(), any(), any(), any()))
                 .thenReturn(new ExternalAiAnswer(
-                        "확인 가능한 공식 복지 사이트는 복지로 1곳입니다.",
-                        List.of(externalSource)
+                        "외부 공식 사이트 검색 결과",
+                        List.of(externalSource, secondExternalSource)
                 ));
-        AiMessage saved = savedAiMessage(
-                "확인 가능한 공식 복지 사이트는 복지로 1곳입니다.");
+        when(answerGenerator.generate(eq(question), any(), any()))
+                .thenAnswer(invocation -> {
+                    List<AiReferenceDocument> sources = invocation.getArgument(2);
+                    return new GeneratedAiAnswer(
+                            "공식 복지 사이트 3곳을 안내합니다.",
+                            sources.stream().map(AiReferenceDocument::documentKey).toList(),
+                            sources.stream()
+                                    .map(source -> new GeneratedAiAnswerItem(
+                                            source.title(), source.documentKey()))
+                                    .toList()
+                    );
+                });
+        String normalizedAnswer = "공식 복지 사이트 3곳을 안내합니다.\n\n"
+                + "요청하신 개수에 맞춰 관련 항목 3개를 안내드립니다.";
+        AiMessage saved = savedAiMessage(normalizedAnswer);
         when(persistenceService.saveAiMessageAndComplete(
                 11L, chatRoom,
-                "확인 가능한 공식 복지 사이트는 복지로 1곳입니다.",
-                false, AiAnswerStatus.ANSWERED, List.of(externalSource)
+                normalizedAnswer,
+                false, AiAnswerStatus.ANSWERED, List.of(
+                        firstPage, externalSource, secondExternalSource)
         )).thenReturn(saved);
 
         var result = service.createMessage(1L, question);
 
         assertThat(result.aiMessage().content())
-                .isEqualTo("확인 가능한 공식 복지 사이트는 복지로 1곳입니다.");
-        assertThat(result.aiMessage().sources()).hasSize(1);
-        verify(externalAnswerProvider).search(eq(question), any(), any(), any());
+                .isEqualTo(normalizedAnswer);
+        assertThat(result.aiMessage().sources()).hasSize(3);
+        verify(externalAnswerProvider).search(
+                contains("공식 복지 사이트 3개 알려줘"), any(), any(), any());
     }
 
     @Test
@@ -2400,8 +2450,8 @@ class AiMessageServiceTest {
         when(resourceListSearchService.retrieve(
                 any(), eq(AiSearchScope.REGION_PRIORITY), eq(5), any(), any()))
                 .thenReturn(List.of(source));
-        String answer = "요청하신 5곳 중 현재 보듬에서 확인 가능한 "
-                + "치료·재활기관은 1곳입니다.\n\n"
+        String answer = "요청하신 5곳 중 현재 보듬에서 확인한 "
+                + "치료·재활기관 1곳을 안내드립니다.\n\n"
                 + "**이안아동발달연구소**\n"
                 + "주소: 경기도 수원시\n"
                 + "전화번호: 031-111-1111\n\n"

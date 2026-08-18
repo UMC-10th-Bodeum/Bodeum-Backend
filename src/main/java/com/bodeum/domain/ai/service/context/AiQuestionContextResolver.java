@@ -36,6 +36,8 @@ public class AiQuestionContextResolver {
     private static final Pattern CONTEXT_REFERENCE_PATTERN = Pattern.compile(
             "(그중|그\\s*(학교|센터|기관|곳|서비스|제도)|위\\s*(학교|센터|기관|곳|서비스|제도)"
                     + "|앞서|이전|방금|해당)");
+    private static final Pattern SHORT_ADDITIONAL_RESULTS_PATTERN = Pattern.compile(
+            "^(?:(?:좀|조금)?더(?:알려줘|알려주세요)?|추가로(?:알려줘|알려주세요)?)$");
     private static final Set<InfoSubCategory> SEARCHABLE_CATEGORIES = Set.of(
             InfoSubCategory.PRIMARY_CARE, InfoSubCategory.EMERGENCY_CLINIC,
             InfoSubCategory.THERAPY_REHAB, InfoSubCategory.WELFARE_CENTER,
@@ -86,6 +88,9 @@ public class AiQuestionContextResolver {
                     : questionIntentClassifier.analyze(
                             content, null, null, null, profile.region());
         }
+
+        analysis = preserveImmediateListContextForShortAdditionalRequest(
+                content, conversationContext, analysis);
 
         // 사이트 목록 요청은 현재 질문을 명시적인 검색 대상으로 보정
         boolean analyzedSiteListRequest = analysis.siteListRequest()
@@ -177,6 +182,45 @@ public class AiQuestionContextResolver {
                 analysis.needsClarification(), analysis.clarificationQuestion(), resolvedContext,
                 resultType,
                 followUp, excludePreviousResults);
+    }
+
+    private AiQuestionAnalysis preserveImmediateListContextForShortAdditionalRequest(
+            String content,
+            AiConversationContext conversationContext,
+            AiQuestionAnalysis analysis
+    ) {
+        AiResolvedContext previousContext = conversationContext
+                .immediatePreviousResolvedContext();
+        if (!isShortAdditionalRequest(content)
+                || previousContext == null
+                || !"목록".equals(previousContext.requestedInformation())) {
+            return analysis;
+        }
+        String resolvedQuestion = previousContext.toResolvedQuestion(content);
+        return new AiQuestionAnalysis(
+                AiQuestionIntent.NONE,
+                analysis.searchScope(),
+                List.of(resolvedQuestion),
+                previousContext.requestedResultCount(),
+                resolvedQuestion,
+                resolveInfoSubCategory(resolvedQuestion, analysis.infoSubCategory()),
+                analysis.searchGoal(),
+                analysis.requiredConcepts(),
+                false,
+                null,
+                previousContext,
+                false,
+                true,
+                true,
+                true
+        );
+    }
+
+    private boolean isShortAdditionalRequest(String content) {
+        return SHORT_ADDITIONAL_RESULTS_PATTERN.matcher(
+                AiTextNormalizer.removeWhitespace(
+                        AiTextNormalizer.normalizeQuestionSpacing(content)))
+                .matches();
     }
 
     /**

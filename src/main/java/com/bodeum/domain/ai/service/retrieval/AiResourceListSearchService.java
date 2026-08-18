@@ -53,7 +53,12 @@ public class AiResourceListSearchService {
                 ? defaultResultCount
                 : requestedResultCount;
         int resultCount = Math.min(Math.max(1, requestedCount), maxResultCount);
-        int candidateCount = Math.max(resultCount * CANDIDATE_MULTIPLIER, maxResultCount);
+        int excludedCount = Math.max(
+                excludedSources == null ? 0 : excludedSources.size(),
+                excludedIdentityKeys == null ? 0 : excludedIdentityKeys.size());
+        int candidateCount = Math.max(
+                Math.max(resultCount * CANDIDATE_MULTIPLIER, maxResultCount),
+                resultCount + excludedCount);
         PageRequest page = PageRequest.of(0, candidateCount);
 
         LinkedHashMap<Long, InfoItem> candidates = new LinkedHashMap<>();

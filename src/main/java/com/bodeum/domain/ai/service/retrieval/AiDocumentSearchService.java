@@ -32,8 +32,18 @@ public class AiDocumentSearchService {
     private final AiAnswerEvidenceService evidenceService;
     private final int maxResultCount;
     private final int maxSupplementalConceptSearches;
+    private int maxQueryCount = 3;
     @Value("${bodeum.ai.rag.max-candidate-count:30}")
     private int maxCandidateCount = 30;
+
+    @Value("${bodeum.ai.rag.max-query-count:3}")
+    void configureMaxQueryCount(int maxQueryCount) {
+        if (maxQueryCount < 1 || maxQueryCount > 3) {
+            throw new IllegalArgumentException(
+                    "bodeum.ai.rag.max-query-count는 1 이상 3 이하여야 합니다.");
+        }
+        this.maxQueryCount = maxQueryCount;
+    }
 
     public AiDocumentSearchService(
             AiDocumentRetriever documentRetriever,
@@ -91,7 +101,7 @@ public class AiDocumentSearchService {
                 .filter(query -> query != null && !query.isBlank())
                 .map(this::semanticSearchQuestion)
                 .distinct()
-                .limit(3)
+                .limit(maxQueryCount)
                 .toList();
 
         List<List<AiReferenceDocument>> documentsByQuery = new ArrayList<>();

@@ -266,4 +266,49 @@ class AiQuestionContextResolverTest {
         assertThat(context.excludePreviousResults()).isTrue();
         assertThat(context.searchProfile().region()).isEqualTo("부산광역시 해운대구");
     }
+
+    @Test
+    void keepsImmediateRehabListContextForShortAdditionalRequest() {
+        String question = "더 알려줘";
+        AiQuestionIntentClassifier classifier = mock(AiQuestionIntentClassifier.class);
+        AiQuestionRegionResolver regionResolver = mock(AiQuestionRegionResolver.class);
+        AiQuestionContextResolver resolver =
+                new AiQuestionContextResolver(classifier, regionResolver);
+        AiUserProfile profile = new AiUserProfile(
+                "경기도 수원시", "경기도", "수원시",
+                null, List.of(), List.of(), null);
+        AiResolvedContext previousContext = new AiResolvedContext(
+                "재활센터",
+                new AiResolvedContext.RegionContext("경기도", "수원시"),
+                Map.of(), "목록", 5);
+        AiConversationContext conversationContext = new AiConversationContext(
+                "사용자: 근처 재활센터를 알려줘",
+                "근처 재활센터를 알려줘",
+                "수원시 재활센터 안내",
+                "근처 재활센터를 알려줘",
+                previousContext, 1L, 1L);
+        Region suwon = Region.create("경기도", "수원시");
+        when(regionResolver.resolve(any(String.class), any(AiUserProfile.class)))
+                .thenAnswer(invocation -> invocation.<String>getArgument(0).contains("수원")
+                        ? AiQuestionRegionResolver.RegionResolution.resolved(suwon)
+                        : AiQuestionRegionResolver.RegionResolution.notFound());
+        when(classifier.analyze(any(), any(), any(), any(), any(), any()))
+                .thenReturn(AiQuestionAnalysis.forQuestion(
+                        "수원시 장애인가족지원센터 알려줘",
+                        AiQuestionIntent.NONE,
+                        AiSearchScope.LOCAL_ONLY,
+                        List.of(),
+                        5
+                ).withResourceListRequest(true));
+
+        var context = resolver.resolve(question, profile, conversationContext);
+
+        assertThat(context.followUp()).isTrue();
+        assertThat(context.excludePreviousResults()).isTrue();
+        assertThat(context.resultType()).isEqualTo(AiResultType.RESOURCE_LIST);
+        assertThat(context.resolvedContext()).isEqualTo(previousContext);
+        assertThat(context.searchProfile().infoSubCategory())
+                .isEqualTo(com.bodeum.domain.info.entity.enums.InfoSubCategory.THERAPY_REHAB);
+        assertThat(context.resolvedQuestion()).contains("재활센터").doesNotContain("가족지원");
+    }
 }

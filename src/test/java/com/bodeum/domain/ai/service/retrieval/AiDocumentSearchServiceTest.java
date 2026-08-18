@@ -3,6 +3,7 @@ package com.bodeum.domain.ai.service.retrieval;
 import com.bodeum.domain.ai.service.validation.AiAnswerEvidenceService;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -34,6 +35,30 @@ class AiDocumentSearchServiceTest {
             mock(AiAnswerEvidenceService.class);
     private final AiDocumentSearchService service = new AiDocumentSearchService(
             documentRetriever, referenceDocumentResolver, 10, 3, evidenceService);
+
+    @Test
+    void limitsMainSearchQueriesUsingConfiguredCount() {
+        service.configureMaxQueryCount(2);
+        when(documentRetriever.retrieve(any(), any(), any())).thenReturn(List.of());
+        when(referenceDocumentResolver.resolve(any())).thenReturn(List.of());
+
+        service.retrieve(
+                "원본 질문", List.of("확장 질문 1", "확장 질문 2"),
+                null, List.of(), null, AiSearchScope.REGION_PRIORITY);
+
+        verify(documentRetriever, times(2))
+                .retrieve(any(), any(), eq(AiSearchScope.REGION_PRIORITY));
+    }
+
+    @Test
+    void rejectsOutOfRangeMainSearchQueryCount() {
+        assertThatIllegalArgumentException()
+                .isThrownBy(() -> service.configureMaxQueryCount(0))
+                .withMessageContaining("1 이상 3 이하");
+        assertThatIllegalArgumentException()
+                .isThrownBy(() -> service.configureMaxQueryCount(4))
+                .withMessageContaining("1 이상 3 이하");
+    }
 
     @Test
     void retrievesBroaderCandidatesBeforeExcludingPreviousResults() {

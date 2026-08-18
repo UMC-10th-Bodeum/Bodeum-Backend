@@ -178,7 +178,10 @@ class OpenAiExternalAnswerProviderTest {
                 .startsWith("요청하신 5곳 중 현재 확인 가능한 공식 사이트는 2곳입니다.")
                 .contains("**복지로**", "**정부24**")
                 .doesNotContain("5곳을 안내");
-        assertThat(normalized.sources()).hasSize(2);
+        assertThat(normalized.sources())
+                .hasSize(2)
+                .extracting(AiReferenceDocument::title)
+                .containsExactly("복지로", "정부24");
     }
 
     @Test
