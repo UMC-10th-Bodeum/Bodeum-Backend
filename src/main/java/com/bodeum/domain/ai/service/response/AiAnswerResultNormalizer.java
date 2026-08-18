@@ -2,6 +2,9 @@ package com.bodeum.domain.ai.service.response;
 
 import com.bodeum.domain.ai.model.answer.GeneratedAiAnswer;
 import com.bodeum.domain.info.entity.enums.InfoSubCategory;
+import java.util.Arrays;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import org.springframework.stereotype.Component;
 
 /**
@@ -10,6 +13,17 @@ import org.springframework.stereotype.Component;
  */
 @Component
 public class AiAnswerResultNormalizer {
+
+    private static final Pattern STANDARD_COUNT_MESSAGE_PATTERN = Pattern.compile(
+            "^\\s*(?:(?:요청하신\\s+\\d+(?:개|곳|건)\\s+중\\s+)"
+                    + "|(?:[^\\n.!?]{1,40}(?:에서|기준으로)\\s+))?"
+                    + "(?:현재\\s+보듬에서\\s+)?(?:추가로\\s+)?"
+                    + "확인\\s+가능한\\s+[^\\n.!?]+(?:은|는)\\s*"
+                    + "\\d+(?:개|곳|건)입니다\\.\\s*$");
+    private static final Pattern ADDITIONAL_COUNT_MESSAGE_PATTERN = Pattern.compile(
+            "^\\s*이전에 안내한 항목을 제외하면,?\\s*추가로 확인 가능한\\s+"
+                    + "관련 (?:항목|학교|기관|사이트)(?:은|는)\\s*"
+                    + "\\d+(?:개|곳|건)입니다\\.\\s*$");
 
     public GeneratedAiAnswer normalizeListedResultCount(
             GeneratedAiAnswer generated,
@@ -36,24 +50,16 @@ public class AiAnswerResultNormalizer {
     }
 
     private String removeExistingCountMessages(String originalAnswer) {
-        return originalAnswer
-                .replaceAll(
-                        "(?m)\\s*[^\\n.!?]*(?:현재\\s+보듬에서\\s+)?(?:추가로\\s+)?"
-                                + "확인\\s+가능한\\s+[^\\n.!?]+(?:은|는)\\s*"
-                                + "\\d+(?:개|곳|건)입니다\\.\\s*",
-                        "\n"
-                )
-                .replaceAll(
-                        "(?m)\\s*현재 확인 가능한 관련 (?:항목|학교|기관|사이트)(?:은|는) "
-                                + "\\d+개입니다\\.\\s*",
-                        "\n"
-                )
-                .replaceAll(
-                        "(?m)\\s*이전에 안내한 항목을 제외하면,? 추가로 확인 가능한 "
-                                + "관련 (?:항목|학교|기관|사이트)(?:은|는) \\d+개입니다\\.\\s*",
-                        "\n"
-                )
+        return Arrays.stream(originalAnswer.split("\\R", -1))
+                .filter(line -> !isCountMessage(line))
+                .collect(Collectors.joining("\n"))
+                .replaceAll("\\n{3,}", "\n\n")
                 .trim();
+    }
+
+    private boolean isCountMessage(String line) {
+        return STANDARD_COUNT_MESSAGE_PATTERN.matcher(line).matches()
+                || ADDITIONAL_COUNT_MESSAGE_PATTERN.matcher(line).matches();
     }
 
     private GeneratedAiAnswer withCountMessage(

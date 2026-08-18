@@ -182,7 +182,7 @@ public record AiQuestionAnalysis(
         if (resolvedIntent != AiQuestionIntent.NONE) {
             return new AiQuestionAnalysis(
                     resolvedIntent,
-                    AiSearchScope.REGION_PRIORITY,
+                    searchScope,
                     List.of(),
                     requestedResultCount,
                     resolvedQuestion,

@@ -82,6 +82,32 @@ class AiQuestionAnalysisTest {
     }
 
     @Test
+    void preservesLocalOnlyScopeForSpecializedIntent() {
+        AiQuestionAnalysis analysis = AiQuestionAnalysis.forQuestion(
+                "근처 재활센터 알려줘",
+                AiQuestionIntent.LOCAL_REHAB_CENTERS,
+                AiSearchScope.LOCAL_ONLY,
+                List.of("수원시 재활센터")
+        );
+
+        assertThat(analysis.searchScope()).isEqualTo(AiSearchScope.LOCAL_ONLY);
+        assertThat(analysis.retrievalQueries()).isEmpty();
+    }
+
+    @Test
+    void preservesNationwideScopeForSpecializedIntent() {
+        AiQuestionAnalysis analysis = AiQuestionAnalysis.forQuestion(
+                "장애아동 의료비 지원 알려줘",
+                AiQuestionIntent.CHILD_MEDICAL_SUPPORT,
+                AiSearchScope.NATIONWIDE,
+                List.of("장애아동 의료비 지원 제도")
+        );
+
+        assertThat(analysis.searchScope()).isEqualTo(AiSearchScope.NATIONWIDE);
+        assertThat(analysis.retrievalQueries()).isEmpty();
+    }
+
+    @Test
     void keepsRequestedResultCountFromClassifier() {
         AiQuestionAnalysis analysis = AiQuestionAnalysis.forQuestion(
                 "근처 장애인재활센터 열 개 알려줘",

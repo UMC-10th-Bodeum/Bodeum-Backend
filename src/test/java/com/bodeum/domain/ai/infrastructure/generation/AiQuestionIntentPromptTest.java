@@ -51,7 +51,9 @@ class AiQuestionIntentPromptTest {
                 "resourceListRequest=true",
                 "resourceListRequest=false",
                 "수원 특수학교 5개",
-                "특정 기관의 이용 방법"
+                "특정 기관의 이용 방법",
+                "resolvedContext.requestedInformation이 자원 목록인 경우에만",
+                "같은 설명을 확장하는 후속 요청으로 판단하고 resourceListRequest=false"
         );
     }
 

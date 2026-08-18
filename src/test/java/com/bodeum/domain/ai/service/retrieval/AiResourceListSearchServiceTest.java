@@ -78,6 +78,27 @@ class AiResourceListSearchServiceTest {
                 .containsExactly(4L, 5L, 6L, 7L, 8L);
     }
 
+    @Test
+    void clampsNonPositiveRequestedCountToOne() {
+        List<InfoItem> centers = List.of(
+                center(1L, "재활센터 1"),
+                center(2L, "재활센터 2")
+        );
+        when(repository.findRehabCentersByRegion(
+                eq("경기도"), eq("수원시"), eq(InfoSubCategory.THERAPY_REHAB),
+                any(Pageable.class))).thenReturn(centers);
+
+        var zeroResult = service.retrieve(profile(), AiSearchScope.LOCAL_ONLY, 0,
+                Set.of(), Set.of());
+        var negativeResult = service.retrieve(profile(), AiSearchScope.LOCAL_ONLY, -3,
+                Set.of(), Set.of());
+
+        assertThat(zeroResult).extracting(document -> document.sourceId())
+                .containsExactly(1L);
+        assertThat(negativeResult).extracting(document -> document.sourceId())
+                .containsExactly(1L);
+    }
+
     private AiUserProfile profile() {
         return new AiUserProfile(
                 "경기도 수원시", "경기도", "수원시", null,

@@ -55,4 +55,38 @@ class AiAnswerResultNormalizerTest {
                         "요청하신 10곳 중 현재 보듬에서 확인 가능한 치료·재활기관은 6곳입니다.")
                 .doesNotContain("수원시에서 확인 가능한 치료·재활기관은 6개입니다.");
     }
+
+    @Test
+    void preservesContentWhenCountExpressionSharesTheLineWithInstitutionName() {
+        GeneratedAiAnswer generated = new GeneratedAiAnswer(
+                "**이안아동발달연구소** 확인 가능한 기관은 1곳입니다.",
+                List.of("1"),
+                List.of(new GeneratedAiAnswerItem("이안아동발달연구소", "1"))
+        );
+
+        GeneratedAiAnswer normalized = normalizer.normalizeListedResultCount(
+                generated, 3, false, InfoSubCategory.THERAPY_REHAB);
+
+        assertThat(normalized.answer())
+                .startsWith("**이안아동발달연구소** 확인 가능한 기관은 1곳입니다.")
+                .contains("현재 보듬에서 확인 가능한 치료·재활기관은 1곳입니다.");
+    }
+
+    @Test
+    void removesOnlyStandaloneRequestedCountMessage() {
+        GeneratedAiAnswer generated = new GeneratedAiAnswer(
+                "기관 목록\n\n"
+                        + "요청하신 5곳 중 현재 보듬에서 확인 가능한 치료·재활기관은 2곳입니다.",
+                List.of("1"),
+                List.of(new GeneratedAiAnswerItem("기관1", "1"))
+        );
+
+        GeneratedAiAnswer normalized = normalizer.normalizeListedResultCount(
+                generated, 3, false, InfoSubCategory.THERAPY_REHAB);
+
+        assertThat(normalized.answer())
+                .startsWith("기관 목록")
+                .doesNotContain("요청하신 5곳 중")
+                .containsOnlyOnce("현재 보듬에서 확인 가능한 치료·재활기관은 1곳입니다.");
+    }
 }

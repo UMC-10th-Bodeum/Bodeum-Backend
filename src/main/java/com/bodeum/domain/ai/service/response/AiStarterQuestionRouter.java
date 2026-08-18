@@ -333,8 +333,18 @@ public class AiStarterQuestionRouter {
     ) {
         String region = displayRegion(profile);
         if (requestedResultCount != null) {
-            return "요청하신 " + requestedResultCount + "곳 중 현재 " + region
-                    + "에서 확인 가능한 재활센터는 " + actualCount + "곳입니다.\n";
+            if (requestedResultCount > MAX_LOCAL_CENTER_LIMIT) {
+                return "한 번에 최대 " + MAX_LOCAL_CENTER_LIMIT
+                        + "곳까지 안내할 수 있으며, 현재 보듬에서 확인한 "
+                        + region + " 재활센터 " + actualCount + "곳을 안내드립니다.\n";
+            }
+            if (actualCount < requestedResultCount) {
+                return "요청하신 " + requestedResultCount
+                        + "곳 중 현재 보듬에서 확인한 " + region
+                        + " 재활센터는 " + actualCount + "곳입니다.\n";
+            }
+            return "요청하신 " + requestedResultCount + "곳에 맞춰 "
+                    + region + " 재활센터 " + actualCount + "곳을 안내드립니다.\n";
         }
         return region + "에서 확인 가능한 재활센터를 정리해드렸어요!\n";
     }

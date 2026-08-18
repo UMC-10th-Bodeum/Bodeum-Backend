@@ -49,9 +49,10 @@ public class AiResourceListSearchService {
         if (profile == null || profile.infoSubCategory() == null) {
             return List.of();
         }
-        int resultCount = requestedResultCount == null
+        int requestedCount = requestedResultCount == null
                 ? defaultResultCount
-                : Math.min(requestedResultCount, maxResultCount);
+                : requestedResultCount;
+        int resultCount = Math.min(Math.max(1, requestedCount), maxResultCount);
         int candidateCount = Math.max(resultCount * CANDIDATE_MULTIPLIER, maxResultCount);
         PageRequest page = PageRequest.of(0, candidateCount);
 

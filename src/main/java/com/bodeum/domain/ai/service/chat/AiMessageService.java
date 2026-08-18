@@ -236,16 +236,17 @@ public class AiMessageService {
                 searchProfile = searchProfile.withInfoSubCategory(previousCategory);
             }
         }
+        AiUserProfile effectiveSearchProfile = searchProfile;
 
         // 초기 추천 질문은 사전 정의된 답변을 우선 조회하고, 근거가 없으면 일반 검색으로 전환
         Optional<AiStarterQuestionAnswer> starterAnswer =
                 questionContext.curatedAnswerType()
                         .flatMap(type -> questionContext.requestedResultCount() == null
                                 ? starterQuestionRouter.route(
-                                        type, questionContext.searchProfile())
+                                        type, effectiveSearchProfile)
                                 : starterQuestionRouter.route(
                                         type,
-                                        questionContext.searchProfile(),
+                                        effectiveSearchProfile,
                                         questionContext.requestedResultCount()));
         if (starterAnswer.isPresent()) {
             AiStarterQuestionAnswer answer = starterAnswer.get();

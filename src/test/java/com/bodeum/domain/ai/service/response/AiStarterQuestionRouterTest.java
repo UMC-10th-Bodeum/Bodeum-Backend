@@ -27,6 +27,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Pageable;
+import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
 class AiStarterQuestionRouterTest {
@@ -386,6 +387,27 @@ class AiStarterQuestionRouterTest {
                 pageCaptor.capture()
         );
         assertThat(pageCaptor.getValue().getPageSize()).isEqualTo(10);
+    }
+
+    @Test
+    void doesNotDescribePageSizeAsTotalRehabCenterCount() {
+        String exactRequestedCount = ReflectionTestUtils.invokeMethod(
+                router, "localRehabAnswerPrefix", profile("경기도 수원시"), 5, 5);
+        String fewerThanRequested = ReflectionTestUtils.invokeMethod(
+                router, "localRehabAnswerPrefix", profile("경기도 수원시"), 5, 3);
+        String overMaximum = ReflectionTestUtils.invokeMethod(
+                router, "localRehabAnswerPrefix", profile("경기도 수원시"), 100, 10);
+
+        assertThat(exactRequestedCount)
+                .isEqualTo("요청하신 5곳에 맞춰 경기도 수원시 재활센터 5곳을 안내드립니다.\n")
+                .doesNotContain("확인 가능한 재활센터는");
+        assertThat(fewerThanRequested)
+                .isEqualTo("요청하신 5곳 중 현재 보듬에서 확인한 경기도 수원시 "
+                        + "재활센터는 3곳입니다.\n");
+        assertThat(overMaximum)
+                .isEqualTo("한 번에 최대 10곳까지 안내할 수 있으며, 현재 보듬에서 확인한 "
+                        + "경기도 수원시 재활센터 10곳을 안내드립니다.\n")
+                .doesNotContain("요청하신 100곳 중");
     }
 
     @Test
