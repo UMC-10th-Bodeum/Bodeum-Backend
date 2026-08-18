@@ -33,6 +33,10 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * AI 채팅방의 오늘 메시지와 이전 대화 이력을 조회하고,
+ * 출처와 피드백을 포함한 응답으로 변환한다.
+ */
 @Service
 @RequiredArgsConstructor
 public class AiMessageQueryService {

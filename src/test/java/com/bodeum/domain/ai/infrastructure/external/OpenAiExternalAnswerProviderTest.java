@@ -9,7 +9,7 @@ import com.bodeum.domain.ai.infrastructure.generation.AiPromptFormatter;
 import com.bodeum.domain.ai.entity.AiExternalSource;
 import com.bodeum.domain.ai.enums.AiAnswerStatus;
 import com.bodeum.domain.ai.enums.AiResponseSourceType;
-import com.bodeum.domain.ai.enums.AiSearchScope;
+import com.bodeum.domain.ai.model.question.AiSearchScope;
 import com.bodeum.domain.ai.model.answer.ExternalAiAnswer;
 import com.bodeum.domain.ai.model.rag.AiReferenceDocument;
 import com.bodeum.domain.ai.model.rag.AiUserProfile;
@@ -113,13 +113,14 @@ class OpenAiExternalAnswerProviderTest {
         ExternalAiAnswer rebuilt = ReflectionTestUtils.invokeMethod(
                 provider,
                 "groupExternalSiteAnswer",
+                "복지 사이트를 알려줘",
                 invalid,
                 Map.of("bokjiro.go.kr", bokjiro)
         );
 
         assertThat(rebuilt.answer())
                 .contains(
-                        "공식 사이트는 다음 1곳",
+                        "현재 확인 가능한 공식 사이트는 1곳",
                         "**복지로**",
                         "장애아보육료지원 안내",
                         "지역아동센터 지원 안내"
@@ -139,6 +140,7 @@ class OpenAiExternalAnswerProviderTest {
         ExternalAiAnswer result = ReflectionTestUtils.invokeMethod(
                 provider(),
                 "groupExternalSiteAnswer",
+                "복지 사이트를 알려줘",
                 invalid,
                 Map.of()
         );
@@ -147,6 +149,36 @@ class OpenAiExternalAnswerProviderTest {
                 .isEqualTo("사이트별 출처를 정확히 확인하지 못했습니다.");
         assertThat(result.answerStatus()).isEqualTo(AiAnswerStatus.NO_EVIDENCE);
         assertThat(result.sources()).isEmpty();
+    }
+
+    @Test
+    void normalizesExternalSiteCountUsingVerifiedUniqueDomains() {
+        ExternalAiAnswer answer = new ExternalAiAnswer(
+                "공식 사이트 5곳을 안내합니다.",
+                List.of(
+                        reference(1L, "https://www.bokjiro.go.kr/welfare"),
+                        reference(2L, "https://www.gov.kr/service")
+                ),
+                AiAnswerStatus.ANSWERED
+        );
+        AiExternalSource bokjiro = mock(AiExternalSource.class);
+        when(bokjiro.getName()).thenReturn("복지로");
+        AiExternalSource government = mock(AiExternalSource.class);
+        when(government.getName()).thenReturn("정부24");
+
+        ExternalAiAnswer normalized = ReflectionTestUtils.invokeMethod(
+                provider(),
+                "groupExternalSiteAnswer",
+                "복지 사이트를 알려줘\n요청 결과 개수: 5개",
+                answer,
+                Map.of("bokjiro.go.kr", bokjiro, "gov.kr", government)
+        );
+
+        assertThat(normalized.answer())
+                .startsWith("요청하신 5곳 중 현재 확인 가능한 공식 사이트는 2곳입니다.")
+                .contains("**복지로**", "**정부24**")
+                .doesNotContain("5곳을 안내");
+        assertThat(normalized.sources()).hasSize(2);
     }
 
     @Test
@@ -184,7 +216,7 @@ class OpenAiExternalAnswerProviderTest {
                         List.of(),
                         ""
                 ),
-                AiSearchScope.GENERAL,
+                AiSearchScope.REGION_PRIORITY,
                 List.of("example.com")
         );
 
@@ -211,7 +243,7 @@ class OpenAiExternalAnswerProviderTest {
                 "부산시 재활센터를 추천해줘",
                 List.of("재활센터 추천"),
                 localProfile,
-                AiSearchScope.LOCAL_RESOURCE,
+                AiSearchScope.LOCAL_ONLY,
                 List.of("example.com")
         );
 

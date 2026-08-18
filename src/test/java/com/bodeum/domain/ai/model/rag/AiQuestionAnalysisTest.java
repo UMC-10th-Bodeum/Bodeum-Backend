@@ -2,8 +2,8 @@ package com.bodeum.domain.ai.model.rag;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.bodeum.domain.ai.enums.AiQuestionIntent;
-import com.bodeum.domain.ai.enums.AiSearchScope;
+import com.bodeum.domain.ai.model.question.AiQuestionIntent;
+import com.bodeum.domain.ai.model.question.AiSearchScope;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
@@ -14,11 +14,11 @@ class AiQuestionAnalysisTest {
         AiQuestionAnalysis analysis = AiQuestionAnalysis.forQuestion(
                 "우리 지역 특수학교 알려줘",
                 AiQuestionIntent.NONE,
-                AiSearchScope.LOCAL_RESOURCE,
+                AiSearchScope.LOCAL_ONLY,
                 List.of("수원시 특수학교")
         );
 
-        assertThat(analysis.searchScope()).isEqualTo(AiSearchScope.LOCAL_RESOURCE);
+        assertThat(analysis.searchScope()).isEqualTo(AiSearchScope.LOCAL_ONLY);
         assertThat(analysis.retrievalQueries())
                 .containsExactly("우리 지역 특수학교 알려줘", "수원시 특수학교");
     }
@@ -86,7 +86,7 @@ class AiQuestionAnalysisTest {
         AiQuestionAnalysis analysis = AiQuestionAnalysis.forQuestion(
                 "근처 장애인재활센터 열 개 알려줘",
                 AiQuestionIntent.NONE,
-                AiSearchScope.LOCAL_RESOURCE,
+                AiSearchScope.LOCAL_ONLY,
                 List.of(),
                 10
         );
@@ -135,5 +135,26 @@ class AiQuestionAnalysisTest {
                 .withResolvedContext(null);
 
         assertThat(analysis.resourceListRequest()).isTrue();
+    }
+
+    @Test
+    void derivesConversationBehaviorFromIndependentFlags() {
+        AiQuestionAnalysis standalone = AiQuestionAnalysis.fallback("새 질문");
+        AiQuestionAnalysis additional = standalone.withConversationContext(true, true);
+
+        assertThat(standalone.followUp()).isFalse();
+        assertThat(additional.followUp()).isTrue();
+        assertThat(additional.excludePreviousResults()).isTrue();
+    }
+
+    @Test
+    void preservesConversationFlagsAcrossAnalysisUpdates() {
+        AiQuestionAnalysis analysis = AiQuestionAnalysis.fallback("신청 방법 알려줘")
+                .withConversationContext(true, false)
+                .withResolvedContext(null)
+                .withResourceListRequest(false);
+
+        assertThat(analysis.referencesPreviousContext()).isTrue();
+        assertThat(analysis.excludePreviousResults()).isFalse();
     }
 }

@@ -6,6 +6,7 @@ import com.bodeum.domain.ai.infrastructure.support.AiTimeoutDetector;
 import com.bodeum.domain.ai.model.rag.AiReferenceDocument;
 import com.bodeum.domain.ai.model.rag.AiUserProfile;
 import com.bodeum.domain.ai.model.answer.GeneratedAiAnswer;
+import com.bodeum.domain.ai.model.context.AiResolvedContext;
 import com.bodeum.domain.ai.service.port.AiAnswerGenerator;
 import com.bodeum.global.apiPayload.exception.ProjectException;
 import java.io.IOException;
@@ -58,6 +59,53 @@ public class SpringAiAnswerGenerator implements AiAnswerGenerator {
                 formatDocuments(documents),
                 question
         );
+
+        return generate(prompt);
+    }
+
+    @Override
+    public GeneratedAiAnswer generate(
+            String originalQuestion,
+            String resolvedQuestion,
+            AiResolvedContext resolvedContext,
+            String searchRegion,
+            AiUserProfile userProfile,
+            List<AiReferenceDocument> documents
+    ) {
+        String prompt = """
+                %s
+
+                [참고자료]
+                %s
+
+                [현재 사용자 원문]
+                %s
+
+                [검색에 사용한 해석 질문]
+                %s
+
+                [구조화된 검색 문맥]
+                %s
+
+                [현재 요청에서 확정한 검색 지역]
+                %s
+
+                현재 사용자 원문에 명시된 지역·대상·조건을 최우선으로 답변하세요.
+                해석 질문과 구조화 문맥은 검색 결과를 이해하기 위한 보조 정보이며,
+                사용자 원문과 충돌하면 사용자 원문을 따르세요.
+                """.formatted(
+                promptFormatter.formatProfile(userProfile),
+                formatDocuments(documents),
+                originalQuestion,
+                resolvedQuestion,
+                resolvedContext == null ? "없음" : resolvedContext.toPromptText(),
+                searchRegion == null || searchRegion.isBlank() ? "없음" : searchRegion
+        );
+
+        return generate(prompt);
+    }
+
+    private GeneratedAiAnswer generate(String prompt) {
 
         try {
             GeneratedAiAnswer answer = chatClient.prompt()

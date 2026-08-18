@@ -1,13 +1,18 @@
 package com.bodeum.domain.ai.service.context;
 
-import com.bodeum.domain.ai.enums.AiQuestionIntent;
-import com.bodeum.domain.ai.enums.AiSearchScope;
+import com.bodeum.domain.ai.model.question.AiQuestionIntent;
+import com.bodeum.domain.ai.model.question.AiCuratedAnswerResolver;
+import com.bodeum.domain.ai.model.question.AiSafetyGuidanceResolver;
+import com.bodeum.domain.ai.model.question.AiResultType;
+import com.bodeum.domain.ai.model.question.AiSearchScope;
+import com.bodeum.domain.ai.model.question.AiCuratedAnswerType;
 import com.bodeum.domain.ai.model.context.AiConversationContext;
 import com.bodeum.domain.ai.model.context.AiQuestionContext;
 import com.bodeum.domain.ai.model.context.AiResolvedContext;
 import com.bodeum.domain.ai.model.rag.AiQuestionAnalysis;
 import com.bodeum.domain.ai.model.rag.AiUserProfile;
 import com.bodeum.domain.ai.service.port.AiQuestionIntentClassifier;
+import com.bodeum.domain.ai.util.AiTextNormalizer;
 import com.bodeum.domain.info.entity.enums.InfoSubCategory;
 import com.bodeum.domain.region.entity.Region;
 import java.util.ArrayList;
@@ -17,6 +22,10 @@ import java.util.Set;
 import java.util.regex.Pattern;
 import org.springframework.stereotype.Component;
 
+/**
+ * 사용자 질문과 이전 대화 문맥을 분석하여
+ * 검색 범위, 결과 유형, 지역 및 검색 조건이 포함된 질문 문맥을 생성한다.
+ */
 @Component
 public class AiQuestionContextResolver {
 
@@ -38,7 +47,6 @@ public class AiQuestionContextResolver {
 
     private final AiQuestionIntentClassifier questionIntentClassifier;
     private final AiQuestionRegionResolver questionRegionResolver;
-
     public AiQuestionContextResolver(
             AiQuestionIntentClassifier questionIntentClassifier,
             AiQuestionRegionResolver questionRegionResolver
@@ -52,81 +60,143 @@ public class AiQuestionContextResolver {
             AiUserProfile profile,
             AiConversationContext conversationContext
     ) {
+        // 질문에 포함된 지역을 해석하고, 전국 단위 시설 검색 여부를 판단
         AiQuestionRegionResolver.RegionResolution originalRegionResolution =
                 questionRegionResolver.resolve(content, profile);
         boolean nationwideResourceQuestion = isNationwideResourceQuestion(
                 content, originalRegionResolution);
-        boolean selfContainedResourceQuestion = isSelfContainedResourceQuestion(
-                content, content, originalRegionResolution);
+
+        // "수원은?"처럼 지역만 변경한 후속 질문을 이전 질문과 결합
         Optional<String> regionFollowUpQuestion = resolveRegionOnlyFollowUpQuestion(
                 content, profile, conversationContext, originalRegionResolution);
 
+        // 지역 후속 질문은 복원된 질문으로, 그 외에는 이전 대화 문맥을 포함해 질문 의도 분석
         AiQuestionAnalysis analysis;
         if (regionFollowUpQuestion.isPresent()) {
             String resolvedRegionQuestion = regionFollowUpQuestion.get();
             analysis = forceResolvedTarget(
-                    questionIntentClassifier.analyze(resolvedRegionQuestion),
+                    questionIntentClassifier.analyze(
+                            resolvedRegionQuestion, null, null, null, profile.region()),
                     resolvedRegionQuestion,
-                    true);
+                    true,
+                    false);
         } else {
-            analysis = conversationContext.hasContext() && !selfContainedResourceQuestion
-                    ? analyzeWithConversationContext(content, conversationContext)
-                    : questionIntentClassifier.analyze(content);
+            analysis = conversationContext.hasContext()
+                    ? analyzeWithConversationContext(content, conversationContext, profile)
+                    : questionIntentClassifier.analyze(
+                            content, null, null, null, profile.region());
         }
+
+        // 사이트 목록 요청은 현재 질문을 명시적인 검색 대상으로 보정
         boolean analyzedSiteListRequest = analysis.siteListRequest()
                 || analysis.intent() == AiQuestionIntent.WELFARE_SITES;
         if (analyzedSiteListRequest && regionFollowUpQuestion.isEmpty()) {
-            analysis = forceResolvedTarget(analysis, content, analysis.followUp());
+            analysis = forceResolvedTarget(
+                    analysis, content, analysis.followUp(),
+                    analysis.excludePreviousResults());
         }
+
+        // 분석 결과를 기반으로 질문 유형, 결과 형식, 후속 질문 여부와 기본 검색 범위 결정
         AiQuestionIntent intent = analysis.intent();
         String resolvedQuestion = analysis.resolvedQuestion() == null
                 ? content : analysis.resolvedQuestion();
-        boolean siteListRequest = analyzedSiteListRequest;
-        boolean resourceListRequest = analysis.resourceListRequest()
-                || intent == AiQuestionIntent.LOCAL_REHAB_CENTERS;
-        boolean followUp = analysis.followUp() && !selfContainedResourceQuestion;
+        AiResultType resultType = resolveResultType(
+                analysis, intent, analyzedSiteListRequest);
+        boolean followUp = regionFollowUpQuestion.isPresent()
+                || analysis.referencesPreviousContext();
+        boolean excludePreviousResults = followUp && analysis.excludePreviousResults();
         AiSearchScope searchScope = resolveSearchScope(intent, analysis.searchScope());
         if (nationwideResourceQuestion) {
-            searchScope = AiSearchScope.GENERAL;
+            searchScope = AiSearchScope.REGION_PRIORITY;
         }
+
+        // 해석된 질문의 지역과 이전 대화 문맥을 병합해 구조화된 검색 조건 생성
         AiQuestionRegionResolver.RegionResolution regionResolution =
                 questionRegionResolver.resolve(resolvedQuestion, profile);
+        AiQuestionRegionResolver.RegionResolution contextRegionResolution =
+                originalRegionResolution.isResolved()
+                        ? originalRegionResolution
+                        : regionResolution;
         AiResolvedContext resolvedContext = resolveStructuredContext(
-                content, analysis.resolvedContext(),
+                analysis.resolvedContext(),
                 conversationContext.immediatePreviousResolvedContext(),
-                regionResolution, followUp || regionFollowUpQuestion.isPresent(),
+                contextRegionResolution, followUp,
                 analysis.requestedResultCount());
+
+        // 후속 질문이면 이전 검색 조건을 반영해 완전한 질문으로 다시 구성
         if (followUp && resolvedContext != null) {
             resolvedQuestion = resolvedContext.toResolvedQuestion(resolvedQuestion);
             regionResolution = questionRegionResolver.resolve(resolvedQuestion, profile);
         }
+
+        // 지역 시설 질문은 명시된 지역 또는 사용자 프로필 지역을 기준으로 검색 범위 제한
         if (intent == AiQuestionIntent.NONE
                 && regionResolution.isResolved()
                 && isLocalResourceTarget(resolvedQuestion)) {
-            searchScope = AiSearchScope.LOCAL_RESOURCE;
+            searchScope = AiSearchScope.LOCAL_ONLY;
         }
-        if (siteListRequest && regionResolution.isResolved()) {
-            searchScope = AiSearchScope.LOCAL_RESOURCE;
+        if (usesProfileRegionForLocalResource(content, resolvedQuestion, profile)) {
+            searchScope = AiSearchScope.LOCAL_ONLY;
         }
-        InfoSubCategory category = siteListRequest
+
+        // 전국 단위 추천 사이트는 특정 지역으로 제한하지 않고 지역 우선 검색
+        boolean nationwideStarterSiteRequest =
+                AiCuratedAnswerResolver.resolve(intent)
+                        .filter(type -> type == AiCuratedAnswerType.WELFARE_SITES
+                                || type == AiCuratedAnswerType.AUTISM_INFO_SITES)
+                        .isPresent();
+        if (resultType == AiResultType.SITE_LIST && regionResolution.isResolved()
+                && !nationwideStarterSiteRequest) {
+            searchScope = AiSearchScope.LOCAL_ONLY;
+        }
+        if (nationwideStarterSiteRequest) {
+            searchScope = AiSearchScope.REGION_PRIORITY;
+        }
+
+        // 검색 카테고리와 우선 지역을 반영해 실제 검색에 사용할 프로필 구성
+        InfoSubCategory category = resultType == AiResultType.SITE_LIST
                 ? null : resolveInfoSubCategory(resolvedQuestion, analysis.infoSubCategory());
         AiQuestionRegionResolver.RegionResolution priorityRegion =
                 resolveNationwideSearchPriorityRegion(
                         category, profile, conversationContext,
                         regionResolution, nationwideResourceQuestion);
         AiUserProfile searchProfile = (priorityRegion.isResolved()
-                ? priorityRegion.applyTo(profile) : profile).withInfoSubCategory(category);
+                ? priorityRegion.toSearchProfile(profile) : profile)
+                .withInfoSubCategory(category);
 
         return new AiQuestionContext(
-                searchProfile, intent.starterQuestionType(), intent.safetyGuidance(),
+                profile, searchProfile,
+                AiCuratedAnswerResolver.resolve(intent),
+                AiSafetyGuidanceResolver.resolve(intent),
                 searchScope,
                 intent == AiQuestionIntent.NONE ? analysis.retrievalQueries() : List.of(),
                 analysis.requestedResultCount() == null && resolvedContext != null
                         ? resolvedContext.requestedResultCount()
                         : analysis.requestedResultCount(),
-                resolvedQuestion, followUp, analysis.searchGoal(), analysis.requiredConcepts(),
+                resolvedQuestion, analysis.searchGoal(), analysis.requiredConcepts(),
                 analysis.needsClarification(), analysis.clarificationQuestion(), resolvedContext,
-                siteListRequest, resourceListRequest);
+                resultType,
+                followUp, excludePreviousResults);
+    }
+
+    /**
+     * 질문 의도와 분석 결과를 기반으로 최종 응답 결과 유형을 결정한다.
+     */
+    private AiResultType resolveResultType(
+            AiQuestionAnalysis analysis,
+            AiQuestionIntent intent,
+            boolean siteListRequest
+    ) {
+        if (intent == AiQuestionIntent.LOCAL_REHAB_CENTERS) {
+            return AiResultType.RESOURCE_LIST;
+        }
+        if (intent == AiQuestionIntent.WELFARE_SITES || siteListRequest) {
+            return AiResultType.SITE_LIST;
+        }
+        if (analysis.resourceListRequest()) {
+            return AiResultType.RESOURCE_LIST;
+        }
+        return AiResultType.DOCUMENT_ANSWER;
     }
 
     public boolean isLocalResourceTarget(String question) {
@@ -137,35 +207,23 @@ public class AiQuestionContextResolver {
         return resolveInfoSubCategory(question, null);
     }
 
-    public boolean isSelfContainedResourceQuestion(
-            String originalQuestion,
-            String resolvedQuestion,
-            AiQuestionRegionResolver.RegionResolution regionResolution
-    ) {
-        String question = resolvedQuestion == null || resolvedQuestion.isBlank()
-                ? originalQuestion : resolvedQuestion;
-        if (!isLocalResourceTarget(question)
-                || CONTEXT_REFERENCE_PATTERN.matcher(originalQuestion).find()) {
-            return false;
-        }
-        return RELATIVE_LOCAL_REGION_PATTERN.matcher(originalQuestion).find()
-                || regionResolution.isResolved()
-                || isNationwideResourceQuestion(originalQuestion, regionResolution);
-    }
-
+    /**
+     * 최근 대화와 직전 문맥을 포함하여 후속 질문 의도를 분석
+     */
     private AiQuestionAnalysis analyzeWithConversationContext(
             String content,
-            AiConversationContext context
+            AiConversationContext context,
+            AiUserProfile profile
     ) {
-        if (context.immediatePreviousResolvedContext() == null) {
-            return questionIntentClassifier.analyze(
-                    content, context.previousUserQuestion(), context.previousAiAnswer());
-        }
         return questionIntentClassifier.analyze(
-                content, context.previousUserQuestion(), context.previousAiAnswer(),
-                context.immediatePreviousResolvedContext());
+                content, context.recentConversation(),
+                context.previousUserQuestion(), context.previousAiAnswer(),
+                context.immediatePreviousResolvedContext(), profile.region());
     }
 
+    /**
+     * 지역명만 변경한 후속 질문을 이전 질문과 결합하여 완전한 질문으로 복원한다.
+     */
     private Optional<String> resolveRegionOnlyFollowUpQuestion(
             String content,
             AiUserProfile profile,
@@ -173,40 +231,48 @@ public class AiQuestionContextResolver {
             AiQuestionRegionResolver.RegionResolution currentResolution
     ) {
         if (!context.hasContext() || context.immediatePreviousUserQuestion() == null
-                || !questionRegionResolver.isRegionOnlyQuestion(content, currentResolution)) {
+                || !questionRegionResolver.isRegionOnlyFollowUp(content, currentResolution)) {
             return Optional.empty();
         }
         String previousQuestion = context.immediatePreviousUserQuestion();
-        return Optional.of(questionRegionResolver.replaceRegion(
+        return Optional.of(questionRegionResolver.replaceRegionInQuestion(
                 previousQuestion,
                 questionRegionResolver.resolve(previousQuestion, profile),
                 currentResolution));
     }
 
+    /**
+     * 해석이 완료된 질문을 검색 쿼리에 우선 포함하고 추가 확인이 필요 없는 상태로 보정한다.
+     */
     private AiQuestionAnalysis forceResolvedTarget(
             AiQuestionAnalysis analysis,
             String resolvedQuestion,
-            boolean followUp
+            boolean followUp,
+            boolean excludePreviousResults
     ) {
         List<String> retrievalQueries = new ArrayList<>();
         retrievalQueries.add(resolvedQuestion);
         retrievalQueries.addAll(analysis.retrievalQueries());
         return new AiQuestionAnalysis(
                 analysis.intent(), analysis.searchScope(), retrievalQueries,
-                analysis.requestedResultCount(), resolvedQuestion, followUp,
+                analysis.requestedResultCount(), resolvedQuestion,
                 analysis.infoSubCategory(), analysis.searchGoal(), analysis.requiredConcepts(),
                 false, null, analysis.resolvedContext(), analysis.siteListRequest(),
-                analysis.resourceListRequest());
+                analysis.resourceListRequest(), followUp, excludePreviousResults);
     }
 
+    /**
+     * 이전 대화 문맥과 현재 질문의 분석 결과를 병합하여
+     * 지역, 결과 개수, 필터가 반영된 구조화 문맥을 생성한다.
+     */
     private AiResolvedContext resolveStructuredContext(
-            String content,
             AiResolvedContext analyzedContext,
             AiResolvedContext previousContext,
             AiQuestionRegionResolver.RegionResolution regionResolution,
             boolean followUp,
             Integer requestedResultCount
     ) {
+        // 후속 질문이면 이전 문맥에 현재 분석 결과를 병합
         AiResolvedContext resolved = followUp && previousContext != null
                 ? previousContext.merge(analyzedContext) : analyzedContext;
         if (resolved == null) {
@@ -225,15 +291,12 @@ public class AiQuestionContextResolver {
                     region == null ? regionResolution.regionLevel1() : region.getRegionLevel1(),
                     region == null ? null : region.getRegionLevel2());
         }
-        String normalized = normalize(content);
-        if (followUp && normalized.contains("공립")) {
-            resolved = resolved.withFilter("설립구분", "공립");
-        } else if (followUp && normalized.contains("사립")) {
-            resolved = resolved.withFilter("설립구분", "사립");
-        }
         return resolved.isEmpty() ? null : resolved;
     }
 
+    /**
+     * 특정 지역이 지정되지 않은 시설 검색 질문인지 판단한다.
+     */
     private boolean isNationwideResourceQuestion(
             String question,
             AiQuestionRegionResolver.RegionResolution regionResolution
@@ -245,6 +308,26 @@ public class AiQuestionContextResolver {
                 && resolveInfoSubCategory(question, null) != null;
     }
 
+    /**
+     * 지역 시설 질문의 상대적 지역 표현을 사용자 프로필 지역으로 해석해야 하는지 판단한다.
+     */
+    private boolean usesProfileRegionForLocalResource(
+            String originalQuestion,
+            String resolvedQuestion,
+            AiUserProfile profile
+    ) {
+        return profile != null
+                && originalQuestion != null
+                && profile.region() != null
+                && !profile.region().isBlank()
+                && RELATIVE_LOCAL_REGION_PATTERN.matcher(originalQuestion).find()
+                && (isLocalResourceTarget(originalQuestion)
+                || isLocalResourceTarget(resolvedQuestion));
+    }
+
+    /**
+     * 전국 시설 검색에서 이전 대화의 동일 카테고리 지역을 검색 우선 지역으로 유지한다.
+     */
     private AiQuestionRegionResolver.RegionResolution resolveNationwideSearchPriorityRegion(
             InfoSubCategory category,
             AiUserProfile profile,
@@ -266,22 +349,28 @@ public class AiQuestionContextResolver {
         return previousResolution.isResolved() ? previousResolution : currentResolution;
     }
 
+    /**
+     * 질문 의도와 분석 결과를 기반으로 검색 범위를 결정한다.
+     */
     private AiSearchScope resolveSearchScope(
             AiQuestionIntent intent,
             AiSearchScope analyzedSearchScope
     ) {
         return switch (intent) {
-            case LOCAL_REHAB_CENTERS -> AiSearchScope.LOCAL_RESOURCE;
-            case CHILD_MEDICAL_SUPPORT, VOUCHER_APPLICATION -> AiSearchScope.NATIONAL_POLICY;
-            default -> analyzedSearchScope == null ? AiSearchScope.GENERAL : analyzedSearchScope;
+            case LOCAL_REHAB_CENTERS -> AiSearchScope.LOCAL_ONLY;
+            case CHILD_MEDICAL_SUPPORT, VOUCHER_APPLICATION -> AiSearchScope.NATIONWIDE;
+            default -> analyzedSearchScope == null ? AiSearchScope.REGION_PRIORITY : analyzedSearchScope;
         };
     }
 
+    /**
+     * 질문에 명시된 시설 유형을 검색 가능한 정보 하위 카테고리로 변환한다.
+     */
     private InfoSubCategory resolveInfoSubCategory(
             String question,
             InfoSubCategory analyzedCategory
     ) {
-        String normalized = normalize(question);
+        String normalized = AiTextNormalizer.removeWhitespace(question);
         if (normalized.contains("특수교육지원센터")) {
             return InfoSubCategory.SPECIAL_EDU_SUPPORT;
         }
@@ -310,7 +399,4 @@ public class AiQuestionContextResolver {
                 ? analyzedCategory : null;
     }
 
-    private String normalize(String value) {
-        return value == null ? "" : value.trim().replaceAll("\\s+", "");
-    }
 }

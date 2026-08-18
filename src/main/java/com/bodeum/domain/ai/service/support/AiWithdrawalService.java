@@ -9,6 +9,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * 회원 탈퇴 시 사용자와 연결된 AI 채팅, 출처 및 피드백 데이터를 삭제한다.
+ */
 @Service
 @RequiredArgsConstructor
 public class AiWithdrawalService {

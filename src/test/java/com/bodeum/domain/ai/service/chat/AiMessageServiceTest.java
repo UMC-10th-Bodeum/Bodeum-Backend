@@ -3,7 +3,11 @@ package com.bodeum.domain.ai.service.chat;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.nullable;
+import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
@@ -14,20 +18,22 @@ import com.bodeum.domain.ai.entity.AiChatRoom;
 import com.bodeum.domain.ai.entity.AiMessage;
 import com.bodeum.domain.ai.enums.AiResponseSourceType;
 import com.bodeum.domain.ai.enums.AiAnswerStatus;
-import com.bodeum.domain.ai.enums.AiQuestionIntent;
-import com.bodeum.domain.ai.enums.AiSearchScope;
-import com.bodeum.domain.ai.enums.AiWarningType;
-import com.bodeum.domain.ai.enums.AiStarterQuestionType;
+import com.bodeum.domain.ai.model.question.AiQuestionIntent;
+import com.bodeum.domain.ai.model.question.AiSearchScope;
+import com.bodeum.domain.ai.dto.response.AiWarningType;
+import com.bodeum.domain.ai.model.question.AiCuratedAnswerType;
+import com.bodeum.domain.ai.model.question.AiStarterQuestionCatalog;
 import com.bodeum.domain.ai.enums.SenderType;
 import com.bodeum.domain.ai.exception.AiErrorCode;
 import com.bodeum.domain.ai.infrastructure.retrieval.AiReferenceDocumentResolver;
-import com.bodeum.domain.ai.service.answer.AiAnswerEvidenceService;
-import com.bodeum.domain.ai.service.answer.AiAnswerFallbackService;
-import com.bodeum.domain.ai.service.answer.AiAnswerResultNormalizer;
-import com.bodeum.domain.ai.service.answer.AiDocumentSearchService;
-import com.bodeum.domain.ai.service.answer.AiSiteListAnswerValidator;
-import com.bodeum.domain.ai.service.answer.AiResourceListSearchService;
-import com.bodeum.domain.ai.service.answer.AiStarterQuestionRouter;
+import com.bodeum.domain.ai.service.response.AiAnswerFallbackService;
+import com.bodeum.domain.ai.service.response.AiAnswerResultNormalizer;
+import com.bodeum.domain.ai.service.response.AiResourceListAnswerBuilder;
+import com.bodeum.domain.ai.service.response.AiStarterQuestionRouter;
+import com.bodeum.domain.ai.service.retrieval.AiDocumentSearchService;
+import com.bodeum.domain.ai.service.retrieval.AiResourceListSearchService;
+import com.bodeum.domain.ai.service.validation.AiAnswerEvidenceService;
+import com.bodeum.domain.ai.service.validation.AiSiteListAnswerValidator;
 import com.bodeum.domain.ai.service.context.AiConversationContextService;
 import com.bodeum.domain.ai.service.context.AiQuestionContextResolver;
 import com.bodeum.domain.ai.service.context.AiQuestionRegionResolver;
@@ -79,7 +85,6 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
 class AiMessageServiceTest {
@@ -123,7 +128,8 @@ class AiMessageServiceTest {
                 new AiQuestionRegionResolver(regionRepository),
                 new AiSiteListAnswerValidator(),
                 new AiDocumentSearchService(
-                        documentRetriever, referenceDocumentResolver, 10, 3),
+                        documentRetriever, referenceDocumentResolver, 10, 3,
+                        evidenceService),
                 new AiQuestionContextResolver(
                         questionIntentClassifier,
                         new AiQuestionRegionResolver(regionRepository)),
@@ -135,7 +141,8 @@ class AiMessageServiceTest {
                 new AiUserProfileFactory(),
                 new AiStarterQuestionContextResolver(aiMessageRepository, regionRepository),
                 answerResultNormalizer,
-                resourceListSearchService);
+                resourceListSearchService,
+                new AiResourceListAnswerBuilder());
         user = User.createSocialUser(SocialProvider.KAKAO, "provider-id", "a@b.com", "보호자");
         chatRoom = AiChatRoom.create(user);
         lenient().when(aiChatRoomRepository.findByUserId(1L)).thenReturn(Optional.of(chatRoom));
@@ -146,10 +153,49 @@ class AiMessageServiceTest {
                 .thenReturn(ExternalAiAnswer.empty());
         lenient().when(referenceDocumentResolver.resolve(any()))
                 .thenAnswer(invocation -> invocation.getArgument(0));
+        lenient().when(documentRetriever.retrieve(any(), any(), any(), anyInt()))
+                .thenAnswer(invocation -> documentRetriever.retrieve(
+                        invocation.getArgument(0), invocation.getArgument(1),
+                        invocation.getArgument(2)));
         lenient().when(starterQuestionRouter.route(any(), any()))
                 .thenReturn(Optional.empty());
         lenient().when(questionIntentClassifier.analyze(any()))
                 .thenReturn(AiQuestionAnalysis.fallback());
+        lenient().when(questionIntentClassifier.analyze(any(), any(), any()))
+                .thenAnswer(invocation -> questionIntentClassifier.analyze(
+                        invocation.getArgument(0)));
+        lenient().when(questionIntentClassifier.analyze(any(), any(), any(), any()))
+                .thenAnswer(invocation -> questionIntentClassifier.analyze(
+                        invocation.getArgument(0), invocation.getArgument(1),
+                        invocation.getArgument(2)));
+        lenient().when(questionIntentClassifier.analyze(
+                any(), any(), any(), any(), any()))
+                .thenAnswer(invocation -> {
+                    String question = invocation.getArgument(0);
+                    String previousQuestion = invocation.getArgument(1);
+                    String previousAnswer = invocation.getArgument(2);
+                    AiResolvedContext previousContext = invocation.getArgument(3);
+                    if (previousQuestion == null || previousAnswer == null) {
+                        return questionIntentClassifier.analyze(question);
+                    }
+                    if (previousContext == null) {
+                        return questionIntentClassifier.analyze(
+                                question, previousQuestion, previousAnswer);
+                    }
+                    return questionIntentClassifier.analyze(
+                            question, previousQuestion, previousAnswer, previousContext);
+                });
+        lenient().when(questionIntentClassifier.analyze(
+                any(), any(), any(), any(), any(), any()))
+                .thenAnswer(invocation -> questionIntentClassifier.analyze(
+                        invocation.getArgument(0), invocation.getArgument(2),
+                        invocation.getArgument(3), invocation.getArgument(4),
+                        invocation.getArgument(5)));
+        lenient().when(answerGenerator.generate(
+                any(), any(), nullable(AiResolvedContext.class), any(), any(), any()))
+                .thenAnswer(invocation -> answerGenerator.generate(
+                        invocation.getArgument(1), invocation.getArgument(4),
+                        invocation.getArgument(5)));
         lenient().when(scrapInterestService.findRecentInterests(1L))
                 .thenReturn(AiScrapInterests.empty());
         AiMessage userMessage = mock(AiMessage.class);
@@ -234,7 +280,7 @@ class AiMessageServiceTest {
                 AiQuestionAnalysis.forQuestion(
                         question,
                         AiQuestionIntent.NONE,
-                        AiSearchScope.GENERAL,
+                        AiSearchScope.REGION_PRIORITY,
                         List.of()
                 ).withClarification(true, clarification)
         );
@@ -285,6 +331,7 @@ class AiMessageServiceTest {
     @Test
     void passesRecentScrapInterestsAsPersonalizationContext() {
         String question = "우리 지역 특수학교 알려줘";
+        String contextualizedQuestion = "경기도 수원시 특수학교 알려줘";
         user.updateInterestRegion(List.of(), Region.create("경기도", "수원시"));
         when(scrapInterestService.findRecentInterests(1L)).thenReturn(
                 new AiScrapInterests(
@@ -294,7 +341,7 @@ class AiMessageServiceTest {
                 )
         );
         when(documentRetriever.retrieve(
-                eq(question),
+                eq(contextualizedQuestion),
                 org.mockito.ArgumentMatchers.argThat(profile ->
                         profile.scrappedInfoTitles().contains("수원시 특수교육 기관")
                                 && profile.scrappedNewsTitles().contains("특수학교 입학 안내")
@@ -310,7 +357,7 @@ class AiMessageServiceTest {
 
         service.createMessage(1L, question);
 
-        verify(documentRetriever).retrieve(eq(question), any(), any());
+        verify(documentRetriever).retrieve(eq(contextualizedQuestion), any(), any());
     }
 
     @ParameterizedTest
@@ -348,7 +395,7 @@ class AiMessageServiceTest {
 
     @Test
     void returnsRoutedStarterAnswerWithoutCallingOpenAi() {
-        String question = AiStarterQuestionType.WELFARE_SITES.getContent();
+        String question = AiStarterQuestionCatalog.contentOf(AiCuratedAnswerType.WELFARE_SITES);
         AiReferenceDocument source = new AiReferenceDocument(
                 "SITE-1",
                 "복지로",
@@ -359,7 +406,7 @@ class AiMessageServiceTest {
                 null
         );
         when(starterQuestionRouter.route(
-                eq(AiStarterQuestionType.WELFARE_SITES),
+                eq(AiCuratedAnswerType.WELFARE_SITES),
                 any()
         )).thenReturn(Optional.of(
                 AiStarterQuestionAnswer.answered("공식 복지 사이트 안내", List.of(source))
@@ -385,9 +432,9 @@ class AiMessageServiceTest {
 
     @Test
     void fallsBackToGeneralFlowWhenStarterAnswerHasNoEvidence() {
-        String question = AiStarterQuestionType.WELFARE_SITES.getContent();
+        String question = AiStarterQuestionCatalog.contentOf(AiCuratedAnswerType.WELFARE_SITES);
         when(starterQuestionRouter.route(
-                eq(AiStarterQuestionType.WELFARE_SITES),
+                eq(AiCuratedAnswerType.WELFARE_SITES),
                 any()
         )).thenReturn(Optional.of(AiStarterQuestionAnswer.noEvidence()));
         when(documentRetriever.retrieve(eq(question), any(), any())).thenReturn(List.of());
@@ -443,7 +490,7 @@ class AiMessageServiceTest {
                 null
         );
         when(starterQuestionRouter.route(
-                eq(AiStarterQuestionType.DIAGNOSIS_FIRST_STEPS),
+                eq(AiCuratedAnswerType.DIAGNOSIS_FIRST_STEPS),
                 any()
         )).thenReturn(Optional.of(
                 AiStarterQuestionAnswer.answered("진단 이후 안내", List.of(source))
@@ -468,7 +515,7 @@ class AiMessageServiceTest {
 
     @Test
     void returnsRegionRequiredWhenLocalCenterQuestionHasNoRegion() {
-        String question = AiStarterQuestionType.LOCAL_REHAB_CENTERS.getContent();
+        String question = AiStarterQuestionCatalog.contentOf(AiCuratedAnswerType.LOCAL_REHAB_CENTERS);
         String regionRequiredMessage =
                 "어느 지역을 기준으로 찾을까요? 시·도와 시·군·구를 알려주세요.";
         AiMessage saved = savedAiMessage(regionRequiredMessage);
@@ -508,7 +555,7 @@ class AiMessageServiceTest {
                 null
         );
         when(starterQuestionRouter.route(
-                eq(AiStarterQuestionType.LOCAL_REHAB_CENTERS),
+                eq(AiCuratedAnswerType.LOCAL_REHAB_CENTERS),
                 org.mockito.ArgumentMatchers.argThat(profile ->
                         profile.region().equals("경기도 수원시")
                                 && profile.regionLevel1().equals("경기도")
@@ -571,7 +618,7 @@ class AiMessageServiceTest {
         assertThat(result.aiMessage().answerStatus())
                 .isEqualTo(AiAnswerStatus.NO_EVIDENCE);
         verify(starterQuestionRouter, never()).route(
-                eq(AiStarterQuestionType.LOCAL_REHAB_CENTERS),
+                eq(AiCuratedAnswerType.LOCAL_REHAB_CENTERS),
                 any()
         );
         verify(documentRetriever).retrieve(eq(question), any(), any());
@@ -608,7 +655,7 @@ class AiMessageServiceTest {
                 null
         );
         when(starterQuestionRouter.route(
-                eq(AiStarterQuestionType.LOCAL_REHAB_CENTERS),
+                eq(AiCuratedAnswerType.LOCAL_REHAB_CENTERS),
                 org.mockito.ArgumentMatchers.argThat(profile ->
                         profile.region().equals("경기도 수원시")
                                 && profile.regionLevel1().equals("경기도")
@@ -763,7 +810,7 @@ class AiMessageServiceTest {
         String question = "공식 복지 사이트 3개 알려줘";
         when(questionIntentClassifier.analyze(question)).thenReturn(
                 AiQuestionAnalysis.forQuestion(
-                        question, AiQuestionIntent.NONE, AiSearchScope.GENERAL, List.of())
+                        question, AiQuestionIntent.NONE, AiSearchScope.REGION_PRIORITY, List.of())
                         .withSiteListRequest(true));
         AiReferenceDocument firstPage = new AiReferenceDocument(
                 "SITE-1", "장애아보육료지원 안내", AiResponseSourceType.SITE,
@@ -817,7 +864,7 @@ class AiMessageServiceTest {
                 AiQuestionAnalysis.forQuestion(
                         question,
                         AiQuestionIntent.LOCAL_REHAB_CENTERS,
-                        AiSearchScope.LOCAL_RESOURCE,
+                        AiSearchScope.LOCAL_ONLY,
                         List.of(),
                         100
                 )
@@ -844,7 +891,7 @@ class AiMessageServiceTest {
 
         verify(starterQuestionRouter, never()).route(any(), any());
         verify(documentRetriever).retrieve(
-                eq(searchQuestion), any(), eq(AiSearchScope.LOCAL_RESOURCE));
+                eq(searchQuestion), any(), eq(AiSearchScope.LOCAL_ONLY));
     }
 
     @Test
@@ -855,13 +902,13 @@ class AiMessageServiceTest {
                 AiQuestionAnalysis.forQuestion(
                         question,
                         AiQuestionIntent.NONE,
-                        AiSearchScope.GENERAL,
+                        AiSearchScope.REGION_PRIORITY,
                         List.of(),
                         3
                 )
         );
         AiReferenceDocument source = referenceDocument("CENTER-1", 1L);
-        when(documentRetriever.retrieve(eq(searchQuestion), any(), eq(AiSearchScope.GENERAL)))
+        when(documentRetriever.retrieve(eq(searchQuestion), any(), eq(AiSearchScope.REGION_PRIORITY)))
                 .thenReturn(List.of(source));
         when(answerGenerator.generate(eq(question), any(), eq(List.of(source))))
                 .thenReturn(new GeneratedAiAnswer("재활센터 3개 안내", List.of("CENTER-1")));
@@ -874,7 +921,7 @@ class AiMessageServiceTest {
         service.createMessage(1L, question);
 
         verify(documentRetriever).retrieve(
-                eq(searchQuestion), any(), eq(AiSearchScope.GENERAL));
+                eq(searchQuestion), any(), eq(AiSearchScope.REGION_PRIORITY));
         verify(answerGenerator).generate(eq(question), any(), eq(List.of(source)));
     }
 
@@ -904,38 +951,6 @@ class AiMessageServiceTest {
                 evidenceService.deduplicateInstitutions(List.of(first, duplicate));
 
         assertThat(result).containsExactly(first);
-    }
-
-    @ParameterizedTest
-    @ValueSource(strings = {
-            "더",
-            "좀 더",
-            "추가로",
-            "부산 특수학교를 더",
-            "5개 더 알려줘",
-            "더 알려줘",
-            "좀 더 추천해줘",
-            "더 5곳 알려주세요",
-            "추가로 알려줘",
-            "추가로 5개 알려줘",
-            "다른 곳 추천해주세요",
-            "더 많은 기관 알려줘"
-    })
-    void recognizesAdditionalResultsQuestions(String question) {
-        assertThat(conversationContextService.isAdditionalResultsQuestion(question)).isTrue();
-    }
-
-    @ParameterizedTest
-    @ValueSource(strings = {
-            "더봄재활센터 알려줘",
-            "더 자세히 알려줘",
-            "상세히 알려주세요",
-            "지원 내용을 더 알려줘",
-            "신청 방법을 더 알려줘",
-            "재활센터 알려줘"
-    })
-    void doesNotTreatNamesOrDetailQuestionsAsAdditionalResults(String question) {
-        assertThat(conversationContextService.isAdditionalResultsQuestion(question)).isFalse();
     }
 
     @Test
@@ -986,11 +1001,11 @@ class AiMessageServiceTest {
                 AiQuestionAnalysis.forQuestion(
                         llmResolvedQuestion,
                         AiQuestionIntent.NONE,
-                        AiSearchScope.LOCAL_RESOURCE,
+                        AiSearchScope.LOCAL_ONLY,
                         List.of(),
                         5,
                         llmResolvedQuestion
-                )
+                ).withConversationContext(true, true)
         );
 
         List<AiReferenceDocument> oldDocuments = new ArrayList<>();
@@ -1009,7 +1024,7 @@ class AiMessageServiceTest {
         List<AiReferenceDocument> newDocuments = IntStream.rangeClosed(11, 15)
                 .mapToObj(index -> referenceDocument("NEW-" + index, index))
                 .toList();
-        when(documentRetriever.retrieve(any(), any(), eq(AiSearchScope.LOCAL_RESOURCE)))
+        when(documentRetriever.retrieve(any(), any(), eq(AiSearchScope.LOCAL_ONLY)))
                 .thenReturn(java.util.stream.Stream.concat(
                         oldDocuments.stream(), newDocuments.stream()).toList());
         when(answerGenerator.generate(
@@ -1034,14 +1049,14 @@ class AiMessageServiceTest {
 
         ArgumentCaptor<String> searchQuestionCaptor = ArgumentCaptor.forClass(String.class);
         verify(documentRetriever, org.mockito.Mockito.atLeastOnce()).retrieve(
-                searchQuestionCaptor.capture(), any(), eq(AiSearchScope.LOCAL_RESOURCE));
+                searchQuestionCaptor.capture(), any(),
+                eq(AiSearchScope.LOCAL_ONLY), eq(15));
         assertThat(searchQuestionCaptor.getAllValues()).anySatisfy(searchQuestion ->
                 assertThat(searchQuestion)
                         .contains(previousQuestion)
                         .contains("이전에 안내한 항목을 제외하고 " + llmResolvedQuestion)
-                        .contains("검색 후보 개수: 10개")
-                        .contains("기존센터-1")
-                        .contains("기존센터-10"));
+                        .doesNotContain("검색 후보 개수:")
+                        .doesNotContain("이전에 안내하여 제외할 기관:"));
         verify(answerGenerator).generate(
                 eq(resolvedQuestion), any(), eq(newDocuments));
     }
@@ -1083,13 +1098,13 @@ class AiMessageServiceTest {
                 .thenReturn(AiQuestionAnalysis.forQuestion(
                         llmResolvedQuestion,
                         AiQuestionIntent.NONE,
-                        AiSearchScope.GENERAL,
+                        AiSearchScope.REGION_PRIORITY,
                         List.of(),
                         null,
                         llmResolvedQuestion,
                         true
-                ));
-        when(documentRetriever.retrieve(any(), any(), eq(AiSearchScope.GENERAL)))
+                ).withConversationContext(true, true));
+        when(documentRetriever.retrieve(any(), any(), eq(AiSearchScope.REGION_PRIORITY)))
                 .thenReturn(List.of());
         AiMessage saved = savedAiMessage("관련 정보를 찾을 수 없습니다.");
         when(persistenceService.saveAiMessageAndComplete(
@@ -1103,7 +1118,7 @@ class AiMessageServiceTest {
                 any(),
                 org.mockito.ArgumentMatchers.argThat(profile ->
                         profile.infoSubCategory() == InfoSubCategory.SPECIAL_SCHOOL),
-                eq(AiSearchScope.GENERAL));
+                eq(AiSearchScope.REGION_PRIORITY));
     }
 
     @Test
@@ -1126,22 +1141,24 @@ class AiMessageServiceTest {
                 .findTopByChatRoomIdAndSenderTypeOrderByCreatedAtDescIdDesc(
                         any(), eq(SenderType.AI)))
                 .thenReturn(Optional.of(previousAiMessage));
-        when(questionIntentClassifier.analyze(
-                question,
-                previousResolvedQuestion,
-                previousAnswer
-        )).thenReturn(AiQuestionAnalysis.forQuestion(
+        doReturn(AiQuestionAnalysis.forQuestion(
                 resolvedQuestion,
                 AiQuestionIntent.NONE,
-                AiSearchScope.LOCAL_RESOURCE,
+                AiSearchScope.LOCAL_ONLY,
                 List.of(),
                 null,
                 resolvedQuestion,
                 true
-        ));
+        )).when(questionIntentClassifier).analyze(
+                eq(question),
+                nullable(String.class),
+                nullable(String.class),
+                nullable(AiResolvedContext.class),
+                nullable(String.class)
+        );
         AiReferenceDocument source = specialSchoolReferenceDocument("AREUM", 1L);
         when(documentRetriever.retrieve(
-                eq(resolvedQuestion), any(), eq(AiSearchScope.LOCAL_RESOURCE)))
+                eq(resolvedQuestion), any(), eq(AiSearchScope.LOCAL_ONLY)))
                 .thenReturn(List.of(source));
         when(answerGenerator.generate(
                 eq(resolvedQuestion), any(), eq(List.of(source))))
@@ -1158,11 +1175,9 @@ class AiMessageServiceTest {
 
         service.createMessage(1L, question);
 
-        verify(questionIntentClassifier).analyze(
-                question,
-                previousResolvedQuestion,
-                previousAnswer
-        );
+        verify(questionIntentClassifier, atLeastOnce()).analyze(
+                eq(question), nullable(String.class), nullable(String.class),
+                nullable(AiResolvedContext.class), nullable(String.class));
         verify(persistenceService).updateUserMessageContext(
                 11L,
                 resolvedQuestion,
@@ -1209,7 +1224,7 @@ class AiMessageServiceTest {
                 AiQuestionAnalysis.forQuestion(
                         resolvedQuestion,
                         AiQuestionIntent.NONE,
-                        AiSearchScope.LOCAL_RESOURCE,
+                        AiSearchScope.LOCAL_ONLY,
                         List.of(),
                         null,
                         resolvedQuestion,
@@ -1217,7 +1232,7 @@ class AiMessageServiceTest {
                 ));
         AiReferenceDocument source = referenceDocument("ANYANG-SITE", 1L);
         when(documentRetriever.retrieve(
-                eq(resolvedQuestion), any(), eq(AiSearchScope.LOCAL_RESOURCE)))
+                eq(resolvedQuestion), any(), eq(AiSearchScope.LOCAL_ONLY)))
                 .thenReturn(List.of(source));
         when(answerGenerator.generate(
                 eq(resolvedQuestion), any(), eq(List.of(source))))
@@ -1256,7 +1271,7 @@ class AiMessageServiceTest {
     }
 
     @Test
-    void preservesExplicitSiteTargetWhenClassifierParaphrasesItAsWelfareServices() {
+    void usesOfficialWelfareSiteAnswerEvenWhenQuestionContainsRegion() {
         String question = "성남에서 알아두면 좋은 복지사이트";
         String changedQuestion = "경기도 성남시 복지 서비스와 기관을 알려줘";
         Region seongnam = Region.create("경기도", "성남시");
@@ -1266,28 +1281,22 @@ class AiMessageServiceTest {
                 AiQuestionAnalysis.forQuestion(
                         changedQuestion,
                         AiQuestionIntent.WELFARE_SITES,
-                        AiSearchScope.GENERAL,
+                        AiSearchScope.REGION_PRIORITY,
                         List.of(),
                         null,
                         changedQuestion,
                         false
-                ));
+        ));
         AiReferenceDocument source = referenceDocument("SEONGNAM-SITE", 1L);
-        when(documentRetriever.retrieve(
-                eq(question), any(), eq(AiSearchScope.LOCAL_RESOURCE)))
-                .thenReturn(List.of(source));
-        when(answerGenerator.generate(eq(question), any(), eq(List.of(source))))
-                .thenReturn(new GeneratedAiAnswer(
-                        "성남시 복지 사이트 안내",
-                        List.of("SEONGNAM-SITE"),
-                        List.of(new GeneratedAiAnswerItem(
-                                "성남시 복지 사이트", "SEONGNAM-SITE"))
-                ));
-        AiMessage saved = savedAiMessage("성남시 복지 사이트 안내");
+        when(starterQuestionRouter.route(
+                eq(AiCuratedAnswerType.WELFARE_SITES), any()
+        )).thenReturn(Optional.of(AiStarterQuestionAnswer.answered(
+                "공식 복지 사이트 안내", List.of(source))));
+        AiMessage saved = savedAiMessage("공식 복지 사이트 안내");
         when(persistenceService.saveAiMessageAndComplete(
                 11L,
                 chatRoom,
-                "성남시 복지 사이트 안내",
+                "공식 복지 사이트 안내",
                 false,
                 AiAnswerStatus.ANSWERED,
                 List.of(source)
@@ -1295,11 +1304,10 @@ class AiMessageServiceTest {
 
         service.createMessage(1L, question);
 
-        verify(documentRetriever, org.mockito.Mockito.atLeastOnce()).retrieve(
-                eq(question), any(), eq(AiSearchScope.LOCAL_RESOURCE));
-        verify(starterQuestionRouter, never()).route(
-                eq(AiStarterQuestionType.WELFARE_SITES), any());
-        verify(answerGenerator).generate(eq(question), any(), eq(List.of(source)));
+        verify(starterQuestionRouter).route(
+                eq(AiCuratedAnswerType.WELFARE_SITES), any());
+        verify(documentRetriever, never()).retrieve(any(), any(), any());
+        verify(answerGenerator, never()).generate(any(), any(), any());
         ArgumentCaptor<AiResolvedContext> contextCaptor =
                 ArgumentCaptor.forClass(AiResolvedContext.class);
         verify(persistenceService).updateUserMessageContext(
@@ -1343,21 +1351,21 @@ class AiMessageServiceTest {
                 .thenAnswer(invocation -> invocation.<String>getArgument(0).contains("성남시")
                         ? List.of(seongnam)
                         : List.of());
-        when(questionIntentClassifier.analyze(
-                eq(question), any(), any(), eq(previousContext)))
-                .thenReturn(AiQuestionAnalysis.forQuestion(
-                        question,
-                        AiQuestionIntent.NONE,
-                        AiSearchScope.GENERAL,
-                        List.of(),
-                        null,
-                        analyzedQuestion,
-                        true,
-                        InfoSubCategory.FAMILY_SUPPORT
-                ).withSiteListRequest(true));
+        doReturn(AiQuestionAnalysis.forQuestion(
+                question,
+                AiQuestionIntent.NONE,
+                AiSearchScope.REGION_PRIORITY,
+                List.of(),
+                null,
+                analyzedQuestion,
+                true,
+                InfoSubCategory.FAMILY_SUPPORT
+        ).withSiteListRequest(true)).when(questionIntentClassifier).analyze(
+                eq(question), nullable(String.class), nullable(String.class),
+                nullable(AiResolvedContext.class), nullable(String.class));
         AiReferenceDocument source = referenceDocument("SEONGNAM-SITE", 1L);
         when(documentRetriever.retrieve(eq(finalQuestion), any(),
-                eq(AiSearchScope.LOCAL_RESOURCE))).thenReturn(List.of(source));
+                eq(AiSearchScope.LOCAL_ONLY))).thenReturn(List.of(source));
         when(answerGenerator.generate(eq(finalQuestion), any(), eq(List.of(source))))
                 .thenReturn(new GeneratedAiAnswer(
                         "성남시 복지 사이트 안내",
@@ -1376,7 +1384,7 @@ class AiMessageServiceTest {
                 ArgumentCaptor.forClass(AiUserProfile.class);
         verify(documentRetriever).retrieve(
                 eq(finalQuestion), profileCaptor.capture(),
-                eq(AiSearchScope.LOCAL_RESOURCE));
+                eq(AiSearchScope.LOCAL_ONLY));
         assertThat(profileCaptor.getValue().infoSubCategory()).isNull();
     }
 
@@ -1405,14 +1413,14 @@ class AiMessageServiceTest {
         )).thenReturn(AiQuestionAnalysis.forQuestion(
                 question,
                 AiQuestionIntent.NONE,
-                AiSearchScope.NATIONAL_POLICY,
+                AiSearchScope.NATIONWIDE,
                 List.of(),
                 null,
                 question,
                 false
         ));
         when(documentRetriever.retrieve(
-                eq(question), any(), eq(AiSearchScope.NATIONAL_POLICY)))
+                eq(question), any(), eq(AiSearchScope.NATIONWIDE)))
                 .thenReturn(List.of());
         AiMessage saved = savedAiMessage("관련 정보를 찾을 수 없습니다.");
         when(persistenceService.saveAiMessageAndComplete(
@@ -1432,7 +1440,7 @@ class AiMessageServiceTest {
     }
 
     @Test
-    void startsNewContextForSelfContainedNearbyResourceQuestionEvenWhenLlmMarksFollowUp() {
+    void startsNewContextWhenLlmTreatsSelfContainedNearbyResourceQuestionAsIndependent() {
         String question = "근처 장애인재활센터 5개 알려줘";
         String previousQuestion = "부산 특수학교 알려줘";
         String previousAnswer = "부산광역시 특수학교 5곳을 안내했습니다.";
@@ -1454,14 +1462,14 @@ class AiMessageServiceTest {
                 .thenReturn(AiQuestionAnalysis.forQuestion(
                         question,
                         AiQuestionIntent.NONE,
-                        AiSearchScope.LOCAL_RESOURCE,
+                        AiSearchScope.LOCAL_ONLY,
                         List.of(),
                         5,
                         question,
-                        true
+                        false
                 ));
         when(documentRetriever.retrieve(
-                any(), any(), eq(AiSearchScope.LOCAL_RESOURCE)))
+                any(), any(), eq(AiSearchScope.LOCAL_ONLY)))
                 .thenReturn(List.of());
         AiMessage saved = savedAiMessage("관련 정보를 찾을 수 없습니다.");
         when(persistenceService.saveAiMessageAndComplete(
@@ -1478,31 +1486,9 @@ class AiMessageServiceTest {
                 eq(null),
                 eq(11L)
         );
-        verify(questionIntentClassifier).analyze(question);
-        verify(questionIntentClassifier, never()).analyze(
-                question, previousQuestion, previousAnswer);
-    }
-
-    @Test
-    void keepsContextForQuestionThatReferencesPreviouslyMentionedResource() {
-        String question = "그 센터 신청 방법을 알려줘";
-        AiQuestionRegionResolver.RegionResolution regionResolution =
-                new AiQuestionRegionResolver.RegionResolution(
-                        AiQuestionRegionResolver.RegionResolution.Status.RESOLVED,
-                        Region.create("경기도", "수원시"),
-                        "경기도",
-                        List.of()
-                );
-
-        Boolean independent = ReflectionTestUtils.invokeMethod(
-                service,
-                "isSelfContainedResourceQuestion",
-                question,
-                "수원시 그 센터 신청 방법을 알려줘",
-                regionResolution
-        );
-
-        assertThat(independent).isFalse();
+        verify(questionIntentClassifier).analyze(
+                eq(question), eq(previousQuestion), eq(previousAnswer),
+                any(), eq("경기도 수원시"));
     }
 
     @Test
@@ -1516,7 +1502,7 @@ class AiMessageServiceTest {
                 AiQuestionAnalysis.forQuestion(
                         question,
                         AiQuestionIntent.NONE,
-                        AiSearchScope.NATIONAL_POLICY,
+                        AiSearchScope.NATIONWIDE,
                         List.of("장애인 활동지원서비스 아동 신청 대상 신청 방법")
                 ).withRetrievalPlan(
                         "활동지원 제도와 신청 조건 안내",
@@ -1613,7 +1599,7 @@ class AiMessageServiceTest {
                 AiQuestionAnalysis.forQuestion(
                         question,
                         AiQuestionIntent.NONE,
-                        AiSearchScope.NATIONAL_POLICY,
+                        AiSearchScope.NATIONWIDE,
                         List.of()
                 ).withRetrievalPlan(
                         "활동지원 제도 안내",
@@ -1700,9 +1686,9 @@ class AiMessageServiceTest {
                 AiQuestionAnalysis.forQuestion(
                         question,
                         AiQuestionIntent.NONE,
-                        AiSearchScope.NATIONAL_POLICY,
+                        AiSearchScope.NATIONWIDE,
                         List.of()
-                )
+                ).withConversationContext(true, false)
         );
 
         List<AiReferenceDocument> childDocuments = IntStream.rangeClosed(1, 5)
@@ -1764,7 +1750,7 @@ class AiMessageServiceTest {
                 AiQuestionAnalysis.forQuestion(
                         question,
                         AiQuestionIntent.NONE,
-                        AiSearchScope.LOCAL_RESOURCE,
+                        AiSearchScope.LOCAL_ONLY,
                         List.of(expandedQuery1, expandedQuery2)
                 )
         );
@@ -1840,7 +1826,7 @@ class AiMessageServiceTest {
         when(questionIntentClassifier.analyze(question)).thenReturn(
                 new AiQuestionAnalysis(
                         AiQuestionIntent.NONE,
-                        AiSearchScope.NATIONAL_POLICY,
+                        AiSearchScope.NATIONWIDE,
                         analyzedQueries
                 )
         );
@@ -1884,7 +1870,7 @@ class AiMessageServiceTest {
                 )
         );
         when(documentRetriever.retrieve(eq(question), any(),
-                eq(AiSearchScope.LOCAL_RESOURCE))).thenReturn(List.of());
+                eq(AiSearchScope.LOCAL_ONLY))).thenReturn(List.of());
         AiMessage saved = savedAiMessage("관련 정보를 찾을 수 없습니다.");
         when(persistenceService.saveAiMessageAndComplete(
                 11L,
@@ -1903,14 +1889,14 @@ class AiMessageServiceTest {
                         "부산광역시".equals(profile.region())
                                 && "부산광역시".equals(profile.regionLevel1())
                                 && profile.regionLevel2().isBlank()),
-                eq(AiSearchScope.LOCAL_RESOURCE)
+                eq(AiSearchScope.LOCAL_ONLY)
         );
         verify(externalAnswerProvider).search(
                 eq(question),
                 any(),
                 org.mockito.ArgumentMatchers.argThat(profile ->
                         "부산광역시".equals(profile.region())),
-                eq(AiSearchScope.LOCAL_RESOURCE)
+                eq(AiSearchScope.LOCAL_ONLY)
         );
     }
 
@@ -1927,12 +1913,12 @@ class AiMessageServiceTest {
                 AiQuestionAnalysis.forQuestion(
                         question,
                         AiQuestionIntent.NONE,
-                        AiSearchScope.GENERAL,
+                        AiSearchScope.REGION_PRIORITY,
                         List.of()
                 )
         );
         when(documentRetriever.retrieve(eq(question), any(),
-                eq(AiSearchScope.LOCAL_RESOURCE))).thenReturn(List.of());
+                eq(AiSearchScope.LOCAL_ONLY))).thenReturn(List.of());
         AiMessage saved = savedAiMessage("관련 정보를 찾을 수 없습니다.");
         when(persistenceService.saveAiMessageAndComplete(
                 11L,
@@ -1951,7 +1937,7 @@ class AiMessageServiceTest {
                         "부산광역시".equals(profile.region())
                                 && "부산광역시".equals(profile.regionLevel1())
                                 && profile.regionLevel2().isBlank()),
-                eq(AiSearchScope.LOCAL_RESOURCE)
+                eq(AiSearchScope.LOCAL_ONLY)
         );
         verify(externalAnswerProvider).search(
                 eq(question),
@@ -1959,7 +1945,7 @@ class AiMessageServiceTest {
                 org.mockito.ArgumentMatchers.argThat(profile ->
                         "부산광역시".equals(profile.region())
                                 && "부산광역시".equals(profile.regionLevel1())),
-                eq(AiSearchScope.LOCAL_RESOURCE)
+                eq(AiSearchScope.LOCAL_ONLY)
         );
     }
 
@@ -1976,12 +1962,12 @@ class AiMessageServiceTest {
                 AiQuestionAnalysis.forQuestion(
                         question,
                         AiQuestionIntent.NONE,
-                        AiSearchScope.GENERAL,
+                        AiSearchScope.REGION_PRIORITY,
                         List.of()
                 )
         );
         when(documentRetriever.retrieve(eq(question), any(),
-                eq(AiSearchScope.LOCAL_RESOURCE))).thenReturn(List.of());
+                eq(AiSearchScope.LOCAL_ONLY))).thenReturn(List.of());
         AiMessage saved = savedAiMessage("관련 정보를 찾을 수 없습니다.");
         when(persistenceService.saveAiMessageAndComplete(
                 11L, chatRoom, "관련 정보를 찾을 수 없습니다.", false,
@@ -1999,7 +1985,7 @@ class AiMessageServiceTest {
                                 && profile.infoSubCategory()
                                 == com.bodeum.domain.info.entity.enums.InfoSubCategory
                                 .SPECIAL_SCHOOL),
-                eq(AiSearchScope.LOCAL_RESOURCE)
+                eq(AiSearchScope.LOCAL_ONLY)
         );
     }
 
@@ -2064,12 +2050,12 @@ class AiMessageServiceTest {
                 AiQuestionAnalysis.forQuestion(
                         metropolitanQuestion,
                         AiQuestionIntent.NONE,
-                        AiSearchScope.GENERAL,
+                        AiSearchScope.REGION_PRIORITY,
                         List.of()
                 )
         );
         when(documentRetriever.retrieve(eq(metropolitanQuestion), any(),
-                eq(AiSearchScope.LOCAL_RESOURCE))).thenReturn(List.of());
+                eq(AiSearchScope.LOCAL_ONLY))).thenReturn(List.of());
         AiMessage saved = savedAiMessage("관련 정보를 찾을 수 없습니다.");
         when(persistenceService.saveAiMessageAndComplete(
                 11L, chatRoom, "관련 정보를 찾을 수 없습니다.", false,
@@ -2083,7 +2069,7 @@ class AiMessageServiceTest {
                 org.mockito.ArgumentMatchers.argThat(profile ->
                         "광주광역시".equals(profile.regionLevel1())
                                 && profile.regionLevel2().isBlank()),
-                eq(AiSearchScope.LOCAL_RESOURCE)
+                eq(AiSearchScope.LOCAL_ONLY)
         );
     }
 
@@ -2097,12 +2083,12 @@ class AiMessageServiceTest {
                 AiQuestionAnalysis.forQuestion(
                         question,
                         AiQuestionIntent.NONE,
-                        AiSearchScope.GENERAL,
+                        AiSearchScope.REGION_PRIORITY,
                         List.of()
                 )
         );
         when(documentRetriever.retrieve(eq(question), any(),
-                eq(AiSearchScope.LOCAL_RESOURCE))).thenReturn(List.of());
+                eq(AiSearchScope.LOCAL_ONLY))).thenReturn(List.of());
         AiMessage saved = savedAiMessage("관련 정보를 찾을 수 없습니다.");
         when(persistenceService.saveAiMessageAndComplete(
                 11L, chatRoom, "관련 정보를 찾을 수 없습니다.", false,
@@ -2117,7 +2103,7 @@ class AiMessageServiceTest {
                         "경기도 광주시".equals(profile.region())
                                 && "경기도".equals(profile.regionLevel1())
                                 && "광주시".equals(profile.regionLevel2())),
-                eq(AiSearchScope.LOCAL_RESOURCE)
+                eq(AiSearchScope.LOCAL_ONLY)
         );
     }
 
@@ -2129,12 +2115,12 @@ class AiMessageServiceTest {
                 AiQuestionAnalysis.forQuestion(
                         question,
                         AiQuestionIntent.NONE,
-                        AiSearchScope.GENERAL,
+                        AiSearchScope.REGION_PRIORITY,
                         List.of()
                 )
         );
         when(documentRetriever.retrieve(eq(question), any(),
-                eq(AiSearchScope.GENERAL))).thenReturn(List.of());
+                eq(AiSearchScope.REGION_PRIORITY))).thenReturn(List.of());
         AiMessage saved = savedAiMessage("관련 정보를 찾을 수 없습니다.");
         when(persistenceService.saveAiMessageAndComplete(
                 11L, chatRoom, "관련 정보를 찾을 수 없습니다.", false,
@@ -2149,7 +2135,7 @@ class AiMessageServiceTest {
                         "경기도 수원시".equals(profile.region())
                                 && "경기도".equals(profile.regionLevel1())
                                 && "수원시".equals(profile.regionLevel2())),
-                eq(AiSearchScope.GENERAL)
+                eq(AiSearchScope.REGION_PRIORITY)
         );
         verify(externalAnswerProvider).search(
                 eq(question),
@@ -2158,7 +2144,7 @@ class AiMessageServiceTest {
                         "경기도 수원시".equals(profile.region())
                                 && "경기도".equals(profile.regionLevel1())
                                 && "수원시".equals(profile.regionLevel2())),
-                eq(AiSearchScope.GENERAL)
+                eq(AiSearchScope.REGION_PRIORITY)
         );
     }
 
@@ -2190,11 +2176,11 @@ class AiMessageServiceTest {
                 AiQuestionAnalysis.forQuestion(
                         question,
                         AiQuestionIntent.NONE,
-                        AiSearchScope.GENERAL,
+                        AiSearchScope.REGION_PRIORITY,
                         List.of()
                 )
         );
-        when(documentRetriever.retrieve(eq(question), any(), eq(AiSearchScope.GENERAL)))
+        when(documentRetriever.retrieve(eq(question), any(), eq(AiSearchScope.REGION_PRIORITY)))
                 .thenReturn(List.of());
         AiMessage saved = savedAiMessage("관련 정보를 찾을 수 없습니다.");
         when(persistenceService.saveAiMessageAndComplete(
@@ -2204,16 +2190,16 @@ class AiMessageServiceTest {
 
         service.createMessage(1L, question);
 
-        verify(questionIntentClassifier).analyze(question);
-        verify(questionIntentClassifier, never()).analyze(
-                question, previousQuestion, previousAnswer);
+        verify(questionIntentClassifier).analyze(
+                eq(question), eq(previousQuestion), eq(previousAnswer),
+                any(), eq("서울특별시 강남구"));
         verify(documentRetriever).retrieve(
                 eq(question),
                 org.mockito.ArgumentMatchers.argThat(profile ->
                         "경기도 수원시".equals(profile.region())
                                 && profile.infoSubCategory()
                                 == InfoSubCategory.SPECIAL_SCHOOL),
-                eq(AiSearchScope.GENERAL)
+                eq(AiSearchScope.REGION_PRIORITY)
         );
     }
 
@@ -2226,14 +2212,14 @@ class AiMessageServiceTest {
                 AiQuestionAnalysis.forQuestion(
                         question,
                         AiQuestionIntent.NONE,
-                        AiSearchScope.LOCAL_RESOURCE,
+                        AiSearchScope.LOCAL_ONLY,
                         List.of()
                 )
         );
         when(regionRepository.findMentionedInQuestion(any(), any()))
                 .thenReturn(List.of());
         when(documentRetriever.retrieve(eq(contextualizedQuestion), any(),
-                eq(AiSearchScope.LOCAL_RESOURCE))).thenReturn(List.of());
+                eq(AiSearchScope.LOCAL_ONLY))).thenReturn(List.of());
         AiMessage saved = savedAiMessage("관련 정보를 찾을 수 없습니다.");
         when(persistenceService.saveAiMessageAndComplete(
                 11L, chatRoom, "관련 정보를 찾을 수 없습니다.", false,
@@ -2246,14 +2232,14 @@ class AiMessageServiceTest {
                 eq(contextualizedQuestion),
                 org.mockito.ArgumentMatchers.argThat(profile ->
                         "경기도 수원시".equals(profile.region())),
-                eq(AiSearchScope.LOCAL_RESOURCE)
+                eq(AiSearchScope.LOCAL_ONLY)
         );
         verify(externalAnswerProvider).search(
                 eq(contextualizedQuestion),
                 eq(List.of(contextualizedQuestion)),
                 org.mockito.ArgumentMatchers.argThat(profile ->
                         "경기도 수원시".equals(profile.region())),
-                eq(AiSearchScope.LOCAL_RESOURCE)
+                eq(AiSearchScope.LOCAL_ONLY)
         );
     }
 
@@ -2267,7 +2253,7 @@ class AiMessageServiceTest {
                 AiQuestionAnalysis.forQuestion(
                         question,
                         AiQuestionIntent.NONE,
-                        AiSearchScope.LOCAL_RESOURCE,
+                        AiSearchScope.LOCAL_ONLY,
                         List.of()
                 )
         );
@@ -2280,7 +2266,7 @@ class AiMessageServiceTest {
                         profile.infoSubCategory()
                                 == com.bodeum.domain.info.entity.enums.InfoSubCategory
                                 .SPECIAL_SCHOOL),
-                eq(AiSearchScope.LOCAL_RESOURCE)))
+                eq(AiSearchScope.LOCAL_ONLY)))
                 .thenReturn(List.of(school));
         when(answerGenerator.generate(eq(question), any(), eq(List.of(school))))
                 .thenReturn(new GeneratedAiAnswer("아름학교 안내", List.of("아름학교")));
@@ -2315,12 +2301,12 @@ class AiMessageServiceTest {
                 AiQuestionAnalysis.forQuestion(
                         question,
                         AiQuestionIntent.NONE,
-                        AiSearchScope.LOCAL_RESOURCE,
+                        AiSearchScope.LOCAL_ONLY,
                         List.of()
                 )
         );
         when(documentRetriever.retrieve(eq(question), any(),
-                eq(AiSearchScope.LOCAL_RESOURCE))).thenReturn(List.of());
+                eq(AiSearchScope.LOCAL_ONLY))).thenReturn(List.of());
         AiMessage saved = savedAiMessage("관련 정보를 찾을 수 없습니다.");
         when(persistenceService.saveAiMessageAndComplete(
                 11L,
@@ -2339,7 +2325,7 @@ class AiMessageServiceTest {
                         "서울특별시 강남구".equals(profile.region())
                                 && "서울특별시".equals(profile.regionLevel1())
                                 && "강남구".equals(profile.regionLevel2())),
-                eq(AiSearchScope.LOCAL_RESOURCE)
+                eq(AiSearchScope.LOCAL_ONLY)
         );
     }
 
@@ -2396,6 +2382,44 @@ class AiMessageServiceTest {
 
         assertThat(normalized).isSameAs(generated);
         assertThat(normalized.answer()).contains("관련 학교는 5개입니다.");
+    }
+
+    @Test
+    void buildsStructuredResourceListWithoutCallingLlm() {
+        String question = "재활센터 5개 알려줘";
+        AiReferenceDocument source = new AiReferenceDocument(
+                "INFO-1", "정보명: 이안아동발달연구소\n주소: 경기도 수원시\n"
+                        + "전화번호: 031-111-1111",
+                AiResponseSourceType.INFO, 1L, "이안아동발달연구소",
+                "https://example.com/1", null);
+        when(questionIntentClassifier.analyze(question)).thenReturn(
+                AiQuestionAnalysis.forQuestion(
+                                question, AiQuestionIntent.NONE,
+                                AiSearchScope.REGION_PRIORITY, List.of(), 5)
+                        .withResourceListRequest(true));
+        when(resourceListSearchService.retrieve(
+                any(), eq(AiSearchScope.REGION_PRIORITY), eq(5), any(), any()))
+                .thenReturn(List.of(source));
+        String answer = "요청하신 5곳 중 현재 보듬에서 확인 가능한 "
+                + "치료·재활기관은 1곳입니다.\n\n"
+                + "**이안아동발달연구소**\n"
+                + "주소: 경기도 수원시\n"
+                + "전화번호: 031-111-1111\n\n"
+                + "방문 전 운영 여부, 이용 대상 및 신청 방법은 해당 기관에 직접 확인해 주세요.";
+        AiMessage saved = savedAiMessage(answer);
+        when(persistenceService.saveAiMessageAndComplete(
+                11L, chatRoom, answer, false,
+                AiAnswerStatus.ANSWERED, List.of(source)))
+                .thenReturn(saved);
+
+        var result = service.createMessage(1L, question);
+
+        assertThat(result.aiMessage().content()).isEqualTo(answer);
+        verify(answerGenerator, never()).generate(any(), any(), any());
+        verify(documentRetriever, never()).retrieve(any(), any(), any());
+        verify(persistenceService).saveAiMessageAndComplete(
+                11L, chatRoom, answer, false,
+                AiAnswerStatus.ANSWERED, List.of(source));
     }
 
     private AiReferenceDocument referenceDocument(String documentKey, long sourceId) {

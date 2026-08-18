@@ -7,7 +7,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.bodeum.domain.ai.enums.AiResponseSourceType;
-import com.bodeum.domain.ai.enums.AiSearchScope;
+import com.bodeum.domain.ai.model.question.AiSearchScope;
 import com.bodeum.domain.ai.model.rag.AiUserProfile;
 import com.bodeum.domain.info.entity.enums.InfoSubCategory;
 import java.time.Instant;
@@ -27,6 +27,28 @@ class SpringAiDocumentRetrieverTest {
 
     @Mock
     private VectorStoreRetriever vectorStoreRetriever;
+
+    @Test
+    void usesTypedCandidateCountForAdditionalResultSearch() {
+        SpringAiDocumentRetriever retriever =
+                new SpringAiDocumentRetriever(vectorStoreRetriever, 5, 10, 0.4);
+        AiUserProfile profile = new AiUserProfile(
+                "경기도 수원시", "경기도", "수원시",
+                null, List.of(), List.of(), null);
+        when(vectorStoreRetriever.similaritySearch(
+                org.mockito.ArgumentMatchers.any(SearchRequest.class)))
+                .thenReturn(List.of());
+
+        retriever.retrieve(
+                "재활센터 더 알려줘", profile, AiSearchScope.LOCAL_ONLY, 30);
+
+        ArgumentCaptor<SearchRequest> requestCaptor =
+                ArgumentCaptor.forClass(SearchRequest.class);
+        verify(vectorStoreRetriever, times(6)).similaritySearch(requestCaptor.capture());
+        assertThat(requestCaptor.getAllValues())
+                .extracting(SearchRequest::getTopK)
+                .containsOnly(30);
+    }
 
     @Test
     void includesRegionAsPriorityContextWithoutAddingRegionFilterToGeneralSearch() {
@@ -89,7 +111,7 @@ class SpringAiDocumentRetrieverTest {
         var result = retriever.retrieve(
                 "특수학교를 알려줘",
                 profile,
-                AiSearchScope.GENERAL
+                AiSearchScope.REGION_PRIORITY
         );
 
         assertThat(result)
@@ -115,7 +137,7 @@ class SpringAiDocumentRetrieverTest {
                 .thenReturn(List.of());
 
         retriever.retrieve("우리 지역 복지센터 알려줘", profile,
-                AiSearchScope.LOCAL_RESOURCE);
+                AiSearchScope.LOCAL_ONLY);
 
         ArgumentCaptor<SearchRequest> requestCaptor = ArgumentCaptor.forClass(SearchRequest.class);
         verify(vectorStoreRetriever, times(6)).similaritySearch(requestCaptor.capture());
@@ -148,7 +170,7 @@ class SpringAiDocumentRetrieverTest {
                 .thenReturn(List.of());
 
         retriever.retrieve("장애인 활동지원서비스 신청 방법", profile,
-                AiSearchScope.NATIONAL_POLICY);
+                AiSearchScope.NATIONWIDE);
 
         ArgumentCaptor<SearchRequest> requestCaptor = ArgumentCaptor.forClass(SearchRequest.class);
         verify(vectorStoreRetriever, times(2)).similaritySearch(requestCaptor.capture());
@@ -191,7 +213,7 @@ class SpringAiDocumentRetrieverTest {
         var result = retriever.retrieve(
                 "수원시 특수학교를 알려줘",
                 profile,
-                AiSearchScope.LOCAL_RESOURCE
+                AiSearchScope.LOCAL_ONLY
         );
 
         assertThat(result)
@@ -228,7 +250,7 @@ class SpringAiDocumentRetrieverTest {
         var result = retriever.retrieve(
                 "근처 장애인재활센터 10개 알려줘",
                 profile,
-                AiSearchScope.LOCAL_RESOURCE
+                AiSearchScope.LOCAL_ONLY
         );
 
         ArgumentCaptor<SearchRequest> requestCaptor =
@@ -253,7 +275,7 @@ class SpringAiDocumentRetrieverTest {
         retriever.retrieve(
                 "재활센터 3개 알려줘",
                 profile,
-                AiSearchScope.GENERAL
+                AiSearchScope.REGION_PRIORITY
         );
 
         ArgumentCaptor<SearchRequest> requestCaptor =
@@ -284,7 +306,7 @@ class SpringAiDocumentRetrieverTest {
         retriever.retrieve(
                 "근처 장애인재활센터 100개 알려줘",
                 profile,
-                AiSearchScope.LOCAL_RESOURCE
+                AiSearchScope.LOCAL_ONLY
         );
 
         ArgumentCaptor<SearchRequest> requestCaptor =
@@ -308,7 +330,7 @@ class SpringAiDocumentRetrieverTest {
         retriever.retrieve(
                 "재활센터 999999999999999999999개 알려줘",
                 profile,
-                AiSearchScope.GENERAL
+                AiSearchScope.REGION_PRIORITY
         );
 
         ArgumentCaptor<SearchRequest> requestCaptor =
@@ -334,7 +356,7 @@ class SpringAiDocumentRetrieverTest {
         retriever.retrieve(
                 "경기도 수원시 특수학교를 알려줘",
                 profile,
-                AiSearchScope.LOCAL_RESOURCE
+                AiSearchScope.LOCAL_ONLY
         );
 
         ArgumentCaptor<SearchRequest> requestCaptor =
