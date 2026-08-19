@@ -1,6 +1,7 @@
 package com.bodeum.domain.ai.infrastructure.generation;
 
 import com.bodeum.domain.ai.model.question.AiQuestionIntent;
+import com.bodeum.domain.ai.model.question.AiResultType;
 import com.bodeum.domain.ai.model.question.AiSearchScope;
 import com.bodeum.domain.ai.infrastructure.support.AiPromptTemplate;
 import com.bodeum.domain.ai.model.context.AiResolvedContext;
@@ -10,7 +11,11 @@ import com.bodeum.domain.ai.service.port.AiQuestionIntentClassifier;
 import com.bodeum.domain.info.entity.enums.InfoSubCategory;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.openai.OpenAiChatOptions;
@@ -160,7 +165,9 @@ public class SpringAiQuestionIntentClassifier implements AiQuestionIntentClassif
             ).withClarification(
                     result != null && result.needsClarification(),
                     result == null ? null : result.clarificationQuestion()
-            ).withResolvedContext(result == null ? null : result.resolvedContext())
+            ).withResolvedContext(result == null || result.resolvedContext() == null
+                    ? null
+                    : result.resolvedContext().toDomain())
                     .withSiteListRequest(result != null && result.siteListRequest())
                     .withResourceListRequest(
                             result != null && result.resourceListRequest())
@@ -193,10 +200,70 @@ public class SpringAiQuestionIntentClassifier implements AiQuestionIntentClassif
             List<AiRequiredConcept> requiredConcepts,
             boolean needsClarification,
             String clarificationQuestion,
-            AiResolvedContext resolvedContext,
+            ClassificationResolvedContext resolvedContext,
             boolean siteListRequest,
             boolean resourceListRequest
     ) {
+    }
+
+    /**
+     * OpenAI Structured Outputs가 임의 키를 가진 Map 스키마를 허용하지 않으므로,
+     * 질문 조건을 key/value 배열로 받은 뒤 도메인 문맥의 Map으로 변환한다.
+     */
+    record ClassificationResolvedContext(
+            String topic,
+            ClassificationRegion region,
+            List<ClassificationFilter> filters,
+            String requestedInformation,
+            Integer requestedResultCount,
+            AiResultType resultType
+    ) {
+        AiResolvedContext toDomain() {
+            Map<String, String> resolvedFilters = new LinkedHashMap<>();
+            Set<String> conflictingNames = new HashSet<>();
+            if (filters != null) {
+                filters.stream()
+                        .filter(filter -> filter != null
+                                && filter.name() != null && !filter.name().isBlank()
+                                && filter.value() != null && !filter.value().isBlank())
+                        .forEach(filter -> mergeFilter(
+                                resolvedFilters, conflictingNames,
+                                filter.name().trim(), filter.value().trim()));
+            }
+            return new AiResolvedContext(
+                    topic,
+                    region == null
+                            ? null
+                            : new AiResolvedContext.RegionContext(
+                                    region.sido(), region.sigungu()),
+                    resolvedFilters,
+                    requestedInformation,
+                    requestedResultCount,
+                    resultType
+            );
+        }
+
+        private void mergeFilter(
+                Map<String, String> resolvedFilters,
+                Set<String> conflictingNames,
+                String name,
+                String value
+        ) {
+            if (conflictingNames.contains(name)) {
+                return;
+            }
+            String previousValue = resolvedFilters.putIfAbsent(name, value);
+            if (previousValue != null && !previousValue.equals(value)) {
+                resolvedFilters.remove(name);
+                conflictingNames.add(name);
+            }
+        }
+    }
+
+    record ClassificationRegion(String sido, String sigungu) {
+    }
+
+    record ClassificationFilter(String name, String value) {
     }
 
     private String readPrompt(Resource resource) {

@@ -512,6 +512,30 @@ class AiMessageServiceTest {
     }
 
     @Test
+    void returnsScopedNoEvidenceWithoutRagForMissingLocalRehabCenters() {
+        String question = "근처 장애인재활센터 10개 알려줘";
+        String message = "현재 보듬에서 확인 가능한 경기도 수원시 "
+                + "재활센터를 찾지 못했습니다.";
+        user.updateInterestRegion(List.of(), Region.create("경기도", "수원시"));
+        when(starterQuestionRouter.route(
+                eq(AiCuratedAnswerType.LOCAL_REHAB_CENTERS), any(), eq(10)))
+                .thenReturn(Optional.of(AiStarterQuestionAnswer.noEvidence(message)));
+        AiMessage saved = savedAiMessage(message);
+        when(persistenceService.saveAiMessageAndComplete(
+                11L, chatRoom, message, false,
+                AiAnswerStatus.NO_EVIDENCE, List.of()))
+                .thenReturn(saved);
+
+        service.createMessage(1L, question);
+
+        verify(persistenceService).saveAiMessageAndComplete(
+                11L, chatRoom, message, false,
+                AiAnswerStatus.NO_EVIDENCE, List.of());
+        verify(documentRetriever, never()).retrieve(any(), any(), any());
+        verify(externalAnswerProvider, never()).search(any(), any(), any(), any());
+    }
+
+    @Test
     void routesSemanticallySimilarQuestionToReviewedStarterAnswer() {
         String question = "장애 진단을 받았는데 이제 뭘 먼저 해야 해?";
         when(questionIntentClassifier.analyze(question))
@@ -886,7 +910,8 @@ class AiMessageServiceTest {
                     );
                 });
         String normalizedAnswer = "공식 복지 사이트 3곳을 안내합니다.\n\n"
-                + "요청하신 개수에 맞춰 관련 항목 3개를 안내드립니다.";
+                + "요청하신 개수에 맞춰 현재 보듬에서 확인 가능한 "
+                + "관련 항목 3개를 안내드립니다.";
         AiMessage saved = savedAiMessage(normalizedAnswer);
         when(persistenceService.saveAiMessageAndComplete(
                 11L, chatRoom,
@@ -905,12 +930,12 @@ class AiMessageServiceTest {
     }
 
     @Test
-    void capsLlmNormalizedResultCountForSearchAndSkipsFixedStarterAnswer() {
+    void capsParameterizedRehabResultCountAfterCuratedQuestionResolution() {
         String question = "근처 장애인재활센터 100개 알려줘";
         String searchQuestion = "경기도 수원시 장애인재활센터 100개 알려줘"
                 + "\n요청 결과 개수: 10개";
         user.updateInterestRegion(List.of(), Region.create("경기도", "수원시"));
-        when(questionIntentClassifier.analyze(question)).thenReturn(
+        lenient().when(questionIntentClassifier.analyze(question)).thenReturn(
                 AiQuestionAnalysis.forQuestion(
                         question,
                         AiQuestionIntent.LOCAL_REHAB_CENTERS,
@@ -939,7 +964,8 @@ class AiMessageServiceTest {
 
         service.createMessage(1L, question);
 
-        verify(starterQuestionRouter, never()).route(any(), any());
+        verify(starterQuestionRouter).route(
+                eq(AiCuratedAnswerType.LOCAL_REHAB_CENTERS), any(), eq(100));
         verify(documentRetriever).retrieve(
                 eq(searchQuestion), any(), eq(AiSearchScope.LOCAL_ONLY));
     }
@@ -1490,7 +1516,7 @@ class AiMessageServiceTest {
     }
 
     @Test
-    void startsNewContextWhenLlmTreatsSelfContainedNearbyResourceQuestionAsIndependent() {
+    void startsNewContextForSelfContainedNearbyResourceQuestionWithoutLlmClassification() {
         String question = "근처 장애인재활센터 5개 알려줘";
         String previousQuestion = "부산 특수학교 알려줘";
         String previousAnswer = "부산광역시 특수학교 5곳을 안내했습니다.";
@@ -1508,16 +1534,6 @@ class AiMessageServiceTest {
         when(aiMessageRepository.findByChatRoomIdAndSenderTypeOrderByCreatedAtDescIdDesc(
                 any(), eq(SenderType.AI), any()))
                 .thenReturn(List.of(previousAiMessage));
-        when(questionIntentClassifier.analyze(question))
-                .thenReturn(AiQuestionAnalysis.forQuestion(
-                        question,
-                        AiQuestionIntent.NONE,
-                        AiSearchScope.LOCAL_ONLY,
-                        List.of(),
-                        5,
-                        question,
-                        false
-                ));
         when(documentRetriever.retrieve(
                 any(), any(), eq(AiSearchScope.LOCAL_ONLY)))
                 .thenReturn(List.of());
@@ -1536,9 +1552,8 @@ class AiMessageServiceTest {
                 eq(null),
                 eq(11L)
         );
-        verify(questionIntentClassifier).analyze(
-                eq(question), eq(previousQuestion), eq(previousAnswer),
-                any(), eq("경기도 수원시"));
+        verify(starterQuestionRouter).route(
+                eq(AiCuratedAnswerType.LOCAL_REHAB_CENTERS), any(), eq(5));
     }
 
     @Test
@@ -2450,7 +2465,7 @@ class AiMessageServiceTest {
         when(resourceListSearchService.retrieve(
                 any(), eq(AiSearchScope.REGION_PRIORITY), eq(5), any(), any()))
                 .thenReturn(List.of(source));
-        String answer = "요청하신 5곳 중 현재 보듬에서 확인한 "
+        String answer = "요청하신 5곳 중 현재 보듬에서 확인 가능한 "
                 + "치료·재활기관 1곳을 안내드립니다.\n\n"
                 + "**이안아동발달연구소**\n"
                 + "주소: 경기도 수원시\n"

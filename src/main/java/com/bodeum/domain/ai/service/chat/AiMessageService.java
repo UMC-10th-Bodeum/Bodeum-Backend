@@ -258,6 +258,10 @@ public class AiMessageService {
                                         questionContext.requestedResultCount()));
         if (starterAnswer.isPresent()) {
             AiStarterQuestionAnswer answer = starterAnswer.get();
+            if (answer.hasNoEvidenceMessage()) {
+                return fallbackService.noEvidence(
+                        chatRoom, userMessage, answer.content());
+            }
             if (answer.isRegionRequired() || answer.hasEvidence()) {
                 if (answer.hasEvidence() && questionContext.isSiteListRequest()) {
                     return fallbackService.saveStarterSiteAnswer(
