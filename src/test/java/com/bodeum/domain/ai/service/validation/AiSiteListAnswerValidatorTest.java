@@ -11,6 +11,21 @@ import org.junit.jupiter.api.Test;
 
 class AiSiteListAnswerValidatorTest {
 
+    @Test
+    void keepsOnlySourcesWithValidUniqueDomains() {
+        AiSiteListAnswerValidator validator = new AiSiteListAnswerValidator();
+        List<AiReferenceDocument> sources = List.of(
+                document("SITE-1", "https://www.bokjiro.go.kr/first"),
+                document("SITE-2", "https://m.bokjiro.go.kr/second"),
+                document("SITE-3", null),
+                document("SITE-4", "https://www.gov.kr")
+        );
+
+        assertThat(validator.uniqueValidSources(sources))
+                .extracting(AiReferenceDocument::documentKey)
+                .containsExactly("SITE-1", "SITE-4");
+    }
+
     private final AiSiteListAnswerValidator validator = new AiSiteListAnswerValidator();
 
     @Test

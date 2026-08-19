@@ -44,7 +44,7 @@ class SpringAiDocumentRetrieverTest {
 
         ArgumentCaptor<SearchRequest> requestCaptor =
                 ArgumentCaptor.forClass(SearchRequest.class);
-        verify(vectorStoreRetriever, times(6)).similaritySearch(requestCaptor.capture());
+        verify(vectorStoreRetriever, times(3)).similaritySearch(requestCaptor.capture());
         assertThat(requestCaptor.getAllValues())
                 .extracting(SearchRequest::getTopK)
                 .containsOnly(30);
@@ -140,16 +140,13 @@ class SpringAiDocumentRetrieverTest {
                 AiSearchScope.LOCAL_ONLY);
 
         ArgumentCaptor<SearchRequest> requestCaptor = ArgumentCaptor.forClass(SearchRequest.class);
-        verify(vectorStoreRetriever, times(6)).similaritySearch(requestCaptor.capture());
-        assertThat(requestCaptor.getAllValues().subList(0, 2))
-                .extracting(request -> request.getFilterExpression().toString())
-                .allMatch(filter -> filter.contains("경기도") && filter.contains("수원시"));
-        assertThat(requestCaptor.getAllValues().subList(2, 4))
-                .extracting(request -> request.getFilterExpression().toString())
-                .allMatch(filter -> filter.contains("경기도") && !filter.contains("수원시"));
-        assertThat(requestCaptor.getAllValues().subList(4, 6))
-                .extracting(SearchRequest::getFilterExpression)
-                .containsOnlyNulls();
+        verify(vectorStoreRetriever, times(3)).similaritySearch(requestCaptor.capture());
+        assertThat(requestCaptor.getAllValues().get(0).getFilterExpression().toString())
+                .contains("경기도", "수원시");
+        assertThat(requestCaptor.getAllValues().get(1).getFilterExpression().toString())
+                .contains("경기도")
+                .doesNotContain("수원시");
+        assertThat(requestCaptor.getAllValues().get(2).getFilterExpression()).isNull();
     }
 
     @Test
@@ -173,7 +170,7 @@ class SpringAiDocumentRetrieverTest {
                 AiSearchScope.NATIONWIDE);
 
         ArgumentCaptor<SearchRequest> requestCaptor = ArgumentCaptor.forClass(SearchRequest.class);
-        verify(vectorStoreRetriever, times(2)).similaritySearch(requestCaptor.capture());
+        verify(vectorStoreRetriever).similaritySearch(requestCaptor.capture());
         assertThat(requestCaptor.getAllValues())
                 .extracting(SearchRequest::getQuery)
                 .allMatch(query -> !query.contains("경기도 수원시"));
@@ -255,7 +252,7 @@ class SpringAiDocumentRetrieverTest {
 
         ArgumentCaptor<SearchRequest> requestCaptor =
                 ArgumentCaptor.forClass(SearchRequest.class);
-        verify(vectorStoreRetriever, times(2)).similaritySearch(requestCaptor.capture());
+        verify(vectorStoreRetriever).similaritySearch(requestCaptor.capture());
         assertThat(requestCaptor.getAllValues())
                 .extracting(SearchRequest::getTopK)
                 .containsOnly(10);
@@ -280,7 +277,7 @@ class SpringAiDocumentRetrieverTest {
 
         ArgumentCaptor<SearchRequest> requestCaptor =
                 ArgumentCaptor.forClass(SearchRequest.class);
-        verify(vectorStoreRetriever, times(2)).similaritySearch(requestCaptor.capture());
+        verify(vectorStoreRetriever).similaritySearch(requestCaptor.capture());
         assertThat(requestCaptor.getAllValues())
                 .extracting(SearchRequest::getTopK)
                 .containsOnly(5);
@@ -311,7 +308,7 @@ class SpringAiDocumentRetrieverTest {
 
         ArgumentCaptor<SearchRequest> requestCaptor =
                 ArgumentCaptor.forClass(SearchRequest.class);
-        verify(vectorStoreRetriever, times(6)).similaritySearch(requestCaptor.capture());
+        verify(vectorStoreRetriever, times(3)).similaritySearch(requestCaptor.capture());
         assertThat(requestCaptor.getAllValues())
                 .extracting(SearchRequest::getTopK)
                 .containsOnly(10);
@@ -335,7 +332,7 @@ class SpringAiDocumentRetrieverTest {
 
         ArgumentCaptor<SearchRequest> requestCaptor =
                 ArgumentCaptor.forClass(SearchRequest.class);
-        verify(vectorStoreRetriever, times(2)).similaritySearch(requestCaptor.capture());
+        verify(vectorStoreRetriever).similaritySearch(requestCaptor.capture());
         assertThat(requestCaptor.getAllValues())
                 .extracting(SearchRequest::getTopK)
                 .containsOnly(10);
@@ -361,20 +358,14 @@ class SpringAiDocumentRetrieverTest {
 
         ArgumentCaptor<SearchRequest> requestCaptor =
                 ArgumentCaptor.forClass(SearchRequest.class);
-        verify(vectorStoreRetriever, times(6)).similaritySearch(requestCaptor.capture());
-        assertThat(requestCaptor.getAllValues().subList(0, 2))
-                .extracting(request -> request.getFilterExpression().toString())
-                .allMatch(filter -> filter.contains("경기도")
-                        && filter.contains("수원시")
-                        && filter.contains("SPECIAL_SCHOOL"));
-        assertThat(requestCaptor.getAllValues().subList(2, 4))
-                .extracting(request -> request.getFilterExpression().toString())
-                .allMatch(filter -> filter.contains("경기도")
-                        && !filter.contains("수원시")
-                        && filter.contains("SPECIAL_SCHOOL"));
-        assertThat(requestCaptor.getAllValues().subList(4, 6))
-                .extracting(request -> request.getFilterExpression().toString())
-                .allMatch(filter -> filter.contains("SPECIAL_SCHOOL"));
+        verify(vectorStoreRetriever, times(3)).similaritySearch(requestCaptor.capture());
+        assertThat(requestCaptor.getAllValues().get(0).getFilterExpression().toString())
+                .contains("경기도", "수원시", "SPECIAL_SCHOOL");
+        assertThat(requestCaptor.getAllValues().get(1).getFilterExpression().toString())
+                .contains("경기도", "SPECIAL_SCHOOL")
+                .doesNotContain("수원시");
+        assertThat(requestCaptor.getAllValues().get(2).getFilterExpression().toString())
+                .contains("SPECIAL_SCHOOL");
     }
 
     private Document document(String id, double score) {

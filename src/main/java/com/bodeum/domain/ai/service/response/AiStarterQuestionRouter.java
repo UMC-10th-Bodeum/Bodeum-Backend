@@ -243,10 +243,7 @@ public class AiStarterQuestionRouter {
     ) {
         int resultCount = requestedResultCount == null
                 ? sites.size() : Math.max(1, requestedResultCount);
-        if (resultCount > sites.size()) {
-            return Optional.empty();
-        }
-        return Optional.of(answerFactory.apply(resultCount));
+        return Optional.of(answerFactory.apply(Math.min(resultCount, sites.size())));
     }
 
     // -------------------------------------------------------------------------
@@ -335,7 +332,7 @@ public class AiStarterQuestionRouter {
         if (requestedResultCount != null) {
             if (requestedResultCount > MAX_LOCAL_CENTER_LIMIT) {
                 return "한 번에 최대 " + MAX_LOCAL_CENTER_LIMIT
-                        + "곳까지 안내할 수 있으며, 현재 보듬에서 확인한 "
+                        + "곳까지 안내할 수 있어, 현재 보듬에서 확인한 "
                         + region + " 재활센터 " + actualCount + "곳을 안내드립니다.\n";
             }
             if (actualCount < requestedResultCount) {

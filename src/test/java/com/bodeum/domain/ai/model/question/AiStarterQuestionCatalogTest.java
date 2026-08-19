@@ -46,6 +46,20 @@ class AiStarterQuestionCatalogTest {
     }
 
     @Test
+    void recognizesRelativeRegionRehabCenterListQuestions() {
+        assertThat(AiStarterQuestionCatalog.findAnswerType("근처 재활센터를 알려줘"))
+                .contains(AiCuratedAnswerType.LOCAL_REHAB_CENTERS);
+        assertThat(AiStarterQuestionCatalog.findAnswerType("주변 재활 센터 추천해주세요"))
+                .contains(AiCuratedAnswerType.LOCAL_REHAB_CENTERS);
+        assertThat(AiStarterQuestionCatalog.findAnswerType("가까운 재활센터 알려줘"))
+                .contains(AiCuratedAnswerType.LOCAL_REHAB_CENTERS);
+        assertThat(AiStarterQuestionCatalog.findAnswerType("근처 재활센터 비용 알려줘"))
+                .isEmpty();
+        assertThat(AiStarterQuestionCatalog.findAnswerType("재활센터 신청 방법 알려줘"))
+                .isEmpty();
+    }
+
+    @Test
     void exposesOnlyVisibleStarterQuestions() {
         assertThat(AiStarterQuestionCatalog.visibleQuestionContents())
                 .contains(AiStarterQuestionCatalog.contentOf(

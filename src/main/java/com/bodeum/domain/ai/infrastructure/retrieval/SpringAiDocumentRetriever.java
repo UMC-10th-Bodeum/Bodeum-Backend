@@ -148,8 +148,9 @@ public class SpringAiDocumentRetriever implements AiDocumentRetriever {
         String searchQuery = buildSearchQuery(question, profile, includeRegion);
         List<Document> personalizedDocuments = search(
                 searchQuery, filterExpression, searchCandidateCount);
-        List<Document> questionDocuments = search(
-                question, filterExpression, searchCandidateCount);
+        List<Document> questionDocuments = searchQuery.equals(question)
+                ? personalizedDocuments
+                : search(question, filterExpression, searchCandidateCount);
 
         Map<String, Document> documentsById = new LinkedHashMap<>();
         if (includeRegion) {

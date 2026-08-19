@@ -17,6 +17,16 @@ public class AiQuestionSearchQueryBuilder {
 
     @Value("${bodeum.ai.result.max-count:10}")
     private int maxResultCount = 10;
+    private int maxQueryCount = 3;
+
+    @Value("${bodeum.ai.rag.max-query-count:3}")
+    void configureMaxQueryCount(int maxQueryCount) {
+        if (maxQueryCount < 1 || maxQueryCount > 3) {
+            throw new IllegalArgumentException(
+                    "bodeum.ai.rag.max-query-count는 1 이상 3 이하여야 합니다.");
+        }
+        this.maxQueryCount = maxQueryCount;
+    }
 
     public AiSearchQueryContext build(
             String resolvedQuestion,
@@ -121,7 +131,7 @@ public class AiQuestionSearchQueryBuilder {
             expanded.addAll(queries);
         }
         return expanded.stream().filter(query -> query != null && !query.isBlank())
-                .map(String::trim).distinct().limit(3).toList();
+                .map(String::trim).distinct().limit(maxQueryCount).toList();
     }
 
     /**

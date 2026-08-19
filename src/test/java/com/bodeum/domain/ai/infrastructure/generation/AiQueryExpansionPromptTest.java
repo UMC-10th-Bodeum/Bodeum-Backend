@@ -19,7 +19,7 @@ class AiQueryExpansionPromptTest {
                 "사용자 질문의 의미와 조건을 유지",
                 "공식 제도명",
                 "자격 여부와 사실관계를 추측하지 마세요",
-                "최대 3개",
+                "최대 {{maxQueryCount}}개",
                 "우리 동네",
                 "서비스, 지원사업, 프로그램",
                 "LOCAL_ONLY",

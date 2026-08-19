@@ -2,6 +2,7 @@ package com.bodeum.domain.ai.model.context;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.bodeum.domain.ai.model.question.AiResultType;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -22,6 +23,7 @@ class AiResolvedContextTest {
 
         assertThat(context.region())
                 .isEqualTo(new AiResolvedContext.RegionContext("경기도", "성남시"));
+        assertThat(context.resultType()).isNull();
     }
 
     @Test
@@ -130,5 +132,18 @@ class AiResolvedContextTest {
 
         assertThat(inherited.requestedResultCount()).isEqualTo(6);
         assertThat(changed.requestedResultCount()).isEqualTo(3);
+    }
+
+    @Test
+    void preservesResultTypeAcrossContextUpdates() {
+        AiResolvedContext original = new AiResolvedContext(
+                "공식 복지 사이트", null, Map.of(), "목록", 5,
+                AiResultType.SITE_LIST);
+
+        AiResolvedContext updated = original
+                .withRequestedResultCount(3)
+                .withFilter("운영 주체", "공공기관");
+
+        assertThat(updated.resultType()).isEqualTo(AiResultType.SITE_LIST);
     }
 }

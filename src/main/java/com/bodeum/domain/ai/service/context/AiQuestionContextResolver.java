@@ -36,6 +36,15 @@ public class AiQuestionContextResolver {
     private static final Pattern CONTEXT_REFERENCE_PATTERN = Pattern.compile(
             "(그중|그\\s*(학교|센터|기관|곳|서비스|제도)|위\\s*(학교|센터|기관|곳|서비스|제도)"
                     + "|앞서|이전|방금|해당)");
+    private static final Pattern SHORT_ADDITIONAL_RESULTS_PATTERN = Pattern.compile(
+            "^(?:(?:좀|조금)?더(?:알려줘|알려주세요)?|추가로(?:알려줘|알려주세요)?)$");
+    private static final Pattern EXPLICIT_ADDITIONAL_RESULTS_PATTERN = Pattern.compile(
+            "(?:(?:앞에서|이전에|전에|앞서).*(?:말한|안내한|추천한|소개한).*"
+                    + "(?:빼고|제외하고)"
+                    + "|(?:아직)?(?:안내|말|소개|추천)하지않은.*"
+                    + "(?:곳|기관|학교|센터|사이트|홈페이지|항목)"
+                    + "|(?:새로운|새|다른).*(?:곳|기관|학교|센터|사이트|홈페이지|항목).*"
+                    + "(?:더|알려|보여|추천|찾))");
     private static final Set<InfoSubCategory> SEARCHABLE_CATEGORIES = Set.of(
             InfoSubCategory.PRIMARY_CARE, InfoSubCategory.EMERGENCY_CLINIC,
             InfoSubCategory.THERAPY_REHAB, InfoSubCategory.WELFARE_CENTER,
@@ -87,6 +96,11 @@ public class AiQuestionContextResolver {
                             content, null, null, null, profile.region());
         }
 
+        analysis = preserveImmediateListContextForShortAdditionalRequest(
+                content, conversationContext, analysis);
+        analysis = enforceExplicitAdditionalResultsRequest(
+                content, conversationContext, analysis);
+
         // 사이트 목록 요청은 현재 질문을 명시적인 검색 대상으로 보정
         boolean analyzedSiteListRequest = analysis.siteListRequest()
                 || analysis.intent() == AiQuestionIntent.WELFARE_SITES;
@@ -100,11 +114,13 @@ public class AiQuestionContextResolver {
         AiQuestionIntent intent = analysis.intent();
         String resolvedQuestion = analysis.resolvedQuestion() == null
                 ? content : analysis.resolvedQuestion();
-        AiResultType resultType = resolveResultType(
-                analysis, intent, analyzedSiteListRequest);
         boolean followUp = regionFollowUpQuestion.isPresent()
                 || analysis.referencesPreviousContext();
         boolean excludePreviousResults = followUp && analysis.excludePreviousResults();
+        AiResultType resultType = resolveResultType(
+                content, analysis, intent, analyzedSiteListRequest,
+                conversationContext.immediatePreviousResolvedContext(),
+                excludePreviousResults);
         AiSearchScope searchScope = resolveSearchScope(intent, analysis.searchScope());
         if (nationwideResourceQuestion) {
             searchScope = AiSearchScope.REGION_PRIORITY;
@@ -122,6 +138,9 @@ public class AiQuestionContextResolver {
                 conversationContext.immediatePreviousResolvedContext(),
                 contextRegionResolution, followUp,
                 analysis.requestedResultCount());
+        if (resolvedContext != null) {
+            resolvedContext = resolvedContext.withResultType(resultType);
+        }
 
         // 후속 질문이면 이전 검색 조건을 반영해 완전한 질문으로 다시 구성
         if (followUp && resolvedContext != null) {
@@ -156,6 +175,14 @@ public class AiQuestionContextResolver {
         // 검색 카테고리와 우선 지역을 반영해 실제 검색에 사용할 프로필 구성
         InfoSubCategory category = resultType == AiResultType.SITE_LIST
                 ? null : resolveInfoSubCategory(resolvedQuestion, analysis.infoSubCategory());
+        boolean needsClarification = analysis.needsClarification();
+        String clarificationQuestion = analysis.clarificationQuestion();
+        if (resultType == AiResultType.RESOURCE_LIST
+                && category == null && !needsClarification) {
+            needsClarification = true;
+            clarificationQuestion = "어떤 종류의 기관을 찾으시나요? "
+                    + "예: 재활센터, 특수학교, 장애인복지관, 가족지원센터";
+        }
         AiQuestionRegionResolver.RegionResolution priorityRegion =
                 resolveNationwideSearchPriorityRegion(
                         category, profile, conversationContext,
@@ -174,29 +201,145 @@ public class AiQuestionContextResolver {
                         ? resolvedContext.requestedResultCount()
                         : analysis.requestedResultCount(),
                 resolvedQuestion, analysis.searchGoal(), analysis.requiredConcepts(),
-                analysis.needsClarification(), analysis.clarificationQuestion(), resolvedContext,
+                needsClarification, clarificationQuestion, resolvedContext,
                 resultType,
                 followUp, excludePreviousResults);
+    }
+
+    private AiQuestionAnalysis preserveImmediateListContextForShortAdditionalRequest(
+            String content,
+            AiConversationContext conversationContext,
+            AiQuestionAnalysis analysis
+    ) {
+        AiResolvedContext previousContext = conversationContext
+                .immediatePreviousResolvedContext();
+        if (!isShortAdditionalRequest(content)
+                || previousContext == null
+                || !"목록".equals(previousContext.requestedInformation())) {
+            return analysis;
+        }
+        String resolvedQuestion = previousContext.toResolvedQuestion(content);
+        AiResultType previousResultType = previousListResultType(previousContext);
+        return new AiQuestionAnalysis(
+                AiQuestionIntent.NONE,
+                analysis.searchScope(),
+                List.of(resolvedQuestion),
+                previousContext.requestedResultCount(),
+                resolvedQuestion,
+                resolveInfoSubCategory(resolvedQuestion, analysis.infoSubCategory()),
+                analysis.searchGoal(),
+                analysis.requiredConcepts(),
+                false,
+                null,
+                previousContext,
+                previousResultType == AiResultType.SITE_LIST,
+                previousResultType == AiResultType.RESOURCE_LIST,
+                true,
+                true
+        );
+    }
+
+    private AiResultType previousListResultType(AiResolvedContext previousContext) {
+        if (previousContext.resultType() != null) {
+            return previousContext.resultType();
+        }
+        String topic = AiTextNormalizer.removeWhitespace(previousContext.topic());
+        return topic.contains("사이트") || topic.contains("홈페이지")
+                ? AiResultType.SITE_LIST
+                : AiResultType.RESOURCE_LIST;
+    }
+
+    private AiQuestionAnalysis enforceExplicitAdditionalResultsRequest(
+            String content,
+            AiConversationContext conversationContext,
+            AiQuestionAnalysis analysis
+    ) {
+        AiResolvedContext previousContext = conversationContext
+                .immediatePreviousResolvedContext();
+        if (previousContext == null
+                || !"목록".equals(previousContext.requestedInformation())
+                || !isExplicitAdditionalResultsRequest(content)) {
+            return analysis;
+        }
+        return analysis.withConversationContext(true, true);
+    }
+
+    private boolean isExplicitAdditionalResultsRequest(String content) {
+        String normalized = AiTextNormalizer.removeWhitespace(
+                AiTextNormalizer.normalizeQuestionSpacing(content));
+        return SHORT_ADDITIONAL_RESULTS_PATTERN.matcher(normalized).matches()
+                || EXPLICIT_ADDITIONAL_RESULTS_PATTERN.matcher(normalized).find();
+    }
+
+    private boolean isShortAdditionalRequest(String content) {
+        return SHORT_ADDITIONAL_RESULTS_PATTERN.matcher(
+                AiTextNormalizer.removeWhitespace(
+                        AiTextNormalizer.normalizeQuestionSpacing(content)))
+                .matches();
     }
 
     /**
      * 질문 의도와 분석 결과를 기반으로 최종 응답 결과 유형을 결정한다.
      */
     private AiResultType resolveResultType(
+            String question,
             AiQuestionAnalysis analysis,
             AiQuestionIntent intent,
-            boolean siteListRequest
+            boolean siteListRequest,
+            AiResolvedContext previousContext,
+            boolean excludePreviousResults
     ) {
-        if (intent == AiQuestionIntent.LOCAL_REHAB_CENTERS) {
-            return AiResultType.RESOURCE_LIST;
+        AiResultType currentType;
+        if (intent == AiQuestionIntent.WELFARE_SITES
+                || siteListRequest && isExplicitSiteListTarget(question)) {
+            currentType = AiResultType.SITE_LIST;
+        } else if (intent == AiQuestionIntent.LOCAL_REHAB_CENTERS) {
+            currentType = AiResultType.RESOURCE_LIST;
+        } else if (siteListRequest) {
+            currentType = AiResultType.SITE_LIST;
+        } else if (analysis.resourceListRequest()) {
+            currentType = AiResultType.RESOURCE_LIST;
+        } else {
+            currentType = AiResultType.DOCUMENT_ANSWER;
         }
-        if (intent == AiQuestionIntent.WELFARE_SITES || siteListRequest) {
-            return AiResultType.SITE_LIST;
+
+        if (!excludePreviousResults || previousContext == null
+                || !"목록".equals(previousContext.requestedInformation())) {
+            return currentType;
         }
-        if (analysis.resourceListRequest()) {
-            return AiResultType.RESOURCE_LIST;
+        AiResultType previousType = previousListResultType(previousContext);
+        return explicitlyChangesResultType(question, currentType, previousType)
+                ? currentType : previousType;
+    }
+
+    private boolean explicitlyChangesResultType(
+            String question,
+            AiResultType currentType,
+            AiResultType previousType
+    ) {
+        if (currentType == previousType) {
+            return false;
         }
-        return AiResultType.DOCUMENT_ANSWER;
+        if (currentType == AiResultType.SITE_LIST) {
+            return isExplicitSiteListTarget(question);
+        }
+        if (currentType == AiResultType.RESOURCE_LIST) {
+            return isLocalResourceTarget(question);
+        }
+        return false;
+    }
+
+    private boolean isExplicitSiteListTarget(String question) {
+        String normalized = AiTextNormalizer.removeWhitespace(question);
+        if (!normalized.contains("사이트") && !normalized.contains("홈페이지")) {
+            return false;
+        }
+        return !normalized.contains("사이트있는")
+                && !normalized.contains("사이트가있는")
+                && !normalized.contains("사이트이있는")
+                && !normalized.contains("홈페이지있는")
+                && !normalized.contains("홈페이지가있는")
+                && !normalized.contains("홈페이지이있는");
     }
 
     public boolean isLocalResourceTarget(String question) {
