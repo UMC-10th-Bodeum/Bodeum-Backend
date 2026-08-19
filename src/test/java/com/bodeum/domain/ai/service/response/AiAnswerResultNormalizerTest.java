@@ -178,7 +178,8 @@ class AiAnswerResultNormalizerTest {
                 3, 5, false, null, null, true, true);
 
         assertThat(normalized)
-                .startsWith("사이트 목록")
+                .startsWith("요청하신 5곳 중 현재 보듬에서 확인 가능한 "
+                        + "공식 사이트 3곳을 안내드립니다.\n\n사이트 목록")
                 .containsOnlyOnce(
                         "요청하신 5곳 중 현재 보듬에서 확인 가능한 공식 사이트 3곳을 안내드립니다.");
     }
