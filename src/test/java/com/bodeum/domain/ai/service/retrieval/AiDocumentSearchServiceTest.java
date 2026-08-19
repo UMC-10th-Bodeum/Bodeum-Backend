@@ -77,6 +77,24 @@ class AiDocumentSearchServiceTest {
     }
 
     @Test
+    void capsConfiguredDefaultCountAtMaximumResultCount() {
+        AiDocumentSearchService cappedService = new AiDocumentSearchService(
+                documentRetriever, referenceDocumentResolver, 20, 10, 3, evidenceService);
+        List<AiReferenceDocument> documents = IntStream.rangeClosed(1, 15)
+                .mapToObj(index -> document("DOC-" + index, index))
+                .toList();
+        when(documentRetriever.retrieve(any(), any(), any())).thenReturn(documents);
+        when(referenceDocumentResolver.resolve(any()))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        List<AiReferenceDocument> result = cappedService.retrieve(
+                "특수학교를 알려줘", List.of(), null, List.of(), null,
+                AiSearchScope.REGION_PRIORITY, null, AiAdditionalResultsContext.empty());
+
+        assertThat(result).hasSize(10);
+    }
+
+    @Test
     void retrievesBroaderCandidatesBeforeExcludingPreviousResults() {
         AiReferenceDocument previous = document("OLD", 1L);
         List<AiReferenceDocument> newDocuments = IntStream.rangeClosed(2, 21)

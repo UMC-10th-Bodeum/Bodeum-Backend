@@ -244,8 +244,10 @@ public class AiQuestionContextResolver {
         if (regionOnlyFollowUp) {
             return previousContext == null ? null : previousContext.requestedResultCount();
         }
-        if (resultType == AiResultType.RESOURCE_LIST
-                && isExplicitResourceListTarget(content)) {
+        if ((resultType == AiResultType.RESOURCE_LIST
+                && isExplicitResourceListTarget(content))
+                || (resultType == AiResultType.SITE_LIST
+                && isExplicitSiteListTarget(content))) {
             return null;
         }
         return analyzedCount;

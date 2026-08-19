@@ -88,9 +88,10 @@ public class AiDocumentSearchService {
     ) {
         AiAdditionalResultsContext additionalContext = additionalResults == null
                 ? AiAdditionalResultsContext.empty() : additionalResults;
-        int targetCount = requestedResultCount == null
-                ? defaultResultCount
-                : Math.min(Math.max(1, requestedResultCount), maxResultCount);
+        int targetCount = Math.min(
+                Math.max(1, requestedResultCount == null
+                        ? defaultResultCount : requestedResultCount),
+                maxResultCount);
         int candidateLimit = Math.max(maxResultCount, maxCandidateCount);
         int candidateCount = additionalContext.isFollowUp()
                 ? Math.min(Math.max(targetCount * 3, maxResultCount), candidateLimit)

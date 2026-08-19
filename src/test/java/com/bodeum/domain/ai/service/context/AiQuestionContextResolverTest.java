@@ -94,6 +94,35 @@ class AiQuestionContextResolverTest {
     }
 
     @Test
+    void ignoresClassifierDefaultCountWhenStandaloneSiteQuestionHasNoCount() {
+        String question = "장애아동 공식 사이트를 알려줘";
+        AiQuestionIntentClassifier classifier = mock(AiQuestionIntentClassifier.class);
+        AiQuestionRegionResolver regionResolver = mock(AiQuestionRegionResolver.class);
+        AiQuestionContextResolver resolver =
+                new AiQuestionContextResolver(classifier, regionResolver);
+        AiUserProfile profile = new AiUserProfile(
+                "경기도 수원시", "경기도", "수원시",
+                null, List.of(), List.of(), null);
+        AiResolvedContext analyzedContext = new AiResolvedContext(
+                "장애아동 공식 사이트", null, Map.of(), "목록", 10,
+                AiResultType.SITE_LIST);
+        when(regionResolver.resolve(question, profile))
+                .thenReturn(AiQuestionRegionResolver.RegionResolution.notFound());
+        when(classifier.analyze(any(), any(), any(), any(), any()))
+                .thenReturn(AiQuestionAnalysis.forQuestion(
+                                question, AiQuestionIntent.NONE,
+                                AiSearchScope.NATIONWIDE, List.of(), 10)
+                        .withSiteListRequest(true)
+                        .withResolvedContext(analyzedContext));
+
+        var context = resolver.resolve(question, profile, AiConversationContext.empty());
+
+        assertThat(context.resultType()).isEqualTo(AiResultType.SITE_LIST);
+        assertThat(context.requestedResultCount()).isNull();
+        assertThat(context.resolvedContext().requestedResultCount()).isNull();
+    }
+
+    @Test
     void routesSpecialSchoolListToStructuredSearchWhenLlmFallsBackToGeneral() {
         String question = "특수학교를 알려줘";
         AiQuestionIntentClassifier classifier = mock(AiQuestionIntentClassifier.class);

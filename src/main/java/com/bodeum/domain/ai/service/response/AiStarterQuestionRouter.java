@@ -34,6 +34,7 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 import org.springframework.data.domain.PageRequest;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -46,8 +47,6 @@ public class AiStarterQuestionRouter {
 
     private static final List<String> CIRCLED_NUMBERS =
             List.of("①", "②", "③", "④", "⑤", "⑥", "⑦", "⑧", "⑨", "⑩");
-    private static final int DEFAULT_LOCAL_CENTER_LIMIT = 5;
-    private static final int MAX_LOCAL_CENTER_LIMIT = 10;
     private static final String REGION_REQUIRED_MESSAGE =
             "활동 지역이 설정되어 있지 않습니다. "
                     + "확인할 시·도와 시·군·구를 알려주세요.";
@@ -198,15 +197,21 @@ public class AiStarterQuestionRouter {
     private final AiExternalSourceRepository externalSourceRepository;
     private final AiExternalDocumentPersistenceService externalDocumentPersistenceService;
     private final InfoItemRepository infoItemRepository;
+    private final int defaultResultCount;
+    private final int maxResultCount;
 
     public AiStarterQuestionRouter(
             AiExternalSourceRepository externalSourceRepository,
             AiExternalDocumentPersistenceService externalDocumentPersistenceService,
-            InfoItemRepository infoItemRepository
+            InfoItemRepository infoItemRepository,
+            @Value("${bodeum.ai.result.default-count:5}") int defaultResultCount,
+            @Value("${bodeum.ai.result.max-count:10}") int maxResultCount
     ) {
         this.externalSourceRepository = externalSourceRepository;
         this.externalDocumentPersistenceService = externalDocumentPersistenceService;
         this.infoItemRepository = infoItemRepository;
+        this.defaultResultCount = defaultResultCount;
+        this.maxResultCount = maxResultCount;
     }
 
     @Transactional
@@ -277,7 +282,7 @@ public class AiStarterQuestionRouter {
                         "네, 참고하면 좋을 공식 복지 사이트 " + resultCount
                                 + "개를 추천드리겠습니다!\n\n"
                                 + "**자주 확인하면 좋은 공식 복지 사이트**\n\n",
-                        "\n\n이 사이트들은 모두 정부·공공기관 및 공식 지원기관이 직접 운영해서 정보 신뢰도가 높아요. "
+                        "\n\n<br>\n\n이 사이트들은 모두 정부·공공기관 및 공식 지원기관이 직접 운영해서 정보 신뢰도가 높아요. "
                                 + "보듬에서도 이 출처들을 기반으로 최신 정보를 정리해드리고 있습니다."
                 ));
         return AiStarterQuestionAnswer.answered(content, references);
@@ -293,8 +298,8 @@ public class AiStarterQuestionRouter {
         }
 
         int resultCount = requestedResultCount == null
-                ? DEFAULT_LOCAL_CENTER_LIMIT
-                : Math.min(Math.max(1, requestedResultCount), MAX_LOCAL_CENTER_LIMIT);
+                ? Math.min(Math.max(1, defaultResultCount), maxResultCount)
+                : Math.min(Math.max(1, requestedResultCount), maxResultCount);
         List<InfoItem> centers = infoItemRepository.findRehabCentersByRegion(
                 profile.regionLevel1(),
                 profile.regionLevel2(),
@@ -332,8 +337,8 @@ public class AiStarterQuestionRouter {
     ) {
         String region = displayRegion(profile);
         if (requestedResultCount != null) {
-            if (requestedResultCount > MAX_LOCAL_CENTER_LIMIT) {
-                return "한 번에 최대 " + MAX_LOCAL_CENTER_LIMIT
+            if (requestedResultCount > maxResultCount) {
+                return "한 번에 최대 " + maxResultCount
                         + "곳까지 안내할 수 있어, 현재 보듬에서 확인 가능한 "
                         + region + " 재활센터 " + actualCount + "곳을 안내드립니다.\n";
             }

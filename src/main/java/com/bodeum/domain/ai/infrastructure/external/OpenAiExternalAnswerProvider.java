@@ -197,7 +197,7 @@ public class OpenAiExternalAnswerProvider implements AiExternalAnswerProvider {
         int requestedCount = requestedResultCount(question);
         int resultLimit = requestedCount > 0
                 ? Math.min(requestedCount, maxResultCount)
-                : defaultResultCount;
+                : Math.min(Math.max(1, defaultResultCount), maxResultCount);
         List<List<AiReferenceDocument>> selectedReferences = referencesByHost.values().stream()
                 .limit(resultLimit)
                 .toList();

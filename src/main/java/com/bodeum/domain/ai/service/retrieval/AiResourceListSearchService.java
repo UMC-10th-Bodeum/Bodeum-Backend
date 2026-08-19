@@ -34,7 +34,7 @@ public class AiResourceListSearchService {
     private final InfoItemRepository infoItemRepository;
     private final AiAnswerEvidenceService evidenceService;
 
-    @Value("${bodeum.ai.rag.top-k:5}")
+    @Value("${bodeum.ai.result.default-count:5}")
     private int defaultResultCount;
 
     @Value("${bodeum.ai.result.max-count:10}")
