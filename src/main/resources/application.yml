@@ -132,6 +132,7 @@ bodeum:
     response:
       timeout: ${AI_RESPONSE_TIMEOUT:90s}
     result:
+      default-count: ${AI_RESULT_DEFAULT_COUNT:5}
       max-count: ${AI_RESULT_MAX_COUNT:10}
     rag:
       top-k: ${AI_RAG_TOP_K:5}

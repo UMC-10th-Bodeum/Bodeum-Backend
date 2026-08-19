@@ -195,8 +195,16 @@ public class AiAnswerFallbackService {
         ExternalAiAnswer answer = externalAnswerProvider.search(
                 question, retrievalQueries, profile, searchScope);
         if (!answer.hasEvidence()) {
-            String content = answer.answer() == null || answer.answer().isBlank()
-                    ? NO_RESULT_MESSAGE : answer.answer();
+            String content;
+            if (listRequest && !siteListRequest
+                    && searchScope == AiSearchScope.LOCAL_ONLY
+                    && infoSubCategory == InfoSubCategory.SPECIAL_SCHOOL) {
+                content = AiResourceListAnswerBuilder.noEvidenceMessage(
+                        region, infoSubCategory, additionalResults);
+            } else {
+                content = answer.answer() == null || answer.answer().isBlank()
+                        ? NO_RESULT_MESSAGE : answer.answer();
+            }
             return noEvidence(chatRoom, userMessage, content);
         }
         String content = answerResultNormalizer.normalizeExternalListAnswer(

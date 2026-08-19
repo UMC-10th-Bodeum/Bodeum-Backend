@@ -30,6 +30,7 @@ public class AiDocumentSearchService {
     private final AiDocumentRetriever documentRetriever;
     private final AiReferenceDocumentResolver referenceDocumentResolver;
     private final AiAnswerEvidenceService evidenceService;
+    private final int defaultResultCount;
     private final int maxResultCount;
     private final int maxSupplementalConceptSearches;
     private int maxQueryCount = 3;
@@ -48,6 +49,7 @@ public class AiDocumentSearchService {
     public AiDocumentSearchService(
             AiDocumentRetriever documentRetriever,
             AiReferenceDocumentResolver referenceDocumentResolver,
+            @Value("${bodeum.ai.result.default-count:5}") int defaultResultCount,
             @Value("${bodeum.ai.result.max-count:10}") int maxResultCount,
             @Value("${bodeum.ai.rag.max-supplemental-concept-searches:3}")
             int maxSupplementalConceptSearches,
@@ -56,6 +58,7 @@ public class AiDocumentSearchService {
         this.documentRetriever = documentRetriever;
         this.referenceDocumentResolver = referenceDocumentResolver;
         this.evidenceService = evidenceService;
+        this.defaultResultCount = defaultResultCount;
         this.maxResultCount = maxResultCount;
         this.maxSupplementalConceptSearches = maxSupplementalConceptSearches;
     }
@@ -85,9 +88,10 @@ public class AiDocumentSearchService {
     ) {
         AiAdditionalResultsContext additionalContext = additionalResults == null
                 ? AiAdditionalResultsContext.empty() : additionalResults;
-        int targetCount = requestedResultCount == null
-                ? maxResultCount
-                : Math.min(Math.max(1, requestedResultCount), maxResultCount);
+        int targetCount = Math.min(
+                Math.max(1, requestedResultCount == null
+                        ? defaultResultCount : requestedResultCount),
+                maxResultCount);
         int candidateLimit = Math.max(maxResultCount, maxCandidateCount);
         int candidateCount = additionalContext.isFollowUp()
                 ? Math.min(Math.max(targetCount * 3, maxResultCount), candidateLimit)

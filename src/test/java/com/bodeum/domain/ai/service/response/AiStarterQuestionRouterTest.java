@@ -47,7 +47,9 @@ class AiStarterQuestionRouterTest {
         router = new AiStarterQuestionRouter(
                 externalSourceRepository,
                 externalDocumentPersistenceService,
-                infoItemRepository
+                infoItemRepository,
+                5,
+                10
         );
     }
 
@@ -117,6 +119,8 @@ class AiStarterQuestionRouterTest {
                 .allMatch(source -> source.sourceType() == AiResponseSourceType.SITE);
         assertThat(result.content()).contains(
                 "공식 복지 사이트 5개를 추천드리겠습니다",
+                "**자주 확인하면 좋은 공식 복지 사이트**",
+                "<br>\n\n이 사이트들은 모두",
                 "복지로",
                 "정부24",
                 "보듬에서도 이 출처들을 기반으로 최신 정보를 정리"
