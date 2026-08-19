@@ -130,7 +130,8 @@ public class AiStarterQuestionContextResolver {
                         searchProfile.regionLevel1(), searchProfile.regionLevel2())
                 : null;
         return new AiResolvedContext(
-                topic, region, Map.of(), requestedInformation, requestedResultCount);
+                topic, region, Map.of(), requestedInformation, requestedResultCount,
+                starterResultType(type));
     }
 
     /**

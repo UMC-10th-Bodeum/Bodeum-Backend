@@ -111,7 +111,7 @@ public class SpringAiQuestionIntentClassifier implements AiQuestionIntentClassif
         try {
             StringBuilder userPrompt = new StringBuilder();
             if (recentConversation != null && !recentConversation.isBlank()) {
-                userPrompt.append("[최근 대화 - 최대 5턴]\n")
+                userPrompt.append("[최근 대화]\n")
                         .append(recentConversation.trim())
                         .append("\n\n");
             } else if (previousUserQuestion != null && !previousUserQuestion.isBlank()

@@ -103,7 +103,7 @@ public class AiAnswerResultNormalizer {
             return withAnswer(generated, answer);
         }
         if (actualCount == 0) {
-            return generated;
+            return withAnswer(generated, answer);
         }
         ResultLabel resultLabel = resultLabel(infoSubCategory);
         String target = (region == null || region.isBlank() ? "" : region.trim() + " ")
@@ -156,28 +156,36 @@ public class AiAnswerResultNormalizer {
         if (priorityCount == 0) {
             if (usedDocuments.size() < requestedResultCount) {
                 return shortRegion(priorityRegion) + "에서 확인 가능한 " + label.name()
-                        + "를 찾지 못해, 요청하신 " + requestedResultCount + label.unit()
+                        + objectParticle(label.name()) + " 찾지 못해, 요청하신 "
+                        + requestedResultCount + label.unit()
                         + " 중 현재 보듬에서 확인한 다른 지역의 " + label.name() + " "
-                        + supplementalCount + label.unit() + "을 안내드립니다.";
+                        + supplementalCount + label.unit()
+                        + objectParticle(label.unit()) + " 안내드립니다.";
             }
             return shortRegion(priorityRegion) + "에서 확인 가능한 " + label.name()
-                    + "를 찾지 못해, 요청하신 " + requestedResultCount + label.unit()
-                    + "은 다른 지역의 " + label.name() + "로 안내드립니다.";
+                    + objectParticle(label.name()) + " 찾지 못해, 요청하신 "
+                    + requestedResultCount + label.unit()
+                    + topicParticle(label.unit()) + " 다른 지역의 " + label.name()
+                    + directionalParticle(label.name()) + " 안내드립니다.";
         }
         if (usedDocuments.size() < requestedResultCount) {
             return "요청하신 " + requestedResultCount + label.unit()
                     + " 중 현재 보듬에서 확인 가능한 " + shortRegion(priorityRegion)
-                    + " " + label.name() + "는 " + priorityCount + label.unit()
+                    + " " + label.name() + topicParticle(label.name()) + " "
+                    + priorityCount + label.unit()
                     + "입니다. 다른 지역의 " + label.name() + " "
                     + supplementalCount + label.unit()
-                    + "으로 보충했지만, 현재 총 " + usedDocuments.size()
+                    + directionalParticle(label.unit())
+                    + " 보충했지만, 현재 총 " + usedDocuments.size()
                     + label.unit() + "만 확인했습니다.";
         }
         return "요청하신 " + requestedResultCount + label.unit()
                 + " 중 현재 보듬에서 확인 가능한 " + shortRegion(priorityRegion)
-                + " " + label.name() + "는 " + priorityCount + label.unit()
+                + " " + label.name() + topicParticle(label.name()) + " "
+                + priorityCount + label.unit()
                 + "입니다. 부족한 " + supplementalCount + label.unit()
-                + "은 다른 지역의 " + label.name() + "로 보충했습니다.";
+                + topicParticle(label.unit()) + " 다른 지역의 " + label.name()
+                + directionalParticle(label.name()) + " 보충했습니다.";
     }
 
     private boolean belongsToRegion(AiReferenceDocument document, String region) {
@@ -248,7 +256,38 @@ public class AiAnswerResultNormalizer {
     }
 
     private String objectParticle(String unit) {
-        return "개".equals(unit) ? "를" : "을";
+        return hasFinalConsonant(unit) ? "을" : "를";
+    }
+
+    private String topicParticle(String word) {
+        return hasFinalConsonant(word) ? "은" : "는";
+    }
+
+    private String directionalParticle(String word) {
+        char last = lastKoreanSyllable(word);
+        if (last == 0) {
+            return "로";
+        }
+        int finalConsonant = (last - 0xAC00) % 28;
+        return finalConsonant == 0 || finalConsonant == 8 ? "로" : "으로";
+    }
+
+    private boolean hasFinalConsonant(String word) {
+        char last = lastKoreanSyllable(word);
+        return last != 0 && (last - 0xAC00) % 28 != 0;
+    }
+
+    private char lastKoreanSyllable(String word) {
+        if (word == null) {
+            return 0;
+        }
+        for (int index = word.length() - 1; index >= 0; index--) {
+            char current = word.charAt(index);
+            if (current >= 0xAC00 && current <= 0xD7A3) {
+                return current;
+            }
+        }
+        return 0;
     }
 
     private String removeExistingCountMessages(String originalAnswer) {

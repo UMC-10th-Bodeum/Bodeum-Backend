@@ -49,6 +49,17 @@ public interface InfoItemRepository extends JpaRepository<InfoItem, Long>, InfoI
                                             @Param("subCategory") InfoSubCategory subCategory,
                                             Pageable pageable);
 
+    @Query("select i from InfoItem i join i.infoCategory c " +
+            "where i.sido = :regionLevel1 and i.sigungu = :regionLevel2 " +
+            "and c.subCategory = :subCategory and i.id not in :excludedIds " +
+            "order by (i.scrapCount * 5 + i.reviewCount * 3 + i.viewCount) desc, i.id desc")
+    List<InfoItem> findRehabCentersByRegionExcludingIds(
+            @Param("regionLevel1") String regionLevel1,
+            @Param("regionLevel2") String regionLevel2,
+            @Param("subCategory") InfoSubCategory subCategory,
+            @Param("excludedIds") Collection<Long> excludedIds,
+            Pageable pageable);
+
     @EntityGraph(attributePaths = "infoCategory")
     @Query("select i from InfoItem i join i.infoCategory c " +
             "where i.sido = :regionLevel1 and c.subCategory = :subCategory " +
@@ -60,10 +71,30 @@ public interface InfoItemRepository extends JpaRepository<InfoItem, Long>, InfoI
 
     @EntityGraph(attributePaths = "infoCategory")
     @Query("select i from InfoItem i join i.infoCategory c " +
+            "where i.sido = :regionLevel1 and c.subCategory = :subCategory " +
+            "and i.id not in :excludedIds " +
+            "order by (i.scrapCount * 5 + i.reviewCount * 3 + i.viewCount) desc, i.id desc")
+    List<InfoItem> findByRegionLevel1AndSubCategoryExcludingIds(
+            @Param("regionLevel1") String regionLevel1,
+            @Param("subCategory") InfoSubCategory subCategory,
+            @Param("excludedIds") Collection<Long> excludedIds,
+            Pageable pageable);
+
+    @EntityGraph(attributePaths = "infoCategory")
+    @Query("select i from InfoItem i join i.infoCategory c " +
             "where c.subCategory = :subCategory " +
             "order by (i.scrapCount * 5 + i.reviewCount * 3 + i.viewCount) desc, i.id desc")
     List<InfoItem> findBySubCategory(
             @Param("subCategory") InfoSubCategory subCategory,
+            Pageable pageable);
+
+    @EntityGraph(attributePaths = "infoCategory")
+    @Query("select i from InfoItem i join i.infoCategory c " +
+            "where c.subCategory = :subCategory and i.id not in :excludedIds " +
+            "order by (i.scrapCount * 5 + i.reviewCount * 3 + i.viewCount) desc, i.id desc")
+    List<InfoItem> findBySubCategoryExcludingIds(
+            @Param("subCategory") InfoSubCategory subCategory,
+            @Param("excludedIds") Collection<Long> excludedIds,
             Pageable pageable);
 
     /**

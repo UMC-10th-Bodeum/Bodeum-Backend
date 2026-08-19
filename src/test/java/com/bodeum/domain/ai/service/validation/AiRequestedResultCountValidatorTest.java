@@ -11,7 +11,10 @@ class AiRequestedResultCountValidatorTest {
             new AiRequestedResultCountValidator();
 
     @ParameterizedTest
-    @ValueSource(strings = {"특수학교 -1개", "특수학교 - 6개", "사이트 0개", "센터 −2곳"})
+    @ValueSource(strings = {
+            "특수학교 -1개", "특수학교 - 6개", "사이트 0개", "센터 −2곳",
+            "특수학교 -999999999999999999999999개"
+    })
     void rejectsNonPositiveExplicitCounts(String question) {
         assertThat(validator.hasNonPositiveCount(question)).isTrue();
     }

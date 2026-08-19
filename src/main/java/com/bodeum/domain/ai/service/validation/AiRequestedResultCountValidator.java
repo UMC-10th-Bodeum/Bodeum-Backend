@@ -1,5 +1,6 @@
 package com.bodeum.domain.ai.service.validation;
 
+import java.math.BigInteger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.springframework.stereotype.Component;
@@ -22,12 +23,8 @@ public class AiRequestedResultCountValidator {
             String number = matcher.group(1)
                     .replace("−", "-")
                     .replaceAll("\\s+", "");
-            try {
-                if (Integer.parseInt(number) <= 0) {
-                    return true;
-                }
-            } catch (NumberFormatException ignored) {
-                // 정수 범위를 벗어난 값은 이후 최대 결과 개수 정책에서 제한한다.
+            if (new BigInteger(number).signum() <= 0) {
+                return true;
             }
         }
         return false;

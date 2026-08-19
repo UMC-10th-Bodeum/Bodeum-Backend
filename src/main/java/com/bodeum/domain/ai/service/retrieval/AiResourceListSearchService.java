@@ -10,9 +10,11 @@ import com.bodeum.domain.info.entity.InfoCategory;
 import com.bodeum.domain.info.entity.InfoItem;
 import com.bodeum.domain.info.repository.InfoItemRepository;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Set;
+import java.util.function.Supplier;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.PageRequest;
@@ -38,6 +40,9 @@ public class AiResourceListSearchService {
     @Value("${bodeum.ai.result.max-count:10}")
     private int maxResultCount;
 
+    @Value("${bodeum.ai.rag.max-candidate-count:30}")
+    private int maxCandidateCount = 30;
+
     @Transactional(readOnly = true)
     public List<AiReferenceDocument> retrieve(
             AiUserProfile profile,
@@ -53,27 +58,42 @@ public class AiResourceListSearchService {
                 ? defaultResultCount
                 : requestedResultCount;
         int resultCount = Math.min(Math.max(1, requestedCount), maxResultCount);
-        int excludedCount = Math.max(
-                excludedSources == null ? 0 : excludedSources.size(),
-                excludedIdentityKeys == null ? 0 : excludedIdentityKeys.size());
-        int candidateCount = Math.max(
-                Math.max(resultCount * CANDIDATE_MULTIPLIER, maxResultCount),
+        Set<Long> excludedInfoIds = excludedInfoIds(excludedSources);
+        long excludedCount = excludedIdentityKeys == null ? 0 : excludedIdentityKeys.size();
+        long calculatedCandidateCount = Math.max(
+                Math.max((long) resultCount * CANDIDATE_MULTIPLIER, maxResultCount),
                 resultCount + excludedCount);
+        int candidateCount = (int) Math.min(
+                calculatedCandidateCount, Math.max(maxResultCount, maxCandidateCount));
         PageRequest page = PageRequest.of(0, candidateCount);
 
         LinkedHashMap<Long, InfoItem> candidates = new LinkedHashMap<>();
         if (hasText(profile.regionLevel1()) && hasText(profile.regionLevel2())) {
-            add(candidates, infoItemRepository.findRehabCentersByRegion(
-                    profile.regionLevel1(), profile.regionLevel2(),
-                    profile.infoSubCategory(), page));
+            add(candidates, query(
+                    () -> infoItemRepository.findRehabCentersByRegion(
+                            profile.regionLevel1(), profile.regionLevel2(),
+                            profile.infoSubCategory(), page),
+                    () -> infoItemRepository.findRehabCentersByRegionExcludingIds(
+                            profile.regionLevel1(), profile.regionLevel2(),
+                            profile.infoSubCategory(), excludedInfoIds, page),
+                    excludedInfoIds));
         }
         if (searchScope != AiSearchScope.LOCAL_ONLY) {
             if (hasText(profile.regionLevel1())) {
-                add(candidates, infoItemRepository.findByRegionLevel1AndSubCategory(
-                        profile.regionLevel1(), profile.infoSubCategory(), page));
+                add(candidates, query(
+                        () -> infoItemRepository.findByRegionLevel1AndSubCategory(
+                                profile.regionLevel1(), profile.infoSubCategory(), page),
+                        () -> infoItemRepository.findByRegionLevel1AndSubCategoryExcludingIds(
+                                profile.regionLevel1(), profile.infoSubCategory(),
+                                excludedInfoIds, page),
+                        excludedInfoIds));
             }
-            add(candidates, infoItemRepository.findBySubCategory(
-                    profile.infoSubCategory(), page));
+            add(candidates, query(
+                    () -> infoItemRepository.findBySubCategory(
+                            profile.infoSubCategory(), page),
+                    () -> infoItemRepository.findBySubCategoryExcludingIds(
+                            profile.infoSubCategory(), excludedInfoIds, page),
+                    excludedInfoIds));
         }
 
         Set<AiSourceKey> safeExcludedSources = excludedSources == null
@@ -88,6 +108,26 @@ public class AiResourceListSearchService {
                         .noneMatch(safeExcludedIdentities::contains))
                 .limit(resultCount)
                 .toList();
+    }
+
+    private Set<Long> excludedInfoIds(Set<AiSourceKey> excludedSources) {
+        if (excludedSources == null || excludedSources.isEmpty()) {
+            return Set.of();
+        }
+        return excludedSources.stream()
+                .filter(source -> source != null
+                        && source.sourceType() == AiResponseSourceType.INFO
+                        && source.sourceId() != null)
+                .map(AiSourceKey::sourceId)
+                .collect(java.util.stream.Collectors.toUnmodifiableSet());
+    }
+
+    private List<InfoItem> query(
+            Supplier<List<InfoItem>> regularQuery,
+            Supplier<List<InfoItem>> excludingQuery,
+            Collection<Long> excludedIds
+    ) {
+        return excludedIds.isEmpty() ? regularQuery.get() : excludingQuery.get();
     }
 
     private void add(LinkedHashMap<Long, InfoItem> candidates, List<InfoItem> items) {

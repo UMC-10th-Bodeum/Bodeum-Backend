@@ -123,6 +123,52 @@ class AiQuestionContextResolverTest {
     }
 
     @Test
+    void treatsRehabCenterHomepagesAsSiteListEvenWhenIntentIsLocalRehab() {
+        String question = "재활센터 홈페이지 5개 알려줘";
+        AiQuestionIntentClassifier classifier = mock(AiQuestionIntentClassifier.class);
+        AiQuestionRegionResolver regionResolver = mock(AiQuestionRegionResolver.class);
+        AiQuestionContextResolver resolver =
+                new AiQuestionContextResolver(classifier, regionResolver);
+        AiUserProfile profile = new AiUserProfile(
+                "경기도 수원시", "경기도", "수원시",
+                null, List.of(), List.of(), null);
+        when(regionResolver.resolve(any(String.class), any(AiUserProfile.class)))
+                .thenReturn(AiQuestionRegionResolver.RegionResolution.notFound());
+        when(classifier.analyze(any(), any(), any(), any(), any()))
+                .thenReturn(AiQuestionAnalysis.forQuestion(
+                                question, AiQuestionIntent.LOCAL_REHAB_CENTERS,
+                                AiSearchScope.LOCAL_ONLY, List.of(), 5)
+                        .withSiteListRequest(true));
+
+        var context = resolver.resolve(question, profile, AiConversationContext.empty());
+
+        assertThat(context.resultType()).isEqualTo(AiResultType.SITE_LIST);
+    }
+
+    @Test
+    void keepsHomepageAvailabilityQuestionAsResourceList() {
+        String question = "홈페이지가 있는 재활센터 알려줘";
+        AiQuestionIntentClassifier classifier = mock(AiQuestionIntentClassifier.class);
+        AiQuestionRegionResolver regionResolver = mock(AiQuestionRegionResolver.class);
+        AiQuestionContextResolver resolver =
+                new AiQuestionContextResolver(classifier, regionResolver);
+        AiUserProfile profile = new AiUserProfile(
+                "경기도 수원시", "경기도", "수원시",
+                null, List.of(), List.of(), null);
+        when(regionResolver.resolve(any(String.class), any(AiUserProfile.class)))
+                .thenReturn(AiQuestionRegionResolver.RegionResolution.notFound());
+        when(classifier.analyze(any(), any(), any(), any(), any()))
+                .thenReturn(AiQuestionAnalysis.forQuestion(
+                                question, AiQuestionIntent.LOCAL_REHAB_CENTERS,
+                                AiSearchScope.LOCAL_ONLY, List.of())
+                        .withResourceListRequest(true));
+
+        var context = resolver.resolve(question, profile, AiConversationContext.empty());
+
+        assertThat(context.resultType()).isEqualTo(AiResultType.RESOURCE_LIST);
+    }
+
+    @Test
     void usesStructuredFilterInsteadOfKeywordOrderForFollowUpCondition() {
         String question = "공립 말고 사립만 알려줘";
         AiQuestionIntentClassifier classifier = mock(AiQuestionIntentClassifier.class);
@@ -190,6 +236,129 @@ class AiQuestionContextResolverTest {
         assertThat(context.resultType()).isEqualTo(AiResultType.SITE_LIST);
         assertThat(context.followUp()).isTrue();
         assertThat(context.excludePreviousResults()).isTrue();
+    }
+
+    @Test
+    void preservesPreviousSiteTypeWhenAdditionalRequestIsMisclassified() {
+        String question = "아직 안내하지 않은 곳 더 보여줘";
+        AiQuestionIntentClassifier classifier = mock(AiQuestionIntentClassifier.class);
+        AiQuestionRegionResolver regionResolver = mock(AiQuestionRegionResolver.class);
+        AiQuestionContextResolver resolver =
+                new AiQuestionContextResolver(classifier, regionResolver);
+        AiUserProfile profile = new AiUserProfile(
+                "경기도 수원시", "경기도", "수원시",
+                null, List.of(), List.of(), null);
+        AiResolvedContext previousContext = new AiResolvedContext(
+                "공식 복지 사이트", null, Map.of(), "목록", 5,
+                AiResultType.SITE_LIST);
+        AiConversationContext conversationContext = new AiConversationContext(
+                "사용자: 복지 사이트 알려줘", "복지 사이트 알려줘",
+                "복지 사이트 안내", "복지 사이트 알려줘",
+                previousContext, 1L, 1L);
+        when(regionResolver.resolve(any(String.class), any(AiUserProfile.class)))
+                .thenReturn(AiQuestionRegionResolver.RegionResolution.notFound());
+        when(classifier.analyze(any(), any(), any(), any(), any(), any()))
+                .thenReturn(AiQuestionAnalysis.forQuestion(
+                                question, AiQuestionIntent.NONE,
+                                AiSearchScope.REGION_PRIORITY, List.of())
+                        .withResourceListRequest(true)
+                        .withConversationContext(true, true));
+
+        var context = resolver.resolve(question, profile, conversationContext);
+
+        assertThat(context.resultType()).isEqualTo(AiResultType.SITE_LIST);
+        assertThat(context.excludePreviousResults()).isTrue();
+    }
+
+    @Test
+    void enforcesExclusionForExplicitAdditionalPhrasesWhenLlmMissesFollowUp() {
+        for (String question : List.of(
+                "아직 안내하지 않은 곳 더 보여줘",
+                "앞에서 말한 곳 빼고 추천해줘",
+                "새로운 기관만 더 찾아줘")) {
+            AiQuestionIntentClassifier classifier = mock(AiQuestionIntentClassifier.class);
+            AiQuestionRegionResolver regionResolver = mock(AiQuestionRegionResolver.class);
+            AiQuestionContextResolver resolver =
+                    new AiQuestionContextResolver(classifier, regionResolver);
+            AiUserProfile profile = new AiUserProfile(
+                    "경기도 수원시", "경기도", "수원시",
+                    null, List.of(), List.of(), null);
+            AiResolvedContext previousContext = new AiResolvedContext(
+                    "재활센터", null, Map.of(), "목록", 5,
+                    AiResultType.RESOURCE_LIST);
+            AiConversationContext conversationContext = new AiConversationContext(
+                    "사용자: 재활센터 알려줘", "재활센터 알려줘",
+                    "재활센터 안내", "재활센터 알려줘",
+                    previousContext, 1L, 1L);
+            when(regionResolver.resolve(any(String.class), any(AiUserProfile.class)))
+                    .thenReturn(AiQuestionRegionResolver.RegionResolution.notFound());
+            when(classifier.analyze(any(), any(), any(), any(), any(), any()))
+                    .thenReturn(AiQuestionAnalysis.forQuestion(
+                            question, AiQuestionIntent.NONE,
+                            AiSearchScope.REGION_PRIORITY, List.of()));
+
+            var context = resolver.resolve(question, profile, conversationContext);
+
+            assertThat(context.followUp()).as(question).isTrue();
+            assertThat(context.excludePreviousResults()).as(question).isTrue();
+            assertThat(context.resultType()).as(question)
+                    .isEqualTo(AiResultType.RESOURCE_LIST);
+        }
+    }
+
+    @Test
+    void doesNotTreatMoreDetailedExplanationAsAdditionalListRequest() {
+        String question = "신청 방법을 더 자세히 알려줘";
+        AiQuestionIntentClassifier classifier = mock(AiQuestionIntentClassifier.class);
+        AiQuestionRegionResolver regionResolver = mock(AiQuestionRegionResolver.class);
+        AiQuestionContextResolver resolver =
+                new AiQuestionContextResolver(classifier, regionResolver);
+        AiUserProfile profile = new AiUserProfile(
+                "경기도 수원시", "경기도", "수원시",
+                null, List.of(), List.of(), null);
+        AiResolvedContext previousContext = new AiResolvedContext(
+                "발달재활서비스 바우처", null, Map.of(), "목록", 5,
+                AiResultType.RESOURCE_LIST);
+        AiConversationContext conversationContext = new AiConversationContext(
+                "사용자: 바우처 목록 알려줘", "바우처 목록 알려줘",
+                "바우처 안내", "바우처 목록 알려줘",
+                previousContext, 1L, 1L);
+        when(regionResolver.resolve(any(String.class), any(AiUserProfile.class)))
+                .thenReturn(AiQuestionRegionResolver.RegionResolution.notFound());
+        when(classifier.analyze(any(), any(), any(), any(), any(), any()))
+                .thenReturn(AiQuestionAnalysis.forQuestion(
+                        question, AiQuestionIntent.NONE,
+                        AiSearchScope.NATIONWIDE, List.of()));
+
+        var context = resolver.resolve(question, profile, conversationContext);
+
+        assertThat(context.excludePreviousResults()).isFalse();
+        assertThat(context.resultType()).isEqualTo(AiResultType.DOCUMENT_ANSWER);
+    }
+
+    @Test
+    void asksForResourceCategoryWhenListTargetIsTooBroad() {
+        String question = "장애아동 관련 기관 알려줘";
+        AiQuestionIntentClassifier classifier = mock(AiQuestionIntentClassifier.class);
+        AiQuestionRegionResolver regionResolver = mock(AiQuestionRegionResolver.class);
+        AiQuestionContextResolver resolver =
+                new AiQuestionContextResolver(classifier, regionResolver);
+        AiUserProfile profile = new AiUserProfile(
+                "경기도 수원시", "경기도", "수원시",
+                null, List.of(), List.of(), null);
+        when(regionResolver.resolve(any(String.class), any(AiUserProfile.class)))
+                .thenReturn(AiQuestionRegionResolver.RegionResolution.notFound());
+        when(classifier.analyze(any(), any(), any(), any(), any()))
+                .thenReturn(AiQuestionAnalysis.forQuestion(
+                                question, AiQuestionIntent.NONE,
+                                AiSearchScope.REGION_PRIORITY, List.of())
+                        .withResourceListRequest(true));
+
+        var context = resolver.resolve(question, profile, AiConversationContext.empty());
+
+        assertThat(context.resultType()).isEqualTo(AiResultType.RESOURCE_LIST);
+        assertThat(context.needsClarification()).isTrue();
+        assertThat(context.clarificationQuestion()).contains("어떤 종류의 기관");
     }
 
     @Test
@@ -280,7 +449,7 @@ class AiQuestionContextResolverTest {
         AiResolvedContext previousContext = new AiResolvedContext(
                 "재활센터",
                 new AiResolvedContext.RegionContext("경기도", "수원시"),
-                Map.of(), "목록", 5);
+                Map.of(), "목록", 5, AiResultType.RESOURCE_LIST);
         AiConversationContext conversationContext = new AiConversationContext(
                 "사용자: 근처 재활센터를 알려줘",
                 "근처 재활센터를 알려줘",
@@ -310,5 +479,45 @@ class AiQuestionContextResolverTest {
         assertThat(context.searchProfile().infoSubCategory())
                 .isEqualTo(com.bodeum.domain.info.entity.enums.InfoSubCategory.THERAPY_REHAB);
         assertThat(context.resolvedQuestion()).contains("재활센터").doesNotContain("가족지원");
+    }
+
+    @Test
+    void keepsImmediateSiteListContextForShortAdditionalRequest() {
+        String question = "더 알려줘";
+        AiQuestionIntentClassifier classifier = mock(AiQuestionIntentClassifier.class);
+        AiQuestionRegionResolver regionResolver = mock(AiQuestionRegionResolver.class);
+        AiQuestionContextResolver resolver =
+                new AiQuestionContextResolver(classifier, regionResolver);
+        AiUserProfile profile = new AiUserProfile(
+                "경기도 수원시", "경기도", "수원시",
+                null, List.of(), List.of(), null);
+        AiResolvedContext previousContext = new AiResolvedContext(
+                "장애아동 공식 사이트",
+                null,
+                Map.of(), "목록", 5, AiResultType.SITE_LIST);
+        AiConversationContext conversationContext = new AiConversationContext(
+                "사용자: 장애아동 사이트 알려줘",
+                "장애아동 사이트 알려줘",
+                "공식 사이트 안내",
+                "장애아동 사이트 알려줘",
+                previousContext, 1L, 1L);
+        when(regionResolver.resolve(any(String.class), any(AiUserProfile.class)))
+                .thenReturn(AiQuestionRegionResolver.RegionResolution.notFound());
+        when(classifier.analyze(any(), any(), any(), any(), any(), any()))
+                .thenReturn(AiQuestionAnalysis.forQuestion(
+                        "장애아동 관련 기관 알려줘",
+                        AiQuestionIntent.NONE,
+                        AiSearchScope.REGION_PRIORITY,
+                        List.of(),
+                        5
+                ).withResourceListRequest(true));
+
+        var context = resolver.resolve(question, profile, conversationContext);
+
+        assertThat(context.followUp()).isTrue();
+        assertThat(context.excludePreviousResults()).isTrue();
+        assertThat(context.resultType()).isEqualTo(AiResultType.SITE_LIST);
+        assertThat(context.resolvedContext().resultType()).isEqualTo(AiResultType.SITE_LIST);
+        assertThat(context.resolvedQuestion()).contains("사이트").doesNotContain("기관");
     }
 }

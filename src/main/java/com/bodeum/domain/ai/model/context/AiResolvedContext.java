@@ -1,5 +1,6 @@
 package com.bodeum.domain.ai.model.context;
 
+import com.bodeum.domain.ai.model.question.AiResultType;
 import com.bodeum.domain.ai.util.AiTextNormalizer;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
@@ -13,8 +14,19 @@ public record AiResolvedContext(
         RegionContext region,
         Map<String, String> filters,
         String requestedInformation,
-        Integer requestedResultCount
+        Integer requestedResultCount,
+        AiResultType resultType
 ) {
+
+    public AiResolvedContext(
+            String topic,
+            RegionContext region,
+            Map<String, String> filters,
+            String requestedInformation,
+            Integer requestedResultCount
+    ) {
+        this(topic, region, filters, requestedInformation, requestedResultCount, null);
+    }
 
     public AiResolvedContext {
         topic = AiTextNormalizer.trimToNull(topic);
@@ -32,7 +44,8 @@ public record AiResolvedContext(
                 && region == null
                 && filters.isEmpty()
                 && requestedInformation == null
-                && requestedResultCount == null;
+                && requestedResultCount == null
+                && resultType == null;
     }
 
     public AiResolvedContext merge(AiResolvedContext update) {
@@ -50,7 +63,8 @@ public record AiResolvedContext(
                         : update.requestedInformation,
                 update.requestedResultCount == null
                         ? requestedResultCount
-                        : update.requestedResultCount
+                        : update.requestedResultCount,
+                update.resultType == null ? resultType : update.resultType
         );
     }
 
@@ -63,7 +77,8 @@ public record AiResolvedContext(
                 new RegionContext(regionLevel1, regionLevel2),
                 filters,
                 requestedInformation,
-                requestedResultCount
+                requestedResultCount,
+                resultType
         );
     }
 
@@ -75,15 +90,23 @@ public record AiResolvedContext(
             updatedFilters.put(normalizedKey, normalizedValue);
         }
         return new AiResolvedContext(
-                topic, region, updatedFilters, requestedInformation, requestedResultCount);
+                topic, region, updatedFilters, requestedInformation,
+                requestedResultCount, resultType);
     }
 
     public AiResolvedContext withRequestedInformation(String information) {
-        return new AiResolvedContext(topic, region, filters, information, requestedResultCount);
+        return new AiResolvedContext(
+                topic, region, filters, information, requestedResultCount, resultType);
     }
 
     public AiResolvedContext withRequestedResultCount(Integer count) {
-        return new AiResolvedContext(topic, region, filters, requestedInformation, count);
+        return new AiResolvedContext(
+                topic, region, filters, requestedInformation, count, resultType);
+    }
+
+    public AiResolvedContext withResultType(AiResultType type) {
+        return new AiResolvedContext(
+                topic, region, filters, requestedInformation, requestedResultCount, type);
     }
 
     public String toResolvedQuestion(String fallback) {
@@ -112,7 +135,8 @@ public record AiResolvedContext(
                 + ", region=" + (region == null ? "null" : region.displayName())
                 + ", filters=" + filters
                 + ", requestedInformation=" + value(requestedInformation)
-                + ", requestedResultCount=" + requestedResultCount;
+                + ", requestedResultCount=" + requestedResultCount
+                + ", resultType=" + resultType;
     }
 
     private static Map<String, String> normalizeFilters(Map<String, String> filters) {
