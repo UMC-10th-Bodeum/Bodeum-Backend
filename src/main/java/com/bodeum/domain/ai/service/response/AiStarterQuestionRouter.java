@@ -45,7 +45,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class AiStarterQuestionRouter {
 
     private static final List<String> CIRCLED_NUMBERS =
-            List.of("①", "②", "③", "④", "⑤");
+            List.of("①", "②", "③", "④", "⑤", "⑥", "⑦", "⑧", "⑨", "⑩");
     private static final int DEFAULT_LOCAL_CENTER_LIMIT = 5;
     private static final int MAX_LOCAL_CENTER_LIMIT = 10;
     private static final String REGION_REQUIRED_MESSAGE =

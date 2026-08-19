@@ -11,6 +11,41 @@ import org.junit.jupiter.api.Test;
 
 class AiResourceListAnswerBuilderTest {
 
+    @Test
+    void rendersSpecialSchoolIntroductionAsIndividualFields() {
+        AiReferenceDocument school = document(
+                1L, "안양해솔학교",
+                "소개: ■ 대상 장애영역: 지적장애\n"
+                        + "■ 설립구분: 공립\n"
+                        + "■ 교장명: 김경숙\n"
+                        + "주소: 경기도 안양시 만안구 호암로30번길 61");
+
+        String answer = builder.build(
+                List.of(school), 3, false, InfoSubCategory.SPECIAL_SCHOOL);
+
+        assertThat(answer)
+                .contains(
+                        "1. **안양해솔학교**",
+                        "- 대상 장애영역: 지적장애",
+                        "- 설립구분: 공립",
+                        "- 교장명: 김경숙",
+                        "- 주소: 경기도 안양시 만안구 호암로30번길 61")
+                .doesNotContain("소개:", "■");
+    }
+
+    @Test
+    void numbersEachSpecialSchoolSequentially() {
+        String answer = builder.build(
+                List.of(
+                        document(1L, "아름학교", "주소: 경기도 수원시"),
+                        document(2L, "자혜학교", "주소: 경기도 수원시")),
+                2, false, InfoSubCategory.SPECIAL_SCHOOL);
+
+        assertThat(answer)
+                .contains("1. **아름학교**", "2. **자혜학교**")
+                .contains("- 주소: 경기도 수원시");
+    }
+
     private final AiResourceListAnswerBuilder builder = new AiResourceListAnswerBuilder();
 
     @Test
