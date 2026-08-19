@@ -55,7 +55,7 @@ class AiAnswerResultNormalizerTest {
 
         assertThat(normalized.answer())
                 .containsOnlyOnce(
-                        "요청하신 10곳 중 현재 보듬에서 확인한 치료·재활기관 6곳을 안내드립니다.")
+                        "요청하신 10곳 중 현재 보듬에서 확인 가능한 치료·재활기관 6곳을 안내드립니다.")
                 .doesNotContain("수원시에서 확인 가능한 치료·재활기관은 6개입니다.");
     }
 
@@ -72,7 +72,7 @@ class AiAnswerResultNormalizerTest {
 
         assertThat(normalized.answer())
                 .startsWith("**이안아동발달연구소** 확인 가능한 기관은 1곳입니다.")
-                .contains("현재 보듬에서 확인한 치료·재활기관 1곳을 안내드립니다.");
+                .contains("현재 보듬에서 확인 가능한 치료·재활기관 1곳을 안내드립니다.");
     }
 
     @Test
@@ -90,7 +90,7 @@ class AiAnswerResultNormalizerTest {
         assertThat(normalized.answer())
                 .startsWith("기관 목록")
                 .doesNotContain("요청하신 5곳 중")
-                .containsOnlyOnce("현재 보듬에서 확인한 치료·재활기관 1곳을 안내드립니다.");
+                .containsOnlyOnce("현재 보듬에서 확인 가능한 치료·재활기관 1곳을 안내드립니다.");
     }
 
     @Test
@@ -113,7 +113,7 @@ class AiAnswerResultNormalizerTest {
                 .startsWith("학교 목록")
                 .doesNotContain("안내할 수 있는 곳", "관련 항목은")
                 .containsOnlyOnce(
-                        "요청하신 7곳 중 현재 보듬에서 확인한 수원시 특수학교 3곳을 안내드립니다.");
+                        "요청하신 7곳 중 현재 보듬에서 확인 가능한 수원시 특수학교 3곳을 안내드립니다.");
     }
 
     @Test
@@ -136,7 +136,7 @@ class AiAnswerResultNormalizerTest {
         assertThat(normalized.answer())
                 .startsWith("학교 목록")
                 .containsOnlyOnce(
-                        "요청하신 개수에 맞춰 부산광역시 특수학교 5곳을 안내드립니다.");
+                        "요청하신 개수에 맞춰 현재 보듬에서 확인 가능한 부산광역시 특수학교 5곳을 안내드립니다.");
     }
 
     @Test
@@ -180,7 +180,7 @@ class AiAnswerResultNormalizerTest {
         assertThat(normalized)
                 .startsWith("사이트 목록")
                 .containsOnlyOnce(
-                        "요청하신 5곳 중 현재 보듬에서 확인한 공식 사이트 3곳을 안내드립니다.");
+                        "요청하신 5곳 중 현재 보듬에서 확인 가능한 공식 사이트 3곳을 안내드립니다.");
     }
 
     @Test
@@ -199,7 +199,7 @@ class AiAnswerResultNormalizerTest {
                 generated, 15, false, InfoSubCategory.SPECIAL_SCHOOL, "부산광역시");
 
         assertThat(normalized.answer()).containsOnlyOnce(
-                "한 번에 최대 10곳까지 안내할 수 있어, 현재 보듬에서 확인한 "
+                "한 번에 최대 10곳까지 안내할 수 있어, 현재 보듬에서 확인 가능한 "
                         + "부산광역시 특수학교 10곳을 안내드립니다.");
     }
 

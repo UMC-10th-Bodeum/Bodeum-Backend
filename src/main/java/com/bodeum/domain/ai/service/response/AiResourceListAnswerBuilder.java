@@ -75,7 +75,7 @@ public class AiResourceListAnswerBuilder {
                     ? " 이전에 안내한 항목을 제외하고" : "";
             return "한 번에 최대 " + maxResultCount + label.unit()
                     + "까지 안내할 수 있어," + exclusion
-                    + " 현재 보듬에서 확인한 " + target + " "
+                    + " 현재 보듬에서 확인 가능한 " + target + " "
                     + actualCount + label.unit()
                     + (additionalResults ? "을 추가로 안내드립니다." : "을 안내드립니다.");
         }
@@ -89,12 +89,13 @@ public class AiResourceListAnswerBuilder {
             String exclusion = additionalResults
                     ? " 이전에 안내한 항목을 제외하고" : "";
             return "요청하신 " + requestedResultCount + label.unit() + " 중"
-                    + exclusion + " 현재 보듬에서 확인한 " + target + " "
+                    + exclusion + " 현재 보듬에서 확인 가능한 " + target + " "
                     + actualCount + label.unit() + "을 안내드립니다.";
         }
         String exclusion = additionalResults
                 ? " 이전에 안내한 항목을 제외하고" : "";
-        return "요청하신 개수에 맞춰" + exclusion + " " + target + " "
+        return "요청하신 개수에 맞춰" + exclusion
+                + " 현재 보듬에서 확인 가능한 " + target + " "
                 + actualCount + label.unit()
                 + (additionalResults ? "을 추가로 안내드립니다." : "을 안내드립니다.");
     }
@@ -125,7 +126,7 @@ public class AiResourceListAnswerBuilder {
             if (documents.size() < requestedResultCount) {
                 return shortRegion(priorityRegion) + "에서 확인 가능한 " + label.name()
                         + "를 찾지 못해, 요청하신 " + requestedResultCount + label.unit()
-                        + " 중 현재 보듬에서 확인한 다른 지역의 " + label.name() + " "
+                        + " 중 현재 보듬에서 확인 가능한 다른 지역의 " + label.name() + " "
                         + supplementalCount + label.unit() + "을 안내드립니다.";
             }
             return shortRegion(priorityRegion) + "에서 확인 가능한 " + label.name()

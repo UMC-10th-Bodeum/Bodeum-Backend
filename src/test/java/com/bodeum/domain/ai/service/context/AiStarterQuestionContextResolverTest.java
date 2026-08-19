@@ -41,6 +41,52 @@ class AiStarterQuestionContextResolverTest {
     }
 
     @Test
+    void routesParameterizedDisabilityRehabQuestionToLocalMysqlSearch() {
+        AiStarterQuestionContextResolver resolver = new AiStarterQuestionContextResolver(
+                mock(AiMessageRepository.class), mock(RegionRepository.class));
+        AiUserProfile profile = new AiUserProfile(
+                "경기도 수원시", "경기도", "수원시",
+                null, List.of(), List.of(), null);
+
+        var context = resolver.resolve(
+                1L, "근처 장애인재활센터 10개 알려줘", profile).orElseThrow();
+
+        assertThat(context.curatedAnswerType())
+                .contains(AiCuratedAnswerType.LOCAL_REHAB_CENTERS);
+        assertThat(context.resultType()).isEqualTo(AiResultType.RESOURCE_LIST);
+        assertThat(context.searchScope()).isEqualTo(AiSearchScope.LOCAL_ONLY);
+        assertThat(context.requestedResultCount()).isEqualTo(10);
+        assertThat(context.resolvedContext().requestedResultCount()).isEqualTo(10);
+        assertThat(context.searchProfile().region()).isEqualTo("경기도 수원시");
+    }
+
+    @Test
+    void preservesRequestedCountForExplicitRegionRehabQuestion() {
+        AiMessageRepository messageRepository = mock(AiMessageRepository.class);
+        RegionRepository regionRepository = mock(RegionRepository.class);
+        Region busan = Region.create("부산광역시", "해운대구");
+        when(regionRepository.findMentionedInQuestion(
+                org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.any(Pageable.class)))
+                .thenReturn(List.of(busan));
+        AiStarterQuestionContextResolver resolver = new AiStarterQuestionContextResolver(
+                messageRepository, regionRepository);
+        AiUserProfile profile = new AiUserProfile(
+                "경기도 수원시", "경기도", "수원시",
+                null, List.of(), List.of(), null);
+
+        var context = resolver.resolve(
+                1L, "부산광역시 해운대구 장애인재활센터 7개 알려줘", profile)
+                .orElseThrow();
+
+        assertThat(context.curatedAnswerType())
+                .contains(AiCuratedAnswerType.LOCAL_REHAB_CENTERS);
+        assertThat(context.requestedResultCount()).isEqualTo(7);
+        assertThat(context.searchProfile().regionLevel1()).isEqualTo("부산광역시");
+        assertThat(context.searchProfile().regionLevel2()).isEqualTo("해운대구");
+    }
+
+    @Test
     void routesRegionalWelfareSiteQuestionToCuratedAnswerWithRequestedCount() {
         AiMessageRepository messageRepository = mock(AiMessageRepository.class);
         RegionRepository regionRepository = mock(RegionRepository.class);

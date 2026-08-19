@@ -30,9 +30,13 @@ public record AiStarterQuestionAnswer(
     }
 
     public static AiStarterQuestionAnswer noEvidence() {
+        return noEvidence(null);
+    }
+
+    public static AiStarterQuestionAnswer noEvidence(String content) {
         return new AiStarterQuestionAnswer(
                 AiAnswerStatus.NO_EVIDENCE,
-                null,
+                content,
                 List.of()
         );
     }
@@ -46,5 +50,11 @@ public record AiStarterQuestionAnswer(
 
     public boolean isRegionRequired() {
         return answerStatus == AiAnswerStatus.REGION_REQUIRED;
+    }
+
+    public boolean hasNoEvidenceMessage() {
+        return answerStatus == AiAnswerStatus.NO_EVIDENCE
+                && content != null
+                && !content.isBlank();
     }
 }
