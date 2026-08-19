@@ -21,6 +21,53 @@ import org.junit.jupiter.api.Test;
 class AiQuestionContextResolverTest {
 
     @Test
+    void routesSpecialSchoolListToStructuredSearchWhenLlmFallsBackToGeneral() {
+        String question = "특수학교를 알려줘";
+        AiQuestionIntentClassifier classifier = mock(AiQuestionIntentClassifier.class);
+        AiQuestionRegionResolver regionResolver = mock(AiQuestionRegionResolver.class);
+        AiQuestionContextResolver resolver =
+                new AiQuestionContextResolver(classifier, regionResolver);
+        AiUserProfile profile = new AiUserProfile(
+                "경기도 수원시", "경기도", "수원시",
+                null, List.of(), List.of(), null);
+        when(regionResolver.resolve(question, profile))
+                .thenReturn(AiQuestionRegionResolver.RegionResolution.notFound());
+        when(classifier.analyze(any(), any(), any(), any(), any()))
+                .thenReturn(AiQuestionAnalysis.forQuestion(
+                        question, AiQuestionIntent.NONE,
+                        AiSearchScope.REGION_PRIORITY, List.of()));
+
+        var context = resolver.resolve(question, profile, AiConversationContext.empty());
+
+        assertThat(context.resultType()).isEqualTo(AiResultType.RESOURCE_LIST);
+        assertThat(context.searchScope()).isEqualTo(AiSearchScope.REGION_PRIORITY);
+        assertThat(context.searchProfile().infoSubCategory())
+                .isEqualTo(com.bodeum.domain.info.entity.enums.InfoSubCategory.SPECIAL_SCHOOL);
+    }
+
+    @Test
+    void keepsSpecialSchoolDetailQuestionAsDocumentAnswerWhenLlmFallsBackToGeneral() {
+        String question = "특수학교 입학 방법을 알려줘";
+        AiQuestionIntentClassifier classifier = mock(AiQuestionIntentClassifier.class);
+        AiQuestionRegionResolver regionResolver = mock(AiQuestionRegionResolver.class);
+        AiQuestionContextResolver resolver =
+                new AiQuestionContextResolver(classifier, regionResolver);
+        AiUserProfile profile = new AiUserProfile(
+                "경기도 수원시", "경기도", "수원시",
+                null, List.of(), List.of(), null);
+        when(regionResolver.resolve(question, profile))
+                .thenReturn(AiQuestionRegionResolver.RegionResolution.notFound());
+        when(classifier.analyze(any(), any(), any(), any(), any()))
+                .thenReturn(AiQuestionAnalysis.forQuestion(
+                        question, AiQuestionIntent.NONE,
+                        AiSearchScope.REGION_PRIORITY, List.of()));
+
+        var context = resolver.resolve(question, profile, AiConversationContext.empty());
+
+        assertThat(context.resultType()).isEqualTo(AiResultType.DOCUMENT_ANSWER);
+    }
+
+    @Test
     void promotesRelativeLocalResourceQuestionEvenWhenLlmReturnsGeneral() {
         String question = "근처 장애인재활센터 알려줘";
         AiQuestionIntentClassifier classifier = mock(AiQuestionIntentClassifier.class);

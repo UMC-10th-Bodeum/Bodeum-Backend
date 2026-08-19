@@ -55,9 +55,22 @@ public class AiStarterQuestionContextResolver {
             AiUserProfile profile
     ) {
         // 질문에 지역이 직접 포함된 재활센터 추천 요청을 우선 처리
-        Optional<Region> explicitRegion = resolveExplicitRehabRegion(content);
-        if (explicitRegion.isPresent()) {
-            return Optional.of(localRehabContext(profile, explicitRegion.get()));
+        Optional<CuratedRehabRequest> explicitRehabRequest =
+                resolveExplicitRehabRequest(content);
+        if (explicitRehabRequest.isPresent()) {
+            CuratedRehabRequest request = explicitRehabRequest.get();
+            return Optional.of(localRehabContext(
+                    profile, request.region(), request.requestedResultCount()));
+        }
+
+        // 상대 지역 재활센터 질문은 수식어와 요청 개수가 포함되어도
+        // LLM 분류를 거치지 않고 정보 탭 기관 검색으로 처리한다.
+        Optional<CuratedRehabRequest> relativeRehabRequest =
+                resolveRelativeRehabRequest(content);
+        if (relativeRehabRequest.isPresent()) {
+            return Optional.of(starterQuestionContext(
+                    profile, profile, AiCuratedAnswerType.LOCAL_REHAB_CENTERS,
+                    relativeRehabRequest.get().requestedResultCount()));
         }
 
         // 고정 초기 질문칩과 일치하면 질문 유형에 맞는 문맥 생성
@@ -80,7 +93,7 @@ public class AiStarterQuestionContextResolver {
 
         // 직전 REGION_REQUIRED 응답에 대한 지역명 후속 답변 처리
         return resolveRegionFollowUp(chatRoomId, content)
-                .map(region -> localRehabContext(profile, region));
+                .map(region -> localRehabContext(profile, region, null));
     }
 
     /**
@@ -160,11 +173,16 @@ public class AiStarterQuestionContextResolver {
      * 특정 지역을 검색 프로필에 반영하여
      * 지역 재활센터 검색 문맥을 생성한다.
      */
-    private AiQuestionContext localRehabContext(AiUserProfile profile, Region region) {
+    private AiQuestionContext localRehabContext(
+            AiUserProfile profile,
+            Region region,
+            Integer requestedResultCount
+    ) {
         AiUserProfile searchProfile = profile.withRegion(
                 region.getFullName(), region.getRegionLevel1(), region.getRegionLevel2());
         return starterQuestionContext(
-                profile, searchProfile, AiCuratedAnswerType.LOCAL_REHAB_CENTERS, null);
+                profile, searchProfile, AiCuratedAnswerType.LOCAL_REHAB_CENTERS,
+                requestedResultCount);
     }
 
     private Optional<CuratedSiteRequest> resolveParameterizedSiteQuestion(String content) {
@@ -219,7 +237,7 @@ public class AiStarterQuestionContextResolver {
      * "수원 재활센터 추천해줘"처럼 지역이 직접 포함된
      * 재활센터 추천 질문에서 지역을 추출한다.
      */
-    private Optional<Region> resolveExplicitRehabRegion(String content) {
+    private Optional<CuratedRehabRequest> resolveExplicitRehabRequest(String content) {
         String normalizedQuestion = normalizeQuestion(content);
         boolean rehabRecommendation = normalizedQuestion.contains("재활센터")
                 && (normalizedQuestion.contains("추천")
@@ -231,7 +249,19 @@ public class AiStarterQuestionContextResolver {
         return regionRepository.findMentionedInQuestion(
                         normalizedContent, PageRequest.of(0, 1)).stream()
                 .filter(region -> isGenericRehabQuestion(normalizedContent, region))
-                .findFirst();
+                .findFirst()
+                .map(region -> new CuratedRehabRequest(
+                        region, requestedResultCount(content)));
+    }
+
+    private Optional<CuratedRehabRequest> resolveRelativeRehabRequest(String content) {
+        String withoutCount = RESULT_COUNT_PATTERN.matcher(content).replaceAll(" ");
+        String canonicalQuestion = withoutCount.replaceAll(
+                "장애인\\s*재활센터", "재활센터");
+        return AiStarterQuestionCatalog.findAnswerType(canonicalQuestion)
+                .filter(type -> type == AiCuratedAnswerType.LOCAL_REHAB_CENTERS)
+                .map(type -> new CuratedRehabRequest(
+                        null, requestedResultCount(content)));
     }
 
     /**
@@ -239,8 +269,10 @@ public class AiStarterQuestionContextResolver {
      * 남은 내용이 고정 재활센터 추천 질문 패턴인지 확인한다.
      */
     private boolean isGenericRehabQuestion(String question, Region region) {
-        String questionWithoutRegion = question.replace(region.getFullName(), " ")
-                .trim().replaceFirst("^(에서|의|에|내)\\s*", "");
+        String questionWithoutRegion = removeRegionMention(question, region);
+        questionWithoutRegion = RESULT_COUNT_PATTERN.matcher(questionWithoutRegion)
+                .replaceAll(" ")
+                .replaceAll("장애인\\s*재활센터", "재활센터");
         String normalizedQuestion = normalizeQuestion(questionWithoutRegion)
                 .replaceFirst("추천해주세요$", "추천해줘")
                 .replaceFirst("알려주세요$", "알려줘");
@@ -283,6 +315,12 @@ public class AiStarterQuestionContextResolver {
 
     private record CuratedSiteRequest(
             AiCuratedAnswerType type,
+            Integer requestedResultCount
+    ) {
+    }
+
+    private record CuratedRehabRequest(
+            Region region,
             Integer requestedResultCount
     ) {
     }

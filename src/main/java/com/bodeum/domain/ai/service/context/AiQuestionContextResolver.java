@@ -33,6 +33,12 @@ public class AiQuestionContextResolver {
             "(학교|센터|기관|병원|의원|약국|복지관|시설|교육원|상담소|지원사업|지원서비스)");
     private static final Pattern RELATIVE_LOCAL_REGION_PATTERN = Pattern.compile(
             "(우리\\s*(지역|동네)|근처|주변)");
+    private static final Pattern RESOURCE_LIST_REQUEST_PATTERN = Pattern.compile(
+            "(알려줘|알려주세요|안내해줘|안내해주세요|추천해줘|추천해주세요|"
+                    + "찾아줘|찾아주세요|목록|어디|어떤\\s*(곳|학교|기관|센터))");
+    private static final Pattern RESOURCE_DETAIL_REQUEST_PATTERN = Pattern.compile(
+            "(입학|신청|이용|접수|운영|비용|가격|자격|조건|절차|방법|시간|"
+                    + "전화번호|주소|홈페이지|상세|자세히)");
     private static final Pattern CONTEXT_REFERENCE_PATTERN = Pattern.compile(
             "(그중|그\\s*(학교|센터|기관|곳|서비스|제도)|위\\s*(학교|센터|기관|곳|서비스|제도)"
                     + "|앞서|이전|방금|해당)");
@@ -297,7 +303,8 @@ public class AiQuestionContextResolver {
             currentType = AiResultType.RESOURCE_LIST;
         } else if (siteListRequest) {
             currentType = AiResultType.SITE_LIST;
-        } else if (analysis.resourceListRequest()) {
+        } else if (analysis.resourceListRequest()
+                || isExplicitResourceListTarget(question)) {
             currentType = AiResultType.RESOURCE_LIST;
         } else {
             currentType = AiResultType.DOCUMENT_ANSWER;
@@ -344,6 +351,19 @@ public class AiQuestionContextResolver {
 
     public boolean isLocalResourceTarget(String question) {
         return question != null && LOCAL_RESOURCE_PATTERN.matcher(question).find();
+    }
+
+    /**
+     * 특수학교·재활센터처럼 코드로 카테고리를 확정할 수 있는 명백한 목록 질문은
+     * LLM 분류가 실패하더라도 구조화된 기관 검색으로 처리한다.
+     */
+    private boolean isExplicitResourceListTarget(String question) {
+        if (question == null || resolveInfoSubCategory(question, null) == null) {
+            return false;
+        }
+        String normalized = AiTextNormalizer.normalizeQuestionSpacing(question);
+        return RESOURCE_LIST_REQUEST_PATTERN.matcher(normalized).find()
+                && !RESOURCE_DETAIL_REQUEST_PATTERN.matcher(normalized).find();
     }
 
     public InfoSubCategory resolveInfoSubCategory(String question) {

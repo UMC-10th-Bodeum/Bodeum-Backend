@@ -52,7 +52,7 @@
 - AI가 모호한 지역을 확인한 뒤 사용자가 "광주광역시", "경기도 광주시"처럼 지역만 답하면, 직전 사용자 질문의 자원 유형과 요청을 유지하고 선택한 지역을 반영한 후속 질문으로 복원하세요.
 - 후속 질문에서 사용자가 새로 추가하거나 변경한 조건은 반영하고, 변경하지 않은 이전 조건은 유지하세요. 이전 대화에 없는 사실이나 조건은 만들지 마세요.
 - 사용자가 사이트 또는 홈페이지 목록을 명시적으로 요청했다면 resolvedQuestion에서도 그 결과 유형을 유지하세요. 사이트 요청을 복지사업, 서비스 또는 기관 목록 요청으로 바꾸지 마세요.
-- resolvedContext에는 현재 질문을 독립적으로 검색하는 데 필요한 구조화 문맥을 반환하세요. topic은 검색 대상, region은 sido와 sigungu, filters는 조건 이름과 값, requestedInformation은 목록·신청 방법·대상·비용·필요 서류처럼 사용자가 원하는 정보이고, requestedResultCount는 요청한 결과 개수입니다.
+- resolvedContext에는 현재 질문을 독립적으로 검색하는 데 필요한 구조화 문맥을 반환하세요. topic은 검색 대상, region은 sido와 sigungu, filters는 `{name, value}` 형식의 조건 배열, requestedInformation은 목록·신청 방법·대상·비용·필요 서류처럼 사용자가 원하는 정보이고, requestedResultCount는 요청한 결과 개수입니다.
 - resolvedContext.resultType은 사이트·홈페이지 목록이면 SITE_LIST, 학교·기관·센터 등 자원 목록이면 RESOURCE_LIST, 그 밖의 설명·방법 질문이면 DOCUMENT_ANSWER로 반환하세요.
 - 직전 구조화 문맥이 제공된 후속 질문은 현재 질문에서 변경한 값만 반영하고, 변경하지 않은 topic·region·filters·requestedInformation은 유지하여 resolvedContext에 모두 반환하세요.
 - 독립적인 새 질문은 이전 구조화 문맥을 이어받지 말고 현재 질문만으로 resolvedContext를 작성하세요. 추출할 값이 없으면 해당 필드는 null 또는 빈 객체로 반환하세요.

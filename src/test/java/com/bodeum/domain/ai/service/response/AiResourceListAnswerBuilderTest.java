@@ -27,7 +27,7 @@ class AiResourceListAnswerBuilderTest {
                 List.of(first, second), 5, false, InfoSubCategory.THERAPY_REHAB);
 
         assertThat(answer)
-                .startsWith("요청하신 5곳 중 현재 보듬에서 확인한 "
+                .startsWith("요청하신 5곳 중 현재 보듬에서 확인 가능한 "
                         + "치료·재활기관 2곳을 안내드립니다.")
                 .contains("**이안아동발달연구소**")
                 .contains("주소: 경기도 수원시 영통구")
@@ -46,7 +46,7 @@ class AiResourceListAnswerBuilderTest {
 
         assertThat(answer).startsWith(
                 "요청하신 3곳 중 이전에 안내한 항목을 제외하고 "
-                        + "현재 보듬에서 확인한 특수학교 1곳을 안내드립니다.");
+                        + "현재 보듬에서 확인 가능한 특수학교 1곳을 안내드립니다.");
     }
 
     @Test
@@ -86,7 +86,7 @@ class AiResourceListAnswerBuilderTest {
                 15, false, InfoSubCategory.SPECIAL_SCHOOL);
 
         assertThat(answer).startsWith(
-                "한 번에 최대 10곳까지 안내할 수 있어, 현재 보듬에서 확인한 "
+                "한 번에 최대 10곳까지 안내할 수 있어, 현재 보듬에서 확인 가능한 "
                         + "부산광역시 특수학교 2곳을 안내드립니다.");
     }
 
@@ -129,7 +129,7 @@ class AiResourceListAnswerBuilderTest {
 
         assertThat(answer).startsWith(
                 "수원시에서 확인 가능한 특수학교를 찾지 못해, 요청하신 3곳 중 "
-                        + "현재 보듬에서 확인한 다른 지역의 특수학교 1곳을 안내드립니다.");
+                        + "현재 보듬에서 확인 가능한 다른 지역의 특수학교 1곳을 안내드립니다.");
     }
 
     private AiReferenceDocument document(Long id, String title, String content) {
