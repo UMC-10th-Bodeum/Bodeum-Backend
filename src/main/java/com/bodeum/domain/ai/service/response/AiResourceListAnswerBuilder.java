@@ -1,5 +1,9 @@
 package com.bodeum.domain.ai.service.response;
 
+import static com.bodeum.domain.ai.util.AiKoreanParticle.directional;
+import static com.bodeum.domain.ai.util.AiKoreanParticle.object;
+import static com.bodeum.domain.ai.util.AiKoreanParticle.topic;
+
 import com.bodeum.domain.ai.model.rag.AiReferenceDocument;
 import com.bodeum.domain.ai.model.question.AiSearchScope;
 import com.bodeum.domain.info.entity.enums.InfoSubCategory;
@@ -31,44 +35,9 @@ public class AiResourceListAnswerBuilder {
                 + resultLabel(category).name();
         return additionalResults
                 ? "이전에 안내한 항목을 제외하고 현재 보듬에서 추가로 확인 가능한 "
-                        + target + objectParticle(target) + " 찾지 못했습니다."
+                        + target + object(target) + " 찾지 못했습니다."
                 : "현재 보듬에서 확인 가능한 " + target
-                        + objectParticle(target) + " 찾지 못했습니다.";
-    }
-
-    private static String objectParticle(String value) {
-        return hasFinalConsonant(value) ? "을" : "를";
-    }
-
-    private static String topicParticle(String value) {
-        return hasFinalConsonant(value) ? "은" : "는";
-    }
-
-    private static String directionalParticle(String value) {
-        char last = lastKoreanSyllable(value);
-        if (last == 0) {
-            return "로";
-        }
-        int finalConsonant = (last - 0xAC00) % 28;
-        return finalConsonant == 0 || finalConsonant == 8 ? "로" : "으로";
-    }
-
-    private static boolean hasFinalConsonant(String value) {
-        char last = lastKoreanSyllable(value);
-        return last != 0 && (last - 0xAC00) % 28 != 0;
-    }
-
-    private static char lastKoreanSyllable(String value) {
-        if (value == null) {
-            return 0;
-        }
-        for (int index = value.length() - 1; index >= 0; index--) {
-            char current = value.charAt(index);
-            if (current >= 0xAC00 && current <= 0xD7A3) {
-                return current;
-            }
-        }
-        return 0;
+                        + object(target) + " 찾지 못했습니다.";
     }
 
     public String build(
@@ -129,7 +98,7 @@ public class AiResourceListAnswerBuilder {
                     + "까지 안내할 수 있어," + exclusion
                     + " 현재 보듬에서 확인 가능한 " + target + " "
                     + actualCount + label.unit()
-                    + objectParticle(label.unit())
+                    + object(label.unit())
                     + (additionalResults ? " 추가로 안내드립니다." : " 안내드립니다.");
         }
         String mixedRegionMessage = mixedRegionMessage(
@@ -143,7 +112,7 @@ public class AiResourceListAnswerBuilder {
                     ? " 이전에 안내한 항목을 제외하고" : "";
             return "요청하신 " + requestedResultCount + label.unit() + " 중"
                     + exclusion + " 현재 보듬에서 확인 가능한 " + target + " "
-                    + actualCount + label.unit() + objectParticle(label.unit())
+                    + actualCount + label.unit() + object(label.unit())
                     + " 안내드립니다.";
         }
         String exclusion = additionalResults
@@ -151,7 +120,7 @@ public class AiResourceListAnswerBuilder {
         return "요청하신 개수에 맞춰" + exclusion
                 + " 현재 보듬에서 확인 가능한 " + target + " "
                 + actualCount + label.unit()
-                + objectParticle(label.unit())
+                + object(label.unit())
                 + (additionalResults ? " 추가로 안내드립니다." : " 안내드립니다.");
     }
 
@@ -180,36 +149,36 @@ public class AiResourceListAnswerBuilder {
         if (priorityCount == 0) {
             if (documents.size() < requestedResultCount) {
                 return shortRegion(priorityRegion) + "에서 확인 가능한 " + label.name()
-                        + objectParticle(label.name()) + " 찾지 못해, 요청하신 "
+                        + object(label.name()) + " 찾지 못해, 요청하신 "
                         + requestedResultCount + label.unit()
                         + " 중 현재 보듬에서 확인 가능한 다른 지역의 " + label.name() + " "
-                        + supplementalCount + label.unit() + objectParticle(label.unit())
+                        + supplementalCount + label.unit() + object(label.unit())
                         + " 안내드립니다.";
             }
             return shortRegion(priorityRegion) + "에서 확인 가능한 " + label.name()
-                    + objectParticle(label.name()) + " 찾지 못해, 요청하신 "
-                    + requestedResultCount + label.unit() + topicParticle(label.unit())
+                    + object(label.name()) + " 찾지 못해, 요청하신 "
+                    + requestedResultCount + label.unit() + topic(label.unit())
                     + " 다른 지역의 " + label.name()
-                    + directionalParticle(label.name()) + " 안내드립니다.";
+                    + directional(label.name()) + " 안내드립니다.";
         }
         if (documents.size() < requestedResultCount) {
             return "요청하신 " + requestedResultCount + label.unit()
                     + " 중 현재 보듬에서 확인 가능한 " + shortRegion(priorityRegion)
-                    + " " + label.name() + topicParticle(label.name()) + " "
+                    + " " + label.name() + topic(label.name()) + " "
                     + priorityCount + label.unit()
                     + "입니다. 다른 지역의 " + label.name() + " "
                     + supplementalCount + label.unit()
-                    + directionalParticle(label.unit()) + " 보충했지만, 현재 총 "
+                    + directional(label.unit()) + " 보충했지만, 현재 총 "
                     + documents.size()
                     + label.unit() + "만 확인했습니다.";
         }
         return "요청하신 " + requestedResultCount + label.unit()
                 + " 중 현재 보듬에서 확인 가능한 " + shortRegion(priorityRegion)
-                + " " + label.name() + topicParticle(label.name()) + " "
+                + " " + label.name() + topic(label.name()) + " "
                 + priorityCount + label.unit()
                 + "입니다. 부족한 " + supplementalCount + label.unit()
-                + topicParticle(label.unit()) + " 다른 지역의 " + label.name()
-                + directionalParticle(label.name()) + " 보충했습니다.";
+                + topic(label.unit()) + " 다른 지역의 " + label.name()
+                + directional(label.name()) + " 보충했습니다.";
     }
 
     private boolean belongsToRegion(AiReferenceDocument document, String region) {
