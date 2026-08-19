@@ -37,7 +37,9 @@ public class AiQuestionContextResolver {
             "(알려줘|알려주세요|안내해줘|안내해주세요|추천해줘|추천해주세요|"
                     + "찾아줘|찾아주세요|목록|어디|어떤\\s*(곳|학교|기관|센터))");
     private static final Pattern RESOURCE_DETAIL_REQUEST_PATTERN = Pattern.compile(
-            "(입학|신청|이용|접수|운영|비용|가격|자격|조건|절차|방법|시간|"
+            "(입학|지원\\s*(은|을|하려면|하려|해|하는|방법|절차)|"
+                    + "등록\\s*(은|을|하려면|하려|해|하는|방법|절차)|"
+                    + "신청|이용|접수|운영|비용|가격|자격|조건|절차|방법|시간|"
                     + "전화번호|주소|홈페이지|상세|자세히)");
     private static final Pattern CONTEXT_REFERENCE_PATTERN = Pattern.compile(
             "(그중|그\\s*(학교|센터|기관|곳|서비스|제도)|위\\s*(학교|센터|기관|곳|서비스|제도)"

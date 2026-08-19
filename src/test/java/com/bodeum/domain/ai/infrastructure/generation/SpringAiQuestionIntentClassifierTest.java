@@ -34,7 +34,11 @@ class SpringAiQuestionIntentClassifierTest {
                         new SpringAiQuestionIntentClassifier.ClassificationFilter(
                                 "설립구분", "공립"),
                         new SpringAiQuestionIntentClassifier.ClassificationFilter(
-                                "장애영역", "지적장애")
+                                " 장애영역 ", " 지적장애 "),
+                        new SpringAiQuestionIntentClassifier.ClassificationFilter(
+                                "", "제외"),
+                        new SpringAiQuestionIntentClassifier.ClassificationFilter(
+                                "제외", "   ")
                 ),
                 "목록",
                 7,
@@ -46,7 +50,33 @@ class SpringAiQuestionIntentClassifierTest {
         assertThat(context.filters())
                 .containsEntry("설립구분", "공립")
                 .containsEntry("장애영역", "지적장애");
+        assertThat(context.filters()).doesNotContainKeys("", "제외");
         assertThat(context.requestedResultCount()).isEqualTo(7);
         assertThat(context.resultType()).isEqualTo(AiResultType.RESOURCE_LIST);
+    }
+
+    @Test
+    void excludesConflictingDuplicateFilterNames() {
+        var context = new SpringAiQuestionIntentClassifier.ClassificationResolvedContext(
+                "특수학교",
+                null,
+                List.of(
+                        new SpringAiQuestionIntentClassifier.ClassificationFilter(
+                                "설립구분", "공립"),
+                        new SpringAiQuestionIntentClassifier.ClassificationFilter(
+                                "설립구분", "사립"),
+                        new SpringAiQuestionIntentClassifier.ClassificationFilter(
+                                "장애영역", "지적장애"),
+                        new SpringAiQuestionIntentClassifier.ClassificationFilter(
+                                "장애영역", "지적장애")
+                ),
+                "목록",
+                null,
+                AiResultType.RESOURCE_LIST
+        ).toDomain();
+
+        assertThat(context.filters())
+                .doesNotContainKey("설립구분")
+                .containsEntry("장애영역", "지적장애");
     }
 }

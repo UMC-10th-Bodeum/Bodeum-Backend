@@ -11,9 +11,11 @@ import com.bodeum.domain.ai.service.port.AiQuestionIntentClassifier;
 import com.bodeum.domain.info.entity.enums.InfoSubCategory;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.openai.OpenAiChatOptions;
@@ -218,13 +220,15 @@ public class SpringAiQuestionIntentClassifier implements AiQuestionIntentClassif
     ) {
         AiResolvedContext toDomain() {
             Map<String, String> resolvedFilters = new LinkedHashMap<>();
+            Set<String> conflictingNames = new HashSet<>();
             if (filters != null) {
                 filters.stream()
                         .filter(filter -> filter != null
-                                && filter.name() != null
-                                && filter.value() != null)
-                        .forEach(filter -> resolvedFilters.put(
-                                filter.name(), filter.value()));
+                                && filter.name() != null && !filter.name().isBlank()
+                                && filter.value() != null && !filter.value().isBlank())
+                        .forEach(filter -> mergeFilter(
+                                resolvedFilters, conflictingNames,
+                                filter.name().trim(), filter.value().trim()));
             }
             return new AiResolvedContext(
                     topic,
@@ -237,6 +241,22 @@ public class SpringAiQuestionIntentClassifier implements AiQuestionIntentClassif
                     requestedResultCount,
                     resultType
             );
+        }
+
+        private void mergeFilter(
+                Map<String, String> resolvedFilters,
+                Set<String> conflictingNames,
+                String name,
+                String value
+        ) {
+            if (conflictingNames.contains(name)) {
+                return;
+            }
+            String previousValue = resolvedFilters.putIfAbsent(name, value);
+            if (previousValue != null && !previousValue.equals(value)) {
+                resolvedFilters.remove(name);
+                conflictingNames.add(name);
+            }
         }
     }
 
