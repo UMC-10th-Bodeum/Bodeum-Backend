@@ -202,6 +202,7 @@ class OpenAiExternalAnswerProviderTest {
                 1200,
                 Duration.ofSeconds(1),
                 Duration.ofSeconds(1),
+                5,
                 10,
                 promptResource,
                 promptFormatter
@@ -276,6 +277,7 @@ class OpenAiExternalAnswerProviderTest {
                 1200,
                 Duration.ofSeconds(1),
                 Duration.ofSeconds(1),
+                5,
                 10,
                 new ClassPathResource("prompts/ai-external-search-system-prompt.txt"),
                 mock(AiPromptFormatter.class)

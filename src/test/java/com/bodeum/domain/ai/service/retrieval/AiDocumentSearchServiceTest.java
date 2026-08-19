@@ -34,7 +34,7 @@ class AiDocumentSearchServiceTest {
     private final AiAnswerEvidenceService evidenceService =
             mock(AiAnswerEvidenceService.class);
     private final AiDocumentSearchService service = new AiDocumentSearchService(
-            documentRetriever, referenceDocumentResolver, 10, 3, evidenceService);
+            documentRetriever, referenceDocumentResolver, 5, 10, 3, evidenceService);
 
     @Test
     void limitsMainSearchQueriesUsingConfiguredCount() {
@@ -58,6 +58,40 @@ class AiDocumentSearchServiceTest {
         assertThatIllegalArgumentException()
                 .isThrownBy(() -> service.configureMaxQueryCount(4))
                 .withMessageContaining("1 이상 3 이하");
+    }
+
+    @Test
+    void usesDefaultFiveDocumentsWhenResultCountIsNotRequested() {
+        List<AiReferenceDocument> documents = IntStream.rangeClosed(1, 10)
+                .mapToObj(index -> document("DOC-" + index, index))
+                .toList();
+        when(documentRetriever.retrieve(any(), any(), any())).thenReturn(documents);
+        when(referenceDocumentResolver.resolve(any()))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        List<AiReferenceDocument> result = service.retrieve(
+                "특수학교를 알려줘", List.of(), null, List.of(), null,
+                AiSearchScope.REGION_PRIORITY, null, AiAdditionalResultsContext.empty());
+
+        assertThat(result).hasSize(5);
+    }
+
+    @Test
+    void capsConfiguredDefaultCountAtMaximumResultCount() {
+        AiDocumentSearchService cappedService = new AiDocumentSearchService(
+                documentRetriever, referenceDocumentResolver, 20, 10, 3, evidenceService);
+        List<AiReferenceDocument> documents = IntStream.rangeClosed(1, 15)
+                .mapToObj(index -> document("DOC-" + index, index))
+                .toList();
+        when(documentRetriever.retrieve(any(), any(), any())).thenReturn(documents);
+        when(referenceDocumentResolver.resolve(any()))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        List<AiReferenceDocument> result = cappedService.retrieve(
+                "특수학교를 알려줘", List.of(), null, List.of(), null,
+                AiSearchScope.REGION_PRIORITY, null, AiAdditionalResultsContext.empty());
+
+        assertThat(result).hasSize(10);
     }
 
     @Test

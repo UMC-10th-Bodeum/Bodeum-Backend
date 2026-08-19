@@ -131,7 +131,7 @@ class AiMessageServiceTest {
                 new AiQuestionRegionResolver(regionRepository),
                 new AiSiteListAnswerValidator(),
                 new AiDocumentSearchService(
-                        documentRetriever, referenceDocumentResolver, 10, 3,
+                        documentRetriever, referenceDocumentResolver, 5, 10, 3,
                         evidenceService),
                 new AiQuestionContextResolver(
                         questionIntentClassifier,
@@ -389,9 +389,10 @@ class AiMessageServiceTest {
                                 .contains("특수학교 정보 (게시판: INFORMATION_QUESTION)"))
                 , any()
         )).thenReturn(List.of());
-        AiMessage saved = savedAiMessage("관련 정보를 찾을 수 없습니다.");
+        String noEvidence = "현재 보듬에서 확인 가능한 경기도 수원시 특수학교를 찾지 못했습니다.";
+        AiMessage saved = savedAiMessage(noEvidence);
         when(persistenceService.saveAiMessageAndComplete(
-                eq(11L), eq(chatRoom), eq("관련 정보를 찾을 수 없습니다."),
+                eq(11L), eq(chatRoom), eq(noEvidence),
                 eq(false), eq(AiAnswerStatus.NO_EVIDENCE), eq(List.of())
         )).thenReturn(saved);
 
@@ -1774,7 +1775,7 @@ class AiMessageServiceTest {
         when(answerGenerator.generate(eq(question), any(), any()))
                 .thenReturn(new GeneratedAiAnswer(
                         "장애아동 활동지원 안내",
-                        List.of("CHILD-4")
+                        List.of("CHILD-2")
                 ));
         AiMessage saved = savedAiMessage("장애아동 활동지원 안내");
         when(persistenceService.saveAiMessageAndComplete(
@@ -1783,7 +1784,7 @@ class AiMessageServiceTest {
                 "장애아동 활동지원 안내",
                 false,
                 AiAnswerStatus.ANSWERED,
-                List.of(childDocuments.get(3))
+                List.of(childDocuments.get(1))
         )).thenReturn(saved);
 
         service.createMessage(1L, question);
@@ -1796,12 +1797,7 @@ class AiMessageServiceTest {
                 nationalDocuments.get(0),
                 localDocuments.get(0),
                 childDocuments.get(1),
-                nationalDocuments.get(1),
-                localDocuments.get(1),
-                childDocuments.get(2),
-                nationalDocuments.get(2),
-                localDocuments.get(2),
-                childDocuments.get(3)
+                nationalDocuments.get(1)
         );
     }
 
@@ -1845,7 +1841,7 @@ class AiMessageServiceTest {
         when(answerGenerator.generate(eq(question), any(), any()))
                 .thenReturn(new GeneratedAiAnswer(
                         "원문 검색 결과를 사용한 답변",
-                        List.of("ORIGINAL-5")
+                        List.of("ORIGINAL-3")
                 ));
         AiMessage saved = savedAiMessage("원문 검색 결과를 사용한 답변");
         when(persistenceService.saveAiMessageAndComplete(
@@ -1854,7 +1850,7 @@ class AiMessageServiceTest {
                 "원문 검색 결과를 사용한 답변",
                 false,
                 AiAnswerStatus.ANSWERED,
-                List.of(originalDocuments.get(4))
+                List.of(originalDocuments.get(2))
         )).thenReturn(saved);
 
         service.createMessage(1L, question);
@@ -1866,12 +1862,10 @@ class AiMessageServiceTest {
                 any(),
                 documentsCaptor.capture()
         );
-        assertThat(documentsCaptor.getValue()).hasSize(10);
-        assertThat(documentsCaptor.getValue().subList(0, 5))
-                .containsExactlyElementsOf(originalDocuments);
+        assertThat(documentsCaptor.getValue()).hasSize(5);
         assertThat(documentsCaptor.getValue())
                 .contains(
-                        originalDocuments.get(4),
+                        originalDocuments.get(2),
                         expandedDocuments1.getFirst(),
                         expandedDocuments2.getFirst()
                 );
@@ -1984,11 +1978,12 @@ class AiMessageServiceTest {
         );
         when(documentRetriever.retrieve(eq(question), any(),
                 eq(AiSearchScope.LOCAL_ONLY))).thenReturn(List.of());
-        AiMessage saved = savedAiMessage("관련 정보를 찾을 수 없습니다.");
+        String noEvidence = "현재 보듬에서 확인 가능한 부산광역시 특수학교를 찾지 못했습니다.";
+        AiMessage saved = savedAiMessage(noEvidence);
         when(persistenceService.saveAiMessageAndComplete(
                 11L,
                 chatRoom,
-                "관련 정보를 찾을 수 없습니다.",
+                noEvidence,
                 false,
                 AiAnswerStatus.NO_EVIDENCE,
                 List.of()
@@ -2033,9 +2028,10 @@ class AiMessageServiceTest {
         );
         when(documentRetriever.retrieve(eq(question), any(),
                 eq(AiSearchScope.LOCAL_ONLY))).thenReturn(List.of());
-        AiMessage saved = savedAiMessage("관련 정보를 찾을 수 없습니다.");
+        String noEvidence = "현재 보듬에서 확인 가능한 경기도 수원시 특수학교를 찾지 못했습니다.";
+        AiMessage saved = savedAiMessage(noEvidence);
         when(persistenceService.saveAiMessageAndComplete(
-                11L, chatRoom, "관련 정보를 찾을 수 없습니다.", false,
+                11L, chatRoom, noEvidence, false,
                 AiAnswerStatus.NO_EVIDENCE, List.of()
         )).thenReturn(saved);
 
@@ -2121,9 +2117,10 @@ class AiMessageServiceTest {
         );
         when(documentRetriever.retrieve(eq(metropolitanQuestion), any(),
                 eq(AiSearchScope.LOCAL_ONLY))).thenReturn(List.of());
-        AiMessage saved = savedAiMessage("관련 정보를 찾을 수 없습니다.");
+        String noEvidence = "현재 보듬에서 확인 가능한 광주광역시 특수학교를 찾지 못했습니다.";
+        AiMessage saved = savedAiMessage(noEvidence);
         when(persistenceService.saveAiMessageAndComplete(
-                11L, chatRoom, "관련 정보를 찾을 수 없습니다.", false,
+                11L, chatRoom, noEvidence, false,
                 AiAnswerStatus.NO_EVIDENCE, List.of()
         )).thenReturn(saved);
 
@@ -2154,9 +2151,10 @@ class AiMessageServiceTest {
         );
         when(documentRetriever.retrieve(eq(question), any(),
                 eq(AiSearchScope.LOCAL_ONLY))).thenReturn(List.of());
-        AiMessage saved = savedAiMessage("관련 정보를 찾을 수 없습니다.");
+        String noEvidence = "현재 보듬에서 확인 가능한 경기도 광주시 특수학교를 찾지 못했습니다.";
+        AiMessage saved = savedAiMessage(noEvidence);
         when(persistenceService.saveAiMessageAndComplete(
-                11L, chatRoom, "관련 정보를 찾을 수 없습니다.", false,
+                11L, chatRoom, noEvidence, false,
                 AiAnswerStatus.NO_EVIDENCE, List.of()
         )).thenReturn(saved);
 
@@ -2285,9 +2283,10 @@ class AiMessageServiceTest {
                 .thenReturn(List.of());
         when(documentRetriever.retrieve(eq(contextualizedQuestion), any(),
                 eq(AiSearchScope.LOCAL_ONLY))).thenReturn(List.of());
-        AiMessage saved = savedAiMessage("관련 정보를 찾을 수 없습니다.");
+        String noEvidence = "현재 보듬에서 확인 가능한 경기도 수원시 특수학교를 찾지 못했습니다.";
+        AiMessage saved = savedAiMessage(noEvidence);
         when(persistenceService.saveAiMessageAndComplete(
-                11L, chatRoom, "관련 정보를 찾을 수 없습니다.", false,
+                11L, chatRoom, noEvidence, false,
                 AiAnswerStatus.NO_EVIDENCE, List.of()
         )).thenReturn(saved);
 
@@ -2372,11 +2371,12 @@ class AiMessageServiceTest {
         );
         when(documentRetriever.retrieve(eq(question), any(),
                 eq(AiSearchScope.LOCAL_ONLY))).thenReturn(List.of());
-        AiMessage saved = savedAiMessage("관련 정보를 찾을 수 없습니다.");
+        String noEvidence = "현재 보듬에서 확인 가능한 서울특별시 강남구 특수학교를 찾지 못했습니다.";
+        AiMessage saved = savedAiMessage(noEvidence);
         when(persistenceService.saveAiMessageAndComplete(
                 11L,
                 chatRoom,
-                "관련 정보를 찾을 수 없습니다.",
+                noEvidence,
                 false,
                 AiAnswerStatus.NO_EVIDENCE,
                 List.of()
@@ -2485,6 +2485,38 @@ class AiMessageServiceTest {
         verify(persistenceService).saveAiMessageAndComplete(
                 11L, chatRoom, answer, false,
                 AiAnswerStatus.ANSWERED, List.of(source));
+    }
+
+    @Test
+    void returnsRegionSpecificNoEvidenceWhenLocalResourceListHasNoInternalOrExternalEvidence() {
+        String question = "근처 특수학교를 알려줘";
+        user.updateInterestRegion(List.of(), Region.create("경기도", "수원시"));
+        when(questionIntentClassifier.analyze(question)).thenReturn(
+                AiQuestionAnalysis.forQuestion(
+                                question, AiQuestionIntent.NONE,
+                                AiSearchScope.LOCAL_ONLY, List.of())
+                        .withResourceListRequest(true));
+        when(resourceListSearchService.retrieve(
+                any(), eq(AiSearchScope.LOCAL_ONLY), nullable(Integer.class), any(), any()))
+                .thenReturn(List.of());
+        when(documentRetriever.retrieve(any(), any(), eq(AiSearchScope.LOCAL_ONLY)))
+                .thenReturn(List.of());
+        when(externalAnswerProvider.search(any(), any(), any(), eq(AiSearchScope.LOCAL_ONLY)))
+                .thenReturn(ExternalAiAnswer.empty());
+        String answer = "현재 보듬에서 확인 가능한 경기도 수원시 특수학교를 찾지 못했습니다.";
+        AiMessage saved = savedAiMessage(answer);
+        when(persistenceService.saveAiMessageAndComplete(
+                11L, chatRoom, answer, false,
+                AiAnswerStatus.NO_EVIDENCE, List.of()))
+                .thenReturn(saved);
+
+        var result = service.createMessage(1L, question);
+
+        assertThat(result.aiMessage().content()).isEqualTo(answer);
+        assertThat(result.aiMessage().answerStatus()).isEqualTo(AiAnswerStatus.NO_EVIDENCE);
+        verify(documentRetriever).retrieve(any(), any(), eq(AiSearchScope.LOCAL_ONLY));
+        verify(answerGenerator, never()).generate(any(), any(), any());
+        verify(externalAnswerProvider).search(any(), any(), any(), eq(AiSearchScope.LOCAL_ONLY));
     }
 
     private AiReferenceDocument referenceDocument(String documentKey, long sourceId) {
