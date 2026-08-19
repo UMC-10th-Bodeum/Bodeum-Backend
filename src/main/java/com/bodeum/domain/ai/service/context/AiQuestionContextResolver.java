@@ -19,6 +19,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.springframework.stereotype.Component;
 
@@ -28,6 +29,9 @@ import org.springframework.stereotype.Component;
  */
 @Component
 public class AiQuestionContextResolver {
+
+    private static final Pattern REQUESTED_RESULT_COUNT_PATTERN = Pattern.compile(
+            "(?<![-\\d])(\\d+)\\s*(?:개|곳|건)");
 
     private static final Pattern LOCAL_RESOURCE_PATTERN = Pattern.compile(
             "(학교|센터|기관|병원|의원|약국|복지관|시설|교육원|상담소|지원사업|지원서비스)");
@@ -141,11 +145,21 @@ public class AiQuestionContextResolver {
                 originalRegionResolution.isResolved()
                         ? originalRegionResolution
                         : regionResolution;
+        Integer requestedResultCount = resolveRequestedResultCount(
+                content, analysis.requestedResultCount(), regionFollowUpQuestion.isPresent(),
+                conversationContext.immediatePreviousResolvedContext(), resultType);
+        AiResolvedContext analyzedResolvedContext = analysis.resolvedContext();
+        if ((resultType == AiResultType.RESOURCE_LIST
+                || resultType == AiResultType.SITE_LIST)
+                && analyzedResolvedContext != null) {
+            analyzedResolvedContext = analyzedResolvedContext.withRequestedResultCount(
+                    requestedResultCount);
+        }
         AiResolvedContext resolvedContext = resolveStructuredContext(
-                analysis.resolvedContext(),
+                analyzedResolvedContext,
                 conversationContext.immediatePreviousResolvedContext(),
                 contextRegionResolution, followUp,
-                analysis.requestedResultCount());
+                requestedResultCount);
         if (resolvedContext != null) {
             resolvedContext = resolvedContext.withResultType(resultType);
         }
@@ -205,13 +219,51 @@ public class AiQuestionContextResolver {
                 AiSafetyGuidanceResolver.resolve(intent),
                 searchScope,
                 intent == AiQuestionIntent.NONE ? analysis.retrievalQueries() : List.of(),
-                analysis.requestedResultCount() == null && resolvedContext != null
-                        ? resolvedContext.requestedResultCount()
-                        : analysis.requestedResultCount(),
+                requestedResultCount,
                 resolvedQuestion, analysis.searchGoal(), analysis.requiredConcepts(),
                 needsClarification, clarificationQuestion, resolvedContext,
                 resultType,
                 followUp, excludePreviousResults);
+    }
+
+    /**
+     * 사용자 원문에 명시된 개수를 우선하고, 지역만 변경한 후속 질문에서만
+     * 이전 사용자의 명시적 요청 개수를 유지한다. 기본 조회 개수는 여기서 저장하지 않는다.
+     */
+    private Integer resolveRequestedResultCount(
+            String content,
+            Integer analyzedCount,
+            boolean regionOnlyFollowUp,
+            AiResolvedContext previousContext,
+            AiResultType resultType
+    ) {
+        Integer explicitCount = explicitRequestedResultCount(content);
+        if (explicitCount != null) {
+            return explicitCount;
+        }
+        if (regionOnlyFollowUp) {
+            return previousContext == null ? null : previousContext.requestedResultCount();
+        }
+        if (resultType == AiResultType.RESOURCE_LIST
+                && isExplicitResourceListTarget(content)) {
+            return null;
+        }
+        return analyzedCount;
+    }
+
+    private Integer explicitRequestedResultCount(String content) {
+        if (content == null || content.isBlank()) {
+            return null;
+        }
+        Matcher matcher = REQUESTED_RESULT_COUNT_PATTERN.matcher(content);
+        if (!matcher.find()) {
+            return null;
+        }
+        try {
+            return Integer.parseInt(matcher.group(1));
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
     }
 
     private AiQuestionAnalysis preserveImmediateListContextForShortAdditionalRequest(

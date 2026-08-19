@@ -21,6 +21,79 @@ import org.junit.jupiter.api.Test;
 class AiQuestionContextResolverTest {
 
     @Test
+    void ignoresClassifierDefaultCountWhenStandaloneResourceQuestionHasNoCount() {
+        String question = "과천시 특수학교를 알려줘";
+        AiQuestionIntentClassifier classifier = mock(AiQuestionIntentClassifier.class);
+        AiQuestionRegionResolver regionResolver = mock(AiQuestionRegionResolver.class);
+        AiQuestionContextResolver resolver =
+                new AiQuestionContextResolver(classifier, regionResolver);
+        AiUserProfile profile = new AiUserProfile(
+                "경기도 수원시", "경기도", "수원시",
+                null, List.of(), List.of(), null);
+        var gwacheon = new AiQuestionRegionResolver.RegionResolution(
+                AiQuestionRegionResolver.RegionResolution.Status.RESOLVED,
+                Region.create("경기도", "과천시"),
+                "경기도 과천시",
+                List.of());
+        when(regionResolver.resolve(any(String.class), any(AiUserProfile.class)))
+                .thenReturn(gwacheon);
+        when(classifier.analyze(any(), any(), any(), any(), any()))
+                .thenReturn(new AiQuestionAnalysis(
+                        AiQuestionIntent.NONE,
+                        AiSearchScope.LOCAL_ONLY,
+                        List.of(),
+                        10,
+                        question,
+                        com.bodeum.domain.info.entity.enums.InfoSubCategory.SPECIAL_SCHOOL,
+                        null,
+                        List.of(),
+                        false,
+                        null,
+                        new AiResolvedContext(
+                                "특수학교", null, Map.of(), "목록", 10,
+                                AiResultType.RESOURCE_LIST),
+                        false,
+                        true,
+                        false,
+                        false));
+
+        var context = resolver.resolve(question, profile, AiConversationContext.empty());
+
+        assertThat(context.requestedResultCount()).isNull();
+        assertThat(context.resolvedContext().requestedResultCount()).isNull();
+        assertThat(context.resultType()).isEqualTo(AiResultType.RESOURCE_LIST);
+    }
+
+    @Test
+    void keepsExplicitCountForStandaloneResourceQuestion() {
+        String question = "부산 특수학교 7개를 알려줘";
+        AiQuestionIntentClassifier classifier = mock(AiQuestionIntentClassifier.class);
+        AiQuestionRegionResolver regionResolver = mock(AiQuestionRegionResolver.class);
+        AiQuestionContextResolver resolver =
+                new AiQuestionContextResolver(classifier, regionResolver);
+        AiUserProfile profile = new AiUserProfile(
+                "경기도 수원시", "경기도", "수원시",
+                null, List.of(), List.of(), null);
+        var busan = new AiQuestionRegionResolver.RegionResolution(
+                AiQuestionRegionResolver.RegionResolution.Status.RESOLVED,
+                Region.create("부산광역시", null),
+                "부산광역시",
+                List.of());
+        when(regionResolver.resolve(any(String.class), any(AiUserProfile.class)))
+                .thenReturn(busan);
+        when(classifier.analyze(any(), any(), any(), any(), any()))
+                .thenReturn(AiQuestionAnalysis.forQuestion(
+                                question, AiQuestionIntent.NONE,
+                                AiSearchScope.LOCAL_ONLY, List.of(), 10)
+                        .withResourceListRequest(true));
+
+        var context = resolver.resolve(question, profile, AiConversationContext.empty());
+
+        assertThat(context.requestedResultCount()).isEqualTo(7);
+        assertThat(context.resolvedContext().requestedResultCount()).isEqualTo(7);
+    }
+
+    @Test
     void routesSpecialSchoolListToStructuredSearchWhenLlmFallsBackToGeneral() {
         String question = "특수학교를 알려줘";
         AiQuestionIntentClassifier classifier = mock(AiQuestionIntentClassifier.class);

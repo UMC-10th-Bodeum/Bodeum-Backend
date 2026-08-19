@@ -21,6 +21,20 @@ public class AiResourceListAnswerBuilder {
     private static final Set<String> INTERNAL_METADATA_LABELS = Set.of(
             "정보명", "대분류", "세부 분류");
 
+    public static String noEvidenceMessage(
+            String region,
+            InfoSubCategory category,
+            boolean additionalResults
+    ) {
+        String normalizedRegion = region == null ? "" : region.trim();
+        String target = (normalizedRegion.isBlank() ? "" : normalizedRegion + " ")
+                + resultLabel(category).name();
+        return additionalResults
+                ? "이전에 안내한 항목을 제외하고 현재 보듬에서 추가로 확인 가능한 "
+                        + target + "를 찾지 못했습니다."
+                : "현재 보듬에서 확인 가능한 " + target + "를 찾지 못했습니다.";
+    }
+
     public String build(
             List<AiReferenceDocument> documents,
             Integer requestedResultCount,
@@ -223,7 +237,7 @@ public class AiResourceListAnswerBuilder {
                 ? normalized.substring(1).trim() : normalized;
     }
 
-    private ResultLabel resultLabel(InfoSubCategory category) {
+    private static ResultLabel resultLabel(InfoSubCategory category) {
         if (category == null) {
             return new ResultLabel("관련 기관", "곳");
         }

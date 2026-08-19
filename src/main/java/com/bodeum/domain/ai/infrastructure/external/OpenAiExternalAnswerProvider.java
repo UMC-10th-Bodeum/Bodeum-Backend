@@ -72,6 +72,7 @@ public class OpenAiExternalAnswerProvider implements AiExternalAnswerProvider {
     private final RestClient restClient;
     private final String model;
     private final int maxOutputTokens;
+    private final int defaultResultCount;
     private final int maxResultCount;
     private final String externalSearchSystemPrompt;
     private final AiPromptFormatter promptFormatter;
@@ -85,6 +86,7 @@ public class OpenAiExternalAnswerProvider implements AiExternalAnswerProvider {
             @Value("${bodeum.ai.web-search.max-output-tokens:1200}") int maxOutputTokens,
             @Value("${bodeum.ai.web-search.connect-timeout:3s}") Duration connectTimeout,
             @Value("${bodeum.ai.web-search.read-timeout:30s}") Duration readTimeout,
+            @Value("${bodeum.ai.result.default-count:5}") int defaultResultCount,
             @Value("${bodeum.ai.result.max-count:10}") int maxResultCount,
             @Value("classpath:prompts/ai-external-search-system-prompt.txt") Resource promptResource,
             AiPromptFormatter promptFormatter
@@ -101,6 +103,7 @@ public class OpenAiExternalAnswerProvider implements AiExternalAnswerProvider {
                 .build();
         this.model = model;
         this.maxOutputTokens = maxOutputTokens;
+        this.defaultResultCount = defaultResultCount;
         this.maxResultCount = maxResultCount;
         this.externalSearchSystemPrompt = AiPromptTemplate.replaceRequiredPlaceholder(
                 readPrompt(promptResource),
@@ -194,7 +197,7 @@ public class OpenAiExternalAnswerProvider implements AiExternalAnswerProvider {
         int requestedCount = requestedResultCount(question);
         int resultLimit = requestedCount > 0
                 ? Math.min(requestedCount, maxResultCount)
-                : maxResultCount;
+                : defaultResultCount;
         List<List<AiReferenceDocument>> selectedReferences = referencesByHost.values().stream()
                 .limit(resultLimit)
                 .toList();
