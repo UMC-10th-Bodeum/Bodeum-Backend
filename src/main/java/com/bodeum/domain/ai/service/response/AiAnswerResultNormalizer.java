@@ -1,5 +1,9 @@
 package com.bodeum.domain.ai.service.response;
 
+import static com.bodeum.domain.ai.util.AiKoreanParticle.directional;
+import static com.bodeum.domain.ai.util.AiKoreanParticle.object;
+import static com.bodeum.domain.ai.util.AiKoreanParticle.topic;
+
 import com.bodeum.domain.ai.model.answer.GeneratedAiAnswer;
 import com.bodeum.domain.ai.model.rag.AiReferenceDocument;
 import com.bodeum.domain.ai.model.question.AiSearchScope;
@@ -156,36 +160,36 @@ public class AiAnswerResultNormalizer {
         if (priorityCount == 0) {
             if (usedDocuments.size() < requestedResultCount) {
                 return shortRegion(priorityRegion) + "에서 확인 가능한 " + label.name()
-                        + objectParticle(label.name()) + " 찾지 못해, 요청하신 "
+                        + object(label.name()) + " 찾지 못해, 요청하신 "
                         + requestedResultCount + label.unit()
                         + " 중 현재 보듬에서 확인 가능한 다른 지역의 " + label.name() + " "
                         + supplementalCount + label.unit()
-                        + objectParticle(label.unit()) + " 안내드립니다.";
+                        + object(label.unit()) + " 안내드립니다.";
             }
             return shortRegion(priorityRegion) + "에서 확인 가능한 " + label.name()
-                    + objectParticle(label.name()) + " 찾지 못해, 요청하신 "
+                    + object(label.name()) + " 찾지 못해, 요청하신 "
                     + requestedResultCount + label.unit()
-                    + topicParticle(label.unit()) + " 다른 지역의 " + label.name()
-                    + directionalParticle(label.name()) + " 안내드립니다.";
+                    + topic(label.unit()) + " 다른 지역의 " + label.name()
+                    + directional(label.name()) + " 안내드립니다.";
         }
         if (usedDocuments.size() < requestedResultCount) {
             return "요청하신 " + requestedResultCount + label.unit()
                     + " 중 현재 보듬에서 확인 가능한 " + shortRegion(priorityRegion)
-                    + " " + label.name() + topicParticle(label.name()) + " "
+                    + " " + label.name() + topic(label.name()) + " "
                     + priorityCount + label.unit()
                     + "입니다. 다른 지역의 " + label.name() + " "
                     + supplementalCount + label.unit()
-                    + directionalParticle(label.unit())
+                    + directional(label.unit())
                     + " 보충했지만, 현재 총 " + usedDocuments.size()
                     + label.unit() + "만 확인했습니다.";
         }
         return "요청하신 " + requestedResultCount + label.unit()
                 + " 중 현재 보듬에서 확인 가능한 " + shortRegion(priorityRegion)
-                + " " + label.name() + topicParticle(label.name()) + " "
+                + " " + label.name() + topic(label.name()) + " "
                 + priorityCount + label.unit()
                 + "입니다. 부족한 " + supplementalCount + label.unit()
-                + topicParticle(label.unit()) + " 다른 지역의 " + label.name()
-                + directionalParticle(label.name()) + " 보충했습니다.";
+                + topic(label.unit()) + " 다른 지역의 " + label.name()
+                + directional(label.name()) + " 보충했습니다.";
     }
 
     private boolean belongsToRegion(AiReferenceDocument document, String region) {
@@ -223,9 +227,10 @@ public class AiAnswerResultNormalizer {
                 : resultLabel(infoSubCategory);
         String target = (region == null || region.isBlank() ? "" : region.trim() + " ")
                 + resultLabel.name();
-        return normalized + "\n\n" + countMessage(
+        String countMessage = countMessage(
                 requestedResultCount, actualCount, additionalResults,
                 target, resultLabel.unit());
+        return countMessage + "\n\n" + normalized;
     }
 
     private String countMessage(
@@ -241,54 +246,19 @@ public class AiAnswerResultNormalizer {
             return "한 번에 최대 " + maxResultCount + unit + "까지 안내할 수 있어,"
                     + exclusion + " 현재 보듬에서 확인 가능한 " + target + " "
                     + actualCount + unit
-                    + objectParticle(unit)
+                    + object(unit)
                     + (additionalResults ? " 추가로 안내드립니다." : " 안내드립니다.");
         }
         if (actualCount < requestedCount) {
             return "요청하신 " + requestedCount + unit + " 중" + exclusion
                     + " 현재 보듬에서 확인 가능한 " + target + " "
-                    + actualCount + unit + objectParticle(unit) + " 안내드립니다.";
+                    + actualCount + unit + object(unit) + " 안내드립니다.";
         }
         return "요청하신 개수에 맞춰" + exclusion
                 + " 현재 보듬에서 확인 가능한 " + target + " "
                 + requestedCount + unit
-                + objectParticle(unit)
+                + object(unit)
                 + (additionalResults ? " 추가로 안내드립니다." : " 안내드립니다.");
-    }
-
-    private String objectParticle(String unit) {
-        return hasFinalConsonant(unit) ? "을" : "를";
-    }
-
-    private String topicParticle(String word) {
-        return hasFinalConsonant(word) ? "은" : "는";
-    }
-
-    private String directionalParticle(String word) {
-        char last = lastKoreanSyllable(word);
-        if (last == 0) {
-            return "로";
-        }
-        int finalConsonant = (last - 0xAC00) % 28;
-        return finalConsonant == 0 || finalConsonant == 8 ? "로" : "으로";
-    }
-
-    private boolean hasFinalConsonant(String word) {
-        char last = lastKoreanSyllable(word);
-        return last != 0 && (last - 0xAC00) % 28 != 0;
-    }
-
-    private char lastKoreanSyllable(String word) {
-        if (word == null) {
-            return 0;
-        }
-        for (int index = word.length() - 1; index >= 0; index--) {
-            char current = word.charAt(index);
-            if (current >= 0xAC00 && current <= 0xD7A3) {
-                return current;
-            }
-        }
-        return 0;
     }
 
     private String removeExistingCountMessages(String originalAnswer) {

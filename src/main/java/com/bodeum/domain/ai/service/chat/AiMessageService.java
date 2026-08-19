@@ -293,6 +293,9 @@ public class AiMessageService {
         boolean structuredResourceList = questionContext.isResourceListRequest()
                 || (additionalResultsContext.isFollowUp()
                 && searchProfile.infoSubCategory() != null);
+        boolean localStructuredResourceList = structuredResourceList
+                && searchProfile.infoSubCategory() != null
+                && questionContext.searchScope() == AiSearchScope.LOCAL_ONLY;
         List<AiReferenceDocument> retrievedDocuments = structuredResourceList
                 ? resourceListSearchService.retrieve(
                         searchProfile,
@@ -302,9 +305,9 @@ public class AiMessageService {
                         additionalResultsContext.excludedIdentityKeys())
                 : List.of();
         boolean hasStructuredResourceList = !retrievedDocuments.isEmpty();
-
-        // 전용 검색 결과가 없으면, 일반 문서 검색 수행
-        if (retrievedDocuments.isEmpty()) {
+        // 지역이 확정된 기관 목록은 MySQL을 최종 근거로 사용하고,
+        // 전국 우선 목록이나 일반 질문만 기존 문서 검색 fallback을 유지한다.
+        if (retrievedDocuments.isEmpty() && !localStructuredResourceList) {
             retrievedDocuments = retrieveDocuments(
                         searchQuestion,
                         searchQueries,
@@ -327,8 +330,19 @@ public class AiMessageService {
             retrievedDocuments = evidenceService.deduplicateInstitutions(retrievedDocuments);
         }
 
-        // MySQL의 구조화된 기관 목록은 LLM을 거치지 않고 정확한 항목과 출처로 응답
-        if (hasStructuredResourceList && !retrievedDocuments.isEmpty()) {
+        // MySQL의 구조화된 기관 목록은 Chroma·외부 검색이나 LLM을 거치지 않는다.
+        if (localStructuredResourceList) {
+            if (retrievedDocuments.isEmpty()) {
+                String answer = AiResourceListAnswerBuilder.noEvidenceMessage(
+                        searchProfile.region(),
+                        searchProfile.infoSubCategory(),
+                        additionalResultsContext.isFollowUp());
+                return fallbackService.noEvidence(chatRoom, userMessage, answer);
+            }
+        }
+
+        if ((localStructuredResourceList || hasStructuredResourceList)
+                && !retrievedDocuments.isEmpty()) {
             String answer = resourceListAnswerBuilder.build(
                     retrievedDocuments,
                     questionContext.requestedResultCount(),

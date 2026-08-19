@@ -116,6 +116,8 @@ class AiAnswerFallbackServiceTest {
                 .contains("고정 사이트 목록", "추가로 확인한 공식 사이트")
                 .contains("요청하신 개수에 맞춰 현재 보듬에서 확인 가능한 "
                         + "공식 사이트 7곳을 안내드립니다.")
+                .satisfies(content -> assertThat(content.indexOf("요청하신 개수에 맞춰"))
+                        .isLessThan(content.indexOf("자주 확인하면 좋은 공식 복지 사이트")))
                 .doesNotContain("공식 복지 사이트 5개를 추천드리겠습니다");
     }
 
