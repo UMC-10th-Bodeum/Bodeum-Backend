@@ -5,6 +5,7 @@ import com.bodeum.domain.ai.entity.AiMessage;
 import com.bodeum.domain.ai.entity.AiResponseSource;
 import com.bodeum.domain.ai.enums.AiAnswerStatus;
 import com.bodeum.domain.ai.exception.AiErrorCode;
+import com.bodeum.domain.ai.infrastructure.support.AiSourceDeduplicator;
 import com.bodeum.domain.ai.model.rag.AiReferenceDocument;
 import com.bodeum.domain.ai.model.context.AiResolvedContext;
 import com.bodeum.domain.ai.repository.AiChatRoomRepository;
@@ -51,6 +52,7 @@ public class AiMessagePersistenceService {
             Long contextParentMessageId,
             Long contextRootMessageId
     ) {
+        rejectCancelledResponse();
         AiMessage userMessage = aiMessageRepository.findById(userMessageId)
                 .orElseThrow(() -> new ProjectException(AiErrorCode.AI_RESPONSE_FAILED));
         userMessage.updateConversationContext(
@@ -74,8 +76,13 @@ public class AiMessagePersistenceService {
             AiAnswerStatus answerStatus,
             List<AiReferenceDocument> sources
     ) {
-        AiMessage userMessage = aiMessageRepository.findById(userMessageId)
+        rejectCancelledResponse();
+        AiMessage userMessage = aiMessageRepository.findByIdForAiResponse(userMessageId)
                 .orElseThrow(() -> new ProjectException(AiErrorCode.AI_RESPONSE_FAILED));
+        if (Thread.currentThread().isInterrupted()
+                || !userMessage.isAiResponseProcessing()) {
+            throw new ProjectException(AiErrorCode.AI_RESPONSE_TIMEOUT);
+        }
         AiMessage message = aiMessageRepository.save(
                 AiMessage.createAiMessage(chatRoom, content, warning, answerStatus));
 
@@ -83,7 +90,8 @@ public class AiMessagePersistenceService {
         message.inheritConversationContext(userMessage);
 
         // AI 답변에 사용된 근거 출처를 함께 저장
-        aiResponseSourceRepository.saveAll(sources.stream()
+        List<AiReferenceDocument> distinctSources = AiSourceDeduplicator.deduplicate(sources);
+        aiResponseSourceRepository.saveAll(distinctSources.stream()
                 .map(source -> AiResponseSource.create(
                         message, source.sourceType(), source.sourceId(), source.title(),
                         source.url(), source.updatedAt()))
@@ -96,5 +104,11 @@ public class AiMessagePersistenceService {
         aiChatRoomRepository.save(chatRoom);
 
         return message;
+    }
+
+    private void rejectCancelledResponse() {
+        if (Thread.currentThread().isInterrupted()) {
+            throw new ProjectException(AiErrorCode.AI_RESPONSE_TIMEOUT);
+        }
     }
 }

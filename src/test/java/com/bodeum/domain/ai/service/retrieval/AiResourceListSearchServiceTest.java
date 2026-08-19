@@ -6,9 +6,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.bodeum.domain.ai.enums.AiResponseSourceType;
+import com.bodeum.domain.ai.model.rag.AiReferenceDocument;
 import com.bodeum.domain.ai.model.question.AiSearchScope;
 import com.bodeum.domain.ai.model.rag.AiSourceKey;
 import com.bodeum.domain.ai.model.rag.AiUserProfile;
@@ -37,6 +39,7 @@ class AiResourceListSearchServiceTest {
         service = new AiResourceListSearchService(repository, evidenceService);
         ReflectionTestUtils.setField(service, "defaultResultCount", 5);
         ReflectionTestUtils.setField(service, "maxResultCount", 10);
+        ReflectionTestUtils.setField(service, "maxCandidateCount", 30);
         when(evidenceService.documentIdentityKeys(any()))
                 .thenAnswer(invocation -> Set.of(
                         "title:" + invocation.<com.bodeum.domain.ai.model.rag.AiReferenceDocument>
@@ -67,6 +70,9 @@ class AiResourceListSearchServiceTest {
         when(repository.findRehabCentersByRegion(
                 eq("경기도"), eq("수원시"), eq(InfoSubCategory.THERAPY_REHAB),
                 any(Pageable.class))).thenReturn(centers);
+        when(repository.findRehabCentersByRegionExcludingIds(
+                eq("경기도"), eq("수원시"), eq(InfoSubCategory.THERAPY_REHAB),
+                any(), any(Pageable.class))).thenReturn(centers);
 
         var result = service.retrieve(profile(), AiSearchScope.LOCAL_ONLY, 5,
                 Set.of(
@@ -97,6 +103,75 @@ class AiResourceListSearchServiceTest {
                 .containsExactly(1L);
         assertThat(negativeResult).extracting(document -> document.sourceId())
                 .containsExactly(1L);
+    }
+
+    @Test
+    void expandsCandidateWindowByPreviouslyExcludedResourceCount() {
+        when(repository.findRehabCentersByRegionExcludingIds(
+                eq("경기도"), eq("수원시"), eq(InfoSubCategory.THERAPY_REHAB),
+                any(), any(Pageable.class))).thenReturn(List.of());
+        Set<AiSourceKey> excludedSources = IntStream.rangeClosed(1, 25)
+                .mapToObj(id -> new AiSourceKey(AiResponseSourceType.INFO, (long) id))
+                .collect(java.util.stream.Collectors.toSet());
+
+        service.retrieve(profile(), AiSearchScope.LOCAL_ONLY, 5,
+                excludedSources, Set.of());
+
+        org.mockito.ArgumentCaptor<Pageable> pageCaptor =
+                org.mockito.ArgumentCaptor.forClass(Pageable.class);
+        verify(repository).findRehabCentersByRegionExcludingIds(
+                eq("경기도"), eq("수원시"), eq(InfoSubCategory.THERAPY_REHAB),
+                any(), pageCaptor.capture());
+        assertThat(pageCaptor.getValue().getPageSize()).isEqualTo(20);
+    }
+
+    @Test
+    void addsSourceAndIdentityExclusionsWhenExpandingCandidateWindow() {
+        ReflectionTestUtils.setField(service, "maxCandidateCount", 100);
+        when(repository.findRehabCentersByRegionExcludingIds(
+                eq("경기도"), eq("수원시"), eq(InfoSubCategory.THERAPY_REHAB),
+                any(), any(Pageable.class))).thenReturn(List.of());
+        Set<AiSourceKey> excludedSources = IntStream.rangeClosed(1, 25)
+                .mapToObj(id -> new AiSourceKey(AiResponseSourceType.INFO, (long) id))
+                .collect(java.util.stream.Collectors.toSet());
+        Set<String> excludedIdentities = IntStream.rangeClosed(1, 25)
+                .mapToObj(id -> "title:재활센터 " + id)
+                .collect(java.util.stream.Collectors.toSet());
+
+        service.retrieve(profile(), AiSearchScope.LOCAL_ONLY, 5,
+                excludedSources, excludedIdentities);
+
+        org.mockito.ArgumentCaptor<Pageable> pageCaptor =
+                org.mockito.ArgumentCaptor.forClass(Pageable.class);
+        verify(repository).findRehabCentersByRegionExcludingIds(
+                eq("경기도"), eq("수원시"), eq(InfoSubCategory.THERAPY_REHAB),
+                any(), pageCaptor.capture());
+        assertThat(pageCaptor.getValue().getPageSize()).isEqualTo(30);
+    }
+
+    @Test
+    void excludesPreviousInfoIdsInDatabaseBeforeApplyingCandidateLimit() {
+        ReflectionTestUtils.setField(service, "maxCandidateCount", 30);
+        when(repository.findRehabCentersByRegionExcludingIds(
+                eq("경기도"), eq("수원시"), eq(InfoSubCategory.THERAPY_REHAB),
+                any(), any(Pageable.class))).thenReturn(List.of(
+                        center(31L, "재활센터 31"),
+                        center(32L, "재활센터 32")
+                ));
+        Set<AiSourceKey> excludedSources = IntStream.rangeClosed(1, 30)
+                .mapToObj(id -> new AiSourceKey(AiResponseSourceType.INFO, (long) id))
+                .collect(java.util.stream.Collectors.toSet());
+
+        var result = service.retrieve(profile(), AiSearchScope.LOCAL_ONLY, 2,
+                excludedSources, Set.of());
+
+        assertThat(result).extracting(AiReferenceDocument::sourceId)
+                .containsExactly(31L, 32L);
+        verify(repository).findRehabCentersByRegionExcludingIds(
+                eq("경기도"), eq("수원시"), eq(InfoSubCategory.THERAPY_REHAB),
+                eq(IntStream.rangeClosed(1, 30).mapToObj(Long::valueOf)
+                        .collect(java.util.stream.Collectors.toSet())),
+                any(Pageable.class));
     }
 
     private AiUserProfile profile() {

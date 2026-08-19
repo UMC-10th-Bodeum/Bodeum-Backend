@@ -232,9 +232,26 @@ public class OpenAiExternalAnswerProvider implements AiExternalAnswerProvider {
         }
         return new ExternalAiAnswer(
                 content.toString(),
-                selectedReferences.stream().flatMap(List::stream).toList(),
+                selectedReferences.stream()
+                        .flatMap(List::stream)
+                        .map(reference -> canonicalSiteReference(
+                                reference, sourcesByDomain))
+                        .toList(),
                 answer.answerStatus()
         );
+    }
+
+    private AiReferenceDocument canonicalSiteReference(
+            AiReferenceDocument reference,
+            Map<String, AiExternalSource> sourcesByDomain
+    ) {
+        String siteName = findSource(reference.url(), sourcesByDomain)
+                .map(AiExternalSource::getName)
+                .filter(name -> !name.isBlank())
+                .orElse(reference.title());
+        return new AiReferenceDocument(
+                reference.documentKey(), reference.content(), reference.sourceType(),
+                reference.sourceId(), siteName, reference.url(), reference.updatedAt());
     }
 
     private static String countMessage(

@@ -135,6 +135,13 @@ public interface AiMessageRepository extends JpaRepository<AiMessage, Long> {
             @Param("messageId") Long messageId
     );
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @QueryHints(@QueryHint(name = "jakarta.persistence.lock.timeout", value = "3000"))
+    @Query("select message from AiMessage message where message.id = :messageId")
+    Optional<AiMessage> findByIdForAiResponse(
+            @Param("messageId") Long messageId
+    );
+
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("""
             delete from AiMessage message

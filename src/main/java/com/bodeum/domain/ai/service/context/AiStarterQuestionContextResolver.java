@@ -8,14 +8,18 @@ import com.bodeum.domain.ai.model.question.AiResultType;
 import com.bodeum.domain.ai.model.question.AiStarterQuestionCatalog;
 import com.bodeum.domain.ai.enums.SenderType;
 import com.bodeum.domain.ai.model.context.AiQuestionContext;
+import com.bodeum.domain.ai.model.context.AiResolvedContext;
 import com.bodeum.domain.ai.model.rag.AiUserProfile;
 import com.bodeum.domain.ai.repository.AiMessageRepository;
 import com.bodeum.domain.ai.util.AiTextNormalizer;
 import com.bodeum.domain.region.entity.Region;
 import com.bodeum.domain.region.repository.RegionRepository;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
@@ -34,6 +38,8 @@ public class AiStarterQuestionContextResolver {
     private static final Set<String> EXPLICIT_REGION_REHAB_QUESTIONS = Set.of(
             "재활센터추천해줘", "재활센터를추천해줘",
             "재활센터알려줘", "재활센터를알려줘");
+    private static final Pattern RESULT_COUNT_PATTERN = Pattern.compile(
+            "(?<!\\d)(\\d+)\\s*(?:개|곳|건)(?:을|를)?");
 
     private final AiMessageRepository aiMessageRepository;
     private final RegionRepository regionRepository;
@@ -59,7 +65,17 @@ public class AiStarterQuestionContextResolver {
                 AiStarterQuestionCatalog.findAnswerType(content);
         if (curatedAnswerType.isPresent()) {
             return Optional.of(starterQuestionContext(
-                    profile, profile, curatedAnswerType.get()));
+                    profile, profile, curatedAnswerType.get(), null));
+        }
+
+        // 공식 사이트 질문은 지역명이 붙어도 전국 공통 선별 답변을 사용하며,
+        // 명시한 개수만큼만 답변한다.
+        Optional<CuratedSiteRequest> curatedSiteRequest =
+                resolveParameterizedSiteQuestion(content);
+        if (curatedSiteRequest.isPresent()) {
+            CuratedSiteRequest request = curatedSiteRequest.get();
+            return Optional.of(starterQuestionContext(
+                    profile, profile, request.type(), request.requestedResultCount()));
         }
 
         // 직전 REGION_REQUIRED 응답에 대한 지역명 후속 답변 처리
@@ -74,14 +90,48 @@ public class AiStarterQuestionContextResolver {
     private AiQuestionContext starterQuestionContext(
             AiUserProfile userProfile,
             AiUserProfile searchProfile,
-            AiCuratedAnswerType curatedAnswerType
+            AiCuratedAnswerType curatedAnswerType,
+            Integer requestedResultCount
     ) {
+        AiResolvedContext resolvedContext = curatedResolvedContext(
+                searchProfile, curatedAnswerType, requestedResultCount);
         return new AiQuestionContext(
                 userProfile, searchProfile,
                 Optional.of(curatedAnswerType), Optional.empty(), searchScope(curatedAnswerType),
-                List.of(), null, null, null, List.of(), false, null, null,
+                List.of(), requestedResultCount, null,
+                null, List.of(), false, null, resolvedContext,
                 starterResultType(curatedAnswerType),
                 false, false);
+    }
+
+    private AiResolvedContext curatedResolvedContext(
+            AiUserProfile searchProfile,
+            AiCuratedAnswerType type,
+            Integer requestedResultCount
+    ) {
+        String topic = switch (type) {
+            case WELFARE_SITES -> "공식 복지 사이트";
+            case LOCAL_REHAB_CENTERS -> "재활센터";
+            case CHILD_MEDICAL_SUPPORT -> "장애아동 의료비 지원";
+            case DIAGNOSIS_FIRST_STEPS -> "장애 진단 후 해야 할 일";
+            case VOUCHER_APPLICATION -> "발달재활서비스 바우처";
+            case AUTISM_INFO_SITES -> "자폐스펙트럼 정보 사이트";
+        };
+        String requestedInformation = switch (type) {
+            case WELFARE_SITES, LOCAL_REHAB_CENTERS, AUTISM_INFO_SITES -> "목록";
+            case VOUCHER_APPLICATION -> "신청 방법";
+            default -> "안내";
+        };
+        AiResolvedContext.RegionContext region = type == AiCuratedAnswerType.LOCAL_REHAB_CENTERS
+                && searchProfile != null
+                && (hasText(searchProfile.regionLevel1())
+                || hasText(searchProfile.regionLevel2()))
+                ? new AiResolvedContext.RegionContext(
+                        searchProfile.regionLevel1(), searchProfile.regionLevel2())
+                : null;
+        return new AiResolvedContext(
+                topic, region, Map.of(), requestedInformation, requestedResultCount,
+                starterResultType(type));
     }
 
     /**
@@ -114,7 +164,55 @@ public class AiStarterQuestionContextResolver {
         AiUserProfile searchProfile = profile.withRegion(
                 region.getFullName(), region.getRegionLevel1(), region.getRegionLevel2());
         return starterQuestionContext(
-                profile, searchProfile, AiCuratedAnswerType.LOCAL_REHAB_CENTERS);
+                profile, searchProfile, AiCuratedAnswerType.LOCAL_REHAB_CENTERS, null);
+    }
+
+    private Optional<CuratedSiteRequest> resolveParameterizedSiteQuestion(String content) {
+        Integer requestedResultCount = requestedResultCount(content);
+        String withoutCount = RESULT_COUNT_PATTERN.matcher(content).replaceAll(" ");
+        Optional<AiCuratedAnswerType> directType = siteAnswerType(withoutCount);
+        if (directType.isPresent()) {
+            return Optional.of(new CuratedSiteRequest(
+                    directType.get(), requestedResultCount));
+        }
+
+        String normalizedContent = AiTextNormalizer.normalizeQuestionSpacing(withoutCount);
+        return regionRepository.findMentionedInQuestion(
+                        normalizedContent, PageRequest.of(0, 1)).stream()
+                .map(region -> removeRegionMention(normalizedContent, region))
+                .map(this::siteAnswerType)
+                .flatMap(Optional::stream)
+                .findFirst()
+                .map(type -> new CuratedSiteRequest(type, requestedResultCount));
+    }
+
+    private Optional<AiCuratedAnswerType> siteAnswerType(String question) {
+        return AiStarterQuestionCatalog.findAnswerType(question)
+                .filter(type -> type == AiCuratedAnswerType.WELFARE_SITES
+                        || type == AiCuratedAnswerType.AUTISM_INFO_SITES);
+    }
+
+    private String removeRegionMention(String question, Region region) {
+        String withoutRegion = question;
+        for (String mention : new String[] {
+                region.getFullName(), region.getRegionLevel1(), region.getRegionLevel2()}) {
+            if (mention != null && !mention.isBlank()) {
+                withoutRegion = withoutRegion.replace(mention, " ");
+            }
+        }
+        return withoutRegion.trim().replaceFirst("^(에서|의|에|내)\\s*", "");
+    }
+
+    private Integer requestedResultCount(String content) {
+        Matcher matcher = RESULT_COUNT_PATTERN.matcher(content);
+        if (!matcher.find()) {
+            return null;
+        }
+        try {
+            return Integer.parseInt(matcher.group(1));
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
     }
 
     /**
@@ -177,5 +275,15 @@ public class AiStarterQuestionContextResolver {
     private String normalizeQuestion(String content) {
         return AiTextNormalizer.removeWhitespace(
                 AiTextNormalizer.normalizeQuestionSpacing(content));
+    }
+
+    private boolean hasText(String value) {
+        return value != null && !value.isBlank();
+    }
+
+    private record CuratedSiteRequest(
+            AiCuratedAnswerType type,
+            Integer requestedResultCount
+    ) {
     }
 }

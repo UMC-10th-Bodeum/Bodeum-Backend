@@ -32,8 +32,8 @@ public class AiConversationContextService {
     private final AiResponseSourceRepository aiResponseSourceRepository;
     private final AiAnswerEvidenceService evidenceService;
 
-    @Value("${bodeum.ai.conversation.recent-turn-count:5}")
-    private int recentConversationTurnCount = 5;
+    @Value("${bodeum.ai.conversation.recent-turn-count:3}")
+    private int recentConversationTurnCount = 3;
 
     @Transactional(readOnly = true)
     public AiConversationContext resolve(Long chatRoomId) {
