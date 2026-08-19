@@ -167,6 +167,36 @@ class AiResourceListAnswerBuilderTest {
                         + "현재 보듬에서 확인 가능한 다른 지역의 특수학교 1곳을 안내드립니다.");
     }
 
+    @Test
+    void usesCorrectObjectParticleInNoEvidenceMessage() {
+        assertThat(AiResourceListAnswerBuilder.noEvidenceMessage(
+                "경기도 과천시", InfoSubCategory.SPECIAL_SCHOOL, false))
+                .isEqualTo("현재 보듬에서 확인 가능한 경기도 과천시 특수학교를 찾지 못했습니다.");
+        assertThat(AiResourceListAnswerBuilder.noEvidenceMessage(
+                "경기도 수원시", InfoSubCategory.THERAPY_REHAB, false))
+                .isEqualTo("현재 보듬에서 확인 가능한 경기도 수원시 "
+                        + "치료·재활기관을 찾지 못했습니다.");
+    }
+
+    @Test
+    void selectsParticlesForCategoryNamesAndCountUnits() {
+        String shortWelfareAnswer = builder.build(
+                List.of(document(1L, "복지 서비스", "지역: 경기도 수원시")),
+                2, false, InfoSubCategory.LOCAL_WELFARE);
+        String supplementedInstitutionAnswer = builder.build(
+                List.of(document(2L, "다른 지역 기관", "지역: 경기도 성남시")),
+                1, false, InfoSubCategory.THERAPY_REHAB,
+                AiSearchScope.REGION_PRIORITY, "경기도 수원시");
+
+        assertThat(shortWelfareAnswer)
+                .startsWith("요청하신 2개 중 현재 보듬에서 확인 가능한 "
+                        + "경기도 수원시 복지 서비스 1개를 안내드립니다.");
+        assertThat(supplementedInstitutionAnswer)
+                .startsWith("수원시에서 확인 가능한 치료·재활기관을 찾지 못해, "
+                        + "요청하신 1곳은 다른 지역의 치료·재활기관으로 안내드립니다.")
+                .doesNotContain("기관를", "기관로");
+    }
+
     private AiReferenceDocument document(Long id, String title, String content) {
         return new AiReferenceDocument(
                 "INFO-" + id, content, AiResponseSourceType.INFO,

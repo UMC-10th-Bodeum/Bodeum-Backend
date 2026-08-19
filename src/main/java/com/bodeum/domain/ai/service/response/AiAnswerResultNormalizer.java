@@ -223,9 +223,10 @@ public class AiAnswerResultNormalizer {
                 : resultLabel(infoSubCategory);
         String target = (region == null || region.isBlank() ? "" : region.trim() + " ")
                 + resultLabel.name();
-        return normalized + "\n\n" + countMessage(
+        String countMessage = countMessage(
                 requestedResultCount, actualCount, additionalResults,
                 target, resultLabel.unit());
+        return countMessage + "\n\n" + normalized;
     }
 
     private String countMessage(
