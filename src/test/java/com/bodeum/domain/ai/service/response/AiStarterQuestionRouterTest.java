@@ -20,6 +20,7 @@ import com.bodeum.domain.info.entity.InfoCategory;
 import com.bodeum.domain.info.entity.InfoItem;
 import com.bodeum.domain.info.repository.InfoItemRepository;
 import java.util.List;
+import java.util.stream.IntStream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -387,6 +388,15 @@ class AiStarterQuestionRouterTest {
                 pageCaptor.capture()
         );
         assertThat(pageCaptor.getValue().getPageSize()).isEqualTo(10);
+    }
+
+    @Test
+    void usesCircledNumbersForAllSupportedRehabCenterItems() {
+        assertThat(IntStream.range(0, 10)
+                .mapToObj(index -> ReflectionTestUtils.<String>invokeMethod(
+                        router, "centerNumber", index))
+                .toList())
+                .containsExactly("①", "②", "③", "④", "⑤", "⑥", "⑦", "⑧", "⑨", "⑩");
     }
 
     @Test

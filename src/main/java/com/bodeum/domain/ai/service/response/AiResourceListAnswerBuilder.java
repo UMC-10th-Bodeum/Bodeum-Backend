@@ -45,7 +45,9 @@ public class AiResourceListAnswerBuilder {
         StringBuilder answer = new StringBuilder(countMessage(
                 requestedResultCount, safeDocuments, additionalResults, label,
                 searchScope, priorityRegion));
-        safeDocuments.forEach(document -> appendDocument(answer, document));
+        for (int index = 0; index < safeDocuments.size(); index++) {
+            appendDocument(answer, safeDocuments.get(index), category, index);
+        }
         answer.append("\n\n방문 전 운영 여부, 이용 대상 및 신청 방법은 해당 기관에 직접 확인해 주세요.");
         return answer.toString();
     }
@@ -176,27 +178,49 @@ public class AiResourceListAnswerBuilder {
         return regions.size() == 1 ? regions.iterator().next() : null;
     }
 
-    private void appendDocument(StringBuilder answer, AiReferenceDocument document) {
+    private void appendDocument(
+            StringBuilder answer,
+            AiReferenceDocument document,
+            InfoSubCategory category,
+            int index
+    ) {
         String title = document.title() == null || document.title().isBlank()
                 ? "기관 정보" : document.title().trim();
-        answer.append("\n\n**").append(title).append("**");
-        String details = visibleDetails(document.content());
+        answer.append("\n\n");
+        if (category == InfoSubCategory.SPECIAL_SCHOOL) {
+            answer.append(index + 1).append(". ");
+        }
+        answer.append("**").append(title).append("**");
+        String details = visibleDetails(document.content(), category);
         if (!details.isBlank()) {
             answer.append('\n').append(details);
         }
     }
 
-    private String visibleDetails(String content) {
+    private String visibleDetails(String content, InfoSubCategory category) {
         if (content == null || content.isBlank()) {
             return "";
         }
         return content.lines()
                 .map(String::trim)
+                .map(line -> normalizeDetailLine(line, category))
                 .filter(line -> !line.isBlank())
                 .filter(line -> INTERNAL_METADATA_LABELS.stream()
                         .noneMatch(label -> line.startsWith(label + ":")))
                 .distinct()
+                .map(line -> category == InfoSubCategory.SPECIAL_SCHOOL
+                        ? "- " + line : line)
                 .collect(Collectors.joining("\n"));
+    }
+
+    private String normalizeDetailLine(String line, InfoSubCategory category) {
+        if (category != InfoSubCategory.SPECIAL_SCHOOL) {
+            return line;
+        }
+        String normalized = line.startsWith("소개:")
+                ? line.substring("소개:".length()).trim() : line;
+        return normalized.startsWith("■")
+                ? normalized.substring(1).trim() : normalized;
     }
 
     private ResultLabel resultLabel(InfoSubCategory category) {
