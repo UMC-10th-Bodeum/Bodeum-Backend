@@ -24,7 +24,6 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.util.StringUtils;
 import org.springframework.web.util.UriComponentsBuilder;
 import org.springframework.web.util.UriUtils;
 
@@ -93,21 +92,6 @@ public class InfoItemQueryService {
 
         if (condition.category() == null && condition.subCategory() == null) {
             condition = condition.withCategory(MainCategory.INSTITUTION);
-        }
-
-        if (!StringUtils.hasText(condition.regionLevel1())) {
-            if (userId != null) {
-                User loginUser = userRepository.findByIdWithGuardianProfileAndRegion(userId)
-                        .orElseGet(() -> userRepository.findById(userId).orElse(null));
-
-                if (loginUser != null && loginUser.getRegion() != null) {
-                    Region userRegion = loginUser.getRegion();
-                    condition = condition.withUserRegion(
-                            userRegion.getRegionLevel1(),
-                            userRegion.getRegionLevel2()
-                    );
-                }
-            }
         }
 
         Page<InfoItem> infoItems = infoItemRepository.searchInfoItems(condition, pageable);
